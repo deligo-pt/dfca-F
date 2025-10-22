@@ -113,18 +113,18 @@ android {
             // Caution! In production, you need to generate your own keystore file.
             // see https://reactnative.dev/docs/signed-apk-android.
             signingConfig signingConfigs.debug
-            def enableShrinkResources = findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: 'false'
-            shrinkResources enableShrinkResources.toBoolean()
+            def enableShrinkResources = (findProperty('android.enableShrinkResourcesInReleaseBuilds') ?: false).toBoolean()
+            shrinkResources enableShrinkResources
             minifyEnabled enableMinifyInReleaseBuilds
             proguardFiles getDefaultProguardFile("proguard-android.txt"), "proguard-rules.pro"
-            def enablePngCrunchInRelease = findProperty('android.enablePngCrunchInReleaseBuilds') ?: 'true'
-            crunchPngs enablePngCrunchInRelease.toBoolean()
+            def enablePngCrunchInRelease = (findProperty('android.enablePngCrunchInReleaseBuilds') ?: true).toBoolean()
+            crunchPngs enablePngCrunchInRelease
         }
     }
     packagingOptions {
         jniLibs {
-            def enableLegacyPackaging = findProperty('expo.useLegacyPackaging') ?: 'false'
-            useLegacyPackaging enableLegacyPackaging.toBoolean()
+            def enableLegacyPackaging = (findProperty('expo.useLegacyPackaging') ?: false).toBoolean()
+            useLegacyPackaging enableLegacyPackaging
         }
     }
     androidResources {

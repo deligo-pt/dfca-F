@@ -4,14 +4,16 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { colors } from '../theme';
 
-const HomeScreen = () => {
+const CategoriesScreen = () => {
   const [location, setLocation] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [loading, setLoading] = useState(false);
+  const [area, setArea] = useState(null);
 
   const getLocation = async () => {
     setLoading(true);
     setErrorMsg(null);
+    setArea(null);
     try {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
@@ -21,6 +23,21 @@ const HomeScreen = () => {
       }
       let loc = await Location.getCurrentPositionAsync({});
       setLocation(loc.coords);
+      // Reverse geocode to get area name
+      let address = await Location.reverseGeocodeAsync({
+        latitude: loc.coords.latitude,
+        longitude: loc.coords.longitude,
+      });
+      if (address && address.length > 0) {
+        const addr = address[0];
+        setArea(
+          [addr.name, addr.street, addr.city, addr.region, addr.country]
+            .filter(Boolean)
+            .join(', ')
+        );
+      } else {
+        setArea('Area not found');
+      }
     } catch (error) {
       setErrorMsg('Error getting location');
     } finally {
@@ -48,6 +65,7 @@ const HomeScreen = () => {
           <View style={styles.locationBox}>
             <Text style={styles.locationText}>Latitude: {location.latitude}</Text>
             <Text style={styles.locationText}>Longitude: {location.longitude}</Text>
+            {area && <Text style={styles.locationText}>Area: {area}</Text>}
           </View>
         )}
       </View>
@@ -113,4 +131,4 @@ const styles = StyleSheet.create({
   },
 });
 
-export default HomeScreen;
+export default CategoriesScreen;

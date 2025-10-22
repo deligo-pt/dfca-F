@@ -9,16 +9,23 @@
     "web": "expo start --web"
   },
   "dependencies": {
+    "@fontsource/poppins": "^5.2.7",
     "@react-native-async-storage/async-storage": "^2.2.0",
     "@react-navigation/bottom-tabs": "^7.4.9",
     "@react-navigation/native": "^7.1.18",
+    "@react-navigation/stack": "^7.4.10",
     "expo": "~54.0.18",
+    "expo-app-loading": "^2.1.1",
+    "expo-location": "^19.0.7",
     "expo-status-bar": "~3.0.8",
     "react": "19.1.0",
+    "react-async-hook": "^4.0.0",
     "react-native": "0.81.5",
     "react-native-app-intro-slider": "^4.0.4",
+    "react-native-country-picker-modal": "^2.0.0",
+    "react-native-gesture-handler": "^2.28.0",
     "react-native-safe-area-context": "^5.6.1",
-    "react-native-screens": "^4.17.1"
+    "react-native-screens": "~4.16.0"
   },
   "private": true
 }

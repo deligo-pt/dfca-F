@@ -2,6 +2,11 @@
   "expo": {
     "name": "DeligoCustomer",
     "slug": "DeligoCustomer",
-    "version": "1.0.0"
+    "version": "1.0.0",
+    "extra": {
+      "eas": {
+        "projectId": "b53f15eb-427a-4d03-89b6-c99f067ef883"
+      }
+    }
   }
 }

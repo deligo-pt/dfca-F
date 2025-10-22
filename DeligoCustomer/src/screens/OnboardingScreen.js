@@ -96,7 +96,7 @@ const OnboardingScreen = ({ onDone }) => {
       renderNextButton={renderNextButton}
       renderDoneButton={renderDoneButton}
       renderSkipButton={renderSkipButton}
-      showSkipButton={true}
+      showSkipButton
       dotStyle={styles.dotStyle}
       activeDotStyle={styles.activeDotStyle}
     />
@@ -106,37 +106,31 @@ const OnboardingScreen = ({ onDone }) => {
 const styles = StyleSheet.create({
   slide: {
     flex: 1,
-    alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 30,
+    alignItems: 'center',
   },
   content: {
+    flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingBottom: 100,
+    paddingHorizontal: 24,
   },
   illustrationWrapper: {
-    width: 250,
-    height: 250,
-    borderRadius: 125,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
     marginBottom: 40,
   },
   title: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: colors.text.white,
-    textAlign: 'center',
+    color: '#fff',
     marginBottom: 16,
+    textAlign: 'center',
+    fontFamily: 'Poppins-Bold',
   },
   text: {
-    fontSize: 16,
-    color: colors.text.white,
+    fontSize: 18,
+    color: '#fff',
     textAlign: 'center',
-    lineHeight: 24,
-    paddingHorizontal: 20,
+    fontFamily: 'Poppins-Regular',
   },
   buttonCircle: {
     width: 44,
@@ -177,4 +171,3 @@ const styles = StyleSheet.create({
 });
 
 export default OnboardingScreen;
-
