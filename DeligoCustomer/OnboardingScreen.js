@@ -1,0 +1,187 @@
+import React from 'react';
+import {
+  View,
+  Text,
+  StyleSheet,
+} from 'react-native';
+import AppIntroSlider from 'react-native-app-intro-slider';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { DealsIllustration, DeliveryIllustration, DiscoverIllustration } from './components/OnboardingIllustrations';
+
+const slides = [
+  {
+    key: 'deals',
+    title: 'Exclusive Deals',
+    text: 'Get amazing deals and discounts on your favorite meals. Save more on every order!',
+    illustration: DealsIllustration,
+    backgroundColor: '#DC3173',
+  },
+  {
+    key: 'deliver',
+    title: 'Fast Delivery',
+    text: 'Your food delivered hot and fresh to your doorstep in no time. Track your order in real-time!',
+    illustration: DeliveryIllustration,
+    backgroundColor: '#DC3173',
+  },
+  {
+    key: 'discover',
+    title: 'Discover Restaurants',
+    text: 'Explore hundreds of restaurants and cuisines around you. Find your next favorite meal!',
+    illustration: DiscoverIllustration,
+    backgroundColor: '#DC3173',
+  },
+];
+
+const OnboardingScreen = ({ onDone }) => {
+  const renderItem = ({ item }) => {
+    const IllustrationComponent = item.illustration;
+    return (
+      <View style={[styles.slide, { backgroundColor: item.backgroundColor }]}>
+        <View style={styles.content}>
+          <View style={styles.illustrationWrapper}>
+            <IllustrationComponent />
+          </View>
+          <Text style={styles.title}>{item.title}</Text>
+          <Text style={styles.text}>{item.text}</Text>
+        </View>
+      </View>
+    );
+  };
+
+  const onDonePress = async () => {
+    try {
+      await AsyncStorage.setItem('onboardingCompleted', 'true');
+      if (onDone) {
+        onDone();
+      }
+    } catch (error) {
+      console.error('Error saving onboarding status:', error);
+    }
+  };
+
+  const onSkipPress = async () => {
+    try {
+      await AsyncStorage.setItem('onboardingCompleted', 'true');
+      if (onDone) {
+        onDone();
+      }
+    } catch (error) {
+      console.error('Error saving onboarding status:', error);
+    }
+  };
+
+  const renderNextButton = () => {
+    return (
+      <View style={styles.buttonCircle}>
+        <Text style={styles.buttonText}>→</Text>
+      </View>
+    );
+  };
+
+  const renderDoneButton = () => {
+    return (
+      <View style={styles.buttonCircle}>
+        <Text style={styles.buttonText}>✓</Text>
+      </View>
+    );
+  };
+
+  const renderSkipButton = () => {
+    return (
+      <View style={styles.skipButton}>
+        <Text style={styles.skipButtonText}>Skip</Text>
+      </View>
+    );
+  };
+
+  return (
+    <AppIntroSlider
+      data={slides}
+      renderItem={renderItem}
+      onDone={onDonePress}
+      onSkip={onSkipPress}
+      renderNextButton={renderNextButton}
+      renderDoneButton={renderDoneButton}
+      renderSkipButton={renderSkipButton}
+      showSkipButton={true}
+      dotStyle={styles.dotStyle}
+      activeDotStyle={styles.activeDotStyle}
+    />
+  );
+};
+
+const styles = StyleSheet.create({
+  slide: {
+    flex: 1,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 30,
+  },
+  content: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingBottom: 100,
+  },
+  illustrationWrapper: {
+    width: 250,
+    height: 250,
+    borderRadius: 125,
+    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 40,
+  },
+  title: {
+    fontSize: 28,
+    fontWeight: 'bold',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 16,
+  },
+  text: {
+    fontSize: 16,
+    color: '#FFFFFF',
+    textAlign: 'center',
+    lineHeight: 24,
+    paddingHorizontal: 20,
+  },
+  buttonCircle: {
+    width: 44,
+    height: 44,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    borderRadius: 22,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  buttonText: {
+    color: '#FFFFFF',
+    fontSize: 24,
+    fontWeight: 'bold',
+  },
+  skipButton: {
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+  },
+  skipButtonText: {
+    color: '#FFFFFF',
+    fontSize: 16,
+    fontWeight: '600',
+  },
+  dotStyle: {
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 4,
+  },
+  activeDotStyle: {
+    backgroundColor: '#FFFFFF',
+    width: 24,
+    height: 8,
+    borderRadius: 4,
+    marginHorizontal: 4,
+  },
+});
+
+export default OnboardingScreen;
+
