@@ -7,3 +7,4 @@ export { default as ProfileScreen } from './ProfileScreen';
 export { default as LoginScreen } from './LoginScreen';
 export { default as TermsOfServiceScreen } from './TermsOfServiceScreen';
 export { default as PrivacyPolicyScreen } from './PrivacyPolicyScreen';
+export { default as LocationAddressScreen } from './LocationAddressScreen';

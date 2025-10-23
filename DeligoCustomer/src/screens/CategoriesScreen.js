@@ -1,14 +1,25 @@
-import React, { useEffect, useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useEffect, useState, useRef } from 'react';
+import { View, StyleSheet, ScrollView, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
-import { colors } from '../theme';
+import { colors, spacing } from '../theme';
+import {
+  LocationHeader,
+  CategoryCard,
+  CuisineChip,
+  RestaurantCard,
+  SectionHeader,
+  StickySearchHeader,
+} from '../components';
+import mockData from '../data/mockData.json';
 
-const CategoriesScreen = () => {
+const CategoriesScreen = ({ navigation }) => {
   const [location, setLocation] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [loading, setLoading] = useState(false);
   const [area, setArea] = useState(null);
+  const [selectedCuisine, setSelectedCuisine] = useState(null);
+  const scrollY = useRef(new Animated.Value(0)).current;
 
   const getLocation = async () => {
     setLoading(true);
@@ -17,7 +28,7 @@ const CategoriesScreen = () => {
     try {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        setErrorMsg('Permission to access location was denied');
+        setErrorMsg('Location denied');
         setLoading(false);
         return;
       }
@@ -30,16 +41,16 @@ const CategoriesScreen = () => {
       });
       if (address && address.length > 0) {
         const addr = address[0];
-        setArea(
-          [addr.name, addr.street, addr.city, addr.region, addr.country]
-            .filter(Boolean)
-            .join(', ')
-        );
+        const areaString = [addr.street, addr.city, addr.region]
+          .filter(Boolean)
+          .join(', ');
+        setArea(areaString || 'Current Location');
       } else {
-        setArea('Area not found');
+        setArea('Current Location');
       }
     } catch (error) {
       setErrorMsg('Error getting location');
+      setArea('Set your location');
     } finally {
       setLoading(false);
     }
@@ -49,86 +60,164 @@ const CategoriesScreen = () => {
     getLocation();
   }, []);
 
+  const handleCategoryPress = (category) => {
+    console.log('Category pressed:', category.name);
+  };
+
+  const handleCuisinePress = (cuisine) => {
+    setSelectedCuisine(selectedCuisine === cuisine.id ? null : cuisine.id);
+  };
+
+  const handleRestaurantPress = (restaurant) => {
+    console.log('Restaurant pressed:', restaurant.name);
+  };
+
+  const handleCartPress = () => {
+    console.log('🛒 CART BUTTON PRESSED - Navigating to Cart screen');
+    navigation.navigate('Cart');
+  };
+
+  const handleLocationPress = () => {
+    console.log('📍 LOCATION BUTTON PRESSED - Navigating to LocationAddress screen');
+    // Navigate to parent stack to access LocationAddress screen
+    const parentNav = navigation.getParent();
+    if (parentNav) {
+      console.log('✅ Parent navigator found, navigating to LocationAddress');
+      parentNav.navigate('LocationAddress', {
+        onSave: (addressData) => {
+          console.log('💾 Address saved:', addressData);
+          // Update the location when user saves address
+          setArea(addressData.address);
+          if (addressData.coordinates) {
+            setLocation(addressData.coordinates);
+          }
+        },
+      });
+    } else {
+      console.log('❌ Parent navigator not found, trying direct navigation');
+      navigation.navigate('LocationAddress', {
+        onSave: (addressData) => {
+          console.log('💾 Address saved:', addressData);
+          // Update the location when user saves address
+          setArea(addressData.address);
+          if (addressData.coordinates) {
+            setLocation(addressData.coordinates);
+          }
+        },
+      });
+    }
+  };
+
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top', 'left', 'right']}>
-      <View style={styles.container}>
-        <Text style={styles.welcomeText}>Welcome to Deligo!</Text>
-        <Text style={styles.subText}>Your food delivery app</Text>
+    <SafeAreaView style={styles.safeArea} edges={['top']}>
+      {/* Sticky Search Header - appears on scroll */}
+      <StickySearchHeader
+        scrollY={scrollY}
+        onCartPress={handleCartPress}
+        onLocationPress={handleLocationPress}
+        area={area}
+      />
 
-        <TouchableOpacity style={styles.button} onPress={getLocation}>
-          <Text style={styles.buttonText}>Refresh Location</Text>
-        </TouchableOpacity>
-
-        {loading && <ActivityIndicator size="large" color={colors.primary} style={{ marginTop: 20 }} />}
-        {errorMsg && <Text style={styles.errorText}>{errorMsg}</Text>}
-        {location && !loading && !errorMsg && (
-          <View style={styles.locationBox}>
-            <Text style={styles.locationText}>Latitude: {location.latitude}</Text>
-            <Text style={styles.locationText}>Longitude: {location.longitude}</Text>
-            {area && <Text style={styles.locationText}>Area: {area}</Text>}
-          </View>
+      <Animated.ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        bounces={true}
+        scrollEventThrottle={16}
+        onScroll={Animated.event(
+          [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+          { useNativeDriver: true }
         )}
-      </View>
+      >
+        {/* Location Header with Search - scrolls away */}
+        <LocationHeader
+          location={location}
+          area={area}
+          loading={loading}
+          errorMsg={errorMsg}
+          onRefresh={handleLocationPress}
+          onCartPress={handleCartPress}
+          onLocationPress={handleLocationPress}
+        />
+
+        {/* Categories Section */}
+        <SectionHeader title="What do you need?" showSeeAll={false} />
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.categoriesContainer}
+        >
+          {mockData.categories.map((category) => (
+            <CategoryCard
+              key={category.id}
+              category={category}
+              onPress={() => handleCategoryPress(category)}
+            />
+          ))}
+        </ScrollView>
+
+        {/* Cuisines Section */}
+        <SectionHeader
+          title="Cuisines"
+          onSeeAll={() => console.log('See all cuisines')}
+        />
+        <ScrollView
+          horizontal
+          showsHorizontalScrollIndicator={false}
+          contentContainerStyle={styles.cuisinesContainer}
+        >
+          {mockData.cuisines.map((cuisine) => (
+            <CuisineChip
+              key={cuisine.id}
+              cuisine={cuisine}
+              onPress={() => handleCuisinePress(cuisine)}
+              isSelected={selectedCuisine === cuisine.id}
+            />
+          ))}
+        </ScrollView>
+
+        {/* Restaurants Section */}
+        <SectionHeader
+          title="Popular Restaurants"
+          onSeeAll={() => console.log('See all restaurants')}
+        />
+        <View style={styles.restaurantsContainer}>
+          {mockData.restaurants.map((restaurant) => (
+            <RestaurantCard
+              key={restaurant.id}
+              restaurant={restaurant}
+              onPress={() => handleRestaurantPress(restaurant)}
+            />
+          ))}
+        </View>
+
+        {/* Bottom Spacing */}
+        <View style={{ height: spacing.xl }} />
+      </Animated.ScrollView>
     </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
-  container: {
+  safeArea: {
+    flex: 1,
+    backgroundColor: colors.primary,
+  },
+  scrollView: {
     flex: 1,
     backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 20,
   },
-  welcomeText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: colors.primary,
-    marginBottom: 10,
-    fontFamily: 'Poppins-Bold',
+  categoriesContainer: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
   },
-  subText: {
-    fontSize: 18,
-    color: colors.text.secondary,
-    marginBottom: 40,
-    fontFamily: 'Poppins-Regular',
+  cuisinesContainer: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
   },
-  button: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 40,
-    paddingVertical: 15,
-    borderRadius: 25,
-    elevation: 3,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 3.84,
-  },
-  buttonText: {
-    color: colors.text.white,
-    fontSize: 16,
-    fontFamily: 'Poppins-Regular',
-  },
-  errorText: {
-    color: 'red',
-    marginTop: 20,
-    fontFamily: 'Poppins-Regular',
-  },
-  locationBox: {
-    marginTop: 30,
-    backgroundColor: colors.background,
-    padding: 16,
-    borderRadius: 10,
-    alignItems: 'center',
-    borderWidth: 1,
-    borderColor: colors.primary,
-  },
-  locationText: {
-    fontSize: 16,
-    color: colors.primary,
-    fontFamily: 'Poppins-Regular',
+  restaurantsContainer: {
+    paddingTop: spacing.xs,
   },
 });
 
 export default CategoriesScreen;
+

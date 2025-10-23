@@ -1,0 +1,167 @@
+{
+  "categories": [
+    {
+      "id": "1",
+      "name": "Food Delivery",
+      "icon": "🍔",
+      "color": "#FF2B85",
+      "description": "Order from restaurants"
+    },
+    {
+      "id": "2",
+      "name": "Groceries",
+      "icon": "🛒",
+      "color": "#00B3AD",
+      "description": "Fresh groceries delivered"
+    },
+    {
+      "id": "3",
+      "name": "Shops",
+      "icon": "🏪",
+      "color": "#9C27B0",
+      "description": "Shopping essentials"
+    },
+    {
+      "id": "4",
+      "name": "Pick-up",
+      "icon": "📦",
+      "color": "#FF9800",
+      "description": "Self pick-up orders"
+    }
+  ],
+  "cuisines": [
+    {
+      "id": "1",
+      "name": "Pizza",
+      "image": "🍕",
+      "restaurants": 145
+    },
+    {
+      "id": "2",
+      "name": "Burgers",
+      "image": "🍔",
+      "restaurants": 234
+    },
+    {
+      "id": "3",
+      "name": "Asian",
+      "image": "🍜",
+      "restaurants": 189
+    },
+    {
+      "id": "4",
+      "name": "Desserts",
+      "image": "🍰",
+      "restaurants": 112
+    },
+    {
+      "id": "5",
+      "name": "Chinese",
+      "image": "🥡",
+      "restaurants": 156
+    },
+    {
+      "id": "6",
+      "name": "Healthy",
+      "image": "🥗",
+      "restaurants": 98
+    }
+  ],
+  "restaurants": [
+    {
+      "id": "1",
+      "name": "Burger King",
+      "image": "🍔",
+      "rating": 4.5,
+      "deliveryTime": "25-35 min",
+      "deliveryFee": "Free",
+      "categories": ["Burgers", "Fast Food"],
+      "offer": "50% off",
+      "distance": "1.2 km",
+      "isNew": false,
+      "isPandaPro": true
+    },
+    {
+      "id": "2",
+      "name": "Pizza Hut",
+      "image": "🍕",
+      "rating": 4.3,
+      "deliveryTime": "30-40 min",
+      "deliveryFee": "$2.99",
+      "categories": ["Pizza", "Italian"],
+      "offer": "Buy 1 Get 1",
+      "distance": "2.1 km",
+      "isNew": false,
+      "isPandaPro": true
+    },
+    {
+      "id": "3",
+      "name": "Sushi Master",
+      "image": "🍣",
+      "rating": 4.7,
+      "deliveryTime": "35-45 min",
+      "deliveryFee": "Free",
+      "categories": ["Japanese", "Sushi"],
+      "offer": null,
+      "distance": "3.5 km",
+      "isNew": true,
+      "isPandaPro": false
+    },
+    {
+      "id": "4",
+      "name": "Taco Bell",
+      "image": "🌮",
+      "rating": 4.2,
+      "deliveryTime": "20-30 min",
+      "deliveryFee": "$1.99",
+      "categories": ["Mexican", "Fast Food"],
+      "offer": "20% off",
+      "distance": "1.8 km",
+      "isNew": false,
+      "isPandaPro": true
+    },
+    {
+      "id": "5",
+      "name": "KFC",
+      "image": "🍗",
+      "rating": 4.4,
+      "deliveryTime": "25-35 min",
+      "deliveryFee": "Free",
+      "categories": ["Chicken", "Fast Food"],
+      "offer": null,
+      "distance": "2.5 km",
+      "isNew": false,
+      "isPandaPro": true
+    },
+    {
+      "id": "6",
+      "name": "Subway",
+      "image": "🥪",
+      "rating": 4.1,
+      "deliveryTime": "15-25 min",
+      "deliveryFee": "$1.49",
+      "categories": ["Sandwiches", "Healthy"],
+      "offer": "15% off",
+      "distance": "0.9 km",
+      "isNew": false,
+      "isPandaPro": false
+    }
+  ],
+  "banners": [
+    {
+      "id": "1",
+      "title": "Free Delivery",
+      "subtitle": "On orders above $20",
+      "color": "#FF2B85",
+      "textColor": "#FFFFFF"
+    },
+    {
+      "id": "2",
+      "title": "New Restaurant",
+      "subtitle": "Check out Sushi Master",
+      "color": "#00B3AD",
+      "textColor": "#FFFFFF"
+    }
+  ]
+}
+
