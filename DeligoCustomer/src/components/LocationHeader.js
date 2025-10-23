@@ -48,8 +48,6 @@ const LocationHeader = ({ location, area, loading, errorMsg, onRefresh, onCartPr
             style={styles.input}
             placeholder="Search for restaurants, cuisines..."
             placeholderTextColor={colors.text.light}
-            editable={false}
-            pointerEvents="none"
           />
         </View>
         <TouchableOpacity

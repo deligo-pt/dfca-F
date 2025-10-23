@@ -10,17 +10,10 @@ const StickySearchHeader = ({ onCartPress, scrollY, onLocationPress, area }) => 
     extrapolate: 'clamp',
   });
 
-  // Disable pointer events when not visible
-  const pointerEvents = scrollY.interpolate({
-    inputRange: [80, 150],
-    outputRange: [0, 1],
-    extrapolate: 'clamp',
-  });
-
   return (
     <Animated.View
       style={[styles.container, { opacity: headerOpacity }]}
-      pointerEvents={headerOpacity._value < 0.5 ? 'none' : 'auto'}
+      pointerEvents="box-none"
     >
       <TouchableOpacity
         style={styles.locationBadge}
