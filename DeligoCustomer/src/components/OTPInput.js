@@ -1,5 +1,5 @@
 import React, { useRef, useState } from 'react';
-import { View, TextInput, StyleSheet } from 'react-native';
+import { View, TextInput, StyleSheet, Platform } from 'react-native';
 
 const OTPInput = ({ length = 4, value, onChangeText, disabled = false }) => {
   const inputRefs = useRef([]);
@@ -62,6 +62,7 @@ const OTPInput = ({ length = 4, value, onChangeText, disabled = false }) => {
           ref={(ref) => (inputRefs.current[index] = ref)}
           style={[
             styles.input,
+            index < length - 1 ? { marginRight: 12 } : null,
             focusedIndex === index && styles.inputFocused,
             value[index] && styles.inputFilled,
           ]}
@@ -75,6 +76,7 @@ const OTPInput = ({ length = 4, value, onChangeText, disabled = false }) => {
           selectTextOnFocus
           editable={!disabled}
           textAlign="center"
+          textAlignVertical={Platform.OS === 'android' ? 'center' : 'auto'}
         />
       ))}
     </View>
@@ -86,7 +88,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'center',
     alignItems: 'center',
-    gap: 12,
     marginBottom: 20,
   },
   input: {
@@ -100,6 +101,7 @@ const styles = StyleSheet.create({
     color: '#222',
     backgroundColor: '#FAFAFA',
     textAlign: 'center',
+    paddingVertical: 0,
   },
   inputFocused: {
     borderColor: '#E91E63',
@@ -117,4 +119,3 @@ const styles = StyleSheet.create({
 });
 
 export default OTPInput;
-
