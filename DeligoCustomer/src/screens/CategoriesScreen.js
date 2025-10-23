@@ -70,6 +70,7 @@ const CategoriesScreen = ({ navigation }) => {
 
   const handleRestaurantPress = (restaurant) => {
     console.log('Restaurant pressed:', restaurant.name);
+    navigation.navigate('RestaurantDetails', { restaurant });
   };
 
   const handleCartPress = () => {
