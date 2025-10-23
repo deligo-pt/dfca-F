@@ -189,8 +189,7 @@ const CategoriesScreen = ({ navigation }) => {
           ))}
         </View>
 
-        {/* Bottom Spacing */}
-        <View style={{ height: spacing.xl }} />
+        <View style={{ height: 100 }} />
       </Animated.ScrollView>
     </SafeAreaView>
   );
