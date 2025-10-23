@@ -29,20 +29,12 @@ const LocationHeader = ({ location, area, loading, errorMsg, onRefresh, onCartPr
             <Text style={styles.address}>Getting location...</Text>
           )}
         </TouchableOpacity>
-        <TouchableOpacity
-          style={styles.refreshButton}
-          onPress={() => {
-            console.log('🔄 LocationHeader: Refresh button pressed');
-            onRefresh && onRefresh();
-          }}
-        >
-          <Text style={styles.refreshIcon}>↻</Text>
-        </TouchableOpacity>
+
       </View>
 
       {/* Search Bar & Cart Section */}
       <View style={styles.searchRow}>
-        <View style={styles.searchContainer}>
+        <View style={styles.searchContainer} pointerEvents="box-none">
           <Text style={styles.searchIcon}>🔍</Text>
           <TextInput
             style={styles.input}
@@ -57,6 +49,7 @@ const LocationHeader = ({ location, area, loading, errorMsg, onRefresh, onCartPr
             onCartPress && onCartPress();
           }}
           activeOpacity={0.7}
+          hitSlop={{ top: 5, bottom: 5, left: 5, right: 5 }}
         >
           <Text style={styles.cartIcon}>🛒</Text>
           <View style={styles.badge} pointerEvents="none">
@@ -115,20 +108,6 @@ const styles = StyleSheet.create({
     color: colors.text.white,
     fontSize: fontSize.sm,
     fontFamily: 'Poppins-Regular',
-  },
-  refreshButton: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginLeft: spacing.sm,
-  },
-  refreshIcon: {
-    color: colors.text.white,
-    fontSize: 20,
-    fontWeight: 'bold',
   },
   searchRow: {
     flexDirection: 'row',

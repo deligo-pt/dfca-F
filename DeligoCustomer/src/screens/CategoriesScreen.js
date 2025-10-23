@@ -134,7 +134,6 @@ const CategoriesScreen = ({ navigation }) => {
           area={area}
           loading={loading}
           errorMsg={errorMsg}
-          onRefresh={getLocation}
           onCartPress={handleCartPress}
           onLocationPress={handleLocationPress}
         />
