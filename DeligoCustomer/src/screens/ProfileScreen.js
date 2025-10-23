@@ -1,6 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, fontSize } from '../theme';
 import { getUserData, logoutUser } from '../utils/auth';
 import CustomModal from '../components/CustomModal';
@@ -12,6 +12,7 @@ const ProfileScreen = ({ onLogout }) => {
   const [modalMessage, setModalMessage] = useState('');
   const [modalOnConfirm, setModalOnConfirm] = useState(null);
   const [modalOnlyConfirm, setModalOnlyConfirm] = useState(false);
+  const insets = useSafeAreaInsets();
 
   useEffect(() => {
     loadUserData();
@@ -46,11 +47,14 @@ const ProfileScreen = ({ onLogout }) => {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top", "left", "right", "bottom"]}>
       <View style={styles.container}>
         <Text style={styles.headerText}>Profile</Text>
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[
+            styles.content,
+            { paddingBottom: insets.bottom + 100 },
+          ]}
           showsVerticalScrollIndicator={false}
         >
           {/* User Info Card */}
