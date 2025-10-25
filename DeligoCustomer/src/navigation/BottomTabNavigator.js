@@ -92,7 +92,7 @@ const BottomTabNavigator = ({ onLogout }) => {
                             tabBarIcon: ({ focused, color }) => <ProfileIcon focused={focused} color={color} />,
                         }}
                     >
-                        {() => <ProfileScreen onLogout={onLogout} />}
+                        {(props) => <ProfileScreen {...props} onLogout={onLogout} />}
                     </Tab.Screen>
                 </Tab.Navigator>
             </KeyboardAvoidingView>
