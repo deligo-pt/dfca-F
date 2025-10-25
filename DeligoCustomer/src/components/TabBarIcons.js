@@ -1,115 +1,180 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 
-// Categories Icon
+// Categories Icon - Foodpanda style (4 squares grid)
 export const CategoriesIcon = ({ focused, color }) => (
   <View style={styles.iconContainer}>
     <View style={styles.gridContainer}>
-      <View style={[styles.gridItem, { backgroundColor: color, top: 0, left: 0 }]} />
-      <View style={[styles.gridItem, { backgroundColor: color, top: 0, right: 0 }]} />
-      <View style={[styles.gridItem, { backgroundColor: color, bottom: 0, left: 0 }]} />
-      <View style={[styles.gridItem, { backgroundColor: color, bottom: 0, right: 0 }]} />
+      <View style={[styles.gridItem, { backgroundColor: focused ? color : color, opacity: focused ? 1 : 0.6 }]} />
+      <View style={[styles.gridItem, { backgroundColor: focused ? color : color, opacity: focused ? 1 : 0.6 }]} />
+      <View style={[styles.gridItem, { backgroundColor: focused ? color : color, opacity: focused ? 1 : 0.6 }]} />
+      <View style={[styles.gridItem, { backgroundColor: focused ? color : color, opacity: focused ? 1 : 0.6 }]} />
     </View>
   </View>
 );
 
-// Orders Icon
+// Orders Icon - Foodpanda style (receipt/document)
 export const OrdersIcon = ({ focused, color }) => (
   <View style={styles.iconContainer}>
-    <View style={[styles.orderBox, { borderColor: color }]}>
-      <View style={[styles.orderLine, { backgroundColor: color }]} />
-      <View style={[styles.orderLine, { backgroundColor: color, width: 12 }]} />
-      <View style={[styles.orderLine, { backgroundColor: color, width: 14 }]} />
+    <View style={[styles.orderDocument, { backgroundColor: focused ? color : 'transparent', borderColor: color, opacity: focused ? 1 : 0.6 }]}>
+      {!focused && (
+        <>
+          <View style={[styles.orderLine, { backgroundColor: color }]} />
+          <View style={[styles.orderLine, { backgroundColor: color }]} />
+          <View style={[styles.orderLine, { backgroundColor: color, width: 10 }]} />
+        </>
+      )}
+      {focused && (
+        <>
+          <View style={[styles.orderLine, { backgroundColor: '#FFFFFF' }]} />
+          <View style={[styles.orderLine, { backgroundColor: '#FFFFFF' }]} />
+          <View style={[styles.orderLine, { backgroundColor: '#FFFFFF', width: 10 }]} />
+        </>
+      )}
     </View>
   </View>
 );
 
-// Cart Icon
+// Cart Icon - Professional shopping cart with basket and wheels
 export const CartIcon = ({ focused, color }) => (
   <View style={styles.iconContainer}>
-    <View style={[styles.cartBody, { borderColor: color }]} />
-    <View style={[styles.cartWheel, { backgroundColor: color }]} />
-    <View style={[styles.cartWheel, { backgroundColor: color, right: 4 }]} />
+    <View style={styles.cartWrapper}>
+      {/* Cart basket */}
+      <View style={[styles.cartBasket, {
+        backgroundColor: focused ? color : 'transparent',
+        borderColor: color,
+      }]}>
+        {/* Cart handle bar */}
+        <View style={[styles.cartHandle, {
+          backgroundColor: focused ? '#FFFFFF' : color,
+        }]} />
+      </View>
+      {/* Cart wheels */}
+      <View style={styles.cartWheels}>
+        <View style={[styles.cartWheel, {
+          backgroundColor: focused ? color : color,
+          opacity: focused ? 1 : 0.6,
+        }]} />
+        <View style={[styles.cartWheel, {
+          backgroundColor: focused ? color : color,
+          opacity: focused ? 1 : 0.6,
+        }]} />
+      </View>
+    </View>
   </View>
 );
 
-// Profile Icon
+// Profile Icon - Foodpanda style (user silhouette)
 export const ProfileIcon = ({ focused, color }) => (
   <View style={styles.iconContainer}>
-    <View style={[styles.profileHead, { backgroundColor: color }]} />
-    <View style={[styles.profileBody, { borderColor: color }]} />
+    <View style={[styles.profileCircle, { backgroundColor: focused ? color : 'transparent', borderColor: color, opacity: focused ? 1 : 0.6 }]}>
+      <View style={[styles.profileHead, { backgroundColor: focused ? '#FFFFFF' : color }]} />
+      <View style={[styles.profileShoulders, { borderColor: focused ? '#FFFFFF' : color }]} />
+    </View>
   </View>
 );
 
 const styles = StyleSheet.create({
   iconContainer: {
-    width: 24,
-    height: 24,
+    width: 26,
+    height: 26,
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // Categories Icon
+  // Categories Icon (Grid)
   gridContainer: {
-    width: 20,
-    height: 20,
-    position: 'relative',
+    width: 22,
+    height: 22,
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'space-between',
+    alignContent: 'space-between',
   },
   gridItem: {
     width: 9,
     height: 9,
-    borderRadius: 2,
-    position: 'absolute',
+    borderRadius: 2.5,
+    margin: 1,
   },
-  // Orders Icon
-  orderBox: {
+  // Orders Icon (Document/Receipt)
+  orderDocument: {
     width: 20,
-    height: 20,
+    height: 24,
     borderWidth: 2,
     borderRadius: 3,
     justifyContent: 'center',
     alignItems: 'center',
-    paddingHorizontal: 3,
+    paddingHorizontal: 4,
+    paddingVertical: 6,
   },
   orderLine: {
     height: 2,
-    width: 10,
+    width: 12,
     borderRadius: 1,
-    marginVertical: 1,
+    marginVertical: 1.5,
   },
-  // Cart Icon
-  cartBody: {
-    width: 18,
-    height: 14,
+  // Cart Icon (Shopping Cart)
+  cartWrapper: {
+    width: 24,
+    height: 24,
+    justifyContent: 'flex-end',
+    alignItems: 'center',
+  },
+  cartBasket: {
+    width: 20,
+    height: 16,
     borderWidth: 2,
-    borderBottomWidth: 0,
-    borderTopLeftRadius: 2,
-    borderTopRightRadius: 2,
-    marginBottom: 4,
+    borderBottomLeftRadius: 3,
+    borderBottomRightRadius: 3,
+    borderTopRightRadius: 3,
+    borderTopLeftRadius: 1,
+    position: 'relative',
+    marginBottom: 2,
+  },
+  cartHandle: {
+    position: 'absolute',
+    top: -4,
+    left: -2,
+    width: 2,
+    height: 12,
+    borderRadius: 1,
+    transform: [{ rotate: '-15deg' }],
+  },
+  cartWheels: {
+    width: 18,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 2,
   },
   cartWheel: {
     width: 4,
     height: 4,
     borderRadius: 2,
-    position: 'absolute',
-    bottom: 0,
-    left: 2,
   },
-  // Profile Icon
-  profileHead: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    position: 'absolute',
-    top: 2,
-  },
-  profileBody: {
-    width: 16,
-    height: 12,
+  // Profile Icon (User in Circle)
+  profileCircle: {
+    width: 24,
+    height: 24,
+    borderRadius: 12,
     borderWidth: 2,
-    borderTopLeftRadius: 8,
-    borderTopRightRadius: 8,
-    position: 'absolute',
-    bottom: 0,
+    justifyContent: 'center',
+    alignItems: 'center',
+    overflow: 'hidden',
+  },
+  profileHead: {
+    width: 7,
+    height: 7,
+    borderRadius: 3.5,
+    marginTop: 3,
+  },
+  profileShoulders: {
+    width: 14,
+    height: 10,
+    borderWidth: 2,
+    borderTopLeftRadius: 7,
+    borderTopRightRadius: 7,
+    borderBottomWidth: 0,
+    marginTop: 2,
   },
 });
 

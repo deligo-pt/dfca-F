@@ -88,6 +88,7 @@ const BottomTabNavigator = ({ onLogout }) => {
                     <Tab.Screen
                         name="Profile"
                         options={{
+                            tabBarLabel: 'Account',
                             tabBarIcon: ({ focused, color }) => <ProfileIcon focused={focused} color={color} />,
                         }}
                     >
