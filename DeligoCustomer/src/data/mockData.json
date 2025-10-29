@@ -27,6 +27,20 @@
       "icon": "📦",
       "color": "#FF9800",
       "description": "Self pick-up orders"
+    },
+    {
+      "id": "5",
+      "name": "Pharmacy",
+      "icon": "💊",
+      "color": "#4CAF50",
+      "description": "Medicine & health"
+    },
+    {
+      "id": "6",
+      "name": "Flowers",
+      "icon": "💐",
+      "color": "#E91E63",
+      "description": "Fresh flowers delivered"
     }
   ],
   "cuisines": [
@@ -65,6 +79,42 @@
       "name": "Healthy",
       "image": "🥗",
       "restaurants": 98
+    },
+    {
+      "id": "7",
+      "name": "Indian",
+      "image": "🍛",
+      "restaurants": 87
+    },
+    {
+      "id": "8",
+      "name": "Italian",
+      "image": "🍝",
+      "restaurants": 134
+    },
+    {
+      "id": "9",
+      "name": "Mexican",
+      "image": "🌮",
+      "restaurants": 76
+    },
+    {
+      "id": "10",
+      "name": "Japanese",
+      "image": "🍣",
+      "restaurants": 92
+    },
+    {
+      "id": "11",
+      "name": "Thai",
+      "image": "🍲",
+      "restaurants": 65
+    },
+    {
+      "id": "12",
+      "name": "Korean",
+      "image": "🍱",
+      "restaurants": 54
     }
   ],
   "restaurants": [
@@ -75,11 +125,13 @@
       "rating": 4.5,
       "deliveryTime": "25-35 min",
       "deliveryFee": "Free",
+      "cuisine": "American",
       "categories": ["Burgers", "Fast Food"],
       "offer": "50% off",
       "distance": "1.2 km",
       "isNew": false,
-      "isPandaPro": true
+      "isPandaPro": true,
+      "description": "Flame-grilled burgers and crispy fries"
     },
     {
       "id": "2",
@@ -88,11 +140,13 @@
       "rating": 4.3,
       "deliveryTime": "30-40 min",
       "deliveryFee": "€2.99",
+      "cuisine": "Italian",
       "categories": ["Pizza", "Italian"],
       "offer": "Buy 1 Get 1",
       "distance": "2.1 km",
       "isNew": false,
-      "isPandaPro": true
+      "isPandaPro": true,
+      "description": "Authentic Italian pizza with fresh ingredients"
     },
     {
       "id": "3",
@@ -101,11 +155,13 @@
       "rating": 4.7,
       "deliveryTime": "35-45 min",
       "deliveryFee": "Free",
+      "cuisine": "Japanese",
       "categories": ["Japanese", "Sushi"],
       "offer": null,
       "distance": "3.5 km",
       "isNew": true,
-      "isPandaPro": false
+      "isPandaPro": false,
+      "description": "Premium sushi and Japanese cuisine"
     },
     {
       "id": "4",
@@ -114,11 +170,13 @@
       "rating": 4.2,
       "deliveryTime": "20-30 min",
       "deliveryFee": "€1.99",
+      "cuisine": "Mexican",
       "categories": ["Mexican", "Fast Food"],
       "offer": "20% off",
       "distance": "1.8 km",
       "isNew": false,
-      "isPandaPro": true
+      "isPandaPro": true,
+      "description": "Mexican-inspired tacos and burritos"
     },
     {
       "id": "5",
@@ -127,11 +185,13 @@
       "rating": 4.4,
       "deliveryTime": "25-35 min",
       "deliveryFee": "Free",
+      "cuisine": "American",
       "categories": ["Chicken", "Fast Food"],
       "offer": null,
       "distance": "2.5 km",
       "isNew": false,
-      "isPandaPro": true
+      "isPandaPro": true,
+      "description": "Finger lickin' good fried chicken"
     },
     {
       "id": "6",
@@ -140,11 +200,223 @@
       "rating": 4.1,
       "deliveryTime": "15-25 min",
       "deliveryFee": "€1.49",
+      "cuisine": "Healthy",
       "categories": ["Sandwiches", "Healthy"],
       "offer": "15% off",
       "distance": "0.9 km",
       "isNew": false,
-      "isPandaPro": false
+      "isPandaPro": false,
+      "description": "Fresh subs made your way"
+    },
+    {
+      "id": "7",
+      "name": "Kitchen Express",
+      "image": "🍽️",
+      "rating": 4.6,
+      "deliveryTime": "30-40 min",
+      "deliveryFee": "Free",
+      "cuisine": "American",
+      "categories": ["American", "Grill"],
+      "offer": "30% off",
+      "distance": "2.3 km",
+      "isNew": false,
+      "isPandaPro": true,
+      "description": "Classic American comfort food"
+    },
+    {
+      "id": "8",
+      "name": "Kebab House",
+      "image": "🥙",
+      "rating": 4.5,
+      "deliveryTime": "20-30 min",
+      "deliveryFee": "€1.99",
+      "cuisine": "Turkish",
+      "categories": ["Turkish", "Kebab"],
+      "offer": null,
+      "distance": "1.5 km",
+      "isNew": false,
+      "isPandaPro": false,
+      "description": "Authentic Turkish kebabs and wraps"
+    },
+    {
+      "id": "9",
+      "name": "Korean BBQ",
+      "image": "🥩",
+      "rating": 4.8,
+      "deliveryTime": "40-50 min",
+      "deliveryFee": "€2.49",
+      "cuisine": "Korean",
+      "categories": ["Korean", "BBQ"],
+      "offer": "25% off",
+      "distance": "4.2 km",
+      "isNew": true,
+      "isPandaPro": true,
+      "description": "Premium Korean BBQ and banchan"
+    },
+    {
+      "id": "10",
+      "name": "Pasta Paradise",
+      "image": "🍝",
+      "rating": 4.4,
+      "deliveryTime": "25-35 min",
+      "deliveryFee": "Free",
+      "cuisine": "Italian",
+      "categories": ["Italian", "Pasta"],
+      "offer": null,
+      "distance": "2.8 km",
+      "isNew": false,
+      "isPandaPro": true,
+      "description": "Homemade pasta with authentic Italian sauces"
+    },
+    {
+      "id": "11",
+      "name": "Thai Orchid",
+      "image": "🍲",
+      "rating": 4.6,
+      "deliveryTime": "30-40 min",
+      "deliveryFee": "€2.99",
+      "cuisine": "Thai",
+      "categories": ["Thai", "Asian"],
+      "offer": "20% off",
+      "distance": "3.1 km",
+      "isNew": false,
+      "isPandaPro": false,
+      "description": "Authentic Thai curries and pad thai"
+    },
+    {
+      "id": "12",
+      "name": "India Palace",
+      "image": "🍛",
+      "rating": 4.7,
+      "deliveryTime": "35-45 min",
+      "deliveryFee": "Free",
+      "cuisine": "Indian",
+      "categories": ["Indian", "Curry"],
+      "offer": "Buy 2 Get 1",
+      "distance": "2.6 km",
+      "isNew": false,
+      "isPandaPro": true,
+      "description": "Traditional Indian cuisine with rich spices"
+    },
+    {
+      "id": "13",
+      "name": "Dragon Wok",
+      "image": "🥡",
+      "rating": 4.3,
+      "deliveryTime": "25-35 min",
+      "deliveryFee": "€1.49",
+      "cuisine": "Chinese",
+      "categories": ["Chinese", "Asian"],
+      "offer": null,
+      "distance": "1.7 km",
+      "isNew": false,
+      "isPandaPro": false,
+      "description": "Chinese stir-fry and dim sum specialties"
+    },
+    {
+      "id": "14",
+      "name": "Sweet Treats",
+      "image": "🍰",
+      "rating": 4.9,
+      "deliveryTime": "20-30 min",
+      "deliveryFee": "€1.99",
+      "cuisine": "Desserts",
+      "categories": ["Desserts", "Bakery"],
+      "offer": "15% off",
+      "distance": "1.3 km",
+      "isNew": true,
+      "isPandaPro": true,
+      "description": "Artisan cakes, pastries and desserts"
+    },
+    {
+      "id": "15",
+      "name": "Healthy Bowl",
+      "image": "🥗",
+      "rating": 4.5,
+      "deliveryTime": "15-25 min",
+      "deliveryFee": "Free",
+      "cuisine": "Healthy",
+      "categories": ["Healthy", "Salads"],
+      "offer": null,
+      "distance": "0.8 km",
+      "isNew": false,
+      "isPandaPro": true,
+      "description": "Fresh salad bowls and smoothies"
+    },
+    {
+      "id": "16",
+      "name": "Ramen House",
+      "image": "🍜",
+      "rating": 4.8,
+      "deliveryTime": "30-40 min",
+      "deliveryFee": "€2.49",
+      "cuisine": "Japanese",
+      "categories": ["Japanese", "Ramen"],
+      "offer": "30% off",
+      "distance": "3.4 km",
+      "isNew": true,
+      "isPandaPro": true,
+      "description": "Authentic Japanese ramen and tonkotsu"
+    },
+    {
+      "id": "17",
+      "name": "Mediterranean Grill",
+      "image": "🫔",
+      "rating": 4.4,
+      "deliveryTime": "25-35 min",
+      "deliveryFee": "€1.99",
+      "cuisine": "Mediterranean",
+      "categories": ["Mediterranean", "Grill"],
+      "offer": null,
+      "distance": "2.2 km",
+      "isNew": false,
+      "isPandaPro": false,
+      "description": "Fresh Mediterranean grills and mezze"
+    },
+    {
+      "id": "18",
+      "name": "Fish & Chips Co",
+      "image": "🐟",
+      "rating": 4.2,
+      "deliveryTime": "20-30 min",
+      "deliveryFee": "Free",
+      "cuisine": "British",
+      "categories": ["British", "Seafood"],
+      "offer": "25% off",
+      "distance": "1.9 km",
+      "isNew": false,
+      "isPandaPro": true,
+      "description": "Classic British fish and chips"
+    },
+    {
+      "id": "19",
+      "name": "Vegan Delight",
+      "image": "🌱",
+      "rating": 4.7,
+      "deliveryTime": "25-35 min",
+      "deliveryFee": "€1.49",
+      "cuisine": "Vegan",
+      "categories": ["Vegan", "Healthy"],
+      "offer": "20% off",
+      "distance": "2.4 km",
+      "isNew": true,
+      "isPandaPro": true,
+      "description": "100% plant-based delicious meals"
+    },
+    {
+      "id": "20",
+      "name": "BBQ Smokehouse",
+      "image": "🍖",
+      "rating": 4.6,
+      "deliveryTime": "35-45 min",
+      "deliveryFee": "€2.99",
+      "cuisine": "American",
+      "categories": ["BBQ", "Grill"],
+      "offer": null,
+      "distance": "3.8 km",
+      "isNew": false,
+      "isPandaPro": true,
+      "description": "Slow-smoked ribs and brisket"
     }
   ],
   "banners": [
@@ -160,6 +432,20 @@
       "title": "New Restaurant",
       "subtitle": "Check out Sushi Master",
       "color": "#00B3AD",
+      "textColor": "#FFFFFF"
+    },
+    {
+      "id": "3",
+      "title": "Weekend Special",
+      "subtitle": "Up to 50% off on selected items",
+      "color": "#9C27B0",
+      "textColor": "#FFFFFF"
+    },
+    {
+      "id": "4",
+      "title": "Fast Delivery",
+      "subtitle": "Get your food in 15 minutes",
+      "color": "#FF9800",
       "textColor": "#FFFFFF"
     }
   ]

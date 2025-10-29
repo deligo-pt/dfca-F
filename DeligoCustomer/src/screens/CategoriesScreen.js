@@ -40,6 +40,17 @@ const CategoriesScreen = ({ navigation }) => {
       })
     : mockData.restaurants || [];
 
+  // Generate autocomplete suggestions (top 5 matches)
+  const searchSuggestions = searchQuery.trim()
+    ? filteredRestaurants.slice(0, 5)
+    : [];
+
+  const handleSuggestionPress = (restaurant) => {
+    console.log('Suggestion selected:', restaurant.name);
+    setSearchQuery(''); // Clear search
+    navigation.navigate('RestaurantDetails', { restaurant });
+  };
+
   const getLocation = async () => {
     setLoading(true);
     setErrorMsg(null);
@@ -139,6 +150,8 @@ const CategoriesScreen = ({ navigation }) => {
         cartItemCount={cartItemCount}
         onSearch={setSearchQuery}
         searchQuery={searchQuery}
+        suggestions={searchSuggestions}
+        onSuggestionPress={handleSuggestionPress}
       />
 
       <Animated.ScrollView
@@ -162,6 +175,8 @@ const CategoriesScreen = ({ navigation }) => {
           cartItemCount={cartItemCount}
           onSearch={setSearchQuery}
           searchQuery={searchQuery}
+          suggestions={searchSuggestions}
+          onSuggestionPress={handleSuggestionPress}
         />
 
         {/* Categories Section */}
