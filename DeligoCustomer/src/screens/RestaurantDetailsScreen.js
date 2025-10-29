@@ -5,8 +5,6 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image,
-  Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, fontSize, borderRadius } from '../theme';
@@ -327,7 +325,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
+    backgroundColor: '#F8F9FA',
   },
   header: {
     flexDirection: 'row',
@@ -335,15 +333,15 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: colors.background,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#F0F0F0',
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.background,
+    backgroundColor: '#F8F9FA',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -362,7 +360,7 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: colors.background,
+    backgroundColor: '#F8F9FA',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -373,9 +371,11 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   restaurantInfo: {
-    backgroundColor: colors.surface,
+    backgroundColor: '#FFFFFF',
     padding: spacing.md,
     marginBottom: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
   },
   restaurantHeader: {
     flexDirection: 'row',
@@ -453,9 +453,9 @@ const styles = StyleSheet.create({
     color: colors.text.white,
   },
   categoryTabs: {
-    backgroundColor: colors.surface,
+    backgroundColor: '#FFFFFF',
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
+    borderBottomColor: '#F0F0F0',
   },
   categoryTabsContent: {
     paddingHorizontal: spacing.md,
@@ -491,15 +491,12 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: colors.surface,
+    backgroundColor: '#FFFFFF',
     padding: spacing.md,
-    borderRadius: borderRadius.lg,
+    borderRadius: 16,
     marginBottom: spacing.md,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F0F0F0',
   },
   menuItemLeft: {
     flexDirection: 'row',
@@ -548,7 +545,7 @@ const styles = StyleSheet.create({
   quantityControl: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: '#F8F9FA',
     borderRadius: borderRadius.lg,
     padding: 4,
   },
