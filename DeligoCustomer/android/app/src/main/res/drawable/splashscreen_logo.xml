@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+  <!-- Background color -->
+  <item android:drawable="@color/splashscreen_background"/>
+
+  <!-- Optional: Add logo/icon here if you have one -->
+  <!-- Uncomment and add your logo when ready -->
+  <!--
+  <item>
+    <bitmap
+      android:gravity="center"
+      android:src="@mipmap/ic_launcher"/>
+  </item>
+  -->
+</layer-list>
+

@@ -4,20 +4,33 @@ import { CategoriesScreen, OrdersScreen, CartScreen, ProfileScreen } from '../sc
 import { CategoriesIcon, OrdersIcon, CartIcon, ProfileIcon } from '../components/TabBarIcons';
 import { colors } from '../theme';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Platform, KeyboardAvoidingView } from 'react-native';
+import { Platform, KeyboardAvoidingView, Dimensions } from 'react-native';
 
 const Tab = createBottomTabNavigator();
 
 const BottomTabNavigator = ({ onLogout }) => {
     const insets = useSafeAreaInsets();
+    const { height: screenHeight } = Dimensions.get('window');
+
+    // Calculate proper bottom padding for tab bar
+    // For large screens (> 800px height), ensure we account for proper spacing
+    const bottomPadding = Platform.select({
+        ios: insets.bottom > 0 ? insets.bottom : 12,
+        android: Math.max(insets.bottom, 12), // Use at least 12, or actual inset if larger
+    });
+
+    // Tab bar base height
+    const tabBarBaseHeight = 64;
+    const totalTabBarHeight = tabBarBaseHeight + bottomPadding;
+
     // Floating, rounded, shadowed tab bar with safe area and Poppins font
     const tabBarStyle = {
         position: 'absolute',
         left: 0,
         right: 0,
         bottom: 0,
-        height: 64 + (Platform.OS === 'ios' ? insets.bottom : 8),
-        paddingBottom: insets.bottom > 0 ? insets.bottom : 12,
+        height: totalTabBarHeight,
+        paddingBottom: bottomPadding,
         paddingTop: 8,
         paddingHorizontal: 16,
         borderTopLeftRadius: 22,
@@ -37,8 +50,9 @@ const BottomTabNavigator = ({ onLogout }) => {
             },
         }),
     };
+
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['bottom', 'left', 'right']}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top', 'left', 'right']}>
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -62,7 +76,10 @@ const BottomTabNavigator = ({ onLogout }) => {
                             alignItems: 'center',
                         },
                     }}
-                    sceneContainerStyle={{ backgroundColor: colors.background }}
+                    sceneContainerStyle={{
+                        backgroundColor: colors.background,
+                        paddingBottom: totalTabBarHeight, // Prevent content from being hidden behind tab bar
+                    }}
                 >
                     <Tab.Screen
                         name="Categories"

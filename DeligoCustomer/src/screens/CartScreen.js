@@ -2,8 +2,11 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing, fontSize, borderRadius } from '../theme';
+import { useLanguage } from '../utils/LanguageContext';
 
 const CartScreen = ({ navigation }) => {
+  const { t } = useLanguage();
+
   // Mock cart data - in real app, this would come from global state/context
   const [cartItems, setCartItems] = useState([
     {
@@ -37,6 +40,7 @@ const CartScreen = ({ navigation }) => {
 
   const [promoCode, setPromoCode] = useState('');
   const [appliedPromo, setAppliedPromo] = useState(null);
+  const [deliveryInstructions, setDeliveryInstructions] = useState('');
 
   const deliveryFee = 0; // Free delivery
   const serviceFee = 1.99;
@@ -70,7 +74,7 @@ const CartScreen = ({ navigation }) => {
     if (promoCode.toUpperCase() === 'SAVE5') {
       setAppliedPromo({ code: 'SAVE5', discount: 5.00 });
     } else {
-      alert('Invalid promo code');
+      alert(t('invalidPromoCode'));
     }
   };
 
@@ -83,7 +87,7 @@ const CartScreen = ({ navigation }) => {
           <Text style={styles.itemDescription} numberOfLines={1}>
             {item.description}
           </Text>
-          <Text style={styles.itemPrice}>${item.price.toFixed(2)}</Text>
+          <Text style={styles.itemPrice}>€{item.price.toFixed(2)}</Text>
         </View>
       </View>
       <View style={styles.itemRight}>
@@ -116,19 +120,19 @@ const CartScreen = ({ navigation }) => {
     return (
       <SafeAreaView style={styles.container} edges={['top']}>
         <View style={styles.header}>
-          <Text style={styles.headerTitle}>Cart</Text>
+          <Text style={styles.headerTitle}>{t('cart')}</Text>
         </View>
         <View style={styles.emptyCart}>
           <Text style={styles.emptyCartIcon}>🛒</Text>
-          <Text style={styles.emptyCartTitle}>Your cart is empty</Text>
+          <Text style={styles.emptyCartTitle}>{t('cartEmpty')}</Text>
           <Text style={styles.emptyCartText}>
-            Add items from a restaurant to get started
+            {t('addItemsToGetStarted')}
           </Text>
           <TouchableOpacity
             style={styles.browseButton}
             onPress={() => navigation.navigate('Categories')}
           >
-            <Text style={styles.browseButtonText}>Browse Restaurants</Text>
+            <Text style={styles.browseButtonText}>{t('browseRestaurants')}</Text>
           </TouchableOpacity>
         </View>
       </SafeAreaView>
@@ -139,9 +143,9 @@ const CartScreen = ({ navigation }) => {
     <SafeAreaView style={styles.container} edges={['top']} mode="padding">
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>Cart</Text>
+        <Text style={styles.headerTitle}>{t('cart')}</Text>
         <TouchableOpacity onPress={() => setCartItems([])}>
-          <Text style={styles.clearAllText}>Clear all</Text>
+          <Text style={styles.clearAllText}>{t('clearAll')}</Text>
         </TouchableOpacity>
       </View>
 
@@ -165,7 +169,7 @@ const CartScreen = ({ navigation }) => {
 
         {/* Cart Items */}
         <View style={styles.cartSection}>
-          <Text style={styles.sectionTitle}>Your Order</Text>
+          <Text style={styles.sectionTitle}>{t('yourOrder')}</Text>
           {cartItems.map((item) => renderCartItem(item))}
         </View>
 
@@ -175,12 +179,12 @@ const CartScreen = ({ navigation }) => {
           onPress={() => navigation.navigate('Categories')}
         >
           <Text style={styles.addMoreIcon}>+</Text>
-          <Text style={styles.addMoreText}>Add more items</Text>
+          <Text style={styles.addMoreText}>{t('addMoreItems')}</Text>
         </TouchableOpacity>
 
         {/* Promo Code */}
         <View style={styles.promoSection}>
-          <Text style={styles.sectionTitle}>Promo Code</Text>
+          <Text style={styles.sectionTitle}>{t('promoCode')}</Text>
           {appliedPromo ? (
             <View style={styles.appliedPromo}>
               <View style={styles.appliedPromoLeft}>
@@ -188,7 +192,7 @@ const CartScreen = ({ navigation }) => {
                 <View>
                   <Text style={styles.appliedPromoCode}>{appliedPromo.code}</Text>
                   <Text style={styles.appliedPromoDiscount}>
-                    -${appliedPromo.discount.toFixed(2)} discount applied
+                    -€{appliedPromo.discount.toFixed(2)} {t('discountApplied')}
                   </Text>
                 </View>
               </View>
@@ -200,14 +204,14 @@ const CartScreen = ({ navigation }) => {
             <View style={styles.promoInputContainer}>
               <TextInput
                 style={styles.promoInput}
-                placeholder="Enter promo code"
+                placeholder={t('enterPromoCode')}
                 placeholderTextColor={colors.text.light}
                 value={promoCode}
                 onChangeText={setPromoCode}
                 autoCapitalize="characters"
               />
               <TouchableOpacity style={styles.applyButton} onPress={applyPromoCode}>
-                <Text style={styles.applyButtonText}>Apply</Text>
+                <Text style={styles.applyButtonText}>{t('apply')}</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -215,45 +219,47 @@ const CartScreen = ({ navigation }) => {
 
         {/* Delivery Instructions */}
         <View style={styles.instructionsSection}>
-          <Text style={styles.sectionTitle}>Delivery Instructions</Text>
+          <Text style={styles.sectionTitle}>{t('deliveryInstructions')}</Text>
           <TextInput
             style={styles.instructionsInput}
-            placeholder="Add delivery instructions (optional)"
+            placeholder={t('addDeliveryInstructions')}
             placeholderTextColor={colors.text.light}
             multiline
+            value={deliveryInstructions}
+            onChangeText={setDeliveryInstructions}
             numberOfLines={3}
           />
         </View>
 
         {/* Price Breakdown */}
         <View style={styles.priceSection}>
-          <Text style={styles.sectionTitle}>Bill Summary</Text>
+          <Text style={styles.sectionTitle}>{t('billSummary')}</Text>
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Subtotal</Text>
-            <Text style={styles.priceValue}>${getSubtotal().toFixed(2)}</Text>
+            <Text style={styles.priceLabel}>{t('subtotal')}</Text>
+            <Text style={styles.priceValue}>€{getSubtotal().toFixed(2)}</Text>
           </View>
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Delivery Fee</Text>
+            <Text style={styles.priceLabel}>{t('deliveryFee')}</Text>
             {deliveryFee === 0 ? (
-              <Text style={styles.priceFree}>FREE</Text>
+              <Text style={styles.priceFree}>{t('free')}</Text>
             ) : (
-              <Text style={styles.priceValue}>${deliveryFee.toFixed(2)}</Text>
+              <Text style={styles.priceValue}>€{deliveryFee.toFixed(2)}</Text>
             )}
           </View>
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>Service Fee</Text>
-            <Text style={styles.priceValue}>${serviceFee.toFixed(2)}</Text>
+            <Text style={styles.priceLabel}>{t('serviceFee')}</Text>
+            <Text style={styles.priceValue}>€{serviceFee.toFixed(2)}</Text>
           </View>
           {discount > 0 && (
             <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>Discount</Text>
-              <Text style={styles.priceDiscount}>-${discount.toFixed(2)}</Text>
+              <Text style={styles.priceLabel}>{t('discount')}</Text>
+              <Text style={styles.priceDiscount}>-€{discount.toFixed(2)}</Text>
             </View>
           )}
           <View style={styles.divider} />
           <View style={styles.priceRow}>
-            <Text style={styles.totalLabel}>Total</Text>
-            <Text style={styles.totalValue}>${getTotal().toFixed(2)}</Text>
+            <Text style={styles.totalLabel}>{t('total')}</Text>
+            <Text style={styles.totalValue}>€{getTotal().toFixed(2)}</Text>
           </View>
         </View>
 
@@ -265,15 +271,27 @@ const CartScreen = ({ navigation }) => {
       <View style={styles.checkoutFooter}>
         <View style={styles.checkoutFooterLeft}>
           <Text style={styles.checkoutItemCount}>
-            {cartItems.reduce((sum, item) => sum + item.quantity, 0)} items
+            {cartItems.reduce((sum, item) => sum + item.quantity, 0)} {t('items')}
           </Text>
-          <Text style={styles.checkoutTotal}>${getTotal().toFixed(2)}</Text>
+          <Text style={styles.checkoutTotal}>€{getTotal().toFixed(2)}</Text>
         </View>
         <TouchableOpacity
           style={styles.checkoutButton}
-          onPress={() => alert('Proceeding to checkout...')}
+          onPress={() => {
+            const cartData = {
+              items: cartItems,
+              subtotal: getSubtotal(),
+              deliveryFee: deliveryFee,
+              serviceFee: serviceFee,
+              discount: discount,
+              total: getTotal(),
+              deliveryInstructions: deliveryInstructions,
+              promoCode: appliedPromo?.code,
+            };
+            navigation.navigate('Checkout', { cartData });
+          }}
         >
-          <Text style={styles.checkoutButtonText}>Checkout</Text>
+          <Text style={styles.checkoutButtonText}>{t('checkout')}</Text>
           <Text style={styles.checkoutButtonIcon}>→</Text>
         </TouchableOpacity>
       </View>

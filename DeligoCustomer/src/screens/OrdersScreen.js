@@ -10,6 +10,7 @@ import {
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors } from '../theme';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { useLanguage } from '../utils/LanguageContext';
 
 // Mock data for orders
 const mockOrders = {
@@ -53,7 +54,8 @@ const mockOrders = {
   ],
 };
 
-const OrdersScreen = () => {
+const OrdersScreen = ({ navigation }) => {
+  const { t } = useLanguage();
   const [activeTab, setActiveTab] = useState('ongoing');
 
   const getStatusIcon = (status) => {
@@ -74,11 +76,11 @@ const OrdersScreen = () => {
   const getStatusText = (status) => {
     switch (status) {
       case 'preparing':
-        return 'Preparing your order';
+        return t('preparing');
       case 'on_the_way':
-        return 'On the way';
+        return t('onTheWay');
       case 'delivered':
-        return 'Delivered';
+        return t('delivered');
       case 'cancelled':
         return 'Cancelled';
       default:
@@ -94,6 +96,7 @@ const OrdersScreen = () => {
         key={order.id}
         style={styles.orderCard}
         activeOpacity={0.7}
+        onPress={() => isOngoing ? navigation.navigate('TrackOrder', { orderId: order.id }) : null}
       >
         {/* Order Header */}
         <View style={styles.orderHeader}>
@@ -130,7 +133,7 @@ const OrdersScreen = () => {
               {getStatusText(order.status)}
             </Text>
           </View>
-          <Text style={styles.totalAmount}>৳{order.totalAmount}</Text>
+          <Text style={styles.totalAmount}>€{order.totalAmount}</Text>
         </View>
 
         {/* Estimated Time for Ongoing Orders */}
@@ -138,7 +141,7 @@ const OrdersScreen = () => {
           <View style={styles.estimatedTimeContainer}>
             <Ionicons name="time-outline" size={16} color={colors.primary} />
             <Text style={styles.estimatedTimeText}>
-              Estimated time: {order.estimatedTime}
+              {t('estimated')} {t('deliveryTime')}: {order.estimatedTime}
             </Text>
           </View>
         )}
@@ -147,24 +150,27 @@ const OrdersScreen = () => {
         <View style={styles.actionButtons}>
           {isOngoing ? (
             <>
-              <TouchableOpacity style={styles.trackButton}>
+              <TouchableOpacity
+                style={styles.trackButton}
+                onPress={() => navigation.navigate('TrackOrder', { order })}
+              >
                 <Ionicons name="location" size={18} color={colors.text.white} />
-                <Text style={styles.trackButtonText}>Track Order</Text>
+                <Text style={styles.trackButtonText}>{t('trackOrder')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.helpButton}>
                 <Ionicons name="help-circle-outline" size={18} color={colors.primary} />
-                <Text style={styles.helpButtonText}>Help</Text>
+                <Text style={styles.helpButtonText}>{t('helpCenter')}</Text>
               </TouchableOpacity>
             </>
           ) : (
             <>
               <TouchableOpacity style={styles.reorderButton}>
                 <MaterialIcons name="replay" size={18} color={colors.primary} />
-                <Text style={styles.reorderButtonText}>Reorder</Text>
+                <Text style={styles.reorderButtonText}>{t('orderAgain')}</Text>
               </TouchableOpacity>
               <TouchableOpacity style={styles.reviewButton}>
                 <Ionicons name="star-outline" size={18} color={colors.primary} />
-                <Text style={styles.reviewButtonText}>Rate</Text>
+                <Text style={styles.reviewButtonText}>{t('rating')}</Text>
               </TouchableOpacity>
             </>
           )}
@@ -181,7 +187,7 @@ const OrdersScreen = () => {
         color={colors.text.light}
       />
       <Text style={styles.emptyStateTitle}>
-        {type === 'ongoing' ? 'No ongoing orders' : 'No order history'}
+        {type === 'ongoing' ? t('noOrders') : t('noOrders')}
       </Text>
       <Text style={styles.emptyStateText}>
         {type === 'ongoing'
@@ -194,12 +200,12 @@ const OrdersScreen = () => {
   return (
     <SafeAreaView
       style={{ flex: 1, backgroundColor: colors.background }}
-      edges={['top', 'left', 'right']}
+      edges={['top']}
     >
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerText}>My Orders</Text>
+          <Text style={styles.headerText}>{t('orders')}</Text>
         </View>
 
         {/* Tabs */}
@@ -209,7 +215,7 @@ const OrdersScreen = () => {
             onPress={() => setActiveTab('ongoing')}
           >
             <Text style={[styles.tabText, activeTab === 'ongoing' && styles.activeTabText]}>
-              Ongoing
+              {t('ongoingOrders')}
             </Text>
             {mockOrders.ongoing.length > 0 && (
               <View style={styles.badge}>
@@ -222,7 +228,7 @@ const OrdersScreen = () => {
             onPress={() => setActiveTab('history')}
           >
             <Text style={[styles.tabText, activeTab === 'history' && styles.activeTabText]}>
-              History
+              {t('pastOrders')}
             </Text>
           </TouchableOpacity>
         </View>
@@ -277,19 +283,23 @@ const styles = StyleSheet.create({
   tab: {
     flex: 1,
     paddingVertical: 12,
+    paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
     backgroundColor: '#F5F5F5',
     flexDirection: 'row',
+    flexWrap: 'wrap',
   },
   activeTab: {
     backgroundColor: colors.primary,
   },
   tabText: {
-    fontSize: 15,
+    fontSize: 14,
     fontFamily: 'Poppins-Medium',
     color: colors.text.secondary,
+    textAlign: 'center',
+    flexShrink: 1,
   },
   activeTabText: {
     color: colors.text.white,

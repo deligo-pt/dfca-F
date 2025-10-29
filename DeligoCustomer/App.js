@@ -2,13 +2,15 @@ import { StatusBar } from 'expo-status-bar';
 import React, { useState, useEffect } from 'react';
 import { StyleSheet, View, ActivityIndicator, Text as RNText, TextInput as RNTextInput } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
-import { OnboardingScreen, LoginScreen, TermsOfServiceScreen, PrivacyPolicyScreen, LocationAddressScreen, RestaurantDetailsScreen, EditProfileScreen, VouchersScreen, SavedAddressesScreen, PaymentMethodsScreen, ReferralsScreen, NotificationsScreen, SettingsScreen, HelpCenterScreen } from './src/screens';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
+import { OnboardingScreen, LoginScreen, TermsOfServiceScreen, PrivacyPolicyScreen, LocationAddressScreen, RestaurantDetailsScreen, TrackOrderScreen, CheckoutScreen, EditProfileScreen, VouchersScreen, SavedAddressesScreen, PaymentMethodsScreen, ReferralsScreen, NotificationsScreen, SettingsScreen, HelpCenterScreen } from './src/screens';
 import { BottomTabNavigator } from './src/navigation';
 import { checkOnboardingStatus } from './src/utils/storage';
 import { isUserAuthenticated, getUserData } from './src/utils/auth';
 import { colors } from './src/theme';
 import * as Font from 'expo-font';
 import { createStackNavigator } from '@react-navigation/stack';
+import { LanguageProvider } from './src/utils/LanguageContext';
 
 // Set default font for all Text and TextInput components
 RNText.defaultProps = RNText.defaultProps || {};
@@ -99,38 +101,44 @@ export default function App() {
   }
 
   return (
-    <NavigationContainer>
-      <Stack.Navigator screenOptions={{ headerShown: false }}>
-        {showOnboarding ? (
-          <Stack.Screen name="Onboarding">
-            {(props) => <OnboardingScreen {...props} onDone={handleOnboardingDone} />}
-          </Stack.Screen>
-        ) : !isAuthenticated ? (
-          <Stack.Screen name="Login">
-            {(props) => <LoginScreen {...props} onLoginSuccess={handleLoginSuccess} />}
-          </Stack.Screen>
-        ) : (
-          <Stack.Screen name="Main">
-            {(props) => <BottomTabNavigator {...props} onLogout={handleLogout} />}
-          </Stack.Screen>
-        )}
-        <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
-        <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
-        <Stack.Screen name="LocationAddress" component={LocationAddressScreen} />
-        <Stack.Screen name="RestaurantDetails" component={RestaurantDetailsScreen} />
+    <SafeAreaProvider>
+      <LanguageProvider>
+        <NavigationContainer>
+          <Stack.Navigator screenOptions={{ headerShown: false }}>
+            {showOnboarding ? (
+              <Stack.Screen name="Onboarding">
+                {(props) => <OnboardingScreen {...props} onDone={handleOnboardingDone} />}
+              </Stack.Screen>
+            ) : !isAuthenticated ? (
+              <Stack.Screen name="Login">
+                {(props) => <LoginScreen {...props} onLoginSuccess={handleLoginSuccess} />}
+              </Stack.Screen>
+            ) : (
+              <Stack.Screen name="Main">
+                {(props) => <BottomTabNavigator {...props} onLogout={handleLogout} />}
+              </Stack.Screen>
+            )}
+            <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
+            <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+            <Stack.Screen name="LocationAddress" component={LocationAddressScreen} />
+            <Stack.Screen name="RestaurantDetails" component={RestaurantDetailsScreen} />
+            <Stack.Screen name="TrackOrder" component={TrackOrderScreen} />
+            <Stack.Screen name="Checkout" component={CheckoutScreen} />
 
-        {/* Account Related Screens */}
-        <Stack.Screen name="EditProfile" component={EditProfileScreen} />
-        <Stack.Screen name="Vouchers" component={VouchersScreen} />
-        <Stack.Screen name="SavedAddresses" component={SavedAddressesScreen} />
-        <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
-        <Stack.Screen name="Referrals" component={ReferralsScreen} />
-        <Stack.Screen name="Notifications" component={NotificationsScreen} />
-        <Stack.Screen name="Settings" component={SettingsScreen} />
-        <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
-      </Stack.Navigator>
-      <StatusBar style="auto" />
-    </NavigationContainer>
+            {/* Account Related Screens */}
+            <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+            <Stack.Screen name="Vouchers" component={VouchersScreen} />
+            <Stack.Screen name="SavedAddresses" component={SavedAddressesScreen} />
+            <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
+            <Stack.Screen name="Referrals" component={ReferralsScreen} />
+            <Stack.Screen name="Notifications" component={NotificationsScreen} />
+            <Stack.Screen name="Settings" component={SettingsScreen} />
+            <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
+          </Stack.Navigator>
+          <StatusBar style="auto" />
+        </NavigationContainer>
+      </LanguageProvider>
+    </SafeAreaProvider>
   );
 }
 

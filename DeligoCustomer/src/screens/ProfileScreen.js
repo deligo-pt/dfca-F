@@ -1,23 +1,23 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme';
 import { getUserData, logoutUser } from '../utils/auth';
 import CustomModal from '../components/CustomModal';
+import { useLanguage } from '../utils/LanguageContext';
 
-const ProfileScreen = ({ onLogout }) => {
+const ProfileScreen = ({ onLogout, navigation }) => {
+  const { t } = useLanguage();
   const [user, setUser] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalTitle, setModalTitle] = useState('');
   const [modalMessage, setModalMessage] = useState('');
   const [modalOnConfirm, setModalOnConfirm] = useState(null);
   const [modalOnlyConfirm, setModalOnlyConfirm] = useState(false);
-  const insets = useSafeAreaInsets();
 
   // Animation values for logout button
   const scaleAnim = useRef(new Animated.Value(1)).current;
-  const shakeAnim = useRef(new Animated.Value(0)).current;
 
   useEffect(() => {
     loadUserData();
@@ -54,7 +54,7 @@ const ProfileScreen = ({ onLogout }) => {
 
   const handleLogout = () => {
     showModal(
-      'Logout',
+      t('logout'),
       'Are you sure you want to logout?',
       async () => {
         setModalVisible(false);
@@ -98,18 +98,15 @@ const ProfileScreen = ({ onLogout }) => {
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F5F5F5' }} edges={["top", "left", "right", "bottom"]}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: '#F5F5F5' }} edges={["top"]}>
       <View style={styles.container}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerText}>Account</Text>
+          <Text style={styles.headerText}>{t('account')}</Text>
         </View>
 
         <ScrollView
-          contentContainerStyle={[
-            styles.content,
-            { paddingBottom: insets.bottom + 100 },
-          ]}
+          contentContainerStyle={styles.content}
           showsVerticalScrollIndicator={false}
         >
           {/* User Profile Card */}
@@ -122,19 +119,25 @@ const ProfileScreen = ({ onLogout }) => {
             <View style={styles.userInfo}>
               <Text style={styles.userName}>{user?.name || 'Guest User'}</Text>
               <Text style={styles.userContact}>{user?.email || user?.mobile || 'No contact info'}</Text>
-              <TouchableOpacity style={styles.editProfileButton}>
-                <Text style={styles.editProfileText}>Edit profile</Text>
+              <TouchableOpacity
+                style={styles.editProfileButton}
+                onPress={() => navigation.navigate('EditProfile')}
+              >
+                <Text style={styles.editProfileText}>{t('editProfile')}</Text>
               </TouchableOpacity>
             </View>
           </View>
 
           {/* Vouchers Card */}
           <View style={styles.card}>
-            <TouchableOpacity style={styles.voucherItem}>
+            <TouchableOpacity
+              style={styles.voucherItem}
+              onPress={() => navigation.navigate('Vouchers')}
+            >
               <View style={styles.voucherIconContainer}>
                 <Ionicons name="ticket" size={24} color={colors.primary} />
               </View>
-              <Text style={styles.voucherText}>Vouchers</Text>
+              <Text style={styles.voucherText}>{t('vouchers')}</Text>
               <View style={styles.voucherBadge}>
                 <Text style={styles.voucherBadgeText}>0</Text>
               </View>
@@ -144,27 +147,33 @@ const ProfileScreen = ({ onLogout }) => {
 
           {/* Your Orders Section */}
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Your orders</Text>
+            <Text style={styles.sectionTitle}>{t('orders')}</Text>
             <MenuItem
               iconName="receipt-outline"
-              title="Orders & reordering"
+              title={t('orders')}
+              onPress={() => navigation.navigate('Orders')}
               showDivider={false}
             />
           </View>
 
           {/* Account Section */}
           <View style={styles.card}>
-            <Text style={styles.sectionTitle}>Account</Text>
-            <MenuItem iconName="card-outline" title="Payment methods" />
+            <Text style={styles.sectionTitle}>{t('account')}</Text>
+            <MenuItem
+              iconName="card-outline"
+              title={t('paymentMethods')}
+              onPress={() => navigation.navigate('PaymentMethods')}
+            />
             <MenuItem
               iconName="gift-outline"
-              title="Referrals"
-              subtitle="Invite friends & get rewards"
+              title={t('referrals')}
+              subtitle={t('earnRewards')}
+              onPress={() => navigation.navigate('Referrals')}
             />
             <MenuItem
               iconName="star-outline"
-              title="pandapro"
-              subtitle="Exclusive benefits & discounts"
+              title={t('deligopro')}
+              subtitle={t('exclusiveBenefits')}
               showDivider={false}
               iconColor="#FFB800"
             />
@@ -173,11 +182,28 @@ const ProfileScreen = ({ onLogout }) => {
           {/* More Section */}
           <View style={styles.card}>
             <Text style={styles.sectionTitle}>More</Text>
-            <MenuItem iconName="location-outline" title="Saved addresses" />
+            <MenuItem
+              iconName="location-outline"
+              title={t('savedAddresses')}
+              onPress={() => navigation.navigate('SavedAddresses')}
+            />
             <MenuItem iconName="heart-outline" title="Favorite orders" />
-            <MenuItem iconName="notifications-outline" title="Notifications" />
-            <MenuItem iconName="settings-outline" title="Settings" />
-            <MenuItem iconName="help-circle-outline" title="Help center" showDivider={false} />
+            <MenuItem
+              iconName="notifications-outline"
+              title={t('notifications')}
+              onPress={() => navigation.navigate('Notifications')}
+            />
+            <MenuItem
+              iconName="settings-outline"
+              title={t('settings')}
+              onPress={() => navigation.navigate('Settings')}
+            />
+            <MenuItem
+              iconName="help-circle-outline"
+              title={t('helpCenter')}
+              showDivider={false}
+              onPress={() => navigation.navigate('HelpCenter')}
+            />
           </View>
 
           {/* Logout Button */}
@@ -190,7 +216,7 @@ const ProfileScreen = ({ onLogout }) => {
               <View style={styles.logoutIconContainer}>
                 <Ionicons name="log-out-outline" size={22} color={colors.error} />
               </View>
-              <Text style={styles.logoutText}>Log out</Text>
+              <Text style={styles.logoutText}>{t('logout')}</Text>
               <View style={styles.logoutArrow}>
                 <Ionicons name="arrow-forward" size={20} color={colors.error} />
               </View>
@@ -198,7 +224,7 @@ const ProfileScreen = ({ onLogout }) => {
           </Animated.View>
 
           {/* App Version */}
-          <Text style={styles.versionText}>Version 1.0.0</Text>
+          <Text style={styles.versionText}>{t('version')}</Text>
         </ScrollView>
 
         <CustomModal
@@ -210,8 +236,8 @@ const ProfileScreen = ({ onLogout }) => {
           }}
           onCancel={() => setModalVisible(false)}
           onlyConfirm={modalOnlyConfirm}
-          confirmText="Logout"
-          cancelText="Cancel"
+          confirmText={t('logout')}
+          cancelText={t('cancel')}
         />
       </View>
     </SafeAreaView>
@@ -238,6 +264,7 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingTop: 12,
+    paddingBottom: 20, // Extra padding for tab bar
   },
   // Profile Card Styles
   profileCard: {
@@ -433,3 +460,4 @@ const styles = StyleSheet.create({
 });
 
 export default ProfileScreen;
+

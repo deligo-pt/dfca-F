@@ -154,7 +154,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
       const item = Object.values(menuItems)
         .flat()
         .find((i) => i.id === itemId);
-      if (item) {
+      if (item && item.price) {
         total += item.price * cart[itemId];
       }
     });
@@ -173,7 +173,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
             <Text style={styles.menuItemDescription} numberOfLines={2}>
               {item.description}
             </Text>
-            <Text style={styles.menuItemPrice}>${item.price}</Text>
+            <Text style={styles.menuItemPrice}>€{item.price ? item.price.toFixed(2) : '0.00'}</Text>
           </View>
         </View>
         <View style={styles.menuItemRight}>
@@ -306,7 +306,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
         <View style={styles.cartFooter}>
           <View style={styles.cartFooterLeft}>
             <Text style={styles.cartItemCount}>{getTotalItems()} items</Text>
-            <Text style={styles.cartTotal}>${getTotalPrice()}</Text>
+            <Text style={styles.cartTotal}>€{getTotalPrice()}</Text>
           </View>
           <TouchableOpacity
             style={styles.viewCartButton}

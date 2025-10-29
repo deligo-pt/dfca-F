@@ -16,6 +16,7 @@ import { sendOTP, verifyOTP, saveUserData } from '../utils/auth';
 import CountryPicker from 'react-native-country-picker-modal';
 import CustomModal from '../components/CustomModal';
 import OTPInput from '../components/OTPInput';
+import { useLanguage } from '../utils/LanguageContext';
 
 const LOGO = require('../assets/images/logo.png'); // Transparent logo icon
 
@@ -25,6 +26,7 @@ const BORDER = '#E0E0E0';
 const INFO_BG = '#FFF8E1';
 
 const LoginScreen = ({ onLoginSuccess, navigation }) => {
+  const { t } = useLanguage();
   const [loginMethod, setLoginMethod] = useState('mobile');
   const [identifier, setIdentifier] = useState('');
   const [otp, setOtp] = useState('');
@@ -59,17 +61,17 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
 
   const handleSendOtp = async () => {
     if (!identifier.trim()) {
-      showModal('Error', `Please enter your ${loginMethod === 'mobile' ? 'mobile number' : 'email address'}`);
+      showModal(t('error'), `${t('pleaseEnter')} ${loginMethod === 'mobile' ? t('mobileNumber') : t('emailAddress')}`);
       return;
     }
     if (loginMethod === 'mobile') {
       if (identifier.length < 10) {
-        showModal('Error', 'Please enter a valid 10-digit mobile number');
+        showModal(t('error'), t('validMobileNumber'));
         return;
       }
     } else {
       if (!identifier.includes('@')) {
-        showModal('Error', 'Please enter a valid email address');
+        showModal(t('error'), t('validEmailAddress'));
         return;
       }
     }
@@ -78,12 +80,12 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
       await sendOTP(identifier, loginMethod);
       setIsOtpSent(true);
       showModal(
-        'OTP Sent',
-        `Check your ${loginMethod === 'mobile' ? 'mobile number' : 'email'} for the OTP we just sent.`,
+        t('otpSent'),
+        t('checkOTP'),
         () => setModalVisible(false)
       );
     } catch (error) {
-      showModal('Not Registered', 'This account is not registered.');
+      showModal(t('notRegistered'), t('accountNotRegistered'));
     } finally {
       setIsLoading(false);
     }
@@ -91,11 +93,11 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
 
   const handleVerifyOtp = async () => {
     if (!otp.trim()) {
-      showModal('Error', 'Please enter the OTP');
+      showModal(t('error'), t('enterOTP'));
       return;
     }
     if (otp.length !== 4) {
-      showModal('Error', 'Please enter a valid 4-digit OTP');
+      showModal(t('error'), t('invalidOTP'));
       return;
     }
     setIsLoading(true);
@@ -103,8 +105,8 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
       const response = await verifyOTP(identifier, otp, loginMethod);
       // Don't save user data yet - wait for user to click OK on modal
       const userData = response.user;
-      setModalTitle('Success');
-      setModalMessage(`Welcome back, ${userData.name}!`);
+      setModalTitle(t('success'));
+      setModalMessage(`${t('welcomeTo')} ${t('deligo')}, ${userData.name}!`);
       setModalOnlyConfirm(true);
       // Store the callback in ref instead of state
       modalOnConfirmRef.current = () => {
@@ -120,7 +122,7 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
       };
       setModalVisible(true);
     } catch (error) {
-      showModal('Error', 'Invalid OTP. Please try again.');
+      showModal(t('error'), t('invalidOTP'));
     } finally {
       setIsLoading(false);
     }
@@ -128,7 +130,7 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
 
   const handleResendOtp = () => {
     setOtp('');
-    showModal('OTP Resent', `A new verification code has been sent to your ${loginMethod === 'mobile' ? 'mobile number' : 'email'}.`);
+    showModal(t('otpResent'), t('newOtpSent'));
   };
 
   const handleChangeMethod = () => {
@@ -147,14 +149,14 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
           <View style={styles.header}>
             {/* Modern logo image, no border or card */}
             <Image source={LOGO} style={styles.logoImageModern} resizeMode="contain" />
-            <Text style={styles.logoText}>Deligo</Text>
-            <Text style={styles.tagline}>Food delivery at your doorstep.</Text>
+            <Text style={styles.logoText}>{t('deligo')}</Text>
+            <Text style={styles.tagline}>{t('tagline')}</Text>
           </View>
 
           {/* Main Card with animation */}
           <Animated.View style={[styles.formCard, { opacity: cardAnim, transform: [{ translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) }] }]}>
-            <Text style={styles.title}>{isOtpSent ? 'Verify OTP' : 'Login or Sign up'}</Text>
-            <Text style={styles.subtitle}>{isOtpSent ? `Enter the code sent to your ${loginMethod === 'mobile' ? 'mobile number' : 'email'}` : `Enter your ${loginMethod === 'mobile' ? 'mobile number' : 'email address'} to continue`}</Text>
+            <Text style={styles.title}>{isOtpSent ? t('verifyOTP') : t('loginOrSignup')}</Text>
+            <Text style={styles.subtitle}>{isOtpSent ? t('enterCodeSent') : t('enterToContinu')}</Text>
 
             {/* Tabs */}
             {!isOtpSent && (
@@ -164,14 +166,14 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
                   onPress={() => loginMethod !== 'mobile' && handleChangeMethod()}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.tabText, loginMethod === 'mobile' && styles.tabTextActive]}>Mobile</Text>
+                  <Text style={[styles.tabText, loginMethod === 'mobile' && styles.tabTextActive]}>{t('mobile')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.tab, loginMethod === 'email' && styles.tabActive]}
                   onPress={() => loginMethod !== 'email' && handleChangeMethod()}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.tabText, loginMethod === 'email' && styles.tabTextActive]}>Email</Text>
+                  <Text style={[styles.tabText, loginMethod === 'email' && styles.tabTextActive]}>{t('email')}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -195,7 +197,7 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
                     <Text style={styles.countryCodeText}>+{country ? country.callingCode[0] : '351'}</Text>
                     <TextInput
                       style={[styles.input, { flex: 1 }]}
-                      placeholder="Mobile number"
+                      placeholder={t('mobileNumber')}
                       placeholderTextColor={GRAY}
                       value={identifier}
                       onChangeText={setIdentifier}
@@ -209,7 +211,7 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
                 {loginMethod === 'email' && (
                   <TextInput
                     style={styles.input}
-                    placeholder="Email address"
+                    placeholder={t('emailAddress')}
                     placeholderTextColor={GRAY}
                     value={identifier}
                     onChangeText={setIdentifier}
@@ -224,7 +226,7 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
                   disabled={isLoading}
                   activeOpacity={0.9}
                 >
-                  <Text style={styles.buttonText}>{isLoading ? 'Sending...' : 'Send OTP'}</Text>
+                  <Text style={styles.buttonText}>{isLoading ? t('sending') : t('sendOTP')}</Text>
                 </TouchableOpacity>
               </View>
             ) : (
@@ -241,16 +243,16 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
                   disabled={isLoading}
                   activeOpacity={0.9}
                 >
-                  <Text style={styles.buttonText}>{isLoading ? 'Verifying...' : 'Verify OTP'}</Text>
+                  <Text style={styles.buttonText}>{isLoading ? t('verifying') : t('verifyOTPButton')}</Text>
                 </TouchableOpacity>
                 <View style={styles.resendContainer}>
-                  <Text style={styles.resendText}>Didn't receive OTP? </Text>
+                  <Text style={styles.resendText}>{t('didntReceiveOTP')} </Text>
                   <TouchableOpacity onPress={handleResendOtp}>
-                    <Text style={styles.resendLink}>Resend</Text>
+                    <Text style={styles.resendLink}>{t('resend')}</Text>
                   </TouchableOpacity>
                 </View>
                 <TouchableOpacity style={styles.changeButton} onPress={() => setIsOtpSent(false)}>
-                  <Text style={styles.changeButtonText}>Change {loginMethod === 'mobile' ? 'Number' : 'Email'}</Text>
+                  <Text style={styles.changeButtonText}>{t('change')} {loginMethod === 'mobile' ? t('number') : t('email')}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -270,14 +272,14 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
           <View style={styles.footerWrap}>
             <View style={styles.divider} />
             <View style={styles.footer}>
-              <Text style={styles.footerText}>By continuing, you agree to our </Text>
+              <Text style={styles.footerText}>{t('byContinuing')} </Text>
               <View style={styles.footerLinks}>
                 <TouchableOpacity onPress={() => navigation.navigate('TermsOfService')}>
-                  <Text style={styles.footerLink}>Terms of Service</Text>
+                  <Text style={styles.footerLink}>{t('termsOfService')}</Text>
                 </TouchableOpacity>
-                <Text style={styles.footerText}> and </Text>
+                <Text style={styles.footerText}> {t('and')} </Text>
                 <TouchableOpacity onPress={() => navigation.navigate('PrivacyPolicy')}>
-                  <Text style={styles.footerLink}>Privacy Policy</Text>
+                  <Text style={styles.footerLink}>{t('privacyPolicy')}</Text>
                 </TouchableOpacity>
               </View>
             </View>

@@ -5,6 +5,7 @@ import {
   StyleSheet,
 } from 'react-native';
 import AppIntroSlider from 'react-native-app-intro-slider';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { DealsIllustration, DeliveryIllustration, DiscoverIllustration } from '../components/OnboardingIllustrations';
 import { setOnboardingCompleted } from '../utils/storage';
 import { colors } from '../theme';
@@ -88,22 +89,28 @@ const OnboardingScreen = ({ onDone }) => {
   };
 
   return (
-    <AppIntroSlider
-      data={slides}
-      renderItem={renderItem}
-      onDone={onDonePress}
-      onSkip={onSkipPress}
-      renderNextButton={renderNextButton}
-      renderDoneButton={renderDoneButton}
-      renderSkipButton={renderSkipButton}
-      showSkipButton
-      dotStyle={styles.dotStyle}
-      activeDotStyle={styles.activeDotStyle}
-    />
+    <SafeAreaView style={styles.container} edges={['top', 'bottom', 'left', 'right']}>
+      <AppIntroSlider
+        data={slides}
+        renderItem={renderItem}
+        onDone={onDonePress}
+        onSkip={onSkipPress}
+        renderNextButton={renderNextButton}
+        renderDoneButton={renderDoneButton}
+        renderSkipButton={renderSkipButton}
+        showSkipButton
+        dotStyle={styles.dotStyle}
+        activeDotStyle={styles.activeDotStyle}
+      />
+    </SafeAreaView>
   );
 };
 
 const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.primary,
+  },
   slide: {
     flex: 1,
     justifyContent: 'center',

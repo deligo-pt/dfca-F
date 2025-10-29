@@ -3,6 +3,7 @@ import { View, StyleSheet, ScrollView, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { colors, spacing } from '../theme';
+import { useLanguage } from '../utils/LanguageContext';
 import {
   LocationHeader,
   CategoryCard,
@@ -14,6 +15,7 @@ import {
 import mockData from '../data/mockData.json';
 
 const CategoriesScreen = ({ navigation }) => {
+  const { t } = useLanguage();
   const [location, setLocation] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -28,7 +30,7 @@ const CategoriesScreen = ({ navigation }) => {
     try {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        setErrorMsg('Location denied');
+        setErrorMsg(t('locationDenied'));
         setLoading(false);
         return;
       }
@@ -44,13 +46,13 @@ const CategoriesScreen = ({ navigation }) => {
         const areaString = [addr.street, addr.city, addr.region]
           .filter(Boolean)
           .join(', ');
-        setArea(areaString || 'Current Location');
+        setArea(areaString || t('currentLocation'));
       } else {
-        setArea('Current Location');
+        setArea(t('currentLocation'));
       }
     } catch (error) {
-      setErrorMsg('Error getting location');
-      setArea('Set your location');
+      setErrorMsg(t('errorGettingLocation'));
+      setArea(t('setYourLocation'));
     } finally {
       setLoading(false);
     }
@@ -140,7 +142,7 @@ const CategoriesScreen = ({ navigation }) => {
         />
 
         {/* Categories Section */}
-        <SectionHeader title="What do you need?" showSeeAll={false} />
+        <SectionHeader title={t('whatDoYouNeed')} showSeeAll={false} />
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
@@ -157,7 +159,7 @@ const CategoriesScreen = ({ navigation }) => {
 
         {/* Cuisines Section */}
         <SectionHeader
-          title="Cuisines"
+          title={t('cuisines')}
           onSeeAll={() => console.log('See all cuisines')}
         />
         <ScrollView
@@ -177,7 +179,7 @@ const CategoriesScreen = ({ navigation }) => {
 
         {/* Restaurants Section */}
         <SectionHeader
-          title="Popular Restaurants"
+          title={t('popularRestaurants')}
           onSeeAll={() => console.log('See all restaurants')}
         />
         <View style={styles.restaurantsContainer}>
