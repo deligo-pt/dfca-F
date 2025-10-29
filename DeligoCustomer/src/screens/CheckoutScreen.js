@@ -12,6 +12,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { colors, spacing } from '../theme';
+import { designTokens } from '../theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLanguage } from '../utils/LanguageContext';
 
@@ -518,6 +519,7 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingTop: 12,
+    paddingBottom: 24,
   },
   deliveryTimeBanner: {
     flexDirection: 'row',

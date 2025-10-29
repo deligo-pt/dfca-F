@@ -156,7 +156,7 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
           {/* Main Card with animation */}
           <Animated.View style={[styles.formCard, { opacity: cardAnim, transform: [{ translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) }] }]}>
             <Text style={styles.title}>{isOtpSent ? t('verifyOTP') : t('loginOrSignup')}</Text>
-            <Text style={styles.subtitle}>{isOtpSent ? t('enterCodeSent') : t('enterToContinu')}</Text>
+            <Text style={styles.subtitle}>{isOtpSent ? t('enterCodeSent') : t('enterToContinue')}</Text>
 
             {/* Tabs */}
             {!isOtpSent && (
