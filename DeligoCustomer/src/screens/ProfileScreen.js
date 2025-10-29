@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme';
 import { getUserData, logoutUser } from '../utils/auth';
@@ -9,6 +9,7 @@ import { useLanguage } from '../utils/LanguageContext';
 
 const ProfileScreen = ({ onLogout, navigation }) => {
   const { t } = useLanguage();
+  const insets = useSafeAreaInsets();
   const [user, setUser] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalTitle, setModalTitle] = useState('');
@@ -106,7 +107,7 @@ const ProfileScreen = ({ onLogout, navigation }) => {
         </View>
 
         <ScrollView
-          contentContainerStyle={styles.content}
+          contentContainerStyle={[styles.content, { paddingBottom: Math.max(100, insets.bottom + 90) }]}
           showsVerticalScrollIndicator={false}
         >
           {/* User Profile Card */}
@@ -264,7 +265,6 @@ const styles = StyleSheet.create({
   },
   content: {
     paddingTop: 12,
-    paddingBottom: 20, // Extra padding for tab bar
   },
   // Profile Card Styles
   profileCard: {
