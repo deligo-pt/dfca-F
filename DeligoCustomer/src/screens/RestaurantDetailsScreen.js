@@ -5,8 +5,10 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
+  TextInput,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius } from '../theme';
 
 const RestaurantDetailsScreen = ({ route, navigation }) => {
@@ -14,6 +16,8 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const insets = useSafeAreaInsets();
   const [selectedCategory, setSelectedCategory] = useState('Popular');
   const [cart, setCart] = useState({});
+  const [searchVisible, setSearchVisible] = useState(false);
+  const [searchQuery, setSearchQuery] = useState('');
 
   // Mock menu data - in real app, this would come from API
   const menuCategories = ['Popular', 'Burgers', 'Sides', 'Drinks', 'Desserts'];
@@ -160,6 +164,19 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     return total.toFixed(2);
   };
 
+  // Filter menu items based on search query
+  const getFilteredMenuItems = () => {
+    if (!searchQuery.trim()) {
+      return menuItems[selectedCategory] || [];
+    }
+
+    const allItems = Object.values(menuItems).flat();
+    return allItems.filter(item =>
+      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+      item.description.toLowerCase().includes(searchQuery.toLowerCase())
+    );
+  };
+
   const renderMenuItem = (item) => {
     const quantity = cart[item.id] || 0;
 
@@ -213,13 +230,36 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
           style={styles.backButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backButtonText}>←</Text>
+          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{restaurant.name}</Text>
-        <TouchableOpacity style={styles.searchButton}>
-          <Text style={styles.searchButtonText}>🔍</Text>
+        <TouchableOpacity
+          style={styles.searchButton}
+          onPress={() => setSearchVisible(!searchVisible)}
+        >
+          <Ionicons name="search" size={22} color={colors.text.primary} />
         </TouchableOpacity>
       </View>
+
+      {/* Search Bar */}
+      {searchVisible && (
+        <View style={styles.searchContainer}>
+          <Ionicons name="search" size={20} color={colors.text.secondary} style={styles.searchIcon} />
+          <TextInput
+            style={styles.searchInput}
+            placeholder="Search menu items..."
+            placeholderTextColor={colors.text.secondary}
+            value={searchQuery}
+            onChangeText={setSearchQuery}
+            autoFocus
+          />
+          {searchQuery.length > 0 && (
+            <TouchableOpacity onPress={() => setSearchQuery('')}>
+              <Ionicons name="close-circle" size={20} color={colors.text.secondary} />
+            </TouchableOpacity>
+          )}
+        </View>
+      )}
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
         {/* Restaurant Info */}
@@ -292,8 +332,18 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
         {/* Menu Items */}
         <View style={styles.menuSection}>
-          <Text style={styles.menuSectionTitle}>{selectedCategory}</Text>
-          {menuItems[selectedCategory]?.map((item) => renderMenuItem(item))}
+          <Text style={styles.menuSectionTitle}>
+            {searchQuery ? `Search Results (${getFilteredMenuItems().length})` : selectedCategory}
+          </Text>
+          {getFilteredMenuItems().length > 0 ? (
+            getFilteredMenuItems().map((item) => renderMenuItem(item))
+          ) : (
+            <View style={styles.noResultsContainer}>
+              <Ionicons name="search-outline" size={48} color={colors.text.secondary} />
+              <Text style={styles.noResultsText}>No items found</Text>
+              <Text style={styles.noResultsSubtext}>Try searching with different keywords</Text>
+            </View>
+          )}
         </View>
 
         {/* Cart Footer - Inside ScrollView */}
@@ -346,10 +396,6 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  backButtonText: {
-    fontSize: 24,
-    color: colors.text.primary,
-  },
   headerTitle: {
     fontSize: fontSize.lg,
     fontFamily: 'Poppins-SemiBold',
@@ -365,8 +411,24 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
   },
-  searchButtonText: {
-    fontSize: 20,
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: '#FFFFFF',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F0F0',
+  },
+  searchIcon: {
+    marginRight: spacing.sm,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: fontSize.md,
+    fontFamily: 'Poppins-Regular',
+    color: colors.text.primary,
+    paddingVertical: spacing.xs,
   },
   scrollView: {
     flex: 1,
@@ -619,6 +681,23 @@ const styles = StyleSheet.create({
   viewCartButtonIcon: {
     fontSize: fontSize.lg,
     color: colors.primary,
+  },
+  noResultsContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xl * 2,
+  },
+  noResultsText: {
+    fontSize: fontSize.lg,
+    fontFamily: 'Poppins-SemiBold',
+    color: colors.text.primary,
+    marginTop: spacing.md,
+  },
+  noResultsSubtext: {
+    fontSize: fontSize.sm,
+    fontFamily: 'Poppins-Regular',
+    color: colors.text.secondary,
+    marginTop: spacing.xs,
   },
 });
 
