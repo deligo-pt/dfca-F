@@ -11,7 +11,7 @@ import {
   Alert,
   Platform,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { colors, spacing, fontSize, borderRadius } from '../theme';
@@ -22,6 +22,7 @@ const { height } = Dimensions.get('window');
 
 const TrackOrderScreen = ({ route, navigation }) => {
   const { t, language } = useLanguage();
+  const insets = useSafeAreaInsets();
   const { order } = route.params || {};
   const [currentStatus, setCurrentStatus] = useState('on_the_way'); // preparing, ready, picked_up, on_the_way, nearby, delivered
   const [progressAnim] = useState(new Animated.Value(0));
@@ -965,20 +966,22 @@ const TrackOrderScreen = ({ route, navigation }) => {
         {/* Order Summary */}
         {renderOrderSummary()}
 
-        {/* Bottom Spacing */}
-        <View style={{ height: 100 }} />
-      </ScrollView>
+        {/* Bottom Action Buttons - Inside ScrollView */}
+        <View style={[styles.bottomActionsInline, {
+          marginBottom: Math.max(spacing.md, insets.bottom + spacing.sm)
+        }]}>
+          <TouchableOpacity style={styles.cancelButton}>
+            <Text style={styles.cancelButtonText}>{t('cancelOrder')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.supportButton}>
+            <Ionicons name="headset" size={20} color={colors.text.white} />
+            <Text style={styles.supportButtonText}>{t('support')}</Text>
+          </TouchableOpacity>
+        </View>
 
-      {/* Bottom Action Buttons */}
-      <View style={styles.bottomActions}>
-        <TouchableOpacity style={styles.cancelButton}>
-          <Text style={styles.cancelButtonText}>{t('cancelOrder')}</Text>
-        </TouchableOpacity>
-        <TouchableOpacity style={styles.supportButton}>
-          <Ionicons name="headset" size={20} color={colors.text.white} />
-          <Text style={styles.supportButtonText}>{t('support')}</Text>
-        </TouchableOpacity>
-      </View>
+        {/* Bottom Spacing for safe area and tab bar */}
+        <View style={{ height: Math.max(80, insets.bottom + 80) }} />
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -1603,12 +1606,10 @@ const styles = StyleSheet.create({
   },
 
   // Bottom Actions
-  bottomActions: {
+  bottomActionsInline: {
     flexDirection: 'row',
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-    borderTopWidth: 1,
-    borderTopColor: colors.border,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
     gap: spacing.sm,
   },
   cancelButton: {

@@ -264,38 +264,40 @@ const CartScreen = ({ navigation }) => {
           </View>
         </View>
 
-        {/* Bottom Spacing - Extra padding to prevent overlap with checkout footer and bottom tabs */}
-        <View style={{ height: Math.max(160, insets.bottom + 150) }} />
-      </ScrollView>
-
-      {/* Checkout Button */}
-      <View style={[styles.checkoutFooter, { bottom: Math.max(64, insets.bottom + 64) }]}>
-        <View style={styles.checkoutFooterLeft}>
-          <Text style={styles.checkoutItemCount}>
-            {cartItems.reduce((sum, item) => sum + item.quantity, 0)} {t('items')}
-          </Text>
-          <Text style={styles.checkoutTotal}>€{getTotal().toFixed(2)}</Text>
+        {/* Checkout Button - Inside ScrollView */}
+        <View style={[styles.checkoutFooterInline, {
+          marginBottom: Math.max(spacing.md, insets.bottom + spacing.sm)
+        }]}>
+          <View style={styles.checkoutFooterLeft}>
+            <Text style={styles.checkoutItemCount}>
+              {cartItems.reduce((sum, item) => sum + item.quantity, 0)} {t('items')}
+            </Text>
+            <Text style={styles.checkoutTotal}>€{getTotal().toFixed(2)}</Text>
+          </View>
+          <TouchableOpacity
+            style={styles.checkoutButton}
+            onPress={() => {
+              const cartData = {
+                items: cartItems,
+                subtotal: getSubtotal(),
+                deliveryFee: deliveryFee,
+                serviceFee: serviceFee,
+                discount: discount,
+                total: getTotal(),
+                deliveryInstructions: deliveryInstructions,
+                promoCode: appliedPromo?.code,
+              };
+              navigation.navigate('Checkout', { cartData });
+            }}
+          >
+            <Text style={styles.checkoutButtonText}>{t('checkout')}</Text>
+            <Text style={styles.checkoutButtonIcon}>→</Text>
+          </TouchableOpacity>
         </View>
-        <TouchableOpacity
-          style={styles.checkoutButton}
-          onPress={() => {
-            const cartData = {
-              items: cartItems,
-              subtotal: getSubtotal(),
-              deliveryFee: deliveryFee,
-              serviceFee: serviceFee,
-              discount: discount,
-              total: getTotal(),
-              deliveryInstructions: deliveryInstructions,
-              promoCode: appliedPromo?.code,
-            };
-            navigation.navigate('Checkout', { cartData });
-          }}
-        >
-          <Text style={styles.checkoutButtonText}>{t('checkout')}</Text>
-          <Text style={styles.checkoutButtonIcon}>→</Text>
-        </TouchableOpacity>
-      </View>
+
+        {/* Bottom Spacing for safe area and tab bar */}
+        <View style={{ height: Math.max(100, insets.bottom + 90) }} />
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -604,21 +606,21 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 20,
   },
-  checkoutFooter: {
-    position: 'absolute',
-    left: 0,
-    right: 0,
+  checkoutFooterInline: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: colors.primary,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.md,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
+    borderRadius: borderRadius.xl,
     shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: -4 },
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
+    shadowRadius: 4,
+    elevation: 4,
   },
   checkoutFooterLeft: {
     flex: 1,

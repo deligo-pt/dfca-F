@@ -10,14 +10,14 @@ import {
   TextInput,
   ActivityIndicator,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing } from '../theme';
-import { designTokens } from '../theme';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLanguage } from '../utils/LanguageContext';
 
 const CheckoutScreen = ({ route, navigation }) => {
   const { t } = useLanguage();
+  const insets = useSafeAreaInsets();
   const { cartData } = route.params || {};
   const [selectedPayment, setSelectedPayment] = useState('card');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -430,36 +430,37 @@ const CheckoutScreen = ({ route, navigation }) => {
           </View>
         </View>
 
-        <View style={{ height: 140 }} />
-      </ScrollView>
-
-      {/* Fixed Bottom Bar */}
-      <View style={styles.checkoutBottomBar}>
-        <View style={styles.totalBar}>
-          <Text style={styles.totalBarLabel}>{t('total')}</Text>
-          <Text style={styles.totalBarAmount}>€{(total + selectedTip).toFixed(2)}</Text>
-        </View>
-        <TouchableOpacity
-          style={[
-            styles.placeOrderBtn,
-            isProcessing && styles.placeOrderBtnDisabled,
-          ]}
-          onPress={handlePlaceOrder}
-          disabled={isProcessing}
-          activeOpacity={0.85}
-        >
-          <Text style={styles.placeOrderBtnText}>
-            {isProcessing ? t('processing') : t('placeOrder')}
-          </Text>
-          <View style={styles.placeOrderArrow}>
-            <Ionicons
-              name={isProcessing ? 'hourglass-outline' : 'arrow-forward'}
-              size={20}
-              color="#FFFFFF"
-            />
+        {/* Place Order Button - Inside ScrollView */}
+        <View style={styles.checkoutButtonContainer}>
+          <View style={styles.totalBarInline}>
+            <Text style={styles.totalBarLabel}>{t('total')}</Text>
+            <Text style={styles.totalBarAmount}>€{(total + selectedTip).toFixed(2)}</Text>
           </View>
-        </TouchableOpacity>
-      </View>
+          <TouchableOpacity
+            style={[
+              styles.placeOrderBtn,
+              isProcessing && styles.placeOrderBtnDisabled,
+            ]}
+            onPress={handlePlaceOrder}
+            disabled={isProcessing}
+            activeOpacity={0.85}
+          >
+            <Text style={styles.placeOrderBtnText}>
+              {isProcessing ? t('processing') : t('placeOrder')}
+            </Text>
+            <View style={styles.placeOrderArrow}>
+              <Ionicons
+                name={isProcessing ? 'hourglass-outline' : 'arrow-forward'}
+                size={20}
+                color="#FFFFFF"
+              />
+            </View>
+          </TouchableOpacity>
+        </View>
+
+        {/* Bottom Spacing for safe area */}
+        <View style={{ height: Math.max(100, insets.bottom + 90) }} />
+      </ScrollView>
 
       {renderProcessingModal()}
       {renderSuccessModal()}
@@ -468,6 +469,7 @@ const CheckoutScreen = ({ route, navigation }) => {
 };
 
 const styles = StyleSheet.create({
+  // ...existing code...
   container: {
     flex: 1,
     backgroundColor: '#F8F9FB',
@@ -519,7 +521,6 @@ const styles = StyleSheet.create({
   },
   scrollContent: {
     paddingTop: 12,
-    paddingBottom: 24,
   },
   deliveryTimeBanner: {
     flexDirection: 'row',
@@ -971,22 +972,29 @@ const styles = StyleSheet.create({
     color: colors.primary,
     letterSpacing: -0.5,
   },
-  checkoutBottomBar: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+  checkoutButtonContainer: {
     backgroundColor: '#FFFFFF',
-    paddingTop: 16,
-    paddingBottom: 24,
-    paddingHorizontal: spacing.lg,
+    marginHorizontal: spacing.lg,
+    marginTop: 12,
+    marginBottom: 12,
+    padding: spacing.lg,
+    borderRadius: 16,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: -3 },
-    shadowOpacity: 0.08,
-    shadowRadius: 12,
-    elevation: 10,
-    borderTopWidth: 1,
-    borderTopColor: '#F0F2F5',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.06,
+    shadowRadius: 4,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F0F2F5',
+  },
+  totalBarInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: spacing.md,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F2F5',
   },
   totalBar: {
     flexDirection: 'row',
