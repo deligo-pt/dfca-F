@@ -1,14 +1,33 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Animated } from 'react-native';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius } from '../theme';
 
-const StickySearchHeader = ({ onCartPress, scrollY, onLocationPress, area }) => {
+const StickySearchHeader = ({
+  onCartPress,
+  scrollY,
+  onLocationPress,
+  area,
+  cartItemCount = 0,
+  onSearch,
+  searchQuery = ''  // Receive from parent as prop
+}) => {
+  const [isSearchFocused, setIsSearchFocused] = useState(false);
+
   // Animate opacity based on scroll - starts after LocationHeader scrolls away
   const headerOpacity = scrollY.interpolate({
     inputRange: [80, 150],
     outputRange: [0, 1],
     extrapolate: 'clamp',
   });
+
+  const handleSearchChange = (text) => {
+    onSearch && onSearch(text);
+  };
+
+  const clearSearch = () => {
+    onSearch && onSearch('');
+  };
 
   return (
     <Animated.View
@@ -23,30 +42,46 @@ const StickySearchHeader = ({ onCartPress, scrollY, onLocationPress, area }) => 
         }}
         activeOpacity={0.7}
       >
-        <Text style={styles.locationIcon}>📍</Text>
+        <Ionicons name="location" size={14} color={colors.text.white} />
         <Text style={styles.locationText} numberOfLines={1}>
           {area || 'Set location'}
         </Text>
+        <Ionicons name="chevron-down" size={12} color={colors.text.white} style={{ marginLeft: 2 }} />
       </TouchableOpacity>
-      <View style={styles.searchContainer}>
-        <Text style={styles.searchIcon}>🔍</Text>
+
+      <View style={[styles.searchContainer, isSearchFocused && styles.searchContainerFocused]}>
+        <Ionicons name="search" size={20} color={colors.text.secondary} style={styles.searchIcon} />
         <TextInput
           style={styles.input}
-          placeholder="Search for restaurants, cuisines..."
-          placeholderTextColor={colors.text.light}
+          placeholder="Search restaurants, cuisines..."
+          placeholderTextColor={colors.text.secondary}
+          value={searchQuery}
+          onChangeText={handleSearchChange}
+          onFocus={() => setIsSearchFocused(true)}
+          onBlur={() => setIsSearchFocused(false)}
+          returnKeyType="search"
         />
+        {searchQuery.length > 0 && (
+          <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
+            <Ionicons name="close-circle" size={18} color={colors.text.secondary} />
+          </TouchableOpacity>
+        )}
       </View>
+
       <TouchableOpacity
         style={styles.cartButton}
         onPress={() => {
           console.log('🛒 StickySearchHeader: Cart button pressed');
           onCartPress && onCartPress();
         }}
+        activeOpacity={0.7}
       >
-        <Text style={styles.cartIcon}>🛒</Text>
-        <View style={styles.badge}>
-          <Text style={styles.badgeText}>3</Text>
-        </View>
+        <Ionicons name="cart-outline" size={24} color={colors.text.white} />
+        {cartItemCount > 0 && (
+          <View style={styles.badge}>
+            <Text style={styles.badgeText}>{cartItemCount > 99 ? '99+' : cartItemCount}</Text>
+          </View>
+        )}
       </TouchableOpacity>
     </Animated.View>
   );
@@ -65,44 +100,46 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     paddingTop: spacing.lg + spacing.sm,
     zIndex: 1000,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
     shadowRadius: 8,
     elevation: 8,
   },
   locationBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.xs + 2,
+    borderRadius: borderRadius.xl,
     marginRight: spacing.sm,
     maxWidth: 120,
-  },
-  locationIcon: {
-    fontSize: 14,
-    marginRight: 4,
   },
   locationText: {
     color: colors.text.white,
     fontSize: fontSize.xs,
-    fontFamily: 'Poppins-Medium',
+    fontFamily: 'Poppins-SemiBold',
     flex: 1,
+    marginLeft: 4,
   },
   searchContainer: {
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.background,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.xl,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     marginRight: spacing.sm,
+    borderWidth: 2,
+    borderColor: 'transparent',
+  },
+  searchContainerFocused: {
+    borderColor: colors.text.white,
+    backgroundColor: '#FFFFFF',
   },
   searchIcon: {
-    fontSize: fontSize.lg,
     marginRight: spacing.sm,
   },
   input: {
@@ -112,29 +149,32 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
     padding: 0,
   },
+  clearButton: {
+    padding: spacing.xs,
+    marginLeft: spacing.xs,
+  },
   cartButton: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
+    backgroundColor: 'rgba(255, 255, 255, 0.25)',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
   },
-  cartIcon: {
-    fontSize: 24,
-  },
   badge: {
     position: 'absolute',
-    top: 2,
-    right: 2,
+    top: 0,
+    right: 0,
     backgroundColor: '#FF3B30',
-    borderRadius: 10,
+    borderRadius: 12,
     minWidth: 20,
     height: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingHorizontal: 4,
+    paddingHorizontal: 5,
+    borderWidth: 2,
+    borderColor: colors.primary,
   },
   badgeText: {
     color: colors.text.white,

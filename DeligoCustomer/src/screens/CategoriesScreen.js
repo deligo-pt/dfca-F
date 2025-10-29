@@ -1,7 +1,8 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, StyleSheet, ScrollView, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing } from '../theme';
 import { useLanguage } from '../utils/LanguageContext';
 import {
@@ -21,7 +22,23 @@ const CategoriesScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(false);
   const [area, setArea] = useState(null);
   const [selectedCuisine, setSelectedCuisine] = useState(null);
+  const [searchQuery, setSearchQuery] = useState('');
   const scrollY = useRef(new Animated.Value(0)).current;
+
+  // Mock cart count - in real app, get from context/state
+  const cartItemCount = 0;
+
+  // Filter restaurants based on search query with null checks
+  const filteredRestaurants = searchQuery.trim()
+    ? (mockData.restaurants || []).filter(restaurant => {
+        if (!restaurant) return false;
+        const query = searchQuery.toLowerCase();
+        const name = (restaurant.name || '').toLowerCase();
+        const cuisine = (restaurant.cuisine || '').toLowerCase();
+        const description = (restaurant.description || '').toLowerCase();
+        return name.includes(query) || cuisine.includes(query) || description.includes(query);
+      })
+    : mockData.restaurants || [];
 
   const getLocation = async () => {
     setLoading(true);
@@ -119,6 +136,9 @@ const CategoriesScreen = ({ navigation }) => {
         onCartPress={handleCartPress}
         onLocationPress={handleLocationPress}
         area={area}
+        cartItemCount={cartItemCount}
+        onSearch={setSearchQuery}
+        searchQuery={searchQuery}
       />
 
       <Animated.ScrollView
@@ -139,6 +159,9 @@ const CategoriesScreen = ({ navigation }) => {
           errorMsg={errorMsg}
           onCartPress={handleCartPress}
           onLocationPress={handleLocationPress}
+          cartItemCount={cartItemCount}
+          onSearch={setSearchQuery}
+          searchQuery={searchQuery}
         />
 
         {/* Categories Section */}
@@ -179,17 +202,25 @@ const CategoriesScreen = ({ navigation }) => {
 
         {/* Restaurants Section */}
         <SectionHeader
-          title={t('popularRestaurants')}
-          onSeeAll={() => console.log('See all restaurants')}
+          title={searchQuery ? `Search Results (${filteredRestaurants.length})` : t('popularRestaurants')}
+          onSeeAll={!searchQuery ? () => console.log('See all restaurants') : undefined}
         />
         <View style={styles.restaurantsContainer}>
-          {mockData.restaurants.map((restaurant) => (
-            <RestaurantCard
-              key={restaurant.id}
-              restaurant={restaurant}
-              onPress={() => handleRestaurantPress(restaurant)}
-            />
-          ))}
+          {filteredRestaurants.length > 0 ? (
+            filteredRestaurants.map((restaurant) => (
+              <RestaurantCard
+                key={restaurant.id}
+                restaurant={restaurant}
+                onPress={() => handleRestaurantPress(restaurant)}
+              />
+            ))
+          ) : searchQuery ? (
+            <View style={styles.noResultsContainer}>
+              <Ionicons name="search-outline" size={48} color={colors.text.secondary} />
+              <Text style={styles.noResultsText}>No restaurants found</Text>
+              <Text style={styles.noResultsSubtext}>Try searching with different keywords</Text>
+            </View>
+          ) : null}
         </View>
 
         <View style={{ height: 100 }} />
@@ -217,6 +248,26 @@ const styles = StyleSheet.create({
   },
   restaurantsContainer: {
     paddingTop: spacing.xs,
+  },
+  noResultsContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.xl * 2,
+    paddingHorizontal: spacing.lg,
+  },
+  noResultsText: {
+    fontSize: 18,
+    fontFamily: 'Poppins-SemiBold',
+    color: colors.text.primary,
+    marginTop: spacing.md,
+    textAlign: 'center',
+  },
+  noResultsSubtext: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: colors.text.secondary,
+    marginTop: spacing.xs,
+    textAlign: 'center',
   },
 });
 
