@@ -123,6 +123,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: 16,
+    paddingBottom: 24,
   },
   addressCard: {
     backgroundColor: colors.background,
