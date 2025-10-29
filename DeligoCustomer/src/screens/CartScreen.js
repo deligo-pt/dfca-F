@@ -1,6 +1,7 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize, borderRadius } from '../theme';
 import { useLanguage } from '../utils/LanguageContext';
 
@@ -265,14 +266,14 @@ const CartScreen = ({ navigation }) => {
         </View>
 
         {/* Checkout Button - Inside ScrollView */}
-        <View style={[styles.checkoutFooterInline, {
-          marginBottom: Math.max(spacing.md, insets.bottom + spacing.sm)
-        }]}>
-          <View style={styles.checkoutFooterLeft}>
-            <Text style={styles.checkoutItemCount}>
-              {cartItems.reduce((sum, item) => sum + item.quantity, 0)} {t('items')}
-            </Text>
-            <Text style={styles.checkoutTotal}>€{getTotal().toFixed(2)}</Text>
+        <View style={styles.checkoutButtonContainer}>
+          <View style={styles.totalBarInline}>
+            <View>
+              <Text style={styles.checkoutItemCount}>
+                {cartItems.reduce((sum, item) => sum + item.quantity, 0)} {t('items')}
+              </Text>
+              <Text style={styles.checkoutTotal}>€{getTotal().toFixed(2)}</Text>
+            </View>
           </View>
           <TouchableOpacity
             style={styles.checkoutButton}
@@ -289,9 +290,12 @@ const CartScreen = ({ navigation }) => {
               };
               navigation.navigate('Checkout', { cartData });
             }}
+            activeOpacity={0.85}
           >
             <Text style={styles.checkoutButtonText}>{t('checkout')}</Text>
-            <Text style={styles.checkoutButtonIcon}>→</Text>
+            <View style={styles.checkoutButtonArrow}>
+              <Ionicons name="arrow-forward" size={20} color="#FFFFFF" />
+            </View>
           </TouchableOpacity>
         </View>
 
@@ -606,53 +610,71 @@ const styles = StyleSheet.create({
   scrollContent: {
     paddingBottom: 20,
   },
-  checkoutFooterInline: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    marginHorizontal: spacing.md,
-    marginTop: spacing.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.xl,
-    shadowColor: colors.shadow,
+  checkoutButtonContainer: {
+    backgroundColor: '#FFFFFF',
+    marginHorizontal: spacing.lg,
+    marginTop: 12,
+    marginBottom: 12,
+    padding: spacing.lg,
+    borderRadius: 16,
+    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
+    shadowOpacity: 0.06,
     shadowRadius: 4,
-    elevation: 4,
+    elevation: 2,
+    borderWidth: 1,
+    borderColor: '#F0F2F5',
   },
-  checkoutFooterLeft: {
-    flex: 1,
+  totalBarInline: {
+    marginBottom: spacing.md,
+    paddingBottom: spacing.md,
+    borderBottomWidth: 1,
+    borderBottomColor: '#F0F2F5',
   },
   checkoutItemCount: {
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Regular',
-    color: colors.text.white,
-    opacity: 0.9,
+    fontSize: 13,
+    fontFamily: 'Poppins-Medium',
+    color: colors.text.secondary,
+    marginBottom: 2,
   },
   checkoutTotal: {
-    fontSize: fontSize.xl,
+    fontSize: 26,
     fontFamily: 'Poppins-Bold',
-    color: colors.text.white,
+    color: colors.primary,
+    letterSpacing: -0.5,
   },
   checkoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.text.white,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.lg,
+    justifyContent: 'center',
+    backgroundColor: colors.primary,
+    paddingHorizontal: 28,
+    paddingVertical: 16,
+    borderRadius: 16,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   checkoutButtonText: {
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-SemiBold',
-    color: colors.primary,
-    marginRight: spacing.sm,
+    fontSize: 16,
+    fontFamily: 'Poppins-Bold',
+    color: '#FFFFFF',
+    marginRight: 8,
+  },
+  checkoutButtonArrow: {
+    width: 28,
+    height: 28,
+    borderRadius: 14,
+    backgroundColor: 'rgba(255, 255, 255, 0.3)',
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   checkoutButtonIcon: {
-    fontSize: fontSize.lg,
-    color: colors.primary,
+    fontSize: 18,
+    color: '#FFFFFF',
+    fontWeight: 'bold',
   },
   emptyCart: {
     flex: 1,
