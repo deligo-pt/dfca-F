@@ -6,11 +6,12 @@ import {
   ScrollView,
   TouchableOpacity,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, fontSize, borderRadius } from '../theme';
 
 const RestaurantDetailsScreen = ({ route, navigation }) => {
   const { restaurant } = route.params;
+  const insets = useSafeAreaInsets();
   const [selectedCategory, setSelectedCategory] = useState('Popular');
   const [cart, setCart] = useState({});
 
@@ -295,29 +296,29 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
           {menuItems[selectedCategory]?.map((item) => renderMenuItem(item))}
         </View>
 
-        {/* Bottom Spacing */}
-        <View style={{ height: 120 }} />
-      </ScrollView>
-
-      {/* Cart Footer */}
-      {getTotalItems() > 0 && (
-        <View style={styles.cartFooter}>
-          <View style={styles.cartFooterLeft}>
-            <Text style={styles.cartItemCount}>{getTotalItems()} items</Text>
-            <Text style={styles.cartTotal}>€{getTotalPrice()}</Text>
+        {/* Cart Footer - Inside ScrollView */}
+        {getTotalItems() > 0 && (
+          <View style={styles.cartFooterInline}>
+            <View style={styles.cartFooterLeft}>
+              <Text style={styles.cartItemCount}>{getTotalItems()} items</Text>
+              <Text style={styles.cartTotal}>€{getTotalPrice()}</Text>
+            </View>
+            <TouchableOpacity
+              style={styles.viewCartButton}
+              onPress={() => {
+                // Navigate back to Main navigator and switch to Cart tab
+                navigation.navigate('Main', { screen: 'Cart' });
+              }}
+            >
+              <Text style={styles.viewCartButtonText}>View Cart</Text>
+              <Text style={styles.viewCartButtonIcon}>→</Text>
+            </TouchableOpacity>
           </View>
-          <TouchableOpacity
-            style={styles.viewCartButton}
-            onPress={() => {
-              // Navigate back to Main navigator and switch to Cart tab
-              navigation.navigate('Main', { screen: 'Cart' });
-            }}
-          >
-            <Text style={styles.viewCartButtonText}>View Cart</Text>
-            <Text style={styles.viewCartButtonIcon}>→</Text>
-          </TouchableOpacity>
-        </View>
-      )}
+        )}
+
+        {/* Bottom Spacing for tab bar + safe area */}
+        <View style={{ height: Math.max(80, insets.bottom + 80) }} />
+      </ScrollView>
     </SafeAreaView>
   );
 };
@@ -570,22 +571,22 @@ const styles = StyleSheet.create({
     minWidth: 20,
     textAlign: 'center',
   },
-  cartFooter: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
+  cartFooterInline: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
     backgroundColor: colors.primary,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
+    marginHorizontal: spacing.md,
+    marginTop: spacing.lg,
+    marginBottom: spacing.sm,
+    borderRadius: borderRadius.xl,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 3,
   },
   cartFooterLeft: {
     flex: 1,
