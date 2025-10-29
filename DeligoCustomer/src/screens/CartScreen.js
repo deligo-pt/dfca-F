@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { colors, spacing, fontSize, borderRadius } from '../theme';
 import { useLanguage } from '../utils/LanguageContext';
 
 const CartScreen = ({ navigation }) => {
   const { t } = useLanguage();
+  const insets = useSafeAreaInsets();
 
   // Mock cart data - in real app, this would come from global state/context
   const [cartItems, setCartItems] = useState([
@@ -264,11 +265,11 @@ const CartScreen = ({ navigation }) => {
         </View>
 
         {/* Bottom Spacing - Extra padding to prevent overlap with checkout footer and bottom tabs */}
-        <View style={{ height: 160 }} />
+        <View style={{ height: Math.max(160, insets.bottom + 150) }} />
       </ScrollView>
 
       {/* Checkout Button */}
-      <View style={styles.checkoutFooter}>
+      <View style={[styles.checkoutFooter, { bottom: Math.max(64, insets.bottom + 64) }]}>
         <View style={styles.checkoutFooterLeft}>
           <Text style={styles.checkoutItemCount}>
             {cartItems.reduce((sum, item) => sum + item.quantity, 0)} {t('items')}
@@ -605,7 +606,6 @@ const styles = StyleSheet.create({
   },
   checkoutFooter: {
     position: 'absolute',
-    bottom: 64,
     left: 0,
     right: 0,
     flexDirection: 'row',
