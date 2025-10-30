@@ -9,8 +9,12 @@ import { checkOnboardingStatus } from './src/utils/storage';
 import { isUserAuthenticated, getUserData } from './src/utils/auth';
 import { colors } from './src/theme';
 import * as Font from 'expo-font';
+import * as SplashScreen from 'expo-splash-screen';
 import { createStackNavigator } from '@react-navigation/stack';
 import { LanguageProvider } from './src/utils/LanguageContext';
+
+// Keep the splash screen visible while we fetch resources
+SplashScreen.preventAutoHideAsync();
 
 // Set default font for all Text and TextInput components
 RNText.defaultProps = RNText.defaultProps || {};
@@ -52,9 +56,26 @@ export default function App() {
 
   useEffect(() => {
     const prepare = async () => {
-      await loadFonts();
-      await initializeApp();
-      setIsLoading(false);
+      try {
+        // Start timing
+        const startTime = Date.now();
+
+        await loadFonts();
+        await initializeApp();
+
+        // Ensure splash screen shows for at least 2 seconds
+        const elapsedTime = Date.now() - startTime;
+        const minimumTime = 2000; // 2 seconds
+        if (elapsedTime < minimumTime) {
+          await new Promise(resolve => setTimeout(resolve, minimumTime - elapsedTime));
+        }
+      } catch (e) {
+        console.warn(e);
+      } finally {
+        setIsLoading(false);
+        // Hide the splash screen
+        await SplashScreen.hideAsync();
+      }
     };
     prepare();
   }, []);
@@ -73,8 +94,6 @@ export default function App() {
       }
     } catch (error) {
       console.error('Error initializing app:', error);
-    } finally {
-      setIsLoading(false);
     }
   };
 
@@ -92,12 +111,10 @@ export default function App() {
     setUser(null);
   };
 
+  // Don't render anything while loading - the native splash screen will show
+  // It has the pink background configured in app.json
   if (isLoading) {
-    return (
-      <View style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
-        <ActivityIndicator size="large" color={colors.primary || '#000'} />
-      </View>
-    );
+    return null;
   }
 
   return (

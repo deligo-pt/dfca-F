@@ -4,8 +4,11 @@
     "slug": "DeligoCustomer",
     "version": "1.0.0",
     "orientation": "portrait",
+    "icon": "./src/assets/icon.png",
     "userInterfaceStyle": "light",
+    "backgroundColor": "#DC3173",
     "splash": {
+      "image": "./src/assets/splash-icon.png",
       "backgroundColor": "#DC3173",
       "resizeMode": "contain"
     },
@@ -14,7 +17,8 @@
     ],
     "platforms": [
       "ios",
-      "android"
+      "android",
+      "web"
     ],
     "extra": {
       "eas": {
@@ -24,6 +28,7 @@
     "ios": {
       "supportsTablet": true,
       "bundleIdentifier": "com.deligo.customer",
+      "icon": "./src/assets/icon.png",
       "config": {
         "googleMapsApiKey": "YOUR_IOS_GOOGLE_MAPS_API_KEY"
       }
@@ -31,6 +36,11 @@
     "android": {
       "package": "com.deligo.customer",
       "versionCode": 1,
+      "icon": "./src/assets/icon.png",
+      "adaptiveIcon": {
+        "foregroundImage": "./src/assets/adaptive-icon.png",
+        "backgroundColor": "#DC3173"
+      },
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"
@@ -41,7 +51,18 @@
         }
       }
     },
+    "web": {
+      "favicon": "./src/assets/favicon.png"
+    },
     "plugins": [
+      [
+        "expo-splash-screen",
+        {
+          "backgroundColor": "#DC3173",
+          "image": "./src/assets/splash-icon.png",
+          "imageWidth": 200
+        }
+      ],
       [
         "expo-location",
         {
