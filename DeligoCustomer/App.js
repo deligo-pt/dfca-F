@@ -152,7 +152,7 @@ export default function App() {
             <Stack.Screen name="Settings" component={SettingsScreen} />
             <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
           </Stack.Navigator>
-          <StatusBar style="auto" />
+          <StatusBar style="light" backgroundColor={colors.primary} />
         </NavigationContainer>
       </LanguageProvider>
     </SafeAreaProvider>

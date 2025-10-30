@@ -16,6 +16,12 @@ const LocationHeader = ({
   searchQuery = '',
   suggestions = [],
   onSuggestionPress,
+  // New props for offers and shops
+  activeOffer = null, // from API: { title, subtitle, code, discount, action: 'navigate_to_offers' }
+  featuredShops = [], // from API: [{ id, name, logo, cuisine }]
+  onOfferPress,
+  onShopPress,
+  userName = null, // for personalized greeting
 }) => {
   const [isSearchFocused, setIsSearchFocused] = useState(false);
 
@@ -36,13 +42,13 @@ const LocationHeader = ({
     <View style={styles.wrapper}>
       <View style={styles.container}>
         {/* Deligo Logo/Brand */}
-        <View style={styles.logoRow}>
-          <Image
-            source={require('../assets/images/logo.png')}
-            style={styles.logoImage}
-            resizeMode="contain"
-          />
-        </View>
+        {/*<View style={styles.logoRow}>*/}
+        {/*  <Image*/}
+        {/*    source={require('../assets/images/logo.png')}*/}
+        {/*    style={styles.logoImage}*/}
+        {/*    resizeMode="contain"*/}
+        {/*  />*/}
+        {/*</View>*/}
 
         {/* Row 1: Deliver To Location */}
         <View style={styles.topRow}>
@@ -114,6 +120,116 @@ const LocationHeader = ({
             )}
           </View>
         </View>
+
+        {/* Dynamic Promo Banner or Welcome Greeting */}
+        {activeOffer ? (
+          // Marketing-Centric Offer Banner
+          <TouchableOpacity
+            style={styles.promoBanner}
+            activeOpacity={0.85}
+            onPress={() => onOfferPress && onOfferPress(activeOffer)}
+          >
+            <View style={styles.promoLeft}>
+              <View style={styles.promoLogoContainer}>
+                <Image
+                  source={require('../assets/images/logo.png')}
+                  style={styles.promoLogo}
+                  resizeMode="contain"
+                />
+                <View style={styles.sparkleEffect}>
+                  <Text style={styles.sparkle}>✨</Text>
+                </View>
+              </View>
+              <View style={styles.promoTextContainer}>
+                <Text style={styles.promoTitle} numberOfLines={1}>
+                  {activeOffer.title || 'Special Offer!'}
+                </Text>
+                <Text style={styles.promoSubtitle} numberOfLines={1}>
+                  {activeOffer.subtitle || 'Limited time offer'}
+                </Text>
+                {activeOffer.code && (
+                  <View style={styles.promoCodeBadge}>
+                    <Text style={styles.promoCodeText}>{activeOffer.code}</Text>
+                  </View>
+                )}
+              </View>
+            </View>
+            <View style={styles.promoRight}>
+              <Text style={styles.promoDiscount}>
+                {activeOffer.discount || '50%'}
+              </Text>
+              <Text style={styles.promoOffText}>OFF</Text>
+              <Ionicons name="chevron-forward" size={16} color="#FFFFFF" style={{ marginTop: 2 }} />
+            </View>
+          </TouchableOpacity>
+        ) : (
+          // Welcome Greeting (No Active Offer)
+          <View style={styles.welcomeBanner}>
+            <Image
+              source={require('../assets/images/logo.png')}
+              style={styles.welcomeLogo}
+              resizeMode="contain"
+            />
+            <View style={styles.welcomeTextContainer}>
+              <Text style={styles.welcomeTitle}>
+                {userName ? `Welcome back, ${userName}! 👋` : 'Welcome to Deligo! 👋'}
+              </Text>
+              <Text style={styles.welcomeSubtitle}>
+                Discover amazing food near you
+              </Text>
+            </View>
+          </View>
+        )}
+
+        {/* Featured Shops - Real Shop Logos */}
+        {featuredShops && featuredShops.length > 0 && (
+          <View style={styles.shopsSection}>
+            <View style={styles.shopsSectionHeader}>
+              <Text style={styles.shopsSectionTitle}>Featured Restaurants</Text>
+              <TouchableOpacity onPress={() => onShopPress && onShopPress('all')}>
+                <Text style={styles.viewAllShops}>View All →</Text>
+              </TouchableOpacity>
+            </View>
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              contentContainerStyle={styles.shopsContainer}
+            >
+              {featuredShops.map((shop, index) => (
+                <TouchableOpacity
+                  key={shop.id || index}
+                  style={styles.shopCard}
+                  activeOpacity={0.8}
+                  onPress={() => onShopPress && onShopPress(shop)}
+                >
+                  <View style={styles.shopLogoWrapper}>
+                    {shop.logo ? (
+                      <Image
+                        source={{ uri: shop.logo }}
+                        style={styles.shopLogo}
+                        resizeMode="cover"
+                      />
+                    ) : (
+                      <View style={styles.shopLogoPlaceholder}>
+                        <Text style={styles.shopLogoText}>
+                          {shop.name ? shop.name.charAt(0).toUpperCase() : '🍽️'}
+                        </Text>
+                      </View>
+                    )}
+                  </View>
+                  <Text style={styles.shopName} numberOfLines={1}>
+                    {shop.name}
+                  </Text>
+                  {shop.cuisine && (
+                    <Text style={styles.shopCuisine} numberOfLines={1}>
+                      {shop.cuisine}
+                    </Text>
+                  )}
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </View>
+        )}
       </View>
 
       {/* Autocomplete Suggestions Dropdown */}
@@ -332,6 +448,220 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     fontFamily: 'Poppins-Regular',
     color: '#666666',
+  },
+  // Marketing-Centric Promo Banner Styles
+  promoBanner: {
+    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    borderRadius: 20,
+    padding: spacing.md + 2,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+    borderWidth: 2,
+    borderColor: 'rgba(255, 215, 0, 0.3)',
+  },
+  promoLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  promoLogoContainer: {
+    position: 'relative',
+    marginRight: spacing.sm,
+  },
+  promoLogo: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    borderWidth: 2,
+    borderColor: colors.primary,
+  },
+  sparkleEffect: {
+    position: 'absolute',
+    top: -4,
+    right: -4,
+    backgroundColor: '#FFD700',
+    borderRadius: 12,
+    width: 20,
+    height: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sparkle: {
+    fontSize: 12,
+  },
+  promoTextContainer: {
+    flex: 1,
+    paddingRight: spacing.xs,
+  },
+  promoTitle: {
+    fontSize: fontSize.md + 1,
+    fontFamily: 'Poppins-Bold',
+    color: '#1A1A1A',
+    marginBottom: 2,
+  },
+  promoSubtitle: {
+    fontSize: fontSize.sm,
+    fontFamily: 'Poppins-Medium',
+    color: '#666666',
+    marginBottom: spacing.xs,
+  },
+  promoCodeBadge: {
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.sm + 2,
+    paddingVertical: 4,
+    borderRadius: 8,
+    alignSelf: 'flex-start',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  promoCodeText: {
+    fontSize: fontSize.xs + 1,
+    fontFamily: 'Poppins-Black',
+    color: '#FFFFFF',
+    letterSpacing: 1.2,
+  },
+  promoRight: {
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm + 2,
+    borderRadius: 16,
+    minWidth: 75,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.4,
+    shadowRadius: 8,
+    elevation: 6,
+  },
+  promoDiscount: {
+    fontSize: 28,
+    fontFamily: 'Poppins-Black',
+    color: '#FFFFFF',
+    lineHeight: 30,
+  },
+  promoOffText: {
+    fontSize: fontSize.sm,
+    fontFamily: 'Poppins-Bold',
+    color: '#FFFFFF',
+    marginTop: -2,
+  },
+  // Welcome Greeting Styles (No Active Offer)
+  welcomeBanner: {
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
+    borderRadius: 16,
+    padding: spacing.md,
+    marginTop: spacing.sm,
+    marginBottom: spacing.xs,
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.3)',
+  },
+  welcomeLogo: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    marginRight: spacing.sm,
+  },
+  welcomeTextContainer: {
+    flex: 1,
+  },
+  welcomeTitle: {
+    fontSize: fontSize.md + 1,
+    fontFamily: 'Poppins-Bold',
+    color: '#FFFFFF',
+    marginBottom: 2,
+  },
+  welcomeSubtitle: {
+    fontSize: fontSize.sm,
+    fontFamily: 'Poppins-Regular',
+    color: 'rgba(255, 255, 255, 0.9)',
+  },
+  // Featured Shops Section Styles
+  shopsSection: {
+    marginTop: spacing.xs,
+  },
+  shopsSectionHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.sm - 2,
+  },
+  shopsSectionTitle: {
+    fontSize: fontSize.md,
+    fontFamily: 'Poppins-Bold',
+    color: '#FFFFFF',
+  },
+  viewAllShops: {
+    fontSize: fontSize.sm,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#FFFFFF',
+  },
+  shopsContainer: {
+    paddingRight: spacing.md,
+  },
+  shopCard: {
+    alignItems: 'center',
+    marginRight: spacing.sm + 2,
+    width: 75,
+  },
+  shopLogoWrapper: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    marginBottom: spacing.xs - 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 5,
+  },
+  shopLogo: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFFFFF',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  shopLogoPlaceholder: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: '#FFFFFF',
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderWidth: 2,
+    borderColor: '#FFFFFF',
+  },
+  shopLogoText: {
+    fontSize: 24,
+    fontFamily: 'Poppins-Bold',
+    color: colors.primary,
+  },
+  shopName: {
+    fontSize: fontSize.xs + 1,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#FFFFFF',
+    textAlign: 'center',
+    marginBottom: 2,
+  },
+  shopCuisine: {
+    fontSize: fontSize.xs - 1,
+    fontFamily: 'Poppins-Regular',
+    color: 'rgba(255, 255, 255, 0.8)',
+    textAlign: 'center',
   },
 });
 

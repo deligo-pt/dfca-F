@@ -7,10 +7,13 @@ import {
   TextInput,
   ScrollView,
   ActivityIndicator,
+  Image,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { colors, spacing, fontSize, borderRadius } from '../theme';
+
+const LOGO = require('../assets/images/logo.png');
 
 const LocationAddressScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(false);
@@ -77,6 +80,11 @@ const LocationAddressScreen = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={styles.safeArea} edges={['top']}>
+      {/* Logo Section */}
+      {/*<View style={styles.logoContainer}>*/}
+      {/*  <Image source={LOGO} style={styles.logoImage} resizeMode="contain" />*/}
+      {/*</View>*/}
+
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity
@@ -212,6 +220,23 @@ const styles = StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: colors.background,
+  },
+  logoContainer: {
+    alignItems: 'center',
+    paddingTop: spacing.xl + 20,
+    paddingBottom: spacing.md,
+    backgroundColor: colors.background,
+  },
+  logoImage: {
+    width: 500,
+    height: 500,
+    // optional slight rounding if desired
+    borderRadius: 12,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 10,
+    elevation: 6,
   },
   header: {
     flexDirection: 'row',

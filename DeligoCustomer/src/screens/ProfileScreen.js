@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Image } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { colors } from '../theme';
@@ -101,15 +101,25 @@ const ProfileScreen = ({ onLogout, navigation }) => {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: '#F5F5F5' }} edges={["top"]}>
       <View style={styles.container}>
-        {/* Header */}
-        <View style={styles.header}>
-          <Text style={styles.headerText}>{t('account')}</Text>
-        </View>
-
         <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: Math.max(100, insets.bottom + 90) }]}
           showsVerticalScrollIndicator={false}
         >
+          {/* Header - Scrolls with content */}
+          <View style={styles.header}>
+            <View style={styles.headerContent}>
+              <Image
+                source={require('../assets/images/logo.png')}
+                style={styles.logoImage}
+                resizeMode="contain"
+              />
+              <View style={styles.headerTextContainer}>
+                <Text style={styles.headerTitle}>Deligo</Text>
+                <Text style={styles.headerSubtitle}>Your favorite food, delivered fast 🍔</Text>
+              </View>
+            </View>
+          </View>
+
           {/* User Profile Card */}
           <View style={styles.profileCard}>
             <View style={styles.avatarContainer}>
@@ -128,6 +138,26 @@ const ProfileScreen = ({ onLogout, navigation }) => {
               </TouchableOpacity>
             </View>
           </View>
+
+          {/* Deligo Pro Promotional Banner */}
+          <TouchableOpacity style={styles.proBanner} activeOpacity={0.85}>
+            <View style={styles.proContent}>
+              <View style={styles.proIconWrapper}>
+                <Ionicons name="diamond" size={28} color="#FFB800" />
+              </View>
+              <View style={styles.proTextContainer}>
+                <View style={styles.proTitleRow}>
+                  <Text style={styles.proTitle}>Try Deligo Pro</Text>
+                  <View style={styles.freeBadge}>
+                    <Text style={styles.freeBadgeText}>FREE</Text>
+                  </View>
+                </View>
+                <Text style={styles.proSubtitle}>Unlimited free delivery + exclusive deals</Text>
+                <Text style={styles.proOffer}>🎁 First month free • Save up to $50/month</Text>
+              </View>
+              <Ionicons name="arrow-forward-circle" size={32} color="#FFB800" />
+            </View>
+          </TouchableOpacity>
 
           {/* Vouchers Card */}
           <View style={styles.card}>
@@ -207,6 +237,26 @@ const ProfileScreen = ({ onLogout, navigation }) => {
             />
           </View>
 
+          {/* Referral Promotion Banner */}
+          <TouchableOpacity
+            style={styles.referralBanner}
+            onPress={() => navigation.navigate('Referrals')}
+            activeOpacity={0.85}
+          >
+            <View style={styles.referralContent}>
+              <View style={styles.referralLeft}>
+                <Text style={styles.referralEmoji}>🎉</Text>
+              </View>
+              <View style={styles.referralMiddle}>
+                <Text style={styles.referralTitle}>Invite Friends, Earn Rewards!</Text>
+                <Text style={styles.referralSubtitle}>Give $10, Get $10 for each friend</Text>
+              </View>
+              <View style={styles.referralRight}>
+                <Ionicons name="chevron-forward" size={24} color={colors.primary} />
+              </View>
+            </View>
+          </TouchableOpacity>
+
           {/* Logout Button */}
           <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
             <TouchableOpacity
@@ -253,18 +303,39 @@ const styles = StyleSheet.create({
   header: {
     backgroundColor: colors.background,
     paddingHorizontal: 20,
-    paddingVertical: 16,
+    paddingTop: 16,
+    paddingBottom: 20,
+    marginBottom: 12,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
   },
-  headerText: {
-    fontSize: 28,
+  headerContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  logoImage: {
+    width: 50,
+    height: 50,
+    marginRight: 16,
+  },
+  headerTextContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  headerTitle: {
+    fontSize: 24,
     fontWeight: '700',
     color: colors.text.primary,
     fontFamily: 'Poppins-Bold',
+    marginBottom: 2,
+  },
+  headerSubtitle: {
+    fontSize: 13,
+    color: colors.text.secondary,
+    fontFamily: 'Poppins-Regular',
   },
   content: {
-    paddingTop: 12,
+    // No top padding needed since header is inside ScrollView
   },
   // Profile Card Styles
   profileCard: {
@@ -368,6 +439,116 @@ const styles = StyleSheet.create({
     fontWeight: '600',
     color: colors.text.white,
     fontFamily: 'Poppins-SemiBold',
+  },
+  // Deligo Pro Banner Styles
+  proBanner: {
+    backgroundColor: '#1A1A1A',
+    marginHorizontal: 20,
+    marginBottom: 12,
+    borderRadius: 16,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  proContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  proIconWrapper: {
+    width: 56,
+    height: 56,
+    borderRadius: 28,
+    backgroundColor: '#2A2A2A',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 14,
+    borderWidth: 2,
+    borderColor: '#FFB800',
+  },
+  proTextContainer: {
+    flex: 1,
+  },
+  proTitleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  proTitle: {
+    fontSize: 18,
+    fontWeight: '700',
+    color: '#FFFFFF',
+    fontFamily: 'Poppins-Bold',
+    marginRight: 8,
+  },
+  freeBadge: {
+    backgroundColor: '#FFB800',
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  freeBadgeText: {
+    fontSize: 11,
+    fontWeight: '800',
+    color: '#1A1A1A',
+    fontFamily: 'Poppins-Bold',
+  },
+  proSubtitle: {
+    fontSize: 13,
+    color: '#E0E0E0',
+    fontFamily: 'Poppins-Medium',
+    marginBottom: 4,
+  },
+  proOffer: {
+    fontSize: 12,
+    color: '#FFB800',
+    fontFamily: 'Poppins-SemiBold',
+  },
+  // Referral Banner Styles
+  referralBanner: {
+    backgroundColor: '#FFF5E6',
+    marginHorizontal: 20,
+    marginBottom: 12,
+    borderRadius: 12,
+    borderWidth: 2,
+    borderColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  referralContent: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+  },
+  referralLeft: {
+    marginRight: 12,
+  },
+  referralEmoji: {
+    fontSize: 42,
+  },
+  referralMiddle: {
+    flex: 1,
+  },
+  referralTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: colors.text.primary,
+    fontFamily: 'Poppins-Bold',
+    marginBottom: 2,
+  },
+  referralSubtitle: {
+    fontSize: 13,
+    color: colors.primary,
+    fontFamily: 'Poppins-SemiBold',
+  },
+  referralRight: {
+    marginLeft: 8,
   },
   // Menu Item Styles
   menuItem: {

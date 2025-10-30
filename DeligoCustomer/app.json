@@ -29,6 +29,10 @@
       "supportsTablet": true,
       "bundleIdentifier": "com.deligo.customer",
       "icon": "./src/assets/icon.png",
+      "infoPlist": {
+        "UIViewControllerBasedStatusBarAppearance": false,
+        "UIStatusBarStyle": "UIStatusBarStyleLightContent"
+      },
       "config": {
         "googleMapsApiKey": "YOUR_IOS_GOOGLE_MAPS_API_KEY"
       }
@@ -40,6 +44,10 @@
       "adaptiveIcon": {
         "foregroundImage": "./src/assets/adaptive-icon.png",
         "backgroundColor": "#DC3173"
+      },
+      "statusBar": {
+        "backgroundColor": "#DC3173",
+        "barStyle": "light-content"
       },
       "permissions": [
         "ACCESS_FINE_LOCATION",
