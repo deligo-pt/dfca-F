@@ -9,9 +9,11 @@ import {
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, fontSize, borderRadius } from '../theme';
+import { spacing, fontSize, borderRadius } from '../theme';
+import { useTheme } from '../utils/ThemeContext';
 
 const RestaurantDetailsScreen = ({ route, navigation }) => {
+  const { colors } = useTheme();
   const { restaurant } = route.params;
   const insets = useSafeAreaInsets();
   const [selectedCategory, setSelectedCategory] = useState('Popular');
@@ -181,39 +183,39 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     const quantity = cart[item.id] || 0;
 
     return (
-      <View key={item.id} style={styles.menuItem}>
-        <View style={styles.menuItemLeft}>
-          <Text style={styles.menuItemImage}>{item.image}</Text>
-          <View style={styles.menuItemInfo}>
-            <Text style={styles.menuItemName}>{item.name}</Text>
-            <Text style={styles.menuItemDescription} numberOfLines={2}>
+      <View key={item.id} style={styles(colors).menuItem}>
+        <View style={styles(colors).menuItemLeft}>
+          <Text style={styles(colors).menuItemImage}>{item.image}</Text>
+          <View style={styles(colors).menuItemInfo}>
+            <Text style={styles(colors).menuItemName}>{item.name}</Text>
+            <Text style={styles(colors).menuItemDescription} numberOfLines={2}>
               {item.description}
             </Text>
-            <Text style={styles.menuItemPrice}>€{item.price ? item.price.toFixed(2) : '0.00'}</Text>
+            <Text style={styles(colors).menuItemPrice}>€{item.price ? item.price.toFixed(2) : '0.00'}</Text>
           </View>
         </View>
-        <View style={styles.menuItemRight}>
+        <View style={styles(colors).menuItemRight}>
           {quantity === 0 ? (
             <TouchableOpacity
-              style={styles.addButton}
+              style={styles(colors).addButton}
               onPress={() => addToCart(item)}
             >
-              <Text style={styles.addButtonText}>Add</Text>
+              <Text style={styles(colors).addButtonText}>Add</Text>
             </TouchableOpacity>
           ) : (
-            <View style={styles.quantityControl}>
+            <View style={styles(colors).quantityControl}>
               <TouchableOpacity
-                style={styles.quantityButton}
+                style={styles(colors).quantityButton}
                 onPress={() => removeFromCart(item)}
               >
-                <Text style={styles.quantityButtonText}>−</Text>
+                <Text style={styles(colors).quantityButtonText}>−</Text>
               </TouchableOpacity>
-              <Text style={styles.quantityText}>{quantity}</Text>
+              <Text style={styles(colors).quantityText}>{quantity}</Text>
               <TouchableOpacity
-                style={styles.quantityButton}
+                style={styles(colors).quantityButton}
                 onPress={() => addToCart(item)}
               >
-                <Text style={styles.quantityButtonText}>+</Text>
+                <Text style={styles(colors).quantityButtonText}>+</Text>
               </TouchableOpacity>
             </View>
           )}
@@ -223,18 +225,18 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles(colors).container} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={styles(colors).header}>
         <TouchableOpacity
-          style={styles.backButton}
+          style={styles(colors).backButton}
           onPress={() => navigation.goBack()}
         >
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>{restaurant.name}</Text>
+        <Text style={styles(colors).headerTitle}>{restaurant.name}</Text>
         <TouchableOpacity
-          style={styles.searchButton}
+          style={styles(colors).searchButton}
           onPress={() => setSearchVisible(!searchVisible)}
         >
           <Ionicons name="search" size={22} color={colors.text.primary} />
@@ -243,10 +245,10 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
       {/* Search Bar */}
       {searchVisible && (
-        <View style={styles.searchContainer}>
-          <Ionicons name="search" size={20} color={colors.text.secondary} style={styles.searchIcon} />
+        <View style={styles(colors).searchContainer}>
+          <Ionicons name="search" size={20} color={colors.text.secondary} style={styles(colors).searchIcon} />
           <TextInput
-            style={styles.searchInput}
+            style={styles(colors).searchInput}
             placeholder="Search menu items..."
             placeholderTextColor={colors.text.secondary}
             value={searchQuery}
@@ -261,42 +263,42 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
         </View>
       )}
 
-      <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles(colors).scrollView} showsVerticalScrollIndicator={false}>
         {/* Restaurant Info */}
-        <View style={styles.restaurantInfo}>
-          <View style={styles.restaurantHeader}>
-            <Text style={styles.restaurantIcon}>{restaurant.image}</Text>
-            <View style={styles.restaurantDetails}>
-              <Text style={styles.restaurantName}>{restaurant.name}</Text>
-              <Text style={styles.restaurantCategories}>
+        <View style={styles(colors).restaurantInfo}>
+          <View style={styles(colors).restaurantHeader}>
+            <Text style={styles(colors).restaurantIcon}>{restaurant.image}</Text>
+            <View style={styles(colors).restaurantDetails}>
+              <Text style={styles(colors).restaurantName}>{restaurant.name}</Text>
+              <Text style={styles(colors).restaurantCategories}>
                 {restaurant.categories?.join(' • ')}
               </Text>
-              <View style={styles.restaurantMeta}>
-                <View style={styles.metaItem}>
-                  <Text style={styles.metaIcon}>⭐</Text>
-                  <Text style={styles.metaText}>{restaurant.rating}</Text>
+              <View style={styles(colors).restaurantMeta}>
+                <View style={styles(colors).metaItem}>
+                  <Text style={styles(colors).metaIcon}>⭐</Text>
+                  <Text style={styles(colors).metaText}>{restaurant.rating}</Text>
                 </View>
-                <View style={styles.metaItem}>
-                  <Text style={styles.metaIcon}>🕐</Text>
-                  <Text style={styles.metaText}>{restaurant.deliveryTime}</Text>
+                <View style={styles(colors).metaItem}>
+                  <Text style={styles(colors).metaIcon}>🕐</Text>
+                  <Text style={styles(colors).metaText}>{restaurant.deliveryTime}</Text>
                 </View>
-                <View style={styles.metaItem}>
-                  <Text style={styles.metaIcon}>📍</Text>
-                  <Text style={styles.metaText}>{restaurant.distance}</Text>
+                <View style={styles(colors).metaItem}>
+                  <Text style={styles(colors).metaIcon}>📍</Text>
+                  <Text style={styles(colors).metaText}>{restaurant.distance}</Text>
                 </View>
               </View>
             </View>
           </View>
 
           {/* Delivery Info */}
-          <View style={styles.deliveryInfo}>
-            <View style={styles.deliveryInfoItem}>
-              <Text style={styles.deliveryInfoLabel}>Delivery Fee</Text>
-              <Text style={styles.deliveryInfoValue}>{restaurant.deliveryFee}</Text>
+          <View style={styles(colors).deliveryInfo}>
+            <View style={styles(colors).deliveryInfoItem}>
+              <Text style={styles(colors).deliveryInfoLabel}>Delivery Fee</Text>
+              <Text style={styles(colors).deliveryInfoValue}>{restaurant.deliveryFee}</Text>
             </View>
             {restaurant.offer && (
-              <View style={styles.offerBadge}>
-                <Text style={styles.offerText}>{restaurant.offer}</Text>
+              <View style={styles(colors).offerBadge}>
+                <Text style={styles(colors).offerText}>{restaurant.offer}</Text>
               </View>
             )}
           </View>
@@ -306,22 +308,22 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={styles.categoryTabs}
-          contentContainerStyle={styles.categoryTabsContent}
+          style={styles(colors).categoryTabs}
+          contentContainerStyle={styles(colors).categoryTabsContent}
         >
           {menuCategories.map((category) => (
             <TouchableOpacity
               key={category}
               style={[
-                styles.categoryTab,
-                selectedCategory === category && styles.categoryTabActive,
+                styles(colors).categoryTab,
+                selectedCategory === category && styles(colors).categoryTabActive,
               ]}
               onPress={() => setSelectedCategory(category)}
             >
               <Text
                 style={[
-                  styles.categoryTabText,
-                  selectedCategory === category && styles.categoryTabTextActive,
+                  styles(colors).categoryTabText,
+                  selectedCategory === category && styles(colors).categoryTabTextActive,
                 ]}
               >
                 {category}
@@ -331,37 +333,37 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
         </ScrollView>
 
         {/* Menu Items */}
-        <View style={styles.menuSection}>
-          <Text style={styles.menuSectionTitle}>
+        <View style={styles(colors).menuSection}>
+          <Text style={styles(colors).menuSectionTitle}>
             {searchQuery ? `Search Results (${getFilteredMenuItems().length})` : selectedCategory}
           </Text>
           {getFilteredMenuItems().length > 0 ? (
             getFilteredMenuItems().map((item) => renderMenuItem(item))
           ) : (
-            <View style={styles.noResultsContainer}>
+            <View style={styles(colors).noResultsContainer}>
               <Ionicons name="search-outline" size={48} color={colors.text.secondary} />
-              <Text style={styles.noResultsText}>No items found</Text>
-              <Text style={styles.noResultsSubtext}>Try searching with different keywords</Text>
+              <Text style={styles(colors).noResultsText}>No items found</Text>
+              <Text style={styles(colors).noResultsSubtext}>Try searching with different keywords</Text>
             </View>
           )}
         </View>
 
         {/* Cart Footer - Inside ScrollView */}
         {getTotalItems() > 0 && (
-          <View style={styles.cartFooterInline}>
-            <View style={styles.cartFooterLeft}>
-              <Text style={styles.cartItemCount}>{getTotalItems()} items</Text>
-              <Text style={styles.cartTotal}>€{getTotalPrice()}</Text>
+          <View style={styles(colors).cartFooterInline}>
+            <View style={styles(colors).cartFooterLeft}>
+              <Text style={styles(colors).cartItemCount}>{getTotalItems()} items</Text>
+              <Text style={styles(colors).cartTotal}>€{getTotalPrice()}</Text>
             </View>
             <TouchableOpacity
-              style={styles.viewCartButton}
+              style={styles(colors).viewCartButton}
               onPress={() => {
                 // Navigate back to Main navigator and switch to Cart tab
                 navigation.navigate('Main', { screen: 'Cart' });
               }}
             >
-              <Text style={styles.viewCartButtonText}>View Cart</Text>
-              <Text style={styles.viewCartButtonIcon}>→</Text>
+              <Text style={styles(colors).viewCartButtonText}>View Cart</Text>
+              <Text style={styles(colors).viewCartButtonIcon}>→</Text>
             </TouchableOpacity>
           </View>
         )}
@@ -373,10 +375,10 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -384,17 +386,24 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.border,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   backButton: {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   headerTitle: {
     fontSize: fontSize.lg,
@@ -407,18 +416,20 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#F8F9FA',
+    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.border,
   },
   searchIcon: {
     marginRight: spacing.sm,
@@ -434,11 +445,16 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   restaurantInfo: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     padding: spacing.md,
     marginBottom: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.border,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   restaurantHeader: {
     flexDirection: 'row',
@@ -509,6 +525,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.md,
+    shadowColor: colors.success,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   offerText: {
     fontSize: fontSize.xs,
@@ -516,9 +537,9 @@ const styles = StyleSheet.create({
     color: colors.text.white,
   },
   categoryTabs: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
+    borderBottomColor: colors.border,
   },
   categoryTabsContent: {
     paddingHorizontal: spacing.md,
@@ -529,9 +550,18 @@ const styles = StyleSheet.create({
     paddingVertical: spacing.sm,
     marginRight: spacing.sm,
     borderRadius: borderRadius.lg,
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   categoryTabActive: {
     backgroundColor: colors.primary,
+    borderColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   categoryTabText: {
     fontSize: fontSize.md,
@@ -554,12 +584,17 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     padding: spacing.md,
     borderRadius: 16,
     marginBottom: spacing.md,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
+    borderColor: colors.border,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 6,
+    elevation: 2,
   },
   menuItemLeft: {
     flexDirection: 'row',
@@ -599,6 +634,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm,
     borderRadius: borderRadius.lg,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   addButtonText: {
     fontSize: fontSize.md,
@@ -608,9 +648,11 @@ const styles = StyleSheet.create({
   quantityControl: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F9FA',
+    backgroundColor: colors.background,
     borderRadius: borderRadius.lg,
     padding: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   quantityButton: {
     width: 32,
@@ -619,6 +661,11 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 3,
+    elevation: 2,
   },
   quantityButtonText: {
     fontSize: 20,
@@ -644,11 +691,11 @@ const styles = StyleSheet.create({
     marginTop: spacing.lg,
     marginBottom: spacing.sm,
     borderRadius: borderRadius.xl,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    elevation: 6,
   },
   cartFooterLeft: {
     flex: 1,
@@ -671,6 +718,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderRadius: borderRadius.lg,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
   },
   viewCartButtonText: {
     fontSize: fontSize.md,
