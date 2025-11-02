@@ -11,11 +11,13 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { colors, spacing } from '../theme';
+import { spacing } from '../theme';
+import { useTheme } from '../utils/ThemeContext';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLanguage } from '../utils/LanguageContext';
 
 const CheckoutScreen = ({ route, navigation }) => {
+  const { colors } = useTheme();
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const { cartData } = route.params || {};
@@ -75,15 +77,15 @@ const CheckoutScreen = ({ route, navigation }) => {
 
   const renderSuccessModal = () => (
     <Modal visible={showSuccessModal} transparent animationType="fade">
-      <View style={styles.modalOverlay}>
-        <View style={styles.successModal}>
-          <View style={styles.successIconContainer}>
+      <View style={styles(colors).modalOverlay}>
+        <View style={styles(colors).successModal}>
+          <View style={styles(colors).successIconContainer}>
             <Ionicons name="checkmark-circle" size={80} color={colors.success} />
           </View>
-          <Text style={styles.successTitle}>{t('orderPlaced')}</Text>
-          <Text style={styles.successMessage}>{t('orderConfirmed')}</Text>
-          <View style={styles.successDetails}>
-            <Text style={styles.successDetailText}>{t('estimatedDeliveryTime')}: 25-35 {t('min')}</Text>
+          <Text style={styles(colors).successTitle}>{t('orderPlaced')}</Text>
+          <Text style={styles(colors).successMessage}>{t('orderConfirmed')}</Text>
+          <View style={styles(colors).successDetails}>
+            <Text style={styles(colors).successDetailText}>{t('estimatedDeliveryTime')}: 25-35 {t('min')}</Text>
           </View>
         </View>
       </View>
@@ -92,71 +94,71 @@ const CheckoutScreen = ({ route, navigation }) => {
 
   const renderProcessingModal = () => (
     <Modal visible={isProcessing} transparent animationType="fade">
-      <View style={styles.modalOverlay}>
-        <View style={styles.processingModal}>
-          <ActivityIndicator size="large" color={colors.primary} style={styles.loadingSpinner} />
-          <Text style={styles.processingText}>{t('processing')}</Text>
+      <View style={styles(colors).modalOverlay}>
+        <View style={styles(colors).processingModal}>
+          <ActivityIndicator size="large" color={colors.primary} style={styles(colors).loadingSpinner} />
+          <Text style={styles(colors).processingText}>{t('processing')}</Text>
         </View>
       </View>
     </Modal>
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={styles(colors).container} edges={['top']}>
       <StatusBar barStyle="dark-content" backgroundColor={colors.surface} />
 
       {/* Header */}
-      <View style={styles.header}>
+      <View style={styles(colors).header}>
         <TouchableOpacity
-          style={styles.backButton}
+          style={styles(colors).backButton}
           onPress={() => navigation.goBack()}
         >
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
-        <View style={styles.headerCenter}>
-          <Text style={styles.headerTitle}>{t('checkout')}</Text>
-          <Text style={styles.headerSubtitle}>
+        <View style={styles(colors).headerCenter}>
+          <Text style={styles(colors).headerTitle}>{t('checkout')}</Text>
+          <Text style={styles(colors).headerSubtitle}>
             {cartItems.length} {t('items')} • {t('estimated')} 25-35 {t('min')}
           </Text>
         </View>
-        <View style={styles.headerRight} />
+        <View style={styles(colors).headerRight} />
       </View>
 
       <ScrollView
-        style={styles.scrollView}
+        style={styles(colors).scrollView}
         showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
+        contentContainerStyle={styles(colors).scrollContent}
       >
         {/* Delivery Time Banner */}
-        <View style={styles.deliveryTimeBanner}>
-          <View style={styles.deliveryTimeIcon}>
+        <View style={styles(colors).deliveryTimeBanner}>
+          <View style={styles(colors).deliveryTimeIcon}>
             <MaterialCommunityIcons name="timer-sand" size={28} color={colors.primary} />
           </View>
-          <View style={styles.deliveryTimeContent}>
-            <Text style={styles.deliveryTimeLabel}>{t('deliveryTime')}</Text>
-            <Text style={styles.deliveryTimeValue}>25-35 {t('min')}</Text>
+          <View style={styles(colors).deliveryTimeContent}>
+            <Text style={styles(colors).deliveryTimeLabel}>{t('deliveryTime')}</Text>
+            <Text style={styles(colors).deliveryTimeValue}>25-35 {t('min')}</Text>
           </View>
-          <View style={styles.deliveryTimeBadge}>
+          <View style={styles(colors).deliveryTimeBadge}>
             <Ionicons name="flash" size={14} color="#FFA000" />
-            <Text style={styles.deliveryTimeBadgeText}>{t('fast')}</Text>
+            <Text style={styles(colors).deliveryTimeBadgeText}>{t('fast')}</Text>
           </View>
         </View>
 
         {/* Delivery Address */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <Text style={styles.sectionTitle}>{t('deliveryTo')}</Text>
+        <View style={styles(colors).section}>
+          <View style={styles(colors).sectionHeader}>
+            <Text style={styles(colors).sectionTitle}>{t('deliveryTo')}</Text>
             <TouchableOpacity activeOpacity={0.7}>
-              <Text style={styles.changeButton}>{t('change')}</Text>
+              <Text style={styles(colors).changeButton}>{t('change')}</Text>
             </TouchableOpacity>
           </View>
-          <View style={styles.addressContainer}>
-            <View style={styles.addressIconWrapper}>
+          <View style={styles(colors).addressContainer}>
+            <View style={styles(colors).addressIconWrapper}>
               <MaterialCommunityIcons name="home-variant" size={24} color={colors.primary} />
             </View>
-            <View style={styles.addressDetails}>
-              <Text style={styles.addressType}>{t('home')}</Text>
-              <Text style={styles.addressFull}>
+            <View style={styles(colors).addressDetails}>
+              <Text style={styles(colors).addressType}>{t('home')}</Text>
+              <Text style={styles(colors).addressFull}>
                 456 Park Avenue, Apartment 5B, 2nd Floor
               </Text>
             </View>
@@ -165,34 +167,34 @@ const CheckoutScreen = ({ route, navigation }) => {
 
         {/* Delivery Instructions */}
         {false && ( // Replace 'false' with actual condition for deliveryInstructions
-          <View style={styles.instructionsContainer}>
-            <View style={styles.instructionsBadge}>
+          <View style={styles(colors).instructionsContainer}>
+            <View style={styles(colors).instructionsBadge}>
               <Ionicons name="alert-circle" size={16} color="#0288D1" />
-              <Text style={styles.instructionsText}>Delivery instructions go here</Text>
+              <Text style={styles(colors).instructionsText}>Delivery instructions go here</Text>
             </View>
           </View>
         )}
 
         {/* Order Items */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleRow}>
-              <Text style={styles.sectionTitle}>{t('yourOrder')}</Text>
+        <View style={styles(colors).section}>
+          <View style={styles(colors).sectionHeader}>
+            <View style={styles(colors).sectionTitleRow}>
+              <Text style={styles(colors).sectionTitle}>{t('yourOrder')}</Text>
             </View>
-            <Text style={styles.itemCount}>{cartItems.length} {t('items')}</Text>
+            <Text style={styles(colors).itemCount}>{cartItems.length} {t('items')}</Text>
           </View>
-          <View style={styles.orderItemsContainer}>
+          <View style={styles(colors).orderItemsContainer}>
             {cartItems.map((item, index) => (
-              <View key={index} style={styles.orderItemRow}>
-                <View style={styles.orderItemLeft}>
-                  <View style={styles.quantityBadge}>
-                    <Text style={styles.quantityText}>{item.quantity}</Text>
+              <View key={index} style={styles(colors).orderItemRow}>
+                <View style={styles(colors).orderItemLeft}>
+                  <View style={styles(colors).quantityBadge}>
+                    <Text style={styles(colors).quantityText}>{item.quantity}</Text>
                   </View>
-                  <Text style={styles.itemNameText} numberOfLines={2}>
+                  <Text style={styles(colors).itemNameText} numberOfLines={2}>
                     {item.name}
                   </Text>
                 </View>
-                <Text style={styles.itemPriceText}>
+                <Text style={styles(colors).itemPriceText}>
                   €{(item.price * item.quantity).toFixed(2)}
                 </Text>
               </View>
@@ -201,21 +203,21 @@ const CheckoutScreen = ({ route, navigation }) => {
         </View>
 
         {/* Voucher */}
-        <View style={styles.section}>
+        <View style={styles(colors).section}>
           <TouchableOpacity
-            style={styles.voucherButton}
+            style={styles(colors).voucherButton}
             onPress={() => setShowVoucherInput(!showVoucherInput)}
             activeOpacity={0.7}
           >
-            <View style={styles.voucherLeft}>
-              <View style={styles.voucherIconBadge}>
+            <View style={styles(colors).voucherLeft}>
+              <View style={styles(colors).voucherIconBadge}>
                 <MaterialCommunityIcons
                   name="ticket-percent"
                   size={24}
                   color={colors.primary}
                 />
               </View>
-              <Text style={styles.voucherButtonText}>
+              <Text style={styles(colors).voucherButtonText}>
                 {voucherCode ? t('voucherApplied') : t('applyVoucher')}
               </Text>
             </View>
@@ -226,49 +228,49 @@ const CheckoutScreen = ({ route, navigation }) => {
             />
           </TouchableOpacity>
           {showVoucherInput && (
-            <View style={styles.voucherInputContainer}>
+            <View style={styles(colors).voucherInputContainer}>
               <TextInput
-                style={styles.voucherInput}
+                style={styles(colors).voucherInput}
                 placeholder={t('enterPromoCode')}
                 placeholderTextColor={colors.text.light}
                 value={voucherCode}
                 onChangeText={setVoucherCode}
                 autoCapitalize="characters"
               />
-              <TouchableOpacity style={styles.applyVoucherButton} activeOpacity={0.8}>
-                <Text style={styles.applyVoucherText}>{t('apply')}</Text>
+              <TouchableOpacity style={styles(colors).applyVoucherButton} activeOpacity={0.8}>
+                <Text style={styles(colors).applyVoucherText}>{t('apply')}</Text>
               </TouchableOpacity>
             </View>
           )}
         </View>
 
         {/* Rider Tip */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleRow}>
+        <View style={styles(colors).section}>
+          <View style={styles(colors).sectionHeader}>
+            <View style={styles(colors).sectionTitleRow}>
               <MaterialCommunityIcons name="bike-fast" size={20} color={colors.primary} />
-              <Text style={styles.sectionTitle}>{t('tipYourRider')}</Text>
+              <Text style={styles(colors).sectionTitle}>{t('tipYourRider')}</Text>
             </View>
-            <Text style={styles.optionalText}>{t('optional')}</Text>
+            <Text style={styles(colors).optionalText}>{t('optional')}</Text>
           </View>
-          <Text style={styles.tipDescription}>
+          <Text style={styles(colors).tipDescription}>
             {t('showAppreciation')}
           </Text>
-          <View style={styles.tipOptionsContainer}>
+          <View style={styles(colors).tipOptionsContainer}>
             {tipOptions.map((tip) => (
               <TouchableOpacity
                 key={tip.id}
                 style={[
-                  styles.tipOption,
-                  selectedTip === tip.value && styles.tipOptionSelected,
+                  styles(colors).tipOption,
+                  selectedTip === tip.value && styles(colors).tipOptionSelected,
                 ]}
                 onPress={() => setSelectedTip(tip.value)}
                 activeOpacity={0.7}
               >
                 <Text
                   style={[
-                    styles.tipOptionText,
-                    selectedTip === tip.value && styles.tipOptionTextSelected,
+                    styles(colors).tipOptionText,
+                    selectedTip === tip.value && styles(colors).tipOptionTextSelected,
                   ]}
                 >
                   {tip.label}
@@ -279,33 +281,33 @@ const CheckoutScreen = ({ route, navigation }) => {
         </View>
 
         {/* Payment Methods */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleRow}>
+        <View style={styles(colors).section}>
+          <View style={styles(colors).sectionHeader}>
+            <View style={styles(colors).sectionTitleRow}>
               <MaterialCommunityIcons
                 name="credit-card-outline"
                 size={20}
                 color={colors.primary}
               />
-              <Text style={styles.sectionTitle}>{t('paymentMethod')}</Text>
+              <Text style={styles(colors).sectionTitle}>{t('paymentMethod')}</Text>
             </View>
           </View>
-          <View style={styles.paymentMethodsList}>
+          <View style={styles(colors).paymentMethodsList}>
             {paymentMethods.map((method) => (
               <TouchableOpacity
                 key={method.id}
                 style={[
-                  styles.paymentMethodCard,
-                  selectedPayment === method.id && styles.paymentMethodCardSelected,
+                  styles(colors).paymentMethodCard,
+                  selectedPayment === method.id && styles(colors).paymentMethodCardSelected,
                 ]}
                 onPress={() => setSelectedPayment(method.id)}
                 activeOpacity={0.7}
               >
-                <View style={styles.paymentMethodLeft}>
+                <View style={styles(colors).paymentMethodLeft}>
                   <View
                     style={[
-                      styles.paymentMethodIcon,
-                      selectedPayment === method.id && styles.paymentMethodIconSelected,
+                      styles(colors).paymentMethodIcon,
+                      selectedPayment === method.id && styles(colors).paymentMethodIconSelected,
                     ]}
                   >
                     <MaterialCommunityIcons
@@ -318,26 +320,26 @@ const CheckoutScreen = ({ route, navigation }) => {
                       }
                     />
                   </View>
-                  <View style={styles.paymentMethodInfo}>
-                    <View style={styles.paymentMethodNameRow}>
-                      <Text style={styles.paymentMethodName}>{method.name}</Text>
+                  <View style={styles(colors).paymentMethodInfo}>
+                    <View style={styles(colors).paymentMethodNameRow}>
+                      <Text style={styles(colors).paymentMethodName}>{method.name}</Text>
                       {method.badge && selectedPayment === method.id && (
-                        <View style={styles.recommendedBadge}>
-                          <Text style={styles.recommendedBadgeText}>{method.badge}</Text>
+                        <View style={styles(colors).recommendedBadge}>
+                          <Text style={styles(colors).recommendedBadgeText}>{method.badge}</Text>
                         </View>
                       )}
                     </View>
-                    <Text style={styles.paymentMethodDetails}>{method.details}</Text>
+                    <Text style={styles(colors).paymentMethodDetails}>{method.details}</Text>
                   </View>
                 </View>
                 <View
                   style={[
-                    styles.paymentRadio,
-                    selectedPayment === method.id && styles.paymentRadioSelected,
+                    styles(colors).paymentRadio,
+                    selectedPayment === method.id && styles(colors).paymentRadioSelected,
                   ]}
                 >
                   {selectedPayment === method.id && (
-                    <View style={styles.paymentRadioInner} />
+                    <View style={styles(colors).paymentRadioInner} />
                   )}
                 </View>
               </TouchableOpacity>
@@ -346,15 +348,15 @@ const CheckoutScreen = ({ route, navigation }) => {
         </View>
 
         {/* Add Notes */}
-        <View style={styles.section}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleRow}>
-              <Text style={styles.sectionTitle}>{t('addNote')}</Text>
+        <View style={styles(colors).section}>
+          <View style={styles(colors).sectionHeader}>
+            <View style={styles(colors).sectionTitleRow}>
+              <Text style={styles(colors).sectionTitle}>{t('addNote')}</Text>
             </View>
-            <Text style={styles.optionalText}>{t('optional')}</Text>
+            <Text style={styles(colors).optionalText}>{t('optional')}</Text>
           </View>
           <TextInput
-            style={styles.notesInput}
+            style={styles(colors).notesInput}
             placeholder={t('specialInstructions')}
             placeholderTextColor={colors.text.light}
             value={notes}
@@ -366,64 +368,64 @@ const CheckoutScreen = ({ route, navigation }) => {
         </View>
 
         {/* Payment Summary */}
-        <View style={styles.summarySection}>
-          <View style={styles.sectionHeader}>
-            <View style={styles.sectionTitleRow}>
+        <View style={styles(colors).summarySection}>
+          <View style={styles(colors).sectionHeader}>
+            <View style={styles(colors).sectionTitleRow}>
               <MaterialCommunityIcons
                 name="receipt-text"
                 size={20}
                 color={colors.primary}
               />
-              <Text style={styles.sectionTitle}>{t('paymentSummary')}</Text>
+              <Text style={styles(colors).sectionTitle}>{t('paymentSummary')}</Text>
             </View>
           </View>
 
-          <View style={styles.summaryRows}>
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>{t('subtotal')}</Text>
-              <Text style={styles.summaryValue}>€{subtotal.toFixed(2)}</Text>
+          <View style={styles(colors).summaryRows}>
+            <View style={styles(colors).summaryRow}>
+              <Text style={styles(colors).summaryLabel}>{t('subtotal')}</Text>
+              <Text style={styles(colors).summaryValue}>€{subtotal.toFixed(2)}</Text>
             </View>
 
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>{t('deliveryFee')}</Text>
+            <View style={styles(colors).summaryRow}>
+              <Text style={styles(colors).summaryLabel}>{t('deliveryFee')}</Text>
               {deliveryFee === 0 ? (
-                <Text style={styles.summaryValueFree}>{t('free')}</Text>
+                <Text style={styles(colors).summaryValueFree}>{t('free')}</Text>
               ) : (
-                <Text style={styles.summaryValue}>€{deliveryFee.toFixed(2)}</Text>
+                <Text style={styles(colors).summaryValue}>€{deliveryFee.toFixed(2)}</Text>
               )}
             </View>
 
-            <View style={styles.summaryRow}>
-              <Text style={styles.summaryLabel}>{t('serviceFee')}</Text>
-              <Text style={styles.summaryValue}>€{serviceFee.toFixed(2)}</Text>
+            <View style={styles(colors).summaryRow}>
+              <Text style={styles(colors).summaryLabel}>{t('serviceFee')}</Text>
+              <Text style={styles(colors).summaryValue}>€{serviceFee.toFixed(2)}</Text>
             </View>
 
             {selectedTip > 0 && (
-              <View style={styles.summaryRow}>
-                <Text style={styles.summaryLabel}>{t('riderTip')}</Text>
-                <Text style={styles.summaryValue}>€{selectedTip.toFixed(2)}</Text>
+              <View style={styles(colors).summaryRow}>
+                <Text style={styles(colors).summaryLabel}>{t('riderTip')}</Text>
+                <Text style={styles(colors).summaryValue}>€{selectedTip.toFixed(2)}</Text>
               </View>
             )}
 
             {discount > 0 && (
-              <View style={styles.summaryRow}>
-                <View style={styles.discountRow}>
+              <View style={styles(colors).summaryRow}>
+                <View style={styles(colors).discountRow}>
                   <MaterialCommunityIcons
                     name="ticket-percent"
                     size={16}
                     color={colors.success}
                   />
-                  <Text style={styles.summaryLabelDiscount}>{t('discount')}</Text>
+                  <Text style={styles(colors).summaryLabelDiscount}>{t('discount')}</Text>
                 </View>
-                <Text style={styles.summaryValueDiscount}>-€{discount.toFixed(2)}</Text>
+                <Text style={styles(colors).summaryValueDiscount}>-€{discount.toFixed(2)}</Text>
               </View>
             )}
 
-            <View style={styles.summaryDivider} />
+            <View style={styles(colors).summaryDivider} />
 
-            <View style={styles.totalSummaryRow}>
-              <Text style={styles.totalSummaryLabel}>{t('total')}</Text>
-              <Text style={styles.totalSummaryValue}>
+            <View style={styles(colors).totalSummaryRow}>
+              <Text style={styles(colors).totalSummaryLabel}>{t('total')}</Text>
+              <Text style={styles(colors).totalSummaryValue}>
                 €{(total + selectedTip).toFixed(2)}
               </Text>
             </View>
@@ -431,24 +433,24 @@ const CheckoutScreen = ({ route, navigation }) => {
         </View>
 
         {/* Place Order Button - Inside ScrollView */}
-        <View style={styles.checkoutButtonContainer}>
-          <View style={styles.totalBarInline}>
-            <Text style={styles.totalBarLabel}>{t('total')}</Text>
-            <Text style={styles.totalBarAmount}>€{(total + selectedTip).toFixed(2)}</Text>
+        <View style={styles(colors).checkoutButtonContainer}>
+          <View style={styles(colors).totalBarInline}>
+            <Text style={styles(colors).totalBarLabel}>{t('total')}</Text>
+            <Text style={styles(colors).totalBarAmount}>€{(total + selectedTip).toFixed(2)}</Text>
           </View>
           <TouchableOpacity
             style={[
-              styles.placeOrderBtn,
-              isProcessing && styles.placeOrderBtnDisabled,
+              styles(colors).placeOrderBtn,
+              isProcessing && styles(colors).placeOrderBtnDisabled,
             ]}
             onPress={handlePlaceOrder}
             disabled={isProcessing}
             activeOpacity={0.85}
           >
-            <Text style={styles.placeOrderBtnText}>
+            <Text style={styles(colors).placeOrderBtnText}>
               {isProcessing ? t('processing') : t('placeOrder')}
             </Text>
-            <View style={styles.placeOrderArrow}>
+            <View style={styles(colors).placeOrderArrow}>
               <Ionicons
                 name={isProcessing ? 'hourglass-outline' : 'arrow-forward'}
                 size={20}
@@ -468,11 +470,10 @@ const CheckoutScreen = ({ route, navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  // ...existing code...
+const styles = (colors) => StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F8F9FB',
+    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -480,10 +481,10 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.lg,
     paddingVertical: 16,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F2F5',
-    shadowColor: '#000',
+    borderBottomColor: colors.border,
+    shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 3,
@@ -495,7 +496,9 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 20,
-    backgroundColor: '#F8F9FB',
+    backgroundColor: colors.background,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   headerCenter: {
     flex: 1,
@@ -525,24 +528,24 @@ const styles = StyleSheet.create({
   deliveryTimeBanner: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     marginHorizontal: spacing.lg,
     marginBottom: 12,
     padding: spacing.lg,
     borderRadius: 16,
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
     shadowRadius: 3,
     elevation: 1,
     borderWidth: 1,
-    borderColor: '#F0F2F5',
+    borderColor: colors.border,
   },
   deliveryTimeIcon: {
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#FFF0F5',
+    backgroundColor: colors.background === '#FFFFFF' ? '#FFF0F5' : 'rgba(220, 49, 115, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
@@ -564,7 +567,7 @@ const styles = StyleSheet.create({
   deliveryTimeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFF8E1',
+    backgroundColor: colors.background === '#FFFFFF' ? '#FFF8E1' : 'rgba(255, 193, 7, 0.15)',
     paddingHorizontal: 12,
     paddingVertical: 6,
     borderRadius: 20,
@@ -576,18 +579,18 @@ const styles = StyleSheet.create({
     color: '#F57C00',
   },
   section: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     marginHorizontal: spacing.lg,
     marginBottom: 12,
     padding: spacing.lg,
     borderRadius: 16,
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.04,
     shadowRadius: 3,
     elevation: 1,
     borderWidth: 1,
-    borderColor: '#F0F2F5',
+    borderColor: colors.border,
   },
   sectionHeader: {
     flexDirection: 'row',
@@ -619,10 +622,12 @@ const styles = StyleSheet.create({
     fontSize: 12,
     fontFamily: 'Poppins-Medium',
     color: colors.text.light,
-    backgroundColor: '#F8F9FB',
+    backgroundColor: colors.background,
     paddingHorizontal: 10,
     paddingVertical: 4,
     borderRadius: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   addressContainer: {
     flexDirection: 'row',
@@ -635,7 +640,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#FFF0F5',
+    backgroundColor: colors.background === '#FFFFFF' ? '#FFF0F5' : 'rgba(220, 49, 115, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -661,7 +666,7 @@ const styles = StyleSheet.create({
   instructionsBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E3F2FD',
+    backgroundColor: colors.background === '#FFFFFF' ? '#E3F2FD' : 'rgba(33, 150, 243, 0.15)',
     padding: spacing.md,
     borderRadius: 12,
     borderLeftWidth: 4,
@@ -684,7 +689,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: '#F8F9FB',
+    borderBottomColor: colors.border,
   },
   orderItemLeft: {
     flexDirection: 'row',
@@ -701,6 +706,11 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     marginRight: 12,
     marginTop: 2,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 2,
   },
   quantityText: {
     fontSize: 13,
@@ -733,7 +743,7 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#FFF0F5',
+    backgroundColor: colors.background === '#FFFFFF' ? '#FFF0F5' : 'rgba(220, 49, 115, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
@@ -751,14 +761,14 @@ const styles = StyleSheet.create({
   voucherInput: {
     flex: 1,
     height: 48,
-    backgroundColor: '#F8F9FB',
+    backgroundColor: colors.background,
     borderRadius: 12,
     paddingHorizontal: spacing.md,
     fontSize: 14,
     fontFamily: 'Poppins-Medium',
     color: colors.text.primary,
     borderWidth: 1,
-    borderColor: '#E8EAED',
+    borderColor: colors.border,
   },
   applyVoucherButton: {
     backgroundColor: colors.primary,
@@ -767,6 +777,11 @@ const styles = StyleSheet.create({
     borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   applyVoucherText: {
     fontSize: 14,
@@ -788,14 +803,19 @@ const styles = StyleSheet.create({
     height: 44,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#F8F9FB',
+    backgroundColor: colors.background,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#E8EAED',
+    borderColor: colors.border,
   },
   tipOptionSelected: {
-    backgroundColor: '#FFF0F5',
+    backgroundColor: colors.background === '#FFFFFF' ? '#FFF0F5' : 'rgba(220, 49, 115, 0.15)',
     borderColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
+    elevation: 2,
   },
   tipOptionText: {
     fontSize: 14,
@@ -813,14 +833,19 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     padding: spacing.md,
-    backgroundColor: '#F8F9FB',
+    backgroundColor: colors.background,
     borderRadius: 14,
     borderWidth: 2,
     borderColor: 'transparent',
   },
   paymentMethodCardSelected: {
-    backgroundColor: '#FFF5F8',
+    backgroundColor: colors.background === '#FFFFFF' ? '#FFF5F8' : 'rgba(220, 49, 115, 0.1)',
     borderColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 6,
+    elevation: 2,
   },
   paymentMethodLeft: {
     flexDirection: 'row',
@@ -831,13 +856,16 @@ const styles = StyleSheet.create({
     width: 48,
     height: 48,
     borderRadius: 24,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   paymentMethodIconSelected: {
-    backgroundColor: '#FFE8F0',
+    backgroundColor: colors.background === '#FFFFFF' ? '#FFE8F0' : 'rgba(220, 49, 115, 0.2)',
+    borderColor: colors.primary,
   },
   paymentMethodInfo: {
     flex: 1,
@@ -874,7 +902,7 @@ const styles = StyleSheet.create({
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: '#D0D5DD',
+    borderColor: colors.text.light,
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -888,29 +916,29 @@ const styles = StyleSheet.create({
     backgroundColor: colors.primary,
   },
   notesInput: {
-    backgroundColor: '#F8F9FB',
+    backgroundColor: colors.background,
     borderRadius: 12,
     padding: spacing.md,
     fontSize: 14,
     fontFamily: 'Poppins-Regular',
     color: colors.text.primary,
     borderWidth: 1,
-    borderColor: '#E8EAED',
+    borderColor: colors.border,
     minHeight: 80,
   },
   summarySection: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     marginHorizontal: spacing.lg,
     marginBottom: 12,
     padding: spacing.lg,
     borderRadius: 16,
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 4,
     elevation: 2,
     borderWidth: 1,
-    borderColor: '#F0F2F5',
+    borderColor: colors.border,
   },
   summaryRows: {
     gap: 14,
@@ -952,7 +980,7 @@ const styles = StyleSheet.create({
   },
   summaryDivider: {
     height: 1,
-    backgroundColor: '#E8EAED',
+    backgroundColor: colors.border,
     marginVertical: 6,
   },
   totalSummaryRow: {
@@ -973,19 +1001,19 @@ const styles = StyleSheet.create({
     letterSpacing: -0.5,
   },
   checkoutButtonContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     marginHorizontal: spacing.lg,
     marginTop: 12,
     marginBottom: 12,
     padding: spacing.lg,
     borderRadius: 16,
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.06,
     shadowRadius: 4,
     elevation: 2,
     borderWidth: 1,
-    borderColor: '#F0F2F5',
+    borderColor: colors.border,
   },
   totalBarInline: {
     flexDirection: 'row',
@@ -994,7 +1022,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.md,
     paddingBottom: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F2F5',
+    borderBottomColor: colors.border,
   },
   totalBar: {
     flexDirection: 'row',
@@ -1049,22 +1077,24 @@ const styles = StyleSheet.create({
   },
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.65)',
+    backgroundColor: colors.overlay,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: spacing.lg,
   },
   processingModal: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     padding: 32,
     borderRadius: 24,
     alignItems: 'center',
     minWidth: 260,
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.2,
     shadowRadius: 20,
     elevation: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   loadingSpinner: {
     marginBottom: 16,
@@ -1075,17 +1105,19 @@ const styles = StyleSheet.create({
     color: colors.text.primary,
   },
   successModal: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     padding: 32,
     borderRadius: 24,
     alignItems: 'center',
     maxWidth: 360,
     width: '100%',
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 10 },
     shadowOpacity: 0.2,
     shadowRadius: 20,
     elevation: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   successIconContainer: {
     marginBottom: 20,
@@ -1107,11 +1139,13 @@ const styles = StyleSheet.create({
   },
   successDetails: {
     alignItems: 'center',
-    backgroundColor: '#F8F9FB',
+    backgroundColor: colors.background,
     paddingVertical: 16,
     paddingHorizontal: 24,
     borderRadius: 16,
     width: '100%',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   successDetailText: {
     fontSize: 14,
