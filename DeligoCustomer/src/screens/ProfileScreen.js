@@ -2,13 +2,14 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Image } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../theme';
+import { useTheme } from '../utils/ThemeContext';
 import { getUserData, logoutUser } from '../utils/auth';
 import CustomModal from '../components/CustomModal';
 import { useLanguage } from '../utils/LanguageContext';
 
 const ProfileScreen = ({ onLogout, navigation }) => {
   const { t } = useLanguage();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const [user, setUser] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -80,7 +81,11 @@ const ProfileScreen = ({ onLogout, navigation }) => {
           onPressOut={() => setPressed(false)}
           activeOpacity={0.7}
         >
-          <View style={[styles.menuIconContainer, pressed && styles.menuIconContainerPressed]}>
+          <View style={[
+            styles.menuIconContainer,
+            { backgroundColor: colors.background, borderColor: colors.border },
+            pressed && [styles.menuIconContainerPressed, { backgroundColor: colors.border }]
+          ]}>
             <Ionicons
               name={iconName}
               size={22}
@@ -88,25 +93,25 @@ const ProfileScreen = ({ onLogout, navigation }) => {
             />
           </View>
           <View style={styles.menuTextContainer}>
-            <Text style={styles.menuText}>{title}</Text>
-            {subtitle && <Text style={styles.menuSubtitle}>{subtitle}</Text>}
+            <Text style={[styles.menuText, { color: colors.text.primary }]}>{title}</Text>
+            {subtitle && <Text style={[styles.menuSubtitle, { color: colors.text.secondary }]}>{subtitle}</Text>}
           </View>
           <Ionicons name="chevron-forward" size={20} color={colors.text.light} />
         </TouchableOpacity>
-        {showDivider && <View style={styles.menuDivider} />}
+        {showDivider && <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />}
       </>
     );
   };
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: '#F5F5F5' }} edges={["top"]}>
-      <View style={styles.container}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: Math.max(100, insets.bottom + 90) }]}
           showsVerticalScrollIndicator={false}
         >
           {/* Header - Scrolls with content */}
-          <View style={styles.header}>
+          <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
             <View style={styles.headerContent}>
               <Image
                 source={require('../assets/images/logo.png')}
@@ -114,27 +119,27 @@ const ProfileScreen = ({ onLogout, navigation }) => {
                 resizeMode="contain"
               />
               <View style={styles.headerTextContainer}>
-                <Text style={styles.headerTitle}>Deligo</Text>
-                <Text style={styles.headerSubtitle}>Your favorite food, delivered fast 🍔</Text>
+                <Text style={[styles.headerTitle, { color: colors.text.primary }]}>Deligo</Text>
+                <Text style={[styles.headerSubtitle, { color: colors.text.secondary }]}>Your favorite food, delivered fast 🍔</Text>
               </View>
             </View>
           </View>
 
           {/* User Profile Card */}
-          <View style={styles.profileCard}>
-            <View style={styles.avatarContainer}>
+          <View style={[styles.profileCard, { backgroundColor: colors.surface }]}>
+            <View style={[styles.avatarContainer, { backgroundColor: colors.primary }]}>
               <Text style={styles.avatarText}>
                 {user?.name?.charAt(0)?.toUpperCase() || 'U'}
               </Text>
             </View>
             <View style={styles.userInfo}>
-              <Text style={styles.userName}>{user?.name || 'Guest User'}</Text>
-              <Text style={styles.userContact}>{user?.email || user?.mobile || 'No contact info'}</Text>
+              <Text style={[styles.userName, { color: colors.text.primary }]}>{user?.name || 'Guest User'}</Text>
+              <Text style={[styles.userContact, { color: colors.text.secondary }]}>{user?.email || user?.mobile || 'No contact info'}</Text>
               <TouchableOpacity
-                style={styles.editProfileButton}
+                style={[styles.editProfileButton, { backgroundColor: colors.background, borderColor: colors.border }]}
                 onPress={() => navigation.navigate('EditProfile')}
               >
-                <Text style={styles.editProfileText}>{t('editProfile')}</Text>
+                <Text style={[styles.editProfileText, { color: colors.primary }]}>{t('editProfile')}</Text>
               </TouchableOpacity>
             </View>
           </View>
@@ -160,16 +165,16 @@ const ProfileScreen = ({ onLogout, navigation }) => {
           </TouchableOpacity>
 
           {/* Vouchers Card */}
-          <View style={styles.card}>
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
             <TouchableOpacity
               style={styles.voucherItem}
               onPress={() => navigation.navigate('Vouchers')}
             >
-              <View style={styles.voucherIconContainer}>
+              <View style={[styles.voucherIconContainer, { backgroundColor: `${colors.primary}15` }]}>
                 <Ionicons name="ticket" size={24} color={colors.primary} />
               </View>
-              <Text style={styles.voucherText}>{t('vouchers')}</Text>
-              <View style={styles.voucherBadge}>
+              <Text style={[styles.voucherText, { color: colors.text.primary }]}>{t('vouchers')}</Text>
+              <View style={[styles.voucherBadge, { backgroundColor: colors.primary }]}>
                 <Text style={styles.voucherBadgeText}>0</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={colors.text.light} />
@@ -177,8 +182,8 @@ const ProfileScreen = ({ onLogout, navigation }) => {
           </View>
 
           {/* Your Orders Section */}
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>{t('orders')}</Text>
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text.secondary }]}>{t('orders')}</Text>
             <MenuItem
               iconName="receipt-outline"
               title={t('orders')}
@@ -188,8 +193,8 @@ const ProfileScreen = ({ onLogout, navigation }) => {
           </View>
 
           {/* Account Section */}
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>{t('account')}</Text>
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text.secondary }]}>{t('account')}</Text>
             <MenuItem
               iconName="card-outline"
               title={t('paymentMethods')}
@@ -211,8 +216,8 @@ const ProfileScreen = ({ onLogout, navigation }) => {
           </View>
 
           {/* More Section */}
-          <View style={styles.card}>
-            <Text style={styles.sectionTitle}>More</Text>
+          <View style={[styles.card, { backgroundColor: colors.surface }]}>
+            <Text style={[styles.sectionTitle, { color: colors.text.secondary }]}>More</Text>
             <MenuItem
               iconName="location-outline"
               title={t('savedAddresses')}
@@ -239,7 +244,7 @@ const ProfileScreen = ({ onLogout, navigation }) => {
 
           {/* Referral Promotion Banner */}
           <TouchableOpacity
-            style={styles.referralBanner}
+            style={[styles.referralBanner, { backgroundColor: colors.surface, borderColor: colors.primary, shadowColor: colors.primary }]}
             onPress={() => navigation.navigate('Referrals')}
             activeOpacity={0.85}
           >
@@ -248,8 +253,8 @@ const ProfileScreen = ({ onLogout, navigation }) => {
                 <Text style={styles.referralEmoji}>🎉</Text>
               </View>
               <View style={styles.referralMiddle}>
-                <Text style={styles.referralTitle}>Invite Friends, Earn Rewards!</Text>
-                <Text style={styles.referralSubtitle}>Give $10, Get $10 for each friend</Text>
+                <Text style={[styles.referralTitle, { color: colors.text.primary }]}>Invite Friends, Earn Rewards!</Text>
+                <Text style={[styles.referralSubtitle, { color: colors.primary }]}>Give $10, Get $10 for each friend</Text>
               </View>
               <View style={styles.referralRight}>
                 <Ionicons name="chevron-forward" size={24} color={colors.primary} />
@@ -260,14 +265,14 @@ const ProfileScreen = ({ onLogout, navigation }) => {
           {/* Logout Button */}
           <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
             <TouchableOpacity
-              style={styles.logoutButton}
+              style={[styles.logoutButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
               onPress={handleLogoutPress}
               activeOpacity={0.8}
             >
-              <View style={styles.logoutIconContainer}>
+              <View style={[styles.logoutIconContainer, { backgroundColor: `${colors.error}15` }]}>
                 <Ionicons name="log-out-outline" size={22} color={colors.error} />
               </View>
-              <Text style={styles.logoutText}>{t('logout')}</Text>
+              <Text style={[styles.logoutText, { color: colors.error }]}>{t('logout')}</Text>
               <View style={styles.logoutArrow}>
                 <Ionicons name="arrow-forward" size={20} color={colors.error} />
               </View>
@@ -275,7 +280,7 @@ const ProfileScreen = ({ onLogout, navigation }) => {
           </Animated.View>
 
           {/* App Version */}
-          <Text style={styles.versionText}>{t('version')}</Text>
+          <Text style={[styles.versionText, { color: colors.text.light }]}>{t('version')}</Text>
         </ScrollView>
 
         <CustomModal
@@ -298,16 +303,13 @@ const ProfileScreen = ({ onLogout, navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
   },
   header: {
-    backgroundColor: colors.background,
     paddingHorizontal: 20,
     paddingTop: 16,
     paddingBottom: 20,
     marginBottom: 12,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
   headerContent: {
     flexDirection: 'row',
@@ -325,13 +327,11 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 24,
     fontWeight: '700',
-    color: colors.text.primary,
     fontFamily: 'Poppins-Bold',
     marginBottom: 2,
   },
   headerSubtitle: {
     fontSize: 13,
-    color: colors.text.secondary,
     fontFamily: 'Poppins-Regular',
   },
   content: {
@@ -339,7 +339,6 @@ const styles = StyleSheet.create({
   },
   // Profile Card Styles
   profileCard: {
-    backgroundColor: colors.background,
     flexDirection: 'row',
     padding: 20,
     marginBottom: 12,
@@ -349,7 +348,6 @@ const styles = StyleSheet.create({
     width: 70,
     height: 70,
     borderRadius: 35,
-    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
@@ -357,7 +355,7 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: colors.text.white,
+    color: '#FFFFFF',
     fontFamily: 'Poppins-Bold',
   },
   userInfo: {
@@ -366,13 +364,11 @@ const styles = StyleSheet.create({
   userName: {
     fontSize: 20,
     fontWeight: '700',
-    color: colors.text.primary,
     fontFamily: 'Poppins-Bold',
     marginBottom: 4,
   },
   userContact: {
     fontSize: 14,
-    color: colors.text.secondary,
     fontFamily: 'Poppins-Regular',
     marginBottom: 8,
   },
@@ -381,20 +377,17 @@ const styles = StyleSheet.create({
   },
   editProfileText: {
     fontSize: 14,
-    color: colors.primary,
     fontWeight: '600',
     fontFamily: 'Poppins-SemiBold',
   },
   // Card Styles
   card: {
-    backgroundColor: colors.background,
     marginBottom: 12,
     paddingVertical: 8,
   },
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.text.secondary,
     fontFamily: 'Poppins-SemiBold',
     paddingHorizontal: 20,
     paddingTop: 12,
@@ -413,7 +406,6 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#FFF0F6',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
@@ -422,11 +414,9 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: 16,
     fontWeight: '500',
-    color: colors.text.primary,
     fontFamily: 'Poppins-Medium',
   },
   voucherBadge: {
-    backgroundColor: colors.primary,
     borderRadius: 12,
     paddingHorizontal: 10,
     paddingVertical: 3,
@@ -437,7 +427,7 @@ const styles = StyleSheet.create({
   voucherBadgeText: {
     fontSize: 12,
     fontWeight: '600',
-    color: colors.text.white,
+    color: '#FFFFFF',
     fontFamily: 'Poppins-SemiBold',
   },
   // Deligo Pro Banner Styles
@@ -509,13 +499,10 @@ const styles = StyleSheet.create({
   },
   // Referral Banner Styles
   referralBanner: {
-    backgroundColor: '#FFF5E6',
     marginHorizontal: 20,
     marginBottom: 12,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: colors.primary,
-    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
@@ -538,13 +525,11 @@ const styles = StyleSheet.create({
   referralTitle: {
     fontSize: 16,
     fontWeight: '700',
-    color: colors.text.primary,
     fontFamily: 'Poppins-Bold',
     marginBottom: 2,
   },
   referralSubtitle: {
     fontSize: 13,
-    color: colors.primary,
     fontFamily: 'Poppins-SemiBold',
   },
   referralRight: {
@@ -561,15 +546,12 @@ const styles = StyleSheet.create({
     width: 44,
     height: 44,
     borderRadius: 22,
-    backgroundColor: '#F8F8F8',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 16,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
   },
   menuIconContainerPressed: {
-    backgroundColor: '#F0F0F0',
     transform: [{ scale: 0.95 }],
   },
   menuTextContainer: {
@@ -578,18 +560,15 @@ const styles = StyleSheet.create({
   menuText: {
     fontSize: 16,
     fontWeight: '500',
-    color: colors.text.primary,
     fontFamily: 'Poppins-Medium',
   },
   menuSubtitle: {
     fontSize: 13,
-    color: colors.text.secondary,
     fontFamily: 'Poppins-Regular',
     marginTop: 2,
   },
   menuDivider: {
     height: 1,
-    backgroundColor: colors.border,
     marginLeft: 80,
   },
   // Logout Button - Modern & Animated
@@ -597,7 +576,6 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: '#FFF5F7',
     marginHorizontal: 20,
     marginTop: 12,
     marginBottom: 16,
@@ -605,8 +583,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 24,
     borderRadius: 12,
     borderWidth: 1.5,
-    borderColor: '#FFE0E8',
-    shadowColor: colors.error,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
@@ -616,14 +592,12 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#FFE5EC',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: 12,
   },
   logoutText: {
     flex: 1,
-    color: colors.error,
     fontSize: 16,
     fontWeight: '600',
     fontFamily: 'Poppins-SemiBold',
@@ -633,7 +607,6 @@ const styles = StyleSheet.create({
   },
   versionText: {
     fontSize: 12,
-    color: colors.text.light,
     textAlign: 'center',
     marginBottom: 20,
     fontFamily: 'Poppins-Regular',

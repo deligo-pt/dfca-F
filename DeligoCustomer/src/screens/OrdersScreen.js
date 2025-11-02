@@ -8,12 +8,13 @@ import {
   Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { colors } from '../theme';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useLanguage } from '../utils/LanguageContext';
+import { useTheme } from '../utils/ThemeContext';
 
 // Mock data for orders
 const mockOrders = {
+  // ...existing code...
   ongoing: [
     {
       id: '1',
@@ -56,6 +57,7 @@ const mockOrders = {
 
 const OrdersScreen = ({ navigation }) => {
   const { t } = useLanguage();
+  const { colors } = useTheme();
   const [activeTab, setActiveTab] = useState('ongoing');
 
   const getStatusIcon = (status) => {
@@ -94,7 +96,7 @@ const OrdersScreen = ({ navigation }) => {
     return (
       <TouchableOpacity
         key={order.id}
-        style={styles.orderCard}
+        style={[styles.orderCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowColor: colors.shadow }]}
         activeOpacity={0.7}
         onPress={() => isOngoing ? navigation.navigate('TrackOrder', { orderId: order.id }) : null}
       >
@@ -102,21 +104,21 @@ const OrdersScreen = ({ navigation }) => {
         <View style={styles.orderHeader}>
           <Image
             source={order.restaurantImage}
-            style={styles.restaurantImage}
+            style={[styles.restaurantImage, { backgroundColor: colors.background }]}
             resizeMode="cover"
           />
           <View style={styles.orderHeaderInfo}>
-            <Text style={styles.restaurantName}>{order.restaurantName}</Text>
-            <Text style={styles.orderNumber}>{order.orderNumber}</Text>
-            <Text style={styles.orderDateTime}>
+            <Text style={[styles.restaurantName, { color: colors.text.primary }]}>{order.restaurantName}</Text>
+            <Text style={[styles.orderNumber, { color: colors.text.secondary }]}>{order.orderNumber}</Text>
+            <Text style={[styles.orderDateTime, { color: colors.text.light }]}>
               {order.orderDate} • {order.orderTime}
             </Text>
           </View>
         </View>
 
         {/* Order Items */}
-        <View style={styles.orderItems}>
-          <Text style={styles.itemsText}>
+        <View style={[styles.orderItems, { borderTopColor: colors.border, borderBottomColor: colors.border }]}>
+          <Text style={[styles.itemsText, { color: colors.text.secondary }]}>
             {order.items.join(', ')}
           </Text>
         </View>
@@ -133,14 +135,14 @@ const OrdersScreen = ({ navigation }) => {
               {getStatusText(order.status)}
             </Text>
           </View>
-          <Text style={styles.totalAmount}>€{order.totalAmount}</Text>
+          <Text style={[styles.totalAmount, { color: colors.text.primary }]}>€{order.totalAmount}</Text>
         </View>
 
         {/* Estimated Time for Ongoing Orders */}
         {isOngoing && order.estimatedTime && (
-          <View style={styles.estimatedTimeContainer}>
+          <View style={[styles.estimatedTimeContainer, { borderTopColor: colors.border }]}>
             <Ionicons name="time-outline" size={16} color={colors.primary} />
-            <Text style={styles.estimatedTimeText}>
+            <Text style={[styles.estimatedTimeText, { color: colors.primary }]}>
               {t('estimated')} {t('deliveryTime')}: {order.estimatedTime}
             </Text>
           </View>
@@ -151,26 +153,26 @@ const OrdersScreen = ({ navigation }) => {
           {isOngoing ? (
             <>
               <TouchableOpacity
-                style={styles.trackButton}
+                style={[styles.trackButton, { backgroundColor: colors.primary }]}
                 onPress={() => navigation.navigate('TrackOrder', { order })}
               >
                 <Ionicons name="location" size={18} color={colors.text.white} />
-                <Text style={styles.trackButtonText}>{t('trackOrder')}</Text>
+                <Text style={[styles.trackButtonText, { color: colors.text.white }]}>{t('trackOrder')}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.helpButton}>
+              <TouchableOpacity style={[styles.helpButton, { backgroundColor: colors.surface, borderColor: colors.primary }]}>
                 <Ionicons name="help-circle-outline" size={18} color={colors.primary} />
-                <Text style={styles.helpButtonText}>{t('helpCenter')}</Text>
+                <Text style={[styles.helpButtonText, { color: colors.primary }]}>{t('helpCenter')}</Text>
               </TouchableOpacity>
             </>
           ) : (
             <>
-              <TouchableOpacity style={styles.reorderButton}>
+              <TouchableOpacity style={[styles.reorderButton, { backgroundColor: colors.surface, borderColor: colors.primary }]}>
                 <MaterialIcons name="replay" size={18} color={colors.primary} />
-                <Text style={styles.reorderButtonText}>{t('orderAgain')}</Text>
+                <Text style={[styles.reorderButtonText, { color: colors.primary }]}>{t('orderAgain')}</Text>
               </TouchableOpacity>
-              <TouchableOpacity style={styles.reviewButton}>
+              <TouchableOpacity style={[styles.reviewButton, { backgroundColor: colors.surface, borderColor: colors.primary }]}>
                 <Ionicons name="star-outline" size={18} color={colors.primary} />
-                <Text style={styles.reviewButtonText}>{t('rating')}</Text>
+                <Text style={[styles.reviewButtonText, { color: colors.primary }]}>{t('rating')}</Text>
               </TouchableOpacity>
             </>
           )}
@@ -186,10 +188,10 @@ const OrdersScreen = ({ navigation }) => {
         size={80}
         color={colors.text.light}
       />
-      <Text style={styles.emptyStateTitle}>
+      <Text style={[styles.emptyStateTitle, { color: colors.text.primary }]}>
         {type === 'ongoing' ? t('noOrders') : t('noOrders')}
       </Text>
-      <Text style={styles.emptyStateText}>
+      <Text style={[styles.emptyStateText, { color: colors.text.secondary }]}>
         {type === 'ongoing'
           ? 'Your active orders will appear here'
           : 'Your past orders will appear here'}
@@ -202,32 +204,48 @@ const OrdersScreen = ({ navigation }) => {
       style={{ flex: 1, backgroundColor: colors.background }}
       edges={['top']}
     >
-      <View style={styles.container}>
+      <View style={[styles.container, { backgroundColor: colors.background }]}>
         {/* Header */}
         <View style={styles.header}>
-          <Text style={styles.headerText}>{t('orders')}</Text>
+          <Text style={[styles.headerText, { color: colors.text.primary }]}>{t('orders')}</Text>
         </View>
 
         {/* Tabs */}
         <View style={styles.tabContainer}>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'ongoing' && styles.activeTab]}
+            style={[
+              styles.tab,
+              { backgroundColor: colors.surface },
+              activeTab === 'ongoing' && { backgroundColor: colors.primary }
+            ]}
             onPress={() => setActiveTab('ongoing')}
           >
-            <Text style={[styles.tabText, activeTab === 'ongoing' && styles.activeTabText]}>
+            <Text style={[
+              styles.tabText,
+              { color: colors.text.secondary },
+              activeTab === 'ongoing' && { color: colors.text.white }
+            ]}>
               {t('ongoingOrders')}
             </Text>
             {mockOrders.ongoing.length > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{mockOrders.ongoing.length}</Text>
+              <View style={[styles.badge, { backgroundColor: activeTab === 'ongoing' ? colors.text.white : colors.primary }]}>
+                <Text style={[styles.badgeText, { color: activeTab === 'ongoing' ? colors.primary : colors.text.white }]}>{mockOrders.ongoing.length}</Text>
               </View>
             )}
           </TouchableOpacity>
           <TouchableOpacity
-            style={[styles.tab, activeTab === 'history' && styles.activeTab]}
+            style={[
+              styles.tab,
+              { backgroundColor: colors.surface },
+              activeTab === 'history' && { backgroundColor: colors.primary }
+            ]}
             onPress={() => setActiveTab('history')}
           >
-            <Text style={[styles.tabText, activeTab === 'history' && styles.activeTabText]}>
+            <Text style={[
+              styles.tabText,
+              { color: colors.text.secondary },
+              activeTab === 'history' && { color: colors.text.white }
+            ]}>
               {t('pastOrders')}
             </Text>
           </TouchableOpacity>
@@ -261,7 +279,6 @@ const OrdersScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   header: {
     paddingHorizontal: 20,
@@ -271,7 +288,6 @@ const styles = StyleSheet.create({
   headerText: {
     fontSize: 28,
     fontWeight: 'bold',
-    color: colors.text.primary,
     fontFamily: 'Poppins-Bold',
   },
   tabContainer: {
@@ -287,25 +303,16 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     borderRadius: 12,
-    backgroundColor: '#F5F5F5',
     flexDirection: 'row',
     flexWrap: 'wrap',
-  },
-  activeTab: {
-    backgroundColor: colors.primary,
   },
   tabText: {
     fontSize: 14,
     fontFamily: 'Poppins-Medium',
-    color: colors.text.secondary,
     textAlign: 'center',
     flexShrink: 1,
   },
-  activeTabText: {
-    color: colors.text.white,
-  },
   badge: {
-    backgroundColor: colors.text.white,
     borderRadius: 10,
     paddingHorizontal: 6,
     paddingVertical: 2,
@@ -316,7 +323,6 @@ const styles = StyleSheet.create({
   badgeText: {
     fontSize: 11,
     fontFamily: 'Poppins-SemiBold',
-    color: colors.primary,
   },
   scrollView: {
     flex: 1,
@@ -326,17 +332,14 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   orderCard: {
-    backgroundColor: colors.text.white,
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
     elevation: 3,
-    shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
     shadowRadius: 8,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
   },
   orderHeader: {
     flexDirection: 'row',
@@ -346,7 +349,6 @@ const styles = StyleSheet.create({
     width: 60,
     height: 60,
     borderRadius: 12,
-    backgroundColor: '#F5F5F5',
   },
   orderHeaderInfo: {
     flex: 1,
@@ -356,31 +358,25 @@ const styles = StyleSheet.create({
   restaurantName: {
     fontSize: 16,
     fontFamily: 'Poppins-SemiBold',
-    color: colors.text.primary,
     marginBottom: 2,
   },
   orderNumber: {
     fontSize: 13,
     fontFamily: 'Poppins-Regular',
-    color: colors.text.secondary,
     marginBottom: 2,
   },
   orderDateTime: {
     fontSize: 12,
     fontFamily: 'Poppins-Regular',
-    color: colors.text.light,
   },
   orderItems: {
     paddingVertical: 12,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F0F0',
   },
   itemsText: {
     fontSize: 13,
     fontFamily: 'Poppins-Regular',
-    color: colors.text.secondary,
     lineHeight: 20,
   },
   orderFooter: {
@@ -401,7 +397,6 @@ const styles = StyleSheet.create({
   totalAmount: {
     fontSize: 18,
     fontFamily: 'Poppins-Bold',
-    color: colors.text.primary,
   },
   estimatedTimeContainer: {
     flexDirection: 'row',
@@ -409,12 +404,10 @@ const styles = StyleSheet.create({
     marginTop: 12,
     paddingTop: 12,
     borderTopWidth: 1,
-    borderTopColor: '#F0F0F0',
   },
   estimatedTimeText: {
     fontSize: 13,
     fontFamily: 'Poppins-Medium',
-    color: colors.primary,
     marginLeft: 6,
   },
   actionButtons: {
@@ -425,7 +418,6 @@ const styles = StyleSheet.create({
   trackButton: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: colors.primary,
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: 'center',
@@ -434,58 +426,48 @@ const styles = StyleSheet.create({
   trackButtonText: {
     fontSize: 14,
     fontFamily: 'Poppins-SemiBold',
-    color: colors.text.white,
     marginLeft: 6,
   },
   helpButton: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: colors.text.white,
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: colors.primary,
   },
   helpButtonText: {
     fontSize: 14,
     fontFamily: 'Poppins-SemiBold',
-    color: colors.primary,
     marginLeft: 6,
   },
   reorderButton: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: colors.text.white,
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: colors.primary,
   },
   reorderButtonText: {
     fontSize: 14,
     fontFamily: 'Poppins-SemiBold',
-    color: colors.primary,
     marginLeft: 6,
   },
   reviewButton: {
     flex: 1,
     flexDirection: 'row',
-    backgroundColor: colors.text.white,
     paddingVertical: 12,
     borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 1.5,
-    borderColor: colors.primary,
   },
   reviewButtonText: {
     fontSize: 14,
     fontFamily: 'Poppins-SemiBold',
-    color: colors.primary,
     marginLeft: 6,
   },
   emptyState: {
@@ -496,14 +478,12 @@ const styles = StyleSheet.create({
   emptyStateTitle: {
     fontSize: 18,
     fontFamily: 'Poppins-SemiBold',
-    color: colors.text.primary,
     marginTop: 16,
     marginBottom: 8,
   },
   emptyStateText: {
     fontSize: 14,
     fontFamily: 'Poppins-Regular',
-    color: colors.text.secondary,
     textAlign: 'center',
   },
 });

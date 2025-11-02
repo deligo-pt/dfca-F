@@ -17,16 +17,16 @@ import CountryPicker from 'react-native-country-picker-modal';
 import CustomModal from '../components/CustomModal';
 import OTPInput from '../components/OTPInput';
 import { useLanguage } from '../utils/LanguageContext';
+import { useTheme } from '../utils/ThemeContext';
 
 const LOGO = require('../assets/images/logo.png'); // Transparent logo icon
 
-const BRAND_PINK = '#E91E63';
-const GRAY = '#757575';
-const BORDER = '#E0E0E0';
-const INFO_BG = '#FFF8E1';
-
 const LoginScreen = ({ onLoginSuccess, navigation }) => {
   const { t } = useLanguage();
+  const { colors } = useTheme();
+  const BRAND_PINK = colors.primary;
+  const GRAY = colors.text.secondary;
+  const INFO_BG = colors.surface;
   const [loginMethod, setLoginMethod] = useState('mobile');
   const [identifier, setIdentifier] = useState('');
   const [otp, setOtp] = useState('');
@@ -143,37 +143,37 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
   return (
     <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
       {/* Soft gradient background */}
-      <View style={styles.gradientBg}>
+      <View style={[styles.gradientBg, { backgroundColor: colors.background }]}>
         <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
           {/* Header Section */}
           <View style={styles.header}>
             {/* Modern logo image, no border or card */}
             <Image source={LOGO} style={styles.logoImageModern} resizeMode="contain" />
-            <Text style={styles.logoText}>{t('deligo')}</Text>
-            <Text style={styles.tagline}>{t('tagline')}</Text>
+            <Text style={[styles.logoText, { color: colors.text.primary }]}>{t('deligo')}</Text>
+            <Text style={[styles.tagline, { color: colors.text.secondary }]}>{t('tagline')}</Text>
           </View>
 
           {/* Main Card with animation */}
-          <Animated.View style={[styles.formCard, { opacity: cardAnim, transform: [{ translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) }] }]}>
-            <Text style={styles.title}>{isOtpSent ? t('verifyOTP') : t('loginOrSignup')}</Text>
-            <Text style={styles.subtitle}>{isOtpSent ? t('enterCodeSent') : t('enterToContinue')}</Text>
+          <Animated.View style={[styles.formCard, { backgroundColor: colors.surface, opacity: cardAnim, transform: [{ translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) }] }]}>
+            <Text style={[styles.title, { color: colors.text.primary }]}>{isOtpSent ? t('verifyOTP') : t('loginOrSignup')}</Text>
+            <Text style={[styles.subtitle, { color: colors.text.secondary }]}>{isOtpSent ? t('enterCodeSent') : t('enterToContinue')}</Text>
 
             {/* Tabs */}
             {!isOtpSent && (
               <View style={styles.tabs}>
                 <TouchableOpacity
-                  style={[styles.tab, loginMethod === 'mobile' && styles.tabActive]}
+                  style={[styles.tab, { backgroundColor: colors.background }, loginMethod === 'mobile' && { backgroundColor: colors.primary }]}
                   onPress={() => loginMethod !== 'mobile' && handleChangeMethod()}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.tabText, loginMethod === 'mobile' && styles.tabTextActive]}>{t('mobile')}</Text>
+                  <Text style={[styles.tabText, { color: colors.text.secondary }, loginMethod === 'mobile' && { color: '#FFFFFF' }]}>{t('mobile')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.tab, loginMethod === 'email' && styles.tabActive]}
+                  style={[styles.tab, { backgroundColor: colors.background }, loginMethod === 'email' && { backgroundColor: colors.primary }]}
                   onPress={() => loginMethod !== 'email' && handleChangeMethod()}
                   activeOpacity={0.8}
                 >
-                  <Text style={[styles.tabText, loginMethod === 'email' && styles.tabTextActive]}>{t('email')}</Text>
+                  <Text style={[styles.tabText, { color: colors.text.secondary }, loginMethod === 'email' && { color: '#FFFFFF' }]}>{t('email')}</Text>
                 </TouchableOpacity>
               </View>
             )}
@@ -194,9 +194,9 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
                       }}
                       containerButtonStyle={styles.countryPicker}
                     />
-                    <Text style={styles.countryCodeText}>+{country ? country.callingCode[0] : '351'}</Text>
+                    <Text style={[styles.countryCodeText, { color: colors.text.primary }]}>+{country ? country.callingCode[0] : '351'}</Text>
                     <TextInput
-                      style={[styles.input, { flex: 1 }]}
+                      style={[styles.input, { backgroundColor: colors.background, color: colors.text.primary, borderColor: colors.border, flex: 1 }]}
                       placeholder={t('mobileNumber')}
                       placeholderTextColor={GRAY}
                       value={identifier}
@@ -210,7 +210,7 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
                 )}
                 {loginMethod === 'email' && (
                   <TextInput
-                    style={styles.input}
+                    style={[styles.input, { backgroundColor: colors.background, color: colors.text.primary, borderColor: colors.border }]}
                     placeholder={t('emailAddress')}
                     placeholderTextColor={GRAY}
                     value={identifier}
@@ -221,7 +221,7 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
                   />
                 )}
                 <TouchableOpacity
-                  style={[styles.button, isLoading && styles.buttonDisabled]}
+                  style={[styles.button, { backgroundColor: colors.primary }, isLoading && styles.buttonDisabled]}
                   onPress={handleSendOtp}
                   disabled={isLoading}
                   activeOpacity={0.9}
@@ -238,7 +238,7 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
                   disabled={isLoading}
                 />
                 <TouchableOpacity
-                  style={[styles.button, isLoading && styles.buttonDisabled]}
+                  style={[styles.button, { backgroundColor: colors.primary }, isLoading && styles.buttonDisabled]}
                   onPress={handleVerifyOtp}
                   disabled={isLoading}
                   activeOpacity={0.9}
@@ -246,21 +246,21 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
                   <Text style={styles.buttonText}>{isLoading ? t('verifying') : t('verifyOTPButton')}</Text>
                 </TouchableOpacity>
                 <View style={styles.resendContainer}>
-                  <Text style={styles.resendText}>{t('didntReceiveOTP')} </Text>
+                  <Text style={[styles.resendText, { color: colors.text.secondary }]}>{t('didntReceiveOTP')} </Text>
                   <TouchableOpacity onPress={handleResendOtp}>
-                    <Text style={styles.resendLink}>{t('resend')}</Text>
+                    <Text style={[styles.resendLink, { color: colors.primary }]}>{t('resend')}</Text>
                   </TouchableOpacity>
                 </View>
                 <TouchableOpacity style={styles.changeButton} onPress={() => setIsOtpSent(false)}>
-                  <Text style={styles.changeButtonText}>{t('change')} {loginMethod === 'mobile' ? t('number') : t('email')}</Text>
+                  <Text style={[styles.changeButtonText, { color: colors.text.secondary }]}>{t('change')} {loginMethod === 'mobile' ? t('number') : t('email')}</Text>
                 </TouchableOpacity>
               </View>
             )}
 
             {/* Collapsible Info Banner (optional) */}
             {showInfo && (
-              <View style={styles.infoBanner}>
-                <Text style={styles.infoText}>Demo: Use any valid mobile or email and OTP 1234 for testing.</Text>
+              <View style={[styles.infoBanner, { backgroundColor: INFO_BG }]}>
+                <Text style={[styles.infoText, { color: colors.text.secondary }]}>Demo: Use any valid mobile or email and OTP 1234 for testing.</Text>
                 <TouchableOpacity style={styles.infoClose} onPress={() => setShowInfo(false)}>
                   <Text style={{ color: BRAND_PINK, fontWeight: 'bold' }}>×</Text>
                 </TouchableOpacity>
@@ -270,16 +270,16 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
 
           {/* Footer */}
           <View style={styles.footerWrap}>
-            <View style={styles.divider} />
+            <View style={[styles.divider, { backgroundColor: colors.border }]} />
             <View style={styles.footer}>
-              <Text style={styles.footerText}>{t('byContinuing')} </Text>
+              <Text style={[styles.footerText, { color: colors.text.secondary }]}>{t('byContinuing')} </Text>
               <View style={styles.footerLinks}>
                 <TouchableOpacity onPress={() => navigation.navigate('TermsOfService')}>
-                  <Text style={styles.footerLink}>{t('termsOfService')}</Text>
+                  <Text style={[styles.footerLink, { color: colors.primary }]}>{t('termsOfService')}</Text>
                 </TouchableOpacity>
-                <Text style={styles.footerText}> {t('and')} </Text>
+                <Text style={[styles.footerText, { color: colors.text.secondary }]}> {t('and')} </Text>
                 <TouchableOpacity onPress={() => navigation.navigate('PrivacyPolicy')}>
-                  <Text style={styles.footerLink}>{t('privacyPolicy')}</Text>
+                  <Text style={[styles.footerLink, { color: colors.primary }]}>{t('privacyPolicy')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
@@ -306,7 +306,6 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
 const styles = StyleSheet.create({
   gradientBg: {
     flex: 1,
-    backgroundColor: '#FFF5F7',
     position: 'relative',
   },
   scrollContent: {
@@ -325,7 +324,6 @@ const styles = StyleSheet.create({
     height: 80,
     marginBottom: 10,
     borderRadius: 24,
-    // No border, no background, just a clean modern logo
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.10,
@@ -335,20 +333,17 @@ const styles = StyleSheet.create({
   logoText: {
     fontSize: 32,
     fontWeight: 'bold',
-    color: BRAND_PINK,
     marginBottom: 2,
     letterSpacing: 1.2,
-    fontFamily: 'Poppins-Bold', // Use Poppins or Inter if available
+    fontFamily: 'Poppins-Bold',
   },
   tagline: {
     fontSize: 15,
-    color: GRAY,
     fontWeight: '500',
     marginBottom: 2,
     fontFamily: 'Poppins-Regular',
   },
   formCard: {
-    backgroundColor: '#fff',
     borderRadius: 24,
     padding: 24,
     marginHorizontal: 0,
@@ -363,21 +358,18 @@ const styles = StyleSheet.create({
   title: {
     fontSize: 22,
     fontWeight: 'bold',
-    color: '#222',
     marginBottom: 6,
     textAlign: 'center',
     fontFamily: 'Poppins-Bold',
   },
   subtitle: {
     fontSize: 15,
-    color: GRAY,
     marginBottom: 18,
     textAlign: 'center',
     fontFamily: 'Poppins-Regular',
   },
   tabs: {
     flexDirection: 'row',
-    backgroundColor: '#F5F5F5',
     borderRadius: 12,
     marginBottom: 18,
     overflow: 'hidden',
@@ -388,19 +380,10 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     borderRadius: 12,
   },
-  tabActive: {
-    backgroundColor: '#FCE4EC',
-  },
   tabText: {
     fontSize: 15,
-    color: GRAY,
     fontWeight: '600',
     fontFamily: 'Poppins-Regular',
-  },
-  tabTextActive: {
-    color: BRAND_PINK,
-    textDecorationLine: 'underline',
-    fontWeight: 'bold',
   },
   inputContainer: {
     marginBottom: 8,
@@ -415,28 +398,22 @@ const styles = StyleSheet.create({
   },
   countryCodeText: {
     fontSize: 15,
-    color: '#222',
     fontWeight: '600',
     marginRight: 8,
   },
   input: {
-    backgroundColor: '#FAFAFA',
     borderWidth: 1,
-    borderColor: BORDER,
     borderRadius: 12,
     padding: 14,
     fontSize: 16,
-    color: '#222',
     marginBottom: 12,
     fontFamily: 'Poppins-Regular',
   },
   button: {
-    backgroundColor: BRAND_PINK,
     paddingVertical: 14,
     borderRadius: 12,
     alignItems: 'center',
     marginTop: 2,
-    shadowColor: BRAND_PINK,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.18,
     shadowRadius: 12,
@@ -459,12 +436,10 @@ const styles = StyleSheet.create({
   },
   resendText: {
     fontSize: 14,
-    color: GRAY,
     fontFamily: 'Poppins-Regular',
   },
   resendLink: {
     fontSize: 14,
-    color: BRAND_PINK,
     fontWeight: '600',
     fontFamily: 'Poppins-Regular',
   },
@@ -474,12 +449,10 @@ const styles = StyleSheet.create({
   },
   changeButtonText: {
     fontSize: 14,
-    color: BRAND_PINK,
     fontWeight: '600',
     fontFamily: 'Poppins-Regular',
   },
   infoBanner: {
-    backgroundColor: INFO_BG,
     borderColor: '#FFECB3',
     borderWidth: 1,
     borderRadius: 10,
@@ -490,7 +463,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   infoText: {
-    color: '#8D6E63',
     fontSize: 14,
     flex: 1,
     fontFamily: 'Poppins-Regular',
@@ -505,7 +477,6 @@ const styles = StyleSheet.create({
   },
   divider: {
     height: 1,
-    backgroundColor: '#F0F0F0',
     width: '100%',
     marginBottom: 18,
   },
@@ -517,7 +488,6 @@ const styles = StyleSheet.create({
   },
   footerText: {
     fontSize: 13,
-    color: GRAY,
     fontFamily: 'Poppins-Regular',
   },
   footerLinks: {
@@ -526,7 +496,6 @@ const styles = StyleSheet.create({
   },
   footerLink: {
     fontSize: 13,
-    color: BRAND_PINK,
     fontWeight: '600',
     fontFamily: 'Poppins-Regular',
   },

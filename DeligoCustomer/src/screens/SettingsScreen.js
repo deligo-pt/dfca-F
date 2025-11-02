@@ -1,20 +1,26 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../theme';
 import { useLanguage } from '../utils/LanguageContext';
+import { useTheme } from '../utils/ThemeContext';
 
 const SettingsScreen = ({ navigation }) => {
   const { language, changeLanguage, t } = useLanguage();
+  const { isDarkMode, toggleTheme, colors } = useTheme();
 
   const [settings, setSettings] = useState({
-    darkMode: false,
+    darkMode: isDarkMode,
     notifications: true,
     locationServices: true,
   });
 
   const [showLanguageModal, setShowLanguageModal] = useState(false);
+
+  // Sync dark mode state with theme context
+  useEffect(() => {
+    setSettings(prev => ({ ...prev, darkMode: isDarkMode }));
+  }, [isDarkMode]);
 
   const languages = [
     { code: 'en', name: 'English', flag: '🇬🇧' },
@@ -22,7 +28,11 @@ const SettingsScreen = ({ navigation }) => {
   ];
 
   const toggleSetting = (key) => {
-    setSettings(prev => ({ ...prev, [key]: !prev[key] }));
+    if (key === 'darkMode') {
+      toggleTheme();
+    } else {
+      setSettings(prev => ({ ...prev, [key]: !prev[key] }));
+    }
   };
 
   const handleLanguageSelect = async (lang) => {
@@ -34,6 +44,165 @@ const SettingsScreen = ({ navigation }) => {
     const lang = languages.find(l => l.code === language);
     return lang ? lang.name : 'English';
   };
+
+  // Dynamic styles based on theme
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+    },
+    headerText: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.text.primary,
+      fontFamily: 'Poppins-SemiBold',
+      flex: 1,
+      textAlign: 'center',
+    },
+    placeholder: {
+      width: 40,
+    },
+    content: {
+      padding: 16,
+      paddingBottom: 24,
+    },
+    section: {
+      marginBottom: 24,
+    },
+    sectionTitle: {
+      fontSize: 14,
+      fontWeight: '600',
+      color: colors.text.secondary,
+      fontFamily: 'Poppins-SemiBold',
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+      marginBottom: 12,
+    },
+    card: {
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      overflow: 'hidden',
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    settingItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      padding: 16,
+    },
+    settingIconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: isDarkMode ? colors.background : '#F8F8F8',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 16,
+    },
+    settingContent: {
+      flex: 1,
+    },
+    settingTitle: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: colors.text.primary,
+      fontFamily: 'Poppins-Medium',
+      marginBottom: 2,
+    },
+    settingSubtitle: {
+      fontSize: 13,
+      color: colors.text.secondary,
+      fontFamily: 'Poppins-Regular',
+    },
+    divider: {
+      height: 1,
+      backgroundColor: colors.border,
+      marginLeft: 72,
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: colors.overlay,
+      justifyContent: 'flex-end',
+    },
+    modalContent: {
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: 24,
+      borderTopRightRadius: 24,
+      paddingBottom: 32,
+      maxHeight: '50%',
+    },
+    modalHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingVertical: 20,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    modalTitle: {
+      fontSize: 20,
+      fontWeight: '600',
+      color: colors.text.primary,
+      fontFamily: 'Poppins-SemiBold',
+    },
+    closeButton: {
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    languageList: {
+      paddingHorizontal: 20,
+      paddingTop: 16,
+    },
+    languageItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 16,
+      paddingHorizontal: 16,
+      backgroundColor: isDarkMode ? colors.background : '#F8F8F8',
+      borderRadius: 12,
+      marginBottom: 12,
+    },
+    languageItemSelected: {
+      backgroundColor: isDarkMode ? colors.primary + '20' : colors.secondary + '40',
+      borderWidth: 2,
+      borderColor: colors.primary,
+    },
+    languageFlag: {
+      fontSize: 32,
+      marginRight: 16,
+    },
+    languageName: {
+      fontSize: 16,
+      fontWeight: '500',
+      color: colors.text.primary,
+      fontFamily: 'Poppins-Medium',
+      flex: 1,
+    },
+    languageNameSelected: {
+      color: colors.primary,
+      fontWeight: '600',
+      fontFamily: 'Poppins-SemiBold',
+    },
+  });
+
 
   const SettingItem = ({ icon, title, subtitle, onPress, hasToggle, settingKey, hasChevron = true }) => (
     <TouchableOpacity
@@ -224,160 +393,6 @@ const SettingsScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: '#F5F5F5',
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: colors.background,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-  },
-  headerText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text.primary,
-    fontFamily: 'Poppins-SemiBold',
-    flex: 1,
-    textAlign: 'center',
-  },
-  placeholder: {
-    width: 40,
-  },
-  content: {
-    padding: 16,
-    paddingBottom: 24,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.secondary,
-    fontFamily: 'Poppins-SemiBold',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 12,
-  },
-  card: {
-    backgroundColor: colors.background,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  settingItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
-  },
-  settingIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F8F8F8',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  settingContent: {
-    flex: 1,
-  },
-  settingTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.text.primary,
-    fontFamily: 'Poppins-Medium',
-    marginBottom: 2,
-  },
-  settingSubtitle: {
-    fontSize: 13,
-    color: colors.text.secondary,
-    fontFamily: 'Poppins-Regular',
-  },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginLeft: 72,
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: colors.background,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingBottom: 32,
-    maxHeight: '50%',
-  },
-  modalHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 20,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  modalTitle: {
-    fontSize: 20,
-    fontWeight: '600',
-    color: colors.text.primary,
-    fontFamily: 'Poppins-SemiBold',
-  },
-  closeButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  languageList: {
-    paddingHorizontal: 20,
-    paddingTop: 16,
-  },
-  languageItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 16,
-    backgroundColor: '#F8F8F8',
-    borderRadius: 12,
-    marginBottom: 12,
-  },
-  languageItemSelected: {
-    backgroundColor: colors.secondary,
-    borderWidth: 2,
-    borderColor: colors.primary,
-  },
-  languageFlag: {
-    fontSize: 32,
-    marginRight: 16,
-  },
-  languageName: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.text.primary,
-    fontFamily: 'Poppins-Medium',
-    flex: 1,
-  },
-  languageNameSelected: {
-    color: colors.primary,
-    fontWeight: '600',
-    fontFamily: 'Poppins-SemiBold',
-  },
-});
 
 export default SettingsScreen;
 

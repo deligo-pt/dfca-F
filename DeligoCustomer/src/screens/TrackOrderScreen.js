@@ -14,14 +14,16 @@ import {
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
-import { colors, spacing, fontSize, borderRadius } from '../theme';
+import { spacing, fontSize, borderRadius } from '../theme';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useLanguage } from '../utils/LanguageContext';
+import { useTheme } from '../utils/ThemeContext';
 
 const { height } = Dimensions.get('window');
 
 const TrackOrderScreen = ({ route, navigation }) => {
   const { t, language } = useLanguage();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
   const { order } = route.params || {};
   const [currentStatus, setCurrentStatus] = useState('on_the_way'); // preparing, ready, picked_up, on_the_way, nearby, delivered
@@ -933,93 +935,40 @@ const TrackOrderScreen = ({ route, navigation }) => {
     </View>
   );
 
-  return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      {/* Header */}
-      <View style={styles.header}>
-        <TouchableOpacity
-          style={styles.backButton}
-          onPress={() => navigation.goBack()}
-        >
-          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
-        </TouchableOpacity>
-        <Text style={styles.headerTitle}>{t('trackOrder')}</Text>
-        <TouchableOpacity style={styles.helpButton}>
-          <Ionicons name="help-circle-outline" size={24} color={colors.text.primary} />
-        </TouchableOpacity>
-      </View>
-
-      <ScrollView
-        style={styles.scrollView}
-        showsVerticalScrollIndicator={false}
-        contentContainerStyle={styles.scrollContent}
-      >
-        {/* Map */}
-        {renderMapPlaceholder()}
-
-        {/* Driver Info */}
-        {(currentStatus === 'picked_up' || currentStatus === 'on_the_way' || currentStatus === 'nearby') && renderDriverInfo()}
-
-        {/* Order Progress */}
-        {renderOrderProgress()}
-
-        {/* Order Summary */}
-        {renderOrderSummary()}
-
-        {/* Bottom Action Buttons - Inside ScrollView */}
-        <View style={[styles.bottomActionsInline, {
-          marginBottom: Math.max(spacing.md, insets.bottom + spacing.sm)
-        }]}>
-          <TouchableOpacity style={styles.cancelButton}>
-            <Text style={styles.cancelButtonText}>{t('cancelOrder')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.supportButton}>
-            <Ionicons name="headset" size={20} color={colors.text.white} />
-            <Text style={styles.supportButtonText}>{t('support')}</Text>
-          </TouchableOpacity>
-        </View>
-
-        {/* Bottom Spacing for safe area and tab bar */}
-        <View style={{ height: Math.max(80, insets.bottom + 80) }} />
-      </ScrollView>
-    </SafeAreaView>
-  );
-};
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  headerTitle: {
-    fontSize: fontSize.xl,
-    fontFamily: 'Poppins-Bold',
-    color: colors.text.primary,
-    flex: 1,
-    textAlign: 'center',
-  },
-  helpButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
+  const styles = useMemo(() => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    headerTitle: {
+      fontSize: fontSize.xl,
+      fontFamily: 'Poppins-Bold',
+      color: colors.text.primary,
+      flex: 1,
+      textAlign: 'center',
+    },
+    helpButton: {
+      width: 40,
+      height: 40,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
   scrollView: {
     flex: 1,
   },
@@ -1642,7 +1591,60 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-SemiBold',
     color: colors.text.white,
   },
-});
+}), [colors]);
+
+  return (
+    <SafeAreaView style={styles.container} edges={['top']}>
+      {/* Header */}
+      <View style={styles.header}>
+        <TouchableOpacity
+          style={styles.backButton}
+          onPress={() => navigation.goBack()}
+        >
+          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+        </TouchableOpacity>
+        <Text style={styles.headerTitle}>{t('trackOrder')}</Text>
+        <TouchableOpacity style={styles.helpButton}>
+          <Ionicons name="help-circle-outline" size={24} color={colors.text.primary} />
+        </TouchableOpacity>
+      </View>
+
+      <ScrollView
+        style={styles.scrollView}
+        showsVerticalScrollIndicator={false}
+        contentContainerStyle={styles.scrollContent}
+      >
+        {/* Map */}
+        {renderMapPlaceholder()}
+
+        {/* Driver Info */}
+        {(currentStatus === 'picked_up' || currentStatus === 'on_the_way' || currentStatus === 'nearby') && renderDriverInfo()}
+
+        {/* Order Progress */}
+        {renderOrderProgress()}
+
+        {/* Order Summary */}
+        {renderOrderSummary()}
+
+        {/* Bottom Action Buttons - Inside ScrollView */}
+        <View style={[styles.bottomActionsInline, {
+          marginBottom: Math.max(spacing.md, insets.bottom + spacing.sm)
+        }]}>
+          <TouchableOpacity style={styles.cancelButton}>
+            <Text style={styles.cancelButtonText}>{t('cancelOrder')}</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.supportButton}>
+            <Ionicons name="headset" size={20} color={colors.text.white} />
+            <Text style={styles.supportButtonText}>{t('support')}</Text>
+          </TouchableOpacity>
+        </View>
+
+        {/* Bottom Spacing for safe area and tab bar */}
+        <View style={{ height: Math.max(80, insets.bottom + 80) }} />
+      </ScrollView>
+    </SafeAreaView>
+  );
+};
 
 export default TrackOrderScreen;
 

@@ -2,11 +2,13 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, fontSize, borderRadius } from '../theme';
+import { spacing, fontSize, borderRadius } from '../theme';
 import { useLanguage } from '../utils/LanguageContext';
+import { useTheme } from '../utils/ThemeContext';
 
 const CartScreen = ({ navigation }) => {
   const { t } = useLanguage();
+  const { colors } = useTheme();
   const insets = useSafeAreaInsets();
 
   // Mock cart data - in real app, this would come from global state/context
@@ -81,28 +83,28 @@ const CartScreen = ({ navigation }) => {
   };
 
   const renderCartItem = (item) => (
-    <View key={item.id} style={styles.cartItem}>
+    <View key={item.id} style={[styles.cartItem, { borderBottomColor: colors.border }]}>
       <View style={styles.itemLeft}>
         <Text style={styles.itemImage}>{item.image}</Text>
         <View style={styles.itemInfo}>
-          <Text style={styles.itemName}>{item.name}</Text>
-          <Text style={styles.itemDescription} numberOfLines={1}>
+          <Text style={[styles.itemName, { color: colors.text.primary }]}>{item.name}</Text>
+          <Text style={[styles.itemDescription, { color: colors.text.secondary }]} numberOfLines={1}>
             {item.description}
           </Text>
-          <Text style={styles.itemPrice}>€{item.price.toFixed(2)}</Text>
+          <Text style={[styles.itemPrice, { color: colors.primary }]}>€{item.price.toFixed(2)}</Text>
         </View>
       </View>
       <View style={styles.itemRight}>
-        <View style={styles.quantityControl}>
+        <View style={[styles.quantityControl, { backgroundColor: colors.background }]}>
           <TouchableOpacity
-            style={styles.quantityButton}
+            style={[styles.quantityButton, { backgroundColor: colors.primary }]}
             onPress={() => updateQuantity(item.id, -1)}
           >
             <Text style={styles.quantityButtonText}>−</Text>
           </TouchableOpacity>
-          <Text style={styles.quantityText}>{item.quantity}</Text>
+          <Text style={[styles.quantityText, { color: colors.text.primary }]}>{item.quantity}</Text>
           <TouchableOpacity
-            style={styles.quantityButton}
+            style={[styles.quantityButton, { backgroundColor: colors.primary }]}
             onPress={() => updateQuantity(item.id, 1)}
           >
             <Text style={styles.quantityButtonText}>+</Text>
@@ -120,18 +122,18 @@ const CartScreen = ({ navigation }) => {
 
   if (cartItems.length === 0) {
     return (
-      <SafeAreaView style={styles.container} edges={['top']}>
-        <View style={styles.header}>
-          <Text style={styles.headerTitle}>{t('cart')}</Text>
+      <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+        <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>{t('cart')}</Text>
         </View>
         <View style={styles.emptyCart}>
           <Text style={styles.emptyCartIcon}>🛒</Text>
-          <Text style={styles.emptyCartTitle}>{t('cartEmpty')}</Text>
-          <Text style={styles.emptyCartText}>
+          <Text style={[styles.emptyCartTitle, { color: colors.text.primary }]}>{t('cartEmpty')}</Text>
+          <Text style={[styles.emptyCartText, { color: colors.text.secondary }]}>
             {t('addItemsToGetStarted')}
           </Text>
           <TouchableOpacity
-            style={styles.browseButton}
+            style={[styles.browseButton, { backgroundColor: colors.primary }]}
             onPress={() => navigation.navigate('Categories')}
           >
             <Text style={styles.browseButtonText}>{t('browseRestaurants')}</Text>
@@ -142,51 +144,51 @@ const CartScreen = ({ navigation }) => {
   }
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']} mode="padding">
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']} mode="padding">
       {/* Header */}
-      <View style={styles.header}>
-        <Text style={styles.headerTitle}>{t('cart')}</Text>
+      <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
+        <Text style={[styles.headerTitle, { color: colors.text.primary }]}>{t('cart')}</Text>
         <TouchableOpacity onPress={() => setCartItems([])}>
-          <Text style={styles.clearAllText}>{t('clearAll')}</Text>
+          <Text style={[styles.clearAllText, { color: colors.primary }]}>{t('clearAll')}</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Restaurant Info */}
-        <View style={styles.restaurantSection}>
+        <View style={[styles.restaurantSection, { backgroundColor: colors.surface }]}>
           <View style={styles.restaurantHeader}>
             <Text style={styles.restaurantIcon}>🍔</Text>
             <View style={styles.restaurantInfo}>
-              <Text style={styles.restaurantName}>Burger King</Text>
+              <Text style={[styles.restaurantName, { color: colors.text.primary }]}>Burger King</Text>
               <View style={styles.restaurantMeta}>
-                <Text style={styles.metaText}>⭐ 4.5</Text>
-                <Text style={styles.metaDot}>•</Text>
-                <Text style={styles.metaText}>25-35 min</Text>
-                <Text style={styles.metaDot}>•</Text>
-                <Text style={styles.metaText}>1.2 km</Text>
+                <Text style={[styles.metaText, { color: colors.text.secondary }]}>⭐ 4.5</Text>
+                <Text style={[styles.metaDot, { color: colors.text.light }]}>•</Text>
+                <Text style={[styles.metaText, { color: colors.text.secondary }]}>25-35 min</Text>
+                <Text style={[styles.metaDot, { color: colors.text.light }]}>•</Text>
+                <Text style={[styles.metaText, { color: colors.text.secondary }]}>1.2 km</Text>
               </View>
             </View>
           </View>
         </View>
 
         {/* Cart Items */}
-        <View style={styles.cartSection}>
-          <Text style={styles.sectionTitle}>{t('yourOrder')}</Text>
+        <View style={[styles.cartSection, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('yourOrder')}</Text>
           {cartItems.map((item) => renderCartItem(item))}
         </View>
 
         {/* Add More Items */}
         <TouchableOpacity
-          style={styles.addMoreButton}
+          style={[styles.addMoreButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
           onPress={() => navigation.navigate('Categories')}
         >
-          <Text style={styles.addMoreIcon}>+</Text>
-          <Text style={styles.addMoreText}>{t('addMoreItems')}</Text>
+          <Text style={[styles.addMoreIcon, { color: colors.primary }]}>+</Text>
+          <Text style={[styles.addMoreText, { color: colors.primary }]}>{t('addMoreItems')}</Text>
         </TouchableOpacity>
 
         {/* Promo Code */}
-        <View style={styles.promoSection}>
-          <Text style={styles.sectionTitle}>{t('promoCode')}</Text>
+        <View style={[styles.promoSection, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('promoCode')}</Text>
           {appliedPromo ? (
             <View style={styles.appliedPromo}>
               <View style={styles.appliedPromoLeft}>
@@ -205,14 +207,14 @@ const CartScreen = ({ navigation }) => {
           ) : (
             <View style={styles.promoInputContainer}>
               <TextInput
-                style={styles.promoInput}
+                style={[styles.promoInput, { backgroundColor: colors.background, color: colors.text.primary, borderColor: colors.border }]}
                 placeholder={t('enterPromoCode')}
                 placeholderTextColor={colors.text.light}
                 value={promoCode}
                 onChangeText={setPromoCode}
                 autoCapitalize="characters"
               />
-              <TouchableOpacity style={styles.applyButton} onPress={applyPromoCode}>
+              <TouchableOpacity style={[styles.applyButton, { backgroundColor: colors.primary }]} onPress={applyPromoCode}>
                 <Text style={styles.applyButtonText}>{t('apply')}</Text>
               </TouchableOpacity>
             </View>
@@ -220,10 +222,10 @@ const CartScreen = ({ navigation }) => {
         </View>
 
         {/* Delivery Instructions */}
-        <View style={styles.instructionsSection}>
-          <Text style={styles.sectionTitle}>{t('deliveryInstructions')}</Text>
+        <View style={[styles.instructionsSection, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('deliveryInstructions')}</Text>
           <TextInput
-            style={styles.instructionsInput}
+            style={[styles.instructionsInput, { backgroundColor: colors.background, color: colors.text.primary, borderColor: colors.border }]}
             placeholder={t('addDeliveryInstructions')}
             placeholderTextColor={colors.text.light}
             multiline
@@ -234,49 +236,49 @@ const CartScreen = ({ navigation }) => {
         </View>
 
         {/* Price Breakdown */}
-        <View style={styles.priceSection}>
-          <Text style={styles.sectionTitle}>{t('billSummary')}</Text>
+        <View style={[styles.priceSection, { backgroundColor: colors.surface }]}>
+          <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('billSummary')}</Text>
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>{t('subtotal')}</Text>
-            <Text style={styles.priceValue}>€{getSubtotal().toFixed(2)}</Text>
+            <Text style={[styles.priceLabel, { color: colors.text.secondary }]}>{t('subtotal')}</Text>
+            <Text style={[styles.priceValue, { color: colors.text.primary }]}>€{getSubtotal().toFixed(2)}</Text>
           </View>
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>{t('deliveryFee')}</Text>
+            <Text style={[styles.priceLabel, { color: colors.text.secondary }]}>{t('deliveryFee')}</Text>
             {deliveryFee === 0 ? (
-              <Text style={styles.priceFree}>{t('free')}</Text>
+              <Text style={[styles.priceFree, { color: colors.success }]}>{t('free')}</Text>
             ) : (
-              <Text style={styles.priceValue}>€{deliveryFee.toFixed(2)}</Text>
+              <Text style={[styles.priceValue, { color: colors.text.primary }]}>€{deliveryFee.toFixed(2)}</Text>
             )}
           </View>
           <View style={styles.priceRow}>
-            <Text style={styles.priceLabel}>{t('serviceFee')}</Text>
-            <Text style={styles.priceValue}>€{serviceFee.toFixed(2)}</Text>
+            <Text style={[styles.priceLabel, { color: colors.text.secondary }]}>{t('serviceFee')}</Text>
+            <Text style={[styles.priceValue, { color: colors.text.primary }]}>€{serviceFee.toFixed(2)}</Text>
           </View>
           {discount > 0 && (
             <View style={styles.priceRow}>
-              <Text style={styles.priceLabel}>{t('discount')}</Text>
-              <Text style={styles.priceDiscount}>-€{discount.toFixed(2)}</Text>
+              <Text style={[styles.priceLabel, { color: colors.text.secondary }]}>{t('discount')}</Text>
+              <Text style={[styles.priceDiscount, { color: colors.success }]}>-€{discount.toFixed(2)}</Text>
             </View>
           )}
-          <View style={styles.divider} />
+          <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.priceRow}>
-            <Text style={styles.totalLabel}>{t('total')}</Text>
-            <Text style={styles.totalValue}>€{getTotal().toFixed(2)}</Text>
+            <Text style={[styles.totalLabel, { color: colors.text.primary }]}>{t('total')}</Text>
+            <Text style={[styles.totalValue, { color: colors.primary }]}>€{getTotal().toFixed(2)}</Text>
           </View>
         </View>
 
         {/* Checkout Button - Inside ScrollView */}
-        <View style={styles.checkoutButtonContainer}>
-          <View style={styles.totalBarInline}>
+        <View style={[styles.checkoutButtonContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+          <View style={[styles.totalBarInline, { borderBottomColor: colors.border }]}>
             <View>
-              <Text style={styles.checkoutItemCount}>
+              <Text style={[styles.checkoutItemCount, { color: colors.text.secondary }]}>
                 {cartItems.reduce((sum, item) => sum + item.quantity, 0)} {t('items')}
               </Text>
-              <Text style={styles.checkoutTotal}>€{getTotal().toFixed(2)}</Text>
+              <Text style={[styles.checkoutTotal, { color: colors.primary }]}>€{getTotal().toFixed(2)}</Text>
             </View>
           </View>
           <TouchableOpacity
-            style={styles.checkoutButton}
+            style={[styles.checkoutButton, { backgroundColor: colors.primary }]}
             onPress={() => {
               const cartData = {
                 items: cartItems,
@@ -309,7 +311,6 @@ const CartScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: colors.background,
   },
   header: {
     flexDirection: 'row',
@@ -317,25 +318,20 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
-    backgroundColor: colors.background,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
   headerTitle: {
     fontSize: fontSize.xl,
     fontFamily: 'Poppins-Bold',
-    color: colors.text.primary,
   },
   clearAllText: {
     fontSize: fontSize.sm,
     fontFamily: 'Poppins-Medium',
-    color: colors.primary,
   },
   scrollView: {
     flex: 1,
   },
   restaurantSection: {
-    backgroundColor: colors.surface,
     padding: spacing.md,
     marginBottom: spacing.sm,
   },
@@ -353,7 +349,6 @@ const styles = StyleSheet.create({
   restaurantName: {
     fontSize: fontSize.lg,
     fontFamily: 'Poppins-Bold',
-    color: colors.text.primary,
     marginBottom: spacing.xs,
   },
   restaurantMeta: {
@@ -363,22 +358,18 @@ const styles = StyleSheet.create({
   metaText: {
     fontSize: fontSize.sm,
     fontFamily: 'Poppins-Regular',
-    color: colors.text.secondary,
   },
   metaDot: {
     fontSize: fontSize.sm,
-    color: colors.text.light,
     marginHorizontal: spacing.xs,
   },
   cartSection: {
-    backgroundColor: colors.surface,
     padding: spacing.md,
     marginBottom: spacing.sm,
   },
   sectionTitle: {
     fontSize: fontSize.lg,
     fontFamily: 'Poppins-Bold',
-    color: colors.text.primary,
     marginBottom: spacing.md,
   },
   cartItem: {
@@ -386,7 +377,6 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
   itemLeft: {
     flexDirection: 'row',
@@ -403,19 +393,16 @@ const styles = StyleSheet.create({
   itemName: {
     fontSize: fontSize.md,
     fontFamily: 'Poppins-SemiBold',
-    color: colors.text.primary,
     marginBottom: spacing.xs,
   },
   itemDescription: {
     fontSize: fontSize.sm,
     fontFamily: 'Poppins-Regular',
-    color: colors.text.secondary,
     marginBottom: spacing.xs,
   },
   itemPrice: {
     fontSize: fontSize.md,
     fontFamily: 'Poppins-Bold',
-    color: colors.primary,
   },
   itemRight: {
     alignItems: 'flex-end',
@@ -424,7 +411,6 @@ const styles = StyleSheet.create({
   quantityControl: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.background,
     borderRadius: borderRadius.lg,
     padding: 4,
   },
@@ -432,19 +418,17 @@ const styles = StyleSheet.create({
     width: 28,
     height: 28,
     borderRadius: 14,
-    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
   },
   quantityButtonText: {
     fontSize: 18,
     fontFamily: 'Poppins-Bold',
-    color: colors.text.white,
+    color: '#FFFFFF',
   },
   quantityText: {
     fontSize: fontSize.md,
     fontFamily: 'Poppins-SemiBold',
-    color: colors.text.primary,
     marginHorizontal: spacing.sm,
     minWidth: 24,
     textAlign: 'center',
@@ -459,25 +443,20 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surface,
     paddingVertical: spacing.md,
     marginBottom: spacing.sm,
     borderWidth: 1,
-    borderColor: colors.border,
     borderStyle: 'dashed',
   },
   addMoreIcon: {
     fontSize: fontSize.xl,
-    color: colors.primary,
     marginRight: spacing.sm,
   },
   addMoreText: {
     fontSize: fontSize.md,
     fontFamily: 'Poppins-SemiBold',
-    color: colors.primary,
   },
   promoSection: {
-    backgroundColor: colors.surface,
     padding: spacing.md,
     marginBottom: spacing.sm,
   },
@@ -487,19 +466,15 @@ const styles = StyleSheet.create({
   },
   promoInput: {
     flex: 1,
-    backgroundColor: colors.background,
     borderRadius: borderRadius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     fontSize: fontSize.md,
     fontFamily: 'Poppins-Regular',
-    color: colors.text.primary,
     marginRight: spacing.sm,
     borderWidth: 1,
-    borderColor: colors.border,
   },
   applyButton: {
-    backgroundColor: colors.primary,
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.sm + 2,
     borderRadius: borderRadius.lg,
@@ -507,7 +482,7 @@ const styles = StyleSheet.create({
   applyButtonText: {
     fontSize: fontSize.md,
     fontFamily: 'Poppins-SemiBold',
-    color: colors.text.white,
+    color: '#FFFFFF',
   },
   appliedPromo: {
     flexDirection: 'row',
@@ -544,25 +519,20 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
   },
   instructionsSection: {
-    backgroundColor: colors.surface,
     padding: spacing.md,
     marginBottom: spacing.sm,
   },
   instructionsInput: {
-    backgroundColor: colors.background,
     borderRadius: borderRadius.lg,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     fontSize: fontSize.md,
     fontFamily: 'Poppins-Regular',
-    color: colors.text.primary,
     borderWidth: 1,
-    borderColor: colors.border,
     minHeight: 80,
     textAlignVertical: 'top',
   },
   priceSection: {
-    backgroundColor: colors.surface,
     padding: spacing.md,
     marginBottom: spacing.sm,
   },
@@ -575,43 +545,35 @@ const styles = StyleSheet.create({
   priceLabel: {
     fontSize: fontSize.md,
     fontFamily: 'Poppins-Regular',
-    color: colors.text.secondary,
   },
   priceValue: {
     fontSize: fontSize.md,
     fontFamily: 'Poppins-SemiBold',
-    color: colors.text.primary,
   },
   priceFree: {
     fontSize: fontSize.md,
     fontFamily: 'Poppins-Bold',
-    color: colors.success,
   },
   priceDiscount: {
     fontSize: fontSize.md,
     fontFamily: 'Poppins-Bold',
-    color: colors.success,
   },
   divider: {
     height: 1,
-    backgroundColor: colors.border,
     marginVertical: spacing.sm,
   },
   totalLabel: {
     fontSize: fontSize.lg,
     fontFamily: 'Poppins-Bold',
-    color: colors.text.primary,
   },
   totalValue: {
     fontSize: fontSize.lg,
     fontFamily: 'Poppins-Bold',
-    color: colors.primary,
   },
   scrollContent: {
     paddingBottom: 20,
   },
   checkoutButtonContainer: {
-    backgroundColor: '#FFFFFF',
     marginHorizontal: spacing.lg,
     marginTop: 12,
     marginBottom: 12,
@@ -623,35 +585,29 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
     elevation: 2,
     borderWidth: 1,
-    borderColor: '#F0F2F5',
   },
   totalBarInline: {
     marginBottom: spacing.md,
     paddingBottom: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: '#F0F2F5',
   },
   checkoutItemCount: {
     fontSize: 13,
     fontFamily: 'Poppins-Medium',
-    color: colors.text.secondary,
     marginBottom: 2,
   },
   checkoutTotal: {
     fontSize: 26,
     fontFamily: 'Poppins-Bold',
-    color: colors.primary,
     letterSpacing: -0.5,
   },
   checkoutButton: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.primary,
     paddingHorizontal: 28,
     paddingVertical: 16,
     borderRadius: 16,
-    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -689,18 +645,15 @@ const styles = StyleSheet.create({
   emptyCartTitle: {
     fontSize: fontSize.xl,
     fontFamily: 'Poppins-Bold',
-    color: colors.text.primary,
     marginBottom: spacing.sm,
   },
   emptyCartText: {
     fontSize: fontSize.md,
     fontFamily: 'Poppins-Regular',
-    color: colors.text.secondary,
     textAlign: 'center',
     marginBottom: spacing.xl,
   },
   browseButton: {
-    backgroundColor: colors.primary,
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
     borderRadius: borderRadius.lg,
@@ -708,7 +661,7 @@ const styles = StyleSheet.create({
   browseButtonText: {
     fontSize: fontSize.md,
     fontFamily: 'Poppins-SemiBold',
-    color: colors.text.white,
+    color: '#FFFFFF',
   },
 });
 

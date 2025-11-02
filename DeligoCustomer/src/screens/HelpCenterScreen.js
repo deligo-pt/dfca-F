@@ -2,11 +2,12 @@ import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../theme';
 import { useLanguage } from '../utils/LanguageContext';
+import { useTheme } from '../utils/ThemeContext';
 
 const HelpCenterScreen = ({ navigation }) => {
   const { t } = useLanguage();
+  const { colors } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
 
   const faqCategories = [
@@ -34,21 +35,21 @@ const HelpCenterScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={["top"]}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
+      <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerText}>{t('helpCenter')}</Text>
+        <Text style={[styles.headerText, { color: colors.text.primary }]}>{t('helpCenter')}</Text>
         <View style={styles.placeholder} />
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Search Bar */}
-        <View style={styles.searchContainer}>
+        <View style={[styles.searchContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Ionicons name="search" size={20} color={colors.text.light} />
           <TextInput
-            style={styles.searchInput}
+            style={[styles.searchInput, { color: colors.text.primary }]}
             placeholder={t('howCanWeHelp')}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -57,15 +58,15 @@ const HelpCenterScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('contactSupport')}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('contactSupport')}</Text>
           {quickActions.map(action => (
-            <TouchableOpacity key={action.id} style={styles.quickActionCard} onPress={() => handleQuickAction(action)}>
+            <TouchableOpacity key={action.id} style={[styles.quickActionCard, { backgroundColor: colors.surface, borderColor: colors.border }]} onPress={() => handleQuickAction(action)}>
               <View style={[styles.quickActionIcon, { backgroundColor: `${action.color}15` }]}>
                 <Ionicons name={action.icon} size={24} color={action.color} />
               </View>
               <View style={styles.quickActionContent}>
-                <Text style={styles.quickActionTitle}>{action.title}</Text>
-                <Text style={styles.quickActionSubtitle}>{action.subtitle}</Text>
+                <Text style={[styles.quickActionTitle, { color: colors.text.primary }]}>{action.title}</Text>
+                <Text style={[styles.quickActionSubtitle, { color: colors.text.secondary }]}>{action.subtitle}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={colors.text.light} />
             </TouchableOpacity>
@@ -73,15 +74,15 @@ const HelpCenterScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('browseTopics')}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('browseTopics')}</Text>
           {faqCategories.map(category => (
-            <TouchableOpacity key={category.id} style={styles.categoryCard}>
+            <TouchableOpacity key={category.id} style={[styles.categoryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
               <View style={styles.categoryIconContainer}>
                 <Ionicons name={category.icon} size={24} color={colors.primary} />
               </View>
               <View style={styles.categoryContent}>
-                <Text style={styles.categoryTitle}>{category.title}</Text>
-                <Text style={styles.categoryDescription}>{category.description}</Text>
+                <Text style={[styles.categoryTitle, { color: colors.text.primary }]}>{category.title}</Text>
+                <Text style={[styles.categoryDescription, { color: colors.text.secondary }]}>{category.description}</Text>
               </View>
               <Ionicons name="chevron-forward" size={20} color={colors.text.light} />
             </TouchableOpacity>
@@ -89,29 +90,29 @@ const HelpCenterScreen = ({ navigation }) => {
         </View>
 
         <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('popularQuestions')}</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('popularQuestions')}</Text>
 
-          <TouchableOpacity style={styles.questionCard}>
+          <TouchableOpacity style={[styles.questionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Ionicons name="help-circle-outline" size={20} color={colors.primary} />
-            <Text style={styles.questionText}>{t('howTrackOrder')}</Text>
+            <Text style={[styles.questionText, { color: colors.text.primary }]}>{t('howTrackOrder')}</Text>
             <Ionicons name="chevron-forward" size={18} color={colors.text.light} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.questionCard}>
+          <TouchableOpacity style={[styles.questionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Ionicons name="help-circle-outline" size={20} color={colors.primary} />
-            <Text style={styles.questionText}>{t('cancelOrder')}</Text>
+            <Text style={[styles.questionText, { color: colors.text.primary }]}>{t('cancelOrder')}</Text>
             <Ionicons name="chevron-forward" size={18} color={colors.text.light} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.questionCard}>
+          <TouchableOpacity style={[styles.questionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Ionicons name="help-circle-outline" size={20} color={colors.primary} />
-            <Text style={styles.questionText}>{t('deliveryCharges')}</Text>
+            <Text style={[styles.questionText, { color: colors.text.primary }]}>{t('deliveryCharges')}</Text>
             <Ionicons name="chevron-forward" size={18} color={colors.text.light} />
           </TouchableOpacity>
 
-          <TouchableOpacity style={styles.questionCard}>
+          <TouchableOpacity style={[styles.questionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
             <Ionicons name="help-circle-outline" size={20} color={colors.primary} />
-            <Text style={styles.questionText}>{t('applyVoucherQuestion')}</Text>
+            <Text style={[styles.questionText, { color: colors.text.primary }]}>{t('applyVoucherQuestion')}</Text>
             <Ionicons name="chevron-forward" size={18} color={colors.text.light} />
           </TouchableOpacity>
         </View>
@@ -123,7 +124,6 @@ const HelpCenterScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
   },
   header: {
     flexDirection: 'row',
@@ -131,9 +131,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: colors.background,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
   backButton: {
     width: 40,
@@ -143,7 +141,6 @@ const styles = StyleSheet.create({
   headerText: {
     fontSize: 18,
     fontWeight: '600',
-    color: colors.text.primary,
     fontFamily: 'Poppins-SemiBold',
     flex: 1,
     textAlign: 'center',
@@ -158,18 +155,15 @@ const styles = StyleSheet.create({
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.background,
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     marginBottom: 24,
     borderWidth: 1,
-    borderColor: colors.border,
   },
   searchInput: {
     flex: 1,
     fontSize: 16,
-    color: colors.text.primary,
     fontFamily: 'Poppins-Regular',
     marginLeft: 12,
   },
@@ -179,19 +173,16 @@ const styles = StyleSheet.create({
   sectionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.text.primary,
     fontFamily: 'Poppins-SemiBold',
     marginBottom: 12,
   },
   quickActionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.background,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: colors.border,
   },
   quickActionIcon: {
     width: 48,
@@ -207,24 +198,20 @@ const styles = StyleSheet.create({
   quickActionTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.text.primary,
     fontFamily: 'Poppins-SemiBold',
     marginBottom: 2,
   },
   quickActionSubtitle: {
     fontSize: 13,
-    color: colors.text.secondary,
     fontFamily: 'Poppins-Regular',
   },
   categoryCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.background,
     borderRadius: 16,
     padding: 16,
     marginBottom: 12,
     borderWidth: 1,
-    borderColor: colors.border,
   },
   categoryIconContainer: {
     width: 48,
@@ -241,29 +228,24 @@ const styles = StyleSheet.create({
   categoryTitle: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.text.primary,
     fontFamily: 'Poppins-SemiBold',
     marginBottom: 2,
   },
   categoryDescription: {
     fontSize: 13,
-    color: colors.text.secondary,
     fontFamily: 'Poppins-Regular',
   },
   questionCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.background,
     borderRadius: 12,
     padding: 16,
     marginBottom: 8,
     borderWidth: 1,
-    borderColor: colors.border,
   },
   questionText: {
     flex: 1,
     fontSize: 15,
-    color: colors.text.primary,
     fontFamily: 'Poppins-Regular',
     marginLeft: 12,
   },

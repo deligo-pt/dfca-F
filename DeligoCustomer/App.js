@@ -12,6 +12,8 @@ import * as Font from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { createStackNavigator } from '@react-navigation/stack';
 import { LanguageProvider } from './src/utils/LanguageContext';
+import { ThemeProvider } from './src/utils/ThemeContext';
+import * as SystemUI from 'expo-system-ui';
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -58,6 +60,9 @@ export default function App() {
     const prepare = async () => {
       try {
         // Start timing
+        // Set system UI colors for notch areas (top and bottom)
+        await SystemUI.setBackgroundColorAsync(colors.primary);
+
         const startTime = Date.now();
 
         await loadFonts();
@@ -119,42 +124,44 @@ export default function App() {
 
   return (
     <SafeAreaProvider>
-      <LanguageProvider>
-        <NavigationContainer>
-          <Stack.Navigator screenOptions={{ headerShown: false }}>
-            {showOnboarding ? (
-              <Stack.Screen name="Onboarding">
-                {(props) => <OnboardingScreen {...props} onDone={handleOnboardingDone} />}
-              </Stack.Screen>
-            ) : !isAuthenticated ? (
-              <Stack.Screen name="Login">
-                {(props) => <LoginScreen {...props} onLoginSuccess={handleLoginSuccess} />}
-              </Stack.Screen>
-            ) : (
-              <Stack.Screen name="Main">
-                {(props) => <BottomTabNavigator {...props} onLogout={handleLogout} />}
-              </Stack.Screen>
-            )}
-            <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
-            <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
-            <Stack.Screen name="LocationAddress" component={LocationAddressScreen} />
-            <Stack.Screen name="RestaurantDetails" component={RestaurantDetailsScreen} />
-            <Stack.Screen name="TrackOrder" component={TrackOrderScreen} />
-            <Stack.Screen name="Checkout" component={CheckoutScreen} />
+      <ThemeProvider>
+        <LanguageProvider>
+          <NavigationContainer>
+            <Stack.Navigator screenOptions={{ headerShown: false }}>
+              {showOnboarding ? (
+                <Stack.Screen name="Onboarding">
+                  {(props) => <OnboardingScreen {...props} onDone={handleOnboardingDone} />}
+                </Stack.Screen>
+              ) : !isAuthenticated ? (
+                <Stack.Screen name="Login">
+                  {(props) => <LoginScreen {...props} onLoginSuccess={handleLoginSuccess} />}
+                </Stack.Screen>
+              ) : (
+                <Stack.Screen name="Main">
+                  {(props) => <BottomTabNavigator {...props} onLogout={handleLogout} />}
+                </Stack.Screen>
+              )}
+              <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
+              <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+              <Stack.Screen name="LocationAddress" component={LocationAddressScreen} />
+              <Stack.Screen name="RestaurantDetails" component={RestaurantDetailsScreen} />
+              <Stack.Screen name="TrackOrder" component={TrackOrderScreen} />
+              <Stack.Screen name="Checkout" component={CheckoutScreen} />
 
-            {/* Account Related Screens */}
-            <Stack.Screen name="EditProfile" component={EditProfileScreen} />
-            <Stack.Screen name="Vouchers" component={VouchersScreen} />
-            <Stack.Screen name="SavedAddresses" component={SavedAddressesScreen} />
-            <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
-            <Stack.Screen name="Referrals" component={ReferralsScreen} />
-            <Stack.Screen name="Notifications" component={NotificationsScreen} />
-            <Stack.Screen name="Settings" component={SettingsScreen} />
-            <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
-          </Stack.Navigator>
-          <StatusBar style="light" backgroundColor={colors.primary} />
-        </NavigationContainer>
-      </LanguageProvider>
+              {/* Account Related Screens */}
+              <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+              <Stack.Screen name="Vouchers" component={VouchersScreen} />
+              <Stack.Screen name="SavedAddresses" component={SavedAddressesScreen} />
+              <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
+              <Stack.Screen name="Referrals" component={ReferralsScreen} />
+              <Stack.Screen name="Notifications" component={NotificationsScreen} />
+              <Stack.Screen name="Settings" component={SettingsScreen} />
+              <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
+            </Stack.Navigator>
+            <StatusBar style="light" backgroundColor={colors.primary} />
+          </NavigationContainer>
+        </LanguageProvider>
+      </ThemeProvider>
     </SafeAreaProvider>
   );
 }
