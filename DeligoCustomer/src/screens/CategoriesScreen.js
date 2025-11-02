@@ -3,7 +3,8 @@ import { View, Text, StyleSheet, ScrollView, Animated, Modal, TouchableOpacity }
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing } from '../theme';
+import { spacing } from '../theme';
+import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
 import {
   LocationHeader,
@@ -16,6 +17,7 @@ import {
 import mockData from '../data/mockData.json';
 
 const CategoriesScreen = ({ navigation }) => {
+  const { colors } = useTheme();
   const { t } = useLanguage();
   const [location, setLocation] = useState(null);
   const [errorMsg, setErrorMsg] = useState(null);
@@ -234,7 +236,7 @@ const CategoriesScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={styles(colors).safeArea} edges={['top']}>
       {/* Sticky Search Header - appears on scroll */}
       <StickySearchHeader
         scrollY={scrollY}
@@ -249,7 +251,7 @@ const CategoriesScreen = ({ navigation }) => {
       />
 
       <Animated.ScrollView
-        style={styles.scrollView}
+        style={styles(colors).scrollView}
         showsVerticalScrollIndicator={false}
         bounces={true}
         scrollEventThrottle={16}
@@ -283,7 +285,7 @@ const CategoriesScreen = ({ navigation }) => {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.categoriesContainer}
+          contentContainerStyle={styles(colors).categoriesContainer}
         >
           {mockData.categories.map((category) => (
             <CategoryCard
@@ -302,7 +304,7 @@ const CategoriesScreen = ({ navigation }) => {
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles.cuisinesContainer}
+          contentContainerStyle={styles(colors).cuisinesContainer}
         >
           {mockData.cuisines.map((cuisine) => (
             <CuisineChip
@@ -319,7 +321,7 @@ const CategoriesScreen = ({ navigation }) => {
           title={searchQuery ? `Search Results (${filteredRestaurants.length})` : t('popularRestaurants')}
           onSeeAll={!searchQuery ? () => console.log('See all restaurants') : undefined}
         />
-        <View style={styles.restaurantsContainer}>
+        <View style={styles(colors).restaurantsContainer}>
           {filteredRestaurants.length > 0 ? (
             filteredRestaurants.map((restaurant) => (
               <RestaurantCard
@@ -329,10 +331,10 @@ const CategoriesScreen = ({ navigation }) => {
               />
             ))
           ) : searchQuery ? (
-            <View style={styles.noResultsContainer}>
+            <View style={styles(colors).noResultsContainer}>
               <Ionicons name="search-outline" size={48} color={colors.text.secondary} />
-              <Text style={styles.noResultsText}>No restaurants found</Text>
-              <Text style={styles.noResultsSubtext}>Try searching with different keywords</Text>
+              <Text style={styles(colors).noResultsText}>No restaurants found</Text>
+              <Text style={styles(colors).noResultsSubtext}>Try searching with different keywords</Text>
             </View>
           ) : null}
         </View>
@@ -347,52 +349,52 @@ const CategoriesScreen = ({ navigation }) => {
         visible={offerModalVisible}
         onRequestClose={() => setOfferModalVisible(false)}
       >
-        <View style={styles.modalOverlay}>
-          <View style={styles.modalContent}>
+        <View style={styles(colors).modalOverlay}>
+          <View style={styles(colors).modalContent}>
             {/* Close Button */}
             <TouchableOpacity
-              style={styles.modalCloseButton}
+              style={styles(colors).modalCloseButton}
               onPress={() => setOfferModalVisible(false)}
             >
-              <Ionicons name="close" size={24} color="#666" />
+              <Ionicons name="close" size={24} color={colors.text.secondary} />
             </TouchableOpacity>
 
             {/* Modal Header */}
-            <View style={styles.modalHeader}>
-              <Text style={styles.modalIcon}>🎉</Text>
-              <Text style={styles.modalTitle}>
+            <View style={styles(colors).modalHeader}>
+              <Text style={styles(colors).modalIcon}>🎉</Text>
+              <Text style={styles(colors).modalTitle}>
                 {selectedOffer?.title || 'Special Offer'}
               </Text>
             </View>
 
             {/* Modal Body */}
-            <View style={styles.modalBody}>
-              <Text style={styles.modalSubtitle}>
+            <View style={styles(colors).modalBody}>
+              <Text style={styles(colors).modalSubtitle}>
                 {selectedOffer?.subtitle || 'Limited time offer'}
               </Text>
 
               {selectedOffer?.code && (
-                <View style={styles.modalPromoCodeContainer}>
-                  <Text style={styles.modalPromoCodeLabel}>Promo Code:</Text>
-                  <View style={styles.modalPromoCode}>
-                    <Text style={styles.modalPromoCodeText}>
+                <View style={styles(colors).modalPromoCodeContainer}>
+                  <Text style={styles(colors).modalPromoCodeLabel}>Promo Code:</Text>
+                  <View style={styles(colors).modalPromoCode}>
+                    <Text style={styles(colors).modalPromoCodeText}>
                       {selectedOffer.code}
                     </Text>
                   </View>
-                  <Text style={styles.modalCopyHint}>Tap to copy</Text>
+                  <Text style={styles(colors).modalCopyHint}>Tap to copy</Text>
                 </View>
               )}
 
-              <View style={styles.modalDiscountBadge}>
-                <Text style={styles.modalDiscountText}>
+              <View style={styles(colors).modalDiscountBadge}>
+                <Text style={styles(colors).modalDiscountText}>
                   {selectedOffer?.discount || '50%'}
                 </Text>
-                <Text style={styles.modalDiscountLabel}>OFF</Text>
+                <Text style={styles(colors).modalDiscountLabel}>OFF</Text>
               </View>
 
-              <View style={styles.modalTerms}>
-                <Text style={styles.modalTermsTitle}>Terms & Conditions:</Text>
-                <Text style={styles.modalTermsText}>
+              <View style={styles(colors).modalTerms}>
+                <Text style={styles(colors).modalTermsTitle}>Terms & Conditions:</Text>
+                <Text style={styles(colors).modalTermsText}>
                   • Valid for first-time users only{'\n'}
                   • Minimum order value: €20{'\n'}
                   • Not applicable with other offers{'\n'}
@@ -403,14 +405,14 @@ const CategoriesScreen = ({ navigation }) => {
 
             {/* Modal Footer */}
             <TouchableOpacity
-              style={styles.modalApplyButton}
+              style={styles(colors).modalApplyButton}
               onPress={() => {
                 setOfferModalVisible(false);
                 // Navigate to menu or apply code
                 console.log('Apply offer:', selectedOffer);
               }}
             >
-              <Text style={styles.modalApplyButtonText}>Apply Offer</Text>
+              <Text style={styles(colors).modalApplyButtonText}>Apply Offer</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -419,7 +421,7 @@ const CategoriesScreen = ({ navigation }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = (colors) => StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: colors.primary,
@@ -462,17 +464,22 @@ const styles = StyleSheet.create({
   // Offer Modal Styles
   modalOverlay: {
     flex: 1,
-    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    backgroundColor: colors.overlay,
     justifyContent: 'flex-end',
   },
   modalContent: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderTopLeftRadius: 24,
     borderTopRightRadius: 24,
     paddingTop: spacing.lg,
     paddingHorizontal: spacing.lg,
     paddingBottom: spacing.xl + 10,
     maxHeight: '80%',
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 12,
+    elevation: 8,
   },
   modalCloseButton: {
     position: 'absolute',
@@ -482,9 +489,11 @@ const styles = StyleSheet.create({
     width: 36,
     height: 36,
     borderRadius: 18,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: colors.background,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   modalHeader: {
     alignItems: 'center',
@@ -497,7 +506,7 @@ const styles = StyleSheet.create({
   modalTitle: {
     fontSize: 22,
     fontFamily: 'Poppins-Bold',
-    color: '#1A1A1A',
+    color: colors.text.primary,
     textAlign: 'center',
   },
   modalBody: {
@@ -506,7 +515,7 @@ const styles = StyleSheet.create({
   modalSubtitle: {
     fontSize: 16,
     fontFamily: 'Poppins-Regular',
-    color: '#666666',
+    color: colors.text.secondary,
     textAlign: 'center',
     marginBottom: spacing.lg,
   },
@@ -517,7 +526,7 @@ const styles = StyleSheet.create({
   modalPromoCodeLabel: {
     fontSize: 14,
     fontFamily: 'Poppins-Medium',
-    color: '#666666',
+    color: colors.text.secondary,
     marginBottom: spacing.xs,
   },
   modalPromoCode: {
@@ -533,22 +542,22 @@ const styles = StyleSheet.create({
   modalPromoCodeText: {
     fontSize: 24,
     fontFamily: 'Poppins-Black',
-    color: '#FFFFFF',
+    color: colors.text.white,
     letterSpacing: 2,
   },
   modalCopyHint: {
     fontSize: 12,
     fontFamily: 'Poppins-Regular',
-    color: '#999999',
+    color: colors.text.light,
   },
   modalDiscountBadge: {
-    backgroundColor: '#FFF8E1',
+    backgroundColor: colors.background === '#FFFFFF' ? '#FFF8E1' : 'rgba(255, 217, 61, 0.15)',
     borderRadius: 16,
     padding: spacing.lg,
     alignItems: 'center',
     marginBottom: spacing.lg,
     borderWidth: 2,
-    borderColor: '#FFD93D',
+    borderColor: colors.background === '#FFFFFF' ? '#FFD93D' : 'rgba(255, 217, 61, 0.3)',
   },
   modalDiscountText: {
     fontSize: 48,
@@ -562,20 +571,22 @@ const styles = StyleSheet.create({
     color: colors.primary,
   },
   modalTerms: {
-    backgroundColor: '#F5F5F5',
+    backgroundColor: colors.background,
     borderRadius: 12,
     padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   modalTermsTitle: {
     fontSize: 14,
     fontFamily: 'Poppins-SemiBold',
-    color: '#333333',
+    color: colors.text.primary,
     marginBottom: spacing.xs,
   },
   modalTermsText: {
     fontSize: 13,
     fontFamily: 'Poppins-Regular',
-    color: '#666666',
+    color: colors.text.secondary,
     lineHeight: 20,
   },
   modalApplyButton: {
@@ -592,7 +603,7 @@ const styles = StyleSheet.create({
   modalApplyButtonText: {
     fontSize: 18,
     fontFamily: 'Poppins-Bold',
-    color: '#FFFFFF',
+    color: colors.text.white,
   },
 });
 

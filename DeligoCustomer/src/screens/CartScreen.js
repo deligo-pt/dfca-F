@@ -8,7 +8,7 @@ import { useTheme } from '../utils/ThemeContext';
 
 const CartScreen = ({ navigation }) => {
   const { t } = useLanguage();
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
 
   // Mock cart data - in real app, this would come from global state/context
@@ -155,7 +155,19 @@ const CartScreen = ({ navigation }) => {
 
       <ScrollView style={styles.scrollView} showsVerticalScrollIndicator={false} contentContainerStyle={styles.scrollContent}>
         {/* Restaurant Info */}
-        <View style={[styles.restaurantSection, { backgroundColor: colors.surface }]}>
+        <View style={[
+          styles.restaurantSection,
+          {
+            backgroundColor: colors.surface,
+            shadowColor: isDarkMode ? '#000' : '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: isDarkMode ? 0.3 : 0.05,
+            shadowRadius: isDarkMode ? 8 : 4,
+            elevation: isDarkMode ? 6 : 2,
+            borderWidth: isDarkMode ? 1 : 0,
+            borderColor: isDarkMode ? colors.border : 'transparent',
+          }
+        ]}>
           <View style={styles.restaurantHeader}>
             <Text style={styles.restaurantIcon}>🍔</Text>
             <View style={styles.restaurantInfo}>
@@ -172,14 +184,37 @@ const CartScreen = ({ navigation }) => {
         </View>
 
         {/* Cart Items */}
-        <View style={[styles.cartSection, { backgroundColor: colors.surface }]}>
+        <View style={[
+          styles.cartSection,
+          {
+            backgroundColor: colors.surface,
+            shadowColor: isDarkMode ? '#000' : '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: isDarkMode ? 0.3 : 0.05,
+            shadowRadius: isDarkMode ? 8 : 4,
+            elevation: isDarkMode ? 6 : 2,
+            borderWidth: isDarkMode ? 1 : 0,
+            borderColor: isDarkMode ? colors.border : 'transparent',
+          }
+        ]}>
           <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('yourOrder')}</Text>
           {cartItems.map((item) => renderCartItem(item))}
         </View>
 
         {/* Add More Items */}
         <TouchableOpacity
-          style={[styles.addMoreButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+          style={[
+            styles.addMoreButton,
+            {
+              backgroundColor: colors.surface,
+              borderColor: colors.border,
+              shadowColor: isDarkMode ? '#000' : '#000',
+              shadowOffset: { width: 0, height: 1 },
+              shadowOpacity: isDarkMode ? 0.2 : 0.03,
+              shadowRadius: isDarkMode ? 4 : 2,
+              elevation: isDarkMode ? 3 : 1,
+            }
+          ]}
           onPress={() => navigation.navigate('Categories')}
         >
           <Text style={[styles.addMoreIcon, { color: colors.primary }]}>+</Text>
@@ -187,7 +222,19 @@ const CartScreen = ({ navigation }) => {
         </TouchableOpacity>
 
         {/* Promo Code */}
-        <View style={[styles.promoSection, { backgroundColor: colors.surface }]}>
+        <View style={[
+          styles.promoSection,
+          {
+            backgroundColor: colors.surface,
+            shadowColor: isDarkMode ? '#000' : '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: isDarkMode ? 0.3 : 0.05,
+            shadowRadius: isDarkMode ? 8 : 4,
+            elevation: isDarkMode ? 6 : 2,
+            borderWidth: isDarkMode ? 1 : 0,
+            borderColor: isDarkMode ? colors.border : 'transparent',
+          }
+        ]}>
           <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('promoCode')}</Text>
           {appliedPromo ? (
             <View style={styles.appliedPromo}>
@@ -222,7 +269,19 @@ const CartScreen = ({ navigation }) => {
         </View>
 
         {/* Delivery Instructions */}
-        <View style={[styles.instructionsSection, { backgroundColor: colors.surface }]}>
+        <View style={[
+          styles.instructionsSection,
+          {
+            backgroundColor: colors.surface,
+            shadowColor: isDarkMode ? '#000' : '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: isDarkMode ? 0.3 : 0.05,
+            shadowRadius: isDarkMode ? 8 : 4,
+            elevation: isDarkMode ? 6 : 2,
+            borderWidth: isDarkMode ? 1 : 0,
+            borderColor: isDarkMode ? colors.border : 'transparent',
+          }
+        ]}>
           <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('deliveryInstructions')}</Text>
           <TextInput
             style={[styles.instructionsInput, { backgroundColor: colors.background, color: colors.text.primary, borderColor: colors.border }]}
@@ -236,7 +295,19 @@ const CartScreen = ({ navigation }) => {
         </View>
 
         {/* Price Breakdown */}
-        <View style={[styles.priceSection, { backgroundColor: colors.surface }]}>
+        <View style={[
+          styles.priceSection,
+          {
+            backgroundColor: colors.surface,
+            shadowColor: isDarkMode ? '#000' : '#000',
+            shadowOffset: { width: 0, height: 2 },
+            shadowOpacity: isDarkMode ? 0.3 : 0.05,
+            shadowRadius: isDarkMode ? 8 : 4,
+            elevation: isDarkMode ? 6 : 2,
+            borderWidth: isDarkMode ? 1 : 0,
+            borderColor: isDarkMode ? colors.border : 'transparent',
+          }
+        ]}>
           <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('billSummary')}</Text>
           <View style={styles.priceRow}>
             <Text style={[styles.priceLabel, { color: colors.text.secondary }]}>{t('subtotal')}</Text>
@@ -268,7 +339,16 @@ const CartScreen = ({ navigation }) => {
         </View>
 
         {/* Checkout Button - Inside ScrollView */}
-        <View style={[styles.checkoutButtonContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        <View style={[
+          styles.checkoutButtonContainer,
+          {
+            backgroundColor: colors.surface,
+            borderColor: colors.border,
+            shadowColor: isDarkMode ? '#000' : '#000',
+            shadowOpacity: isDarkMode ? 0.3 : 0.06,
+            elevation: isDarkMode ? 8 : 2,
+          }
+        ]}>
           <View style={[styles.totalBarInline, { borderBottomColor: colors.border }]}>
             <View>
               <Text style={[styles.checkoutItemCount, { color: colors.text.secondary }]}>
@@ -278,7 +358,15 @@ const CartScreen = ({ navigation }) => {
             </View>
           </View>
           <TouchableOpacity
-            style={[styles.checkoutButton, { backgroundColor: colors.primary }]}
+            style={[
+              styles.checkoutButton,
+              {
+                backgroundColor: colors.primary,
+                shadowColor: colors.primary,
+                shadowOpacity: isDarkMode ? 0.4 : 0.3,
+                elevation: isDarkMode ? 8 : 6,
+              }
+            ]}
             onPress={() => {
               const cartData = {
                 items: cartItems,
@@ -488,11 +576,11 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    backgroundColor: '#E8F5E9',
+    backgroundColor: 'rgba(76, 175, 80, 0.12)',
     padding: spacing.md,
     borderRadius: borderRadius.lg,
     borderWidth: 1,
-    borderColor: '#4CAF50',
+    borderColor: 'rgba(76, 175, 80, 0.3)',
   },
   appliedPromoLeft: {
     flexDirection: 'row',
@@ -506,16 +594,16 @@ const styles = StyleSheet.create({
   appliedPromoCode: {
     fontSize: fontSize.md,
     fontFamily: 'Poppins-Bold',
-    color: '#2E7D32',
+    color: '#4CAF50',
   },
   appliedPromoDiscount: {
     fontSize: fontSize.sm,
     fontFamily: 'Poppins-Regular',
-    color: '#388E3C',
+    color: '#4CAF50',
   },
   removePromoText: {
     fontSize: fontSize.lg,
-    color: '#2E7D32',
+    color: '#4CAF50',
     paddingHorizontal: spacing.sm,
   },
   instructionsSection: {
@@ -579,11 +667,8 @@ const styles = StyleSheet.create({
     marginBottom: 12,
     padding: spacing.lg,
     borderRadius: 16,
-    shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
     shadowRadius: 4,
-    elevation: 2,
     borderWidth: 1,
   },
   totalBarInline: {
@@ -609,9 +694,7 @@ const styles = StyleSheet.create({
     paddingVertical: 16,
     borderRadius: 16,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 6,
   },
   checkoutButtonText: {
     fontSize: 16,

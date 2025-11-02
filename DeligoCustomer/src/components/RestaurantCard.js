@@ -1,53 +1,56 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { colors, spacing, fontSize, borderRadius } from '../theme';
+import { spacing, fontSize, borderRadius } from '../theme';
+import { useTheme } from '../utils/ThemeContext';
 
 const RestaurantCard = ({ restaurant, onPress }) => {
+  const { colors } = useTheme();
+
   return (
     <TouchableOpacity
-      style={styles.container}
+      style={styles(colors).container}
       onPress={onPress}
       activeOpacity={0.8}
     >
-      <View style={styles.imageContainer}>
-        <Text style={styles.image}>{restaurant.image}</Text>
+      <View style={styles(colors).imageContainer}>
+        <Text style={styles(colors).image}>{restaurant.image}</Text>
         {restaurant.offer && (
-          <View style={styles.offerBadge}>
-            <Text style={styles.offerText}>{restaurant.offer}</Text>
+          <View style={styles(colors).offerBadge}>
+            <Text style={styles(colors).offerText}>{restaurant.offer}</Text>
           </View>
         )}
         {restaurant.isNew && (
-          <View style={styles.newBadge}>
-            <Text style={styles.newText}>NEW</Text>
+          <View style={styles(colors).newBadge}>
+            <Text style={styles(colors).newText}>NEW</Text>
           </View>
         )}
       </View>
 
-      <View style={styles.content}>
-        <View style={styles.header}>
-          <Text style={styles.name} numberOfLines={1}>{restaurant.name}</Text>
+      <View style={styles(colors).content}>
+        <View style={styles(colors).header}>
+          <Text style={styles(colors).name} numberOfLines={1}>{restaurant.name}</Text>
           {restaurant.isPandaPro && (
-            <View style={styles.proBadge}>
-              <Text style={styles.proText}>PRO</Text>
+            <View style={styles(colors).proBadge}>
+              <Text style={styles(colors).proText}>PRO</Text>
             </View>
           )}
         </View>
 
-        <Text style={styles.categories} numberOfLines={1}>
+        <Text style={styles(colors).categories} numberOfLines={1}>
           {restaurant.categories.join(' • ')}
         </Text>
 
-        <View style={styles.footer}>
-          <View style={styles.infoRow}>
-            <Text style={styles.rating}>⭐ {restaurant.rating}</Text>
-            <Text style={styles.dot}>•</Text>
-            <Text style={styles.time}>{restaurant.deliveryTime}</Text>
-            <Text style={styles.dot}>•</Text>
-            <Text style={styles.distance}>{restaurant.distance}</Text>
+        <View style={styles(colors).footer}>
+          <View style={styles(colors).infoRow}>
+            <Text style={styles(colors).rating}>⭐ {restaurant.rating}</Text>
+            <Text style={styles(colors).dot}>•</Text>
+            <Text style={styles(colors).time}>{restaurant.deliveryTime}</Text>
+            <Text style={styles(colors).dot}>•</Text>
+            <Text style={styles(colors).distance}>{restaurant.distance}</Text>
           </View>
           <Text style={[
-            styles.deliveryFee,
-            restaurant.deliveryFee === 'Free' && styles.freeDelivery
+            styles(colors).deliveryFee,
+            restaurant.deliveryFee === 'Free' && styles(colors).freeDelivery
           ]}>
             {restaurant.deliveryFee}
           </Text>
@@ -57,9 +60,9 @@ const RestaurantCard = ({ restaurant, onPress }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = (colors) => StyleSheet.create({
   container: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     borderRadius: borderRadius.lg,
     marginHorizontal: spacing.md,
     marginBottom: spacing.md,
@@ -69,11 +72,13 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.08,
     shadowRadius: 8,
     elevation: 3,
+    borderWidth: 1,
+    borderColor: colors.border,
   },
   imageContainer: {
     width: '100%',
     height: 160,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: colors.background === '#FFFFFF' ? '#F5F5F5' : 'rgba(255, 255, 255, 0.05)',
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
@@ -89,6 +94,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: borderRadius.sm,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   offerText: {
     color: colors.text.white,
@@ -103,6 +113,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: borderRadius.sm,
+    shadowColor: colors.success,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   newText: {
     color: colors.text.white,
@@ -111,6 +126,7 @@ const styles = StyleSheet.create({
   },
   content: {
     padding: spacing.md,
+    backgroundColor: colors.surface,
   },
   header: {
     flexDirection: 'row',

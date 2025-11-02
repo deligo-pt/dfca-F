@@ -1,22 +1,25 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { colors, spacing, fontSize, borderRadius } from '../theme';
+import { spacing, fontSize, borderRadius } from '../theme';
+import { useTheme } from '../utils/ThemeContext';
 
 const CategoryCard = ({ category, onPress }) => {
+  const { colors } = useTheme();
+
   return (
     <TouchableOpacity
-      style={[styles.container, { backgroundColor: category.color }]}
+      style={[styles(colors).container, { backgroundColor: category.color }]}
       onPress={onPress}
       activeOpacity={0.8}
     >
-      <Text style={styles.icon}>{category.icon}</Text>
-      <Text style={styles.name}>{category.name}</Text>
-      <Text style={styles.description}>{category.description}</Text>
+      <Text style={styles(colors).icon}>{category.icon}</Text>
+      <Text style={styles(colors).name}>{category.name}</Text>
+      <Text style={styles(colors).description}>{category.description}</Text>
     </TouchableOpacity>
   );
 };
 
-const styles = StyleSheet.create({
+const styles = (colors) => StyleSheet.create({
   container: {
     width: 160,
     height: 140,
