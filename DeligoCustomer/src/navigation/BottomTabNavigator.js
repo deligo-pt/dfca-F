@@ -2,13 +2,14 @@ import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { CategoriesScreen, OrdersScreen, CartScreen, ProfileScreen } from '../screens';
 import { CategoriesIcon, OrdersIcon, CartIcon, ProfileIcon } from '../components/TabBarIcons';
-import { colors } from '../theme';
+import { useTheme } from '../utils/ThemeContext';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Platform, KeyboardAvoidingView, Dimensions } from 'react-native';
 
 const Tab = createBottomTabNavigator();
 
 const BottomTabNavigator = ({ onLogout }) => {
+    const { colors, isDarkMode } = useTheme();
     const insets = useSafeAreaInsets();
     const { height: screenHeight } = Dimensions.get('window');
 
@@ -35,18 +36,19 @@ const BottomTabNavigator = ({ onLogout }) => {
         paddingHorizontal: 16,
         borderTopLeftRadius: 22,
         borderTopRightRadius: 22,
-        backgroundColor: colors.background,
-        borderTopWidth: 0,
+        backgroundColor: isDarkMode ? colors.surface : colors.background,
+        borderTopWidth: isDarkMode ? 1 : 0,
+        borderTopColor: isDarkMode ? colors.border : 'transparent',
         marginHorizontal: 0,
         ...Platform.select({
             ios: {
-                shadowColor: '#000',
+                shadowColor: isDarkMode ? '#000' : '#000',
                 shadowOffset: { width: 0, height: -4 },
-                shadowOpacity: 0.12,
-                shadowRadius: 16,
+                shadowOpacity: isDarkMode ? 0.3 : 0.12,
+                shadowRadius: isDarkMode ? 20 : 16,
             },
             android: {
-                elevation: 16,
+                elevation: isDarkMode ? 20 : 16,
             },
         }),
     };
@@ -62,7 +64,7 @@ const BottomTabNavigator = ({ onLogout }) => {
                     screenOptions={{
                         headerShown: false,
                         tabBarActiveTintColor: colors.primary, // #DC3173
-                        tabBarInactiveTintColor: '#999999',
+                        tabBarInactiveTintColor: isDarkMode ? colors.text.light : '#999999',
                         tabBarStyle,
                         tabBarHideOnKeyboard: true,
                         tabBarLabelStyle: {
