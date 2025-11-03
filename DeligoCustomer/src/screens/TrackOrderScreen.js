@@ -36,7 +36,6 @@ const TrackOrderScreen = ({ route, navigation }) => {
   const [restaurantLocation, setRestaurantLocation] = useState(null);
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [mapReady, setMapReady] = useState(false);
-  const [mapError, setMapError] = useState(false);
 
   // Normalize order data to handle both detailed and simple formats
   const normalizeOrderData = (data) => {
@@ -484,21 +483,6 @@ const TrackOrderScreen = ({ route, navigation }) => {
   };
 
   const renderMapPlaceholder = () => {
-    // If there's a map error (API key issue)
-    if (mapError) {
-      return (
-        <View style={styles.mapContainer}>
-          <View style={[styles.map, styles.mapLoading]}>
-            <Ionicons name="alert-circle-outline" size={48} color={colors.error || '#FF3B30'} />
-            <Text style={styles.mapLoadingText}>{t('mapLoadError') || 'Map configuration error'}</Text>
-            <Text style={[styles.mapLoadingText, { fontSize: 12, marginTop: 8 }]}>
-              {t('mapApiKeyNeeded') || 'Please configure Google Maps API key'}
-            </Text>
-          </View>
-        </View>
-      );
-    }
-
     // If location data is not ready, show loading state
     if (!userLocation) {
       return (
@@ -517,14 +501,9 @@ const TrackOrderScreen = ({ route, navigation }) => {
           ref={mapRef}
           provider={PROVIDER_GOOGLE}
           style={styles.map}
-          onMapReady={() => {
-            console.log('Map is ready');
-            setMapReady(true);
-            setMapError(false);
-          }}
+          onMapReady={() => setMapReady(true)}
           onError={(error) => {
             console.error('MapView Error:', error);
-            setMapError(true);
           }}
           initialRegion={{
             latitude: userLocation.latitude,

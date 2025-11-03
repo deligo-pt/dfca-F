@@ -4,7 +4,8 @@ import { CategoriesScreen, OrdersScreen, CartScreen, ProfileScreen } from '../sc
 import { CategoriesIcon, OrdersIcon, CartIcon, ProfileIcon } from '../components/TabBarIcons';
 import { useTheme } from '../utils/ThemeContext';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Platform, KeyboardAvoidingView, Dimensions } from 'react-native';
+import {Platform, KeyboardAvoidingView, Dimensions, View} from 'react-native';
+import { StatusBar } from 'expo-status-bar';
 
 const Tab = createBottomTabNavigator();
 
@@ -54,7 +55,9 @@ const BottomTabNavigator = ({ onLogout }) => {
     };
 
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.primary }} edges={['top', 'left', 'right']}>
+            <StatusBar style="light" backgroundColor={colors.primary} />
+            <View style={{ flex: 1, backgroundColor: colors.background }}>
             <KeyboardAvoidingView
                 style={{ flex: 1 }}
                 behavior={Platform.OS === 'ios' ? 'padding' : undefined}
@@ -115,6 +118,7 @@ const BottomTabNavigator = ({ onLogout }) => {
                     </Tab.Screen>
                 </Tab.Navigator>
             </KeyboardAvoidingView>
+            </View>
         </SafeAreaView>
     );
 };

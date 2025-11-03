@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, View, ActivityIndicator, Text as RNText, TextInput as RNTextInput, Platform } from 'react-native';
+import { StyleSheet, View, ActivityIndicator, Text as RNText, TextInput as RNTextInput } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { OnboardingScreen, LoginScreen, TermsOfServiceScreen, PrivacyPolicyScreen, LocationAddressScreen, RestaurantDetailsScreen, TrackOrderScreen, CheckoutScreen, EditProfileScreen, VouchersScreen, SavedAddressesScreen, PaymentMethodsScreen, ReferralsScreen, NotificationsScreen, SettingsScreen, HelpCenterScreen } from './src/screens';
@@ -62,13 +62,6 @@ export default function App() {
         // Start timing
         // Set system UI colors for notch areas (top and bottom)
         await SystemUI.setBackgroundColorAsync(colors.primary);
-
-        // Also set navigation bar color for Android
-        if (Platform.OS === 'android') {
-          const { StatusBar } = require('react-native');
-          StatusBar.setBackgroundColor(colors.primary);
-          StatusBar.setBarStyle('light-content');
-        }
 
         const startTime = Date.now();
 
