@@ -11,11 +11,13 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
-import { colors, spacing, fontSize, borderRadius } from '../theme';
+import { spacing, fontSize, borderRadius } from '../theme';
+import { useTheme } from '../utils/ThemeContext';
 
 const LOGO = require('../assets/images/logo.png');
 
 const LocationAddressScreen = ({ navigation, route }) => {
+  const { colors } = useTheme();
   const [loading, setLoading] = useState(false);
   const [currentLocation, setCurrentLocation] = useState(null);
   const [address, setAddress] = useState('');
@@ -79,49 +81,49 @@ const LocationAddressScreen = ({ navigation, route }) => {
   };
 
   return (
-    <SafeAreaView style={styles.safeArea} edges={['top']}>
+    <SafeAreaView style={styles(colors).safeArea} edges={['top']}>
       {/* Logo Section */}
-      {/*<View style={styles.logoContainer}>*/}
-      {/*  <Image source={LOGO} style={styles.logoImage} resizeMode="contain" />*/}
+      {/*<View style={styles(colors).logoContainer}>*/}
+      {/*  <Image source={LOGO} style={styles(colors).logoImage} resizeMode="contain" />*/}
       {/*</View>*/}
 
       {/* Header */}
-      <View style={styles.header}>
+      <View style={styles(colors).header}>
         <TouchableOpacity
-          style={styles.backButton}
+          style={styles(colors).backButton}
           onPress={() => navigation.goBack()}
         >
-          <Text style={styles.backIcon}>←</Text>
+          <Text style={styles(colors).backIcon}>←</Text>
         </TouchableOpacity>
-        <Text style={styles.headerTitle}>Add Delivery Address</Text>
-        <View style={styles.placeholder} />
+        <Text style={styles(colors).headerTitle}>Add Delivery Address</Text>
+        <View style={styles(colors).placeholder} />
       </View>
 
-      <ScrollView style={styles.content} showsVerticalScrollIndicator={false}>
+      <ScrollView style={styles(colors).content} showsVerticalScrollIndicator={false}>
         {/* Current Location Button */}
         <TouchableOpacity
-          style={styles.currentLocationButton}
+          style={styles(colors).currentLocationButton}
           onPress={getCurrentLocation}
           disabled={loading}
         >
-          <Text style={styles.locationIcon}>📍</Text>
-          <View style={styles.currentLocationText}>
-            <Text style={styles.currentLocationTitle}>Use current location</Text>
-            <Text style={styles.currentLocationSubtitle}>
+          <Text style={styles(colors).locationIcon}>📍</Text>
+          <View style={styles(colors).currentLocationText}>
+            <Text style={styles(colors).currentLocationTitle}>Use current location</Text>
+            <Text style={styles(colors).currentLocationSubtitle}>
               Enable your GPS for better accuracy
             </Text>
           </View>
           {loading ? (
             <ActivityIndicator size="small" color={colors.primary} />
           ) : (
-            <Text style={styles.arrow}>→</Text>
+            <Text style={styles(colors).arrow}>→</Text>
           )}
         </TouchableOpacity>
 
         {/* Map Placeholder */}
-        <View style={styles.mapPlaceholder}>
-          <Text style={styles.mapIcon}>🗺️</Text>
-          <Text style={styles.mapText}>
+        <View style={styles(colors).mapPlaceholder}>
+          <Text style={styles(colors).mapIcon}>🗺️</Text>
+          <Text style={styles(colors).mapText}>
             {currentLocation
               ? `Lat: ${currentLocation.latitude.toFixed(4)}, Lng: ${currentLocation.longitude.toFixed(4)}`
               : 'Tap to select location on map'}
@@ -129,10 +131,10 @@ const LocationAddressScreen = ({ navigation, route }) => {
         </View>
 
         {/* Address Input */}
-        <View style={styles.inputSection}>
-          <Text style={styles.label}>Address *</Text>
+        <View style={styles(colors).inputSection}>
+          <Text style={styles(colors).label}>Address *</Text>
           <TextInput
-            style={styles.input}
+            style={styles(colors).input}
             placeholder="e.g., 123 Main Street, City"
             placeholderTextColor={colors.text.light}
             value={address}
@@ -142,10 +144,10 @@ const LocationAddressScreen = ({ navigation, route }) => {
         </View>
 
         {/* Detailed Address Input */}
-        <View style={styles.inputSection}>
-          <Text style={styles.label}>Apartment / Building (Optional)</Text>
+        <View style={styles(colors).inputSection}>
+          <Text style={styles(colors).label}>Apartment / Building (Optional)</Text>
           <TextInput
-            style={styles.input}
+            style={styles(colors).input}
             placeholder="e.g., Apt 4B, Floor 2"
             placeholderTextColor={colors.text.light}
             value={detailedAddress}
@@ -154,30 +156,30 @@ const LocationAddressScreen = ({ navigation, route }) => {
         </View>
 
         {/* Address Label */}
-        <View style={styles.inputSection}>
-          <Text style={styles.label}>Label as *</Text>
-          <View style={styles.labelButtons}>
+        <View style={styles(colors).inputSection}>
+          <Text style={styles(colors).label}>Label as *</Text>
+          <View style={styles(colors).labelButtons}>
             <TouchableOpacity
-              style={[styles.labelButton, label === 'Home' && styles.labelButtonActive]}
+              style={[styles(colors).labelButton, label === 'Home' && styles(colors).labelButtonActive]}
               onPress={() => setLabel('Home')}
             >
-              <Text style={[styles.labelButtonText, label === 'Home' && styles.labelButtonTextActive]}>
+              <Text style={[styles(colors).labelButtonText, label === 'Home' && styles(colors).labelButtonTextActive]}>
                 🏠 Home
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.labelButton, label === 'Work' && styles.labelButtonActive]}
+              style={[styles(colors).labelButton, label === 'Work' && styles(colors).labelButtonActive]}
               onPress={() => setLabel('Work')}
             >
-              <Text style={[styles.labelButtonText, label === 'Work' && styles.labelButtonTextActive]}>
+              <Text style={[styles(colors).labelButtonText, label === 'Work' && styles(colors).labelButtonTextActive]}>
                 💼 Work
               </Text>
             </TouchableOpacity>
             <TouchableOpacity
-              style={[styles.labelButton, label === 'Other' && styles.labelButtonActive]}
+              style={[styles(colors).labelButton, label === 'Other' && styles(colors).labelButtonActive]}
               onPress={() => setLabel('Other')}
             >
-              <Text style={[styles.labelButtonText, label === 'Other' && styles.labelButtonTextActive]}>
+              <Text style={[styles(colors).labelButtonText, label === 'Other' && styles(colors).labelButtonTextActive]}>
                 📍 Other
               </Text>
             </TouchableOpacity>
@@ -185,16 +187,16 @@ const LocationAddressScreen = ({ navigation, route }) => {
         </View>
 
         {/* Saved Addresses */}
-        <View style={styles.savedSection}>
-          <Text style={styles.savedTitle}>Saved Addresses</Text>
-          <View style={styles.savedItem}>
-            <Text style={styles.savedIcon}>🏠</Text>
-            <View style={styles.savedInfo}>
-              <Text style={styles.savedLabel}>Home</Text>
-              <Text style={styles.savedAddress}>123 Example St, City</Text>
+        <View style={styles(colors).savedSection}>
+          <Text style={styles(colors).savedTitle}>Saved Addresses</Text>
+          <View style={styles(colors).savedItem}>
+            <Text style={styles(colors).savedIcon}>🏠</Text>
+            <View style={styles(colors).savedInfo}>
+              <Text style={styles(colors).savedLabel}>Home</Text>
+              <Text style={styles(colors).savedAddress}>123 Example St, City</Text>
             </View>
             <TouchableOpacity>
-              <Text style={styles.savedAction}>→</Text>
+              <Text style={styles(colors).savedAction}>→</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -203,20 +205,20 @@ const LocationAddressScreen = ({ navigation, route }) => {
       </ScrollView>
 
       {/* Save Button */}
-      <View style={styles.footer}>
+      <View style={styles(colors).footer}>
         <TouchableOpacity
-          style={[styles.saveButton, !address.trim() && styles.saveButtonDisabled]}
+          style={[styles(colors).saveButton, !address.trim() && styles(colors).saveButtonDisabled]}
           onPress={handleSaveAddress}
           disabled={!address.trim()}
         >
-          <Text style={styles.saveButtonText}>Save Address</Text>
+          <Text style={styles(colors).saveButtonText}>Save Address</Text>
         </TouchableOpacity>
       </View>
     </SafeAreaView>
   );
 };
 
-const styles = StyleSheet.create({
+const styles = (colors) => StyleSheet.create({
   safeArea: {
     flex: 1,
     backgroundColor: colors.background,
@@ -230,9 +232,8 @@ const styles = StyleSheet.create({
   logoImage: {
     width: 500,
     height: 500,
-    // optional slight rounding if desired
     borderRadius: 12,
-    shadowColor: '#000',
+    shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.18,
     shadowRadius: 10,
@@ -244,9 +245,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.md,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     borderBottomWidth: 1,
     borderBottomColor: colors.border,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   backButton: {
     width: 40,
@@ -277,7 +283,7 @@ const styles = StyleSheet.create({
   currentLocationButton: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     padding: spacing.md,
     borderRadius: borderRadius.lg,
     marginBottom: spacing.md,
@@ -313,7 +319,7 @@ const styles = StyleSheet.create({
   },
   mapPlaceholder: {
     height: 200,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: colors.background === '#FFFFFF' ? '#F5F5F5' : '#1A1A1A',
     borderRadius: borderRadius.lg,
     alignItems: 'center',
     justifyContent: 'center',
@@ -329,6 +335,8 @@ const styles = StyleSheet.create({
     fontSize: fontSize.sm,
     fontFamily: 'Poppins-Regular',
     color: colors.text.secondary,
+    textAlign: 'center',
+    paddingHorizontal: spacing.md,
   },
   inputSection: {
     marginBottom: spacing.lg,
@@ -340,7 +348,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.sm,
   },
   input: {
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     borderWidth: 1,
     borderColor: colors.border,
     borderRadius: borderRadius.lg,
@@ -362,12 +370,22 @@ const styles = StyleSheet.create({
     borderRadius: borderRadius.lg,
     borderWidth: 1.5,
     borderColor: colors.border,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     alignItems: 'center',
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.03,
+    shadowRadius: 2,
+    elevation: 1,
   },
   labelButtonActive: {
     borderColor: colors.primary,
     backgroundColor: colors.primary,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 4,
+    elevation: 3,
   },
   labelButtonText: {
     fontSize: fontSize.sm,
@@ -389,11 +407,16 @@ const styles = StyleSheet.create({
   savedItem: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     padding: spacing.md,
     borderRadius: borderRadius.lg,
     borderWidth: 1,
     borderColor: colors.border,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 2,
   },
   savedIcon: {
     fontSize: 24,
@@ -419,23 +442,30 @@ const styles = StyleSheet.create({
   },
   footer: {
     padding: spacing.md,
-    backgroundColor: colors.background,
+    backgroundColor: colors.surface,
     borderTopWidth: 1,
     borderTopColor: colors.border,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: -2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 4,
+    elevation: 5,
   },
   saveButton: {
     backgroundColor: colors.primary,
     paddingVertical: spacing.md,
     borderRadius: borderRadius.lg,
     alignItems: 'center',
-    shadowColor: colors.shadow,
+    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
+    shadowOpacity: 0.3,
     shadowRadius: 8,
-    elevation: 5,
+    elevation: 6,
   },
   saveButtonDisabled: {
     backgroundColor: colors.border,
+    shadowOpacity: 0,
+    elevation: 0,
   },
   saveButtonText: {
     color: colors.text.white,
