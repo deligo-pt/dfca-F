@@ -34,7 +34,7 @@
         "UIStatusBarStyle": "UIStatusBarStyleLightContent"
       },
       "config": {
-        "googleMapsApiKey": "YOUR_IOS_GOOGLE_MAPS_API_KEY"
+        "googleMapsApiKey": "AIzaSyCZ1jixNYbSRM21Uq82a6KXNO_FSpLUwaQ"
       }
     },
     "android": {
@@ -55,7 +55,7 @@
       ],
       "config": {
         "googleMaps": {
-          "apiKey": "YOUR_ANDROID_GOOGLE_MAPS_API_KEY"
+          "apiKey": "AIzaSyCZ1jixNYbSRM21Uq82a6KXNO_FSpLUwaQ"
         }
       }
     },

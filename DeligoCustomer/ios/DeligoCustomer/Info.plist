@@ -40,7 +40,7 @@
 		<string>arm64</string>
 	</array>
 	<key>UIStatusBarStyle</key>
-	<string>UIStatusBarStyleDefault</string>
+	<string>UIStatusBarStyleLightContent</string>
 	<key>UISupportedInterfaceOrientations</key>
 	<array>
 		<string>UIInterfaceOrientationPortrait</string>
@@ -49,5 +49,11 @@
 	</array>
 	<key>UIViewControllerBasedStatusBarAppearance</key>
 	<false/>
+	<key>NSLocationWhenInUseUsageDescription</key>
+	<string>Allow Deligo to use your location for order tracking and delivery.</string>
+	<key>NSLocationAlwaysUsageDescription</key>
+	<string>Allow Deligo to use your location for order tracking and delivery.</string>
+	<key>NSLocationAlwaysAndWhenInUseUsageDescription</key>
+	<string>Allow Deligo to use your location for order tracking and delivery.</string>
 </dict>
 </plist>
