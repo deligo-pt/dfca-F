@@ -76,25 +76,25 @@ export const ProfileIcon = ({ focused, color }) => (
 
 const styles = StyleSheet.create({
   iconContainer: {
-    width: 26,
-    height: 26,
+    width: 24,
+    height: 24,
     justifyContent: 'center',
     alignItems: 'center',
   },
   // Categories Icon (Grid)
   gridContainer: {
-    width: 22,
-    height: 22,
+    width: 20,
+    height: 20,
     flexDirection: 'row',
     flexWrap: 'wrap',
     justifyContent: 'space-between',
     alignContent: 'space-between',
   },
   gridItem: {
-    width: 9,
-    height: 9,
+    width: 8.5,
+    height: 8.5,
     borderRadius: 2.5,
-    margin: 1,
+    margin: 0.5,
   },
   // Orders Icon (Document/Receipt)
   orderDocument: {
@@ -115,14 +115,14 @@ const styles = StyleSheet.create({
   },
   // Cart Icon (Shopping Cart)
   cartWrapper: {
-    width: 24,
-    height: 24,
+    width: 22,
+    height: 22,
     justifyContent: 'flex-end',
     alignItems: 'center',
   },
   cartBasket: {
-    width: 20,
-    height: 16,
+    width: 18,
+    height: 14,
     borderWidth: 2,
     borderBottomLeftRadius: 3,
     borderBottomRightRadius: 3,
@@ -136,12 +136,12 @@ const styles = StyleSheet.create({
     top: -4,
     left: -2,
     width: 2,
-    height: 12,
+    height: 10,
     borderRadius: 1,
     transform: [{ rotate: '-15deg' }],
   },
   cartWheels: {
-    width: 18,
+    width: 16,
     flexDirection: 'row',
     justifyContent: 'space-between',
     paddingHorizontal: 2,
