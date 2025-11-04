@@ -10,6 +10,7 @@ import {
   Linking,
   Alert,
   Platform,
+  Modal,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -36,6 +37,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
   const [restaurantLocation, setRestaurantLocation] = useState(null);
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [mapReady, setMapReady] = useState(false);
+  const [isMapFullscreen, setIsMapFullscreen] = useState(false);
 
   // Normalize order data to handle both detailed and simple formats
   const normalizeOrderData = (data) => {
@@ -580,6 +582,16 @@ const TrackOrderScreen = ({ route, navigation }) => {
         <Text style={styles.etaText}>{orderData.estimatedTime}</Text>
       </View>
 
+
+      {/* Fullscreen Toggle Button */}
+      <TouchableOpacity
+        style={styles.fullscreenButton}
+        onPress={() => setIsMapFullscreen(true)}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="expand" size={24} color={colors.text.primary} />
+      </TouchableOpacity>
+
       {/* Zoom Controls */}
       <View style={styles.zoomControls}>
         <TouchableOpacity
@@ -935,6 +947,226 @@ const TrackOrderScreen = ({ route, navigation }) => {
     </View>
   );
 
+  const renderFullscreenMap = () => (
+    <Modal
+      visible={isMapFullscreen}
+      animationType="slide"
+      onRequestClose={() => setIsMapFullscreen(false)}
+    >
+      <SafeAreaView style={styles.fullscreenContainer} edges={['top', 'bottom']}>
+        {/* Fullscreen Map Header */}
+        <View style={styles.fullscreenHeader}>
+          <TouchableOpacity
+            style={styles.backButton}
+            onPress={() => setIsMapFullscreen(false)}
+          >
+            <Ionicons name="close" size={28} color={colors.text.primary} />
+          </TouchableOpacity>
+          <Text style={styles.fullscreenTitle}>{t('liveTracking')}</Text>
+          <View style={styles.backButton} />
+        </View>
+
+        {/* Fullscreen Map View */}
+        <View style={styles.fullscreenMapContainer}>
+          {!userLocation ? (
+            <View style={[styles.map, styles.mapLoading]}>
+              <Ionicons name="map-outline" size={48} color={colors.text.light} />
+              <Text style={styles.mapLoadingText}>{t('loadingMap') || 'Loading map...'}</Text>
+            </View>
+          ) : (
+            <>
+              <MapView
+                ref={mapRef}
+                provider={PROVIDER_GOOGLE}
+                style={styles.fullscreenMap}
+                initialRegion={{
+                  latitude: userLocation.latitude,
+                  longitude: userLocation.longitude,
+                  latitudeDelta: 0.02,
+                  longitudeDelta: 0.02,
+                }}
+                showsUserLocation={true}
+                showsMyLocationButton={false}
+                showsCompass={true}
+                loadingEnabled={true}
+              >
+                {/* Restaurant Marker */}
+                {restaurantLocation && (
+                  <Marker
+                    coordinate={restaurantLocation}
+                    title={orderData.restaurantName}
+                    description="Restaurant"
+                  >
+                    <View style={styles.customMarker}>
+                      <View style={styles.restaurantMarker}>
+                        <MaterialIcons name="restaurant" size={20} color={colors.text.white} />
+                      </View>
+                    </View>
+                  </Marker>
+                )}
+
+                {/* Driver Marker */}
+                {driverLocation && (currentStatus === 'picked_up' || currentStatus === 'on_the_way' || currentStatus === 'nearby') && (
+                  <Marker
+                    coordinate={driverLocation}
+                    title={orderData.driverName}
+                    description="Delivery Rider"
+                    anchor={{ x: 0.5, y: 0.5 }}
+                  >
+                    <View style={styles.customMarker}>
+                      <View style={styles.driverMarker}>
+                        <Ionicons name="bicycle" size={20} color={colors.text.white} />
+                      </View>
+                      <View style={styles.driverMarkerPulse} />
+                    </View>
+                  </Marker>
+                )}
+
+                {/* User Location Marker */}
+                {userLocation && (
+                  <Marker
+                    coordinate={userLocation}
+                    title="Your Location"
+                    description={orderData.deliveryAddress}
+                  >
+                    <View style={styles.customMarker}>
+                      <View style={styles.userMarker}>
+                        <Ionicons name="location" size={24} color={colors.primary} />
+                      </View>
+                    </View>
+                  </Marker>
+                )}
+
+                {/* Route Polyline */}
+                {routeCoordinates.length > 0 && (
+                  <Polyline
+                    coordinates={routeCoordinates}
+                    strokeColor={colors.primary}
+                    strokeWidth={4}
+                    lineDashPattern={[1]}
+                  />
+                )}
+              </MapView>
+
+
+              {/* ETA Badge - Fullscreen */}
+              <View style={styles.fullscreenEtaBadge}>
+                <Ionicons name="time-outline" size={20} color={colors.text.white} />
+                <Text style={styles.fullscreenEtaText}>{orderData.estimatedTime}</Text>
+              </View>
+
+              {/* Zoom Controls - Fullscreen */}
+              <View style={styles.fullscreenZoomControls}>
+                <TouchableOpacity
+                  style={styles.zoomButton}
+                  onPress={() => {
+                    if (mapRef.current) {
+                      try {
+                        mapRef.current.getCamera().then((cam) => {
+                          if (mapRef.current) {
+                            cam.zoom += 1;
+                            mapRef.current.animateCamera(cam);
+                          }
+                        }).catch(err => console.log('Zoom in error:', err));
+                      } catch (error) {
+                        console.log('Camera zoom error:', error);
+                      }
+                    }
+                  }}
+                >
+                  <Ionicons name="add" size={24} color={colors.text.primary} />
+                </TouchableOpacity>
+                <View style={styles.zoomDivider} />
+                <TouchableOpacity
+                  style={styles.zoomButton}
+                  onPress={() => {
+                    if (mapRef.current) {
+                      try {
+                        mapRef.current.getCamera().then((cam) => {
+                          if (mapRef.current) {
+                            cam.zoom -= 1;
+                            mapRef.current.animateCamera(cam);
+                          }
+                        }).catch(err => console.log('Zoom out error:', err));
+                      } catch (error) {
+                        console.log('Camera zoom error:', error);
+                      }
+                    }
+                  }}
+                >
+                  <Ionicons name="remove" size={24} color={colors.text.primary} />
+                </TouchableOpacity>
+              </View>
+
+              {/* My Location Button - Fullscreen */}
+              <TouchableOpacity
+                style={styles.fullscreenMyLocationButton}
+                onPress={() => {
+                  if (userLocation && mapRef.current) {
+                    try {
+                      mapRef.current.animateToRegion({
+                        latitude: userLocation.latitude,
+                        longitude: userLocation.longitude,
+                        latitudeDelta: 0.01,
+                        longitudeDelta: 0.01,
+                      });
+                    } catch (error) {
+                      console.log('Animate to region error:', error);
+                    }
+                  }
+                }}
+              >
+                <MaterialIcons name="my-location" size={24} color={colors.primary} />
+              </TouchableOpacity>
+
+              {/* Driver Info Card - Fullscreen Bottom */}
+              {(currentStatus === 'picked_up' || currentStatus === 'on_the_way' || currentStatus === 'nearby') && (
+                <View style={styles.fullscreenDriverCard}>
+                  <View style={styles.driverCardContent}>
+                    <View style={styles.driverLeft}>
+                      <View style={styles.driverAvatar}>
+                        <Ionicons name="person" size={28} color={colors.primary} />
+                        <View style={styles.onlineBadge}>
+                          <View style={styles.onlineDot} />
+                        </View>
+                      </View>
+                      <View style={styles.driverInfo}>
+                        <Text style={styles.driverName}>{orderData.driverName}</Text>
+                        <View style={styles.driverRating}>
+                          <Ionicons name="star" size={14} color="#FFD700" />
+                          <Text style={styles.driverRatingText}>{orderData.driverRating}</Text>
+                          <Text style={styles.driverVehicle}>• {orderData.vehicleType}</Text>
+                        </View>
+                      </View>
+                    </View>
+                    <View style={styles.driverActions}>
+                      <TouchableOpacity
+                        style={styles.driverActionButton}
+                        onPress={handleCallDriver}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="call" size={20} color={colors.primary} />
+                        <Text style={styles.actionButtonLabel}>{t('call')}</Text>
+                      </TouchableOpacity>
+                      <TouchableOpacity
+                        style={styles.driverActionButton}
+                        onPress={handleMessageDriver}
+                        activeOpacity={0.7}
+                      >
+                        <Ionicons name="chatbubble" size={20} color={colors.primary} />
+                        <Text style={styles.actionButtonLabel}>{t('chat')}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                </View>
+              )}
+            </>
+          )}
+        </View>
+      </SafeAreaView>
+    </Modal>
+  );
+
   const styles = useMemo(() => StyleSheet.create({
     container: {
       flex: 1,
@@ -1079,6 +1311,22 @@ const TrackOrderScreen = ({ route, navigation }) => {
     color: colors.text.white,
     marginLeft: spacing.xs,
   },
+  fullscreenButton: {
+    position: 'absolute',
+    bottom: spacing.md + 50,
+    right: spacing.md,
+    width: 48,
+    height: 48,
+    backgroundColor: colors.surface,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
   zoomControls: {
     position: 'absolute',
     top: spacing.md,
@@ -1165,7 +1413,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
     width: 56,
     height: 56,
     borderRadius: 28,
-    backgroundColor: '#E8F5E9',
+    backgroundColor: colors.primary + '15',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
@@ -1242,7 +1490,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
     paddingHorizontal: spacing.sm,
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.md,
-    backgroundColor: '#E8F5E9',
+    backgroundColor: colors.primary + '15',
     alignItems: 'center',
     justifyContent: 'center',
   },
@@ -1257,7 +1505,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
     alignItems: 'center',
     marginTop: spacing.md,
     padding: spacing.sm,
-    backgroundColor: '#E8F5E9',
+    backgroundColor: colors.primary + '15',
     borderRadius: borderRadius.md,
   },
   statusItem: {
@@ -1432,7 +1680,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
     width: 40,
     height: 40,
     borderRadius: 20,
-    backgroundColor: '#E8F5E9',
+    backgroundColor: colors.primary + '15',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.md,
@@ -1461,7 +1709,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
   instructionsBadge: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#E3F2FD',
+    backgroundColor: colors.info + '15',
     paddingHorizontal: spacing.sm,
     paddingVertical: 4,
     borderRadius: borderRadius.sm,
@@ -1554,6 +1802,110 @@ const TrackOrderScreen = ({ route, navigation }) => {
     marginVertical: spacing.md,
   },
 
+  // Fullscreen Map Styles
+  fullscreenContainer: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  fullscreenHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    backgroundColor: colors.surface,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+    zIndex: 10,
+  },
+  fullscreenTitle: {
+    fontSize: fontSize.xl,
+    fontFamily: 'Poppins-Bold',
+    color: colors.text.primary,
+    flex: 1,
+    textAlign: 'center',
+  },
+  fullscreenMapContainer: {
+    flex: 1,
+    position: 'relative',
+  },
+  fullscreenMap: {
+    flex: 1,
+    width: '100%',
+    height: '100%',
+  },
+  fullscreenEtaBadge: {
+    position: 'absolute',
+    top: spacing.md,
+    right: spacing.md,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: colors.primary,
+    paddingHorizontal: spacing.lg,
+    paddingVertical: spacing.md,
+    borderRadius: borderRadius.lg,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.25,
+    shadowRadius: 4,
+    elevation: 5,
+  },
+  fullscreenEtaText: {
+    fontSize: fontSize.lg,
+    fontFamily: 'Poppins-Bold',
+    color: colors.text.white,
+    marginLeft: spacing.xs,
+  },
+  fullscreenZoomControls: {
+    position: 'absolute',
+    bottom: 200,
+    right: spacing.md,
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  fullscreenMyLocationButton: {
+    position: 'absolute',
+    bottom: 280,
+    right: spacing.md,
+    width: 48,
+    height: 48,
+    backgroundColor: colors.surface,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
+  },
+  fullscreenDriverCard: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    backgroundColor: colors.surface,
+    borderTopLeftRadius: borderRadius.xl,
+    borderTopRightRadius: borderRadius.xl,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: -4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 8,
+    elevation: 8,
+  },
+  driverCardContent: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    padding: spacing.lg,
+  },
+
   // Bottom Actions
   bottomActionsInline: {
     flexDirection: 'row',
@@ -1642,6 +1994,9 @@ const TrackOrderScreen = ({ route, navigation }) => {
         {/* Bottom Spacing for safe area and tab bar */}
         <View style={{ height: Math.max(80, insets.bottom + 80) }} />
       </ScrollView>
+
+      {/* Fullscreen Map Modal */}
+      {renderFullscreenMap()}
     </SafeAreaView>
   );
 };

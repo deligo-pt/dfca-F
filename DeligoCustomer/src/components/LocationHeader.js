@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, TextInput, ScrollView, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, TextInput, ScrollView, Image, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { colors, spacing, fontSize } from '../theme';
 
@@ -40,51 +40,51 @@ const LocationHeader = ({
 
   return (
     <View style={styles.wrapper}>
+      <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
+
       <View style={styles.container}>
-        {/* Deligo Logo/Brand */}
-        <View style={styles.logoRow}>
-          <Image
-            source={require('../assets/images/logo.png')}
-            style={styles.logoImage}
-            resizeMode="contain"
-          />
-        </View>
+        {/* Header Row: Greeting + Location + Icons */}
+        <View style={styles.headerRow}>
+          {/* Left side: Greeting and Location */}
+          <View style={styles.leftSection}>
+            <Text style={styles.greetingText}>Good Afternoon</Text>
+            <TouchableOpacity
+              style={styles.locationButton}
+              onPress={onLocationPress}
+              activeOpacity={0.7}
+            >
+              {loading ? (
+                <ActivityIndicator size="small" color={colors.text.white} />
+              ) : errorMsg ? (
+                <Text style={styles.errorText}>{errorMsg}</Text>
+              ) : (
+                <View style={styles.locationContent}>
+                  <Ionicons name="location-sharp" size={16} color="#FFFFFF" />
+                  <Text style={styles.locationText} numberOfLines={1}>
+                    {area || 'Set location'}
+                  </Text>
+                  <Ionicons name="chevron-down" size={14} color="#FFFFFF" />
+                </View>
+              )}
+            </TouchableOpacity>
+          </View>
 
-        {/* Row 1: Deliver To Location */}
-        <View style={styles.topRow}>
-          <TouchableOpacity
-            style={styles.locationButton}
-            onPress={onLocationPress}
-            activeOpacity={0.7}
-          >
-            <Text style={styles.label}>Deliver to</Text>
-            {loading ? (
-              <ActivityIndicator size="small" color={colors.text.white} />
-            ) : errorMsg ? (
-              <Text style={styles.errorText}>{errorMsg}</Text>
-            ) : (
-              <View style={styles.locationContent}>
-                <Ionicons name="location-sharp" size={14} color="#FFFFFF" />
-                <Text style={styles.locationText} numberOfLines={1}>
-                  {area || 'Set location'}
-                </Text>
-                <Ionicons name="chevron-down" size={12} color="#FFFFFF" />
-              </View>
-            )}
-          </TouchableOpacity>
+          {/* Right side: Notification and Profile Icons */}
+          <View style={styles.rightSection}>
+            <TouchableOpacity
+              style={styles.iconButton}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="notifications-outline" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
 
-          <TouchableOpacity
-            style={styles.cartButtonTop}
-            onPress={onCartPress}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="cart-outline" size={20} color="#FFFFFF" />
-            {cartItemCount > 0 && (
-              <View style={styles.badge}>
-                <Text style={styles.badgeText}>{cartItemCount > 99 ? '99+' : cartItemCount}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
+            <TouchableOpacity
+              style={styles.iconButton}
+              activeOpacity={0.7}
+            >
+              <Ionicons name="person-outline" size={24} color="#FFFFFF" />
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Row 2: Search Bar - NO BACK BUTTON (always visible header) */}
@@ -276,9 +276,12 @@ const LocationHeader = ({
 const styles = StyleSheet.create({
   wrapper: {
     position: 'relative',
+    paddingTop: 0,
+    marginTop: 0,
   },
   container: {
     backgroundColor: colors.primary,
+    paddingTop: spacing.xs,
     paddingBottom: spacing.sm,
     paddingHorizontal: spacing.md,
     shadowColor: colors.shadow,
@@ -289,32 +292,43 @@ const styles = StyleSheet.create({
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
   },
-  // Logo Row
-  logoRow: {
-    paddingTop: spacing.md,
-    marginBottom: spacing.xs,
-    alignItems: 'center',
+  // Header Row with Greeting, Location and Icons
+  headerRow: {
+    flexDirection: 'row',
+    alignItems: 'flex-start',
+    justifyContent: 'space-between',
+    marginTop: 0,
+    marginBottom: spacing.sm,
+    paddingTop: 0,
   },
-  logoImage: {
-    width: 150,
-    height: 50,
+  leftSection: {
+    flex: 1,
+    paddingRight: spacing.sm,
   },
-  // Row 1: Location & Cart - ALWAYS VISIBLE
-  topRow: {
+  greetingText: {
+    color: 'rgba(255, 255, 255, 0.9)',
+    fontSize: fontSize.md,
+    fontFamily: 'Poppins-Medium',
+    marginBottom: spacing.xs - 2,
+    lineHeight: 20,
+  },
+  rightSection: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.xs,
-    minHeight: 32,
+    gap: spacing.sm,
+  },
+  iconButton: {
+    width: 40,
+    height: 40,
+    alignItems: 'center',
+    justifyContent: 'center',
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.15)',
   },
   locationButton: {
-    flex: 1,
-  },
-  label: {
-    color: 'rgba(255, 255, 255, 0.8)',
-    fontSize: 10,
-    fontFamily: 'Poppins-Regular',
-    marginBottom: 2,
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: spacing.xs - 2,
   },
   locationContent: {
     flexDirection: 'row',
@@ -322,28 +336,24 @@ const styles = StyleSheet.create({
   },
   locationText: {
     color: '#FFFFFF',
-    fontSize: 12,
+    fontSize: fontSize.md,
     fontFamily: 'Poppins-SemiBold',
-    marginLeft: 4,
-    marginRight: 3,
-    flex: 1,
+    marginLeft: spacing.xs,
+    marginRight: spacing.xs - 2,
+    maxWidth: 200,
+    lineHeight: 18,
   },
   errorText: {
     color: '#FFB3BA',
     fontSize: 11,
     fontFamily: 'Poppins-Regular',
   },
-  cartButtonTop: {
-    width: 32,
-    height: 32,
-    alignItems: 'center',
-    justifyContent: 'center',
-    position: 'relative',
-  },
   // Row 2: Search - NO BACK BUTTON
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    marginTop: 0,
+    paddingTop: 0,
   },
   searchContainer: {
     flex: 1,

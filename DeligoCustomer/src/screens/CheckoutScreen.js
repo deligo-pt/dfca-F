@@ -42,12 +42,6 @@ const CheckoutScreen = ({ route, navigation }) => {
       icon: 'credit-card-outline',
       badge: t('recommended'),
     },
-    {
-      id: 'cash',
-      name: t('cashOnDelivery'),
-      icon: 'cash',
-      details: t('payWhenReceive'),
-    },
     { id: 'wallet', name: t('digitalWallet'), icon: 'wallet' },
   ];
 
