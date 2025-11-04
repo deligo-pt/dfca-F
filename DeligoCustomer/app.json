@@ -49,6 +49,10 @@
         "backgroundColor": "#DC3173",
         "barStyle": "light-content"
       },
+      "navigationBar": {
+        "backgroundColor": "#DC3173",
+        "barStyle": "light-content"
+      },
       "permissions": [
         "ACCESS_FINE_LOCATION",
         "ACCESS_COARSE_LOCATION"

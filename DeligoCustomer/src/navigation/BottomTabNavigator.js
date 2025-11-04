@@ -4,7 +4,7 @@ import { CategoriesScreen, OrdersScreen, CartScreen, ProfileScreen } from '../sc
 import { CategoriesIcon, OrdersIcon, CartIcon, ProfileIcon } from '../components/TabBarIcons';
 import { useTheme } from '../utils/ThemeContext';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import {Platform, KeyboardAvoidingView, Dimensions, View} from 'react-native';
+import {Platform, Dimensions} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 
 const Tab = createBottomTabNavigator();
@@ -55,70 +55,62 @@ const BottomTabNavigator = ({ onLogout }) => {
     };
 
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: colors.primary }} edges={['top', 'left', 'right']}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.primary }}>
             <StatusBar style="light" backgroundColor={colors.primary} />
-            <View style={{ flex: 1, backgroundColor: colors.background }}>
-            <KeyboardAvoidingView
-                style={{ flex: 1 }}
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
-                keyboardVerticalOffset={0}
+            <Tab.Navigator
+                screenOptions={{
+                    headerShown: false,
+                    tabBarActiveTintColor: colors.primary, // #DC3173
+                    tabBarInactiveTintColor: isDarkMode ? colors.text.light : '#999999',
+                    tabBarStyle,
+                    tabBarHideOnKeyboard: true,
+                    tabBarLabelStyle: {
+                        fontSize: 12,
+                        fontFamily: 'Poppins-Medium',
+                        letterSpacing: 0.2,
+                        paddingTop: 2,
+                    },
+                    tabBarItemStyle: {
+                        justifyContent: 'center',
+                        alignItems: 'center',
+                    },
+                }}
+                sceneContainerStyle={{
+                    backgroundColor: colors.background,
+                    paddingBottom: totalTabBarHeight, // Prevent content from being hidden behind tab bar
+                }}
             >
-                <Tab.Navigator
-                    screenOptions={{
-                        headerShown: false,
-                        tabBarActiveTintColor: colors.primary, // #DC3173
-                        tabBarInactiveTintColor: isDarkMode ? colors.text.light : '#999999',
-                        tabBarStyle,
-                        tabBarHideOnKeyboard: true,
-                        tabBarLabelStyle: {
-                            fontSize: 12,
-                            fontFamily: 'Poppins-Medium',
-                            letterSpacing: 0.2,
-                            paddingTop: 2,
-                        },
-                        tabBarItemStyle: {
-                            justifyContent: 'center',
-                            alignItems: 'center',
-                        },
+                <Tab.Screen
+                    name="Categories"
+                    component={CategoriesScreen}
+                    options={{
+                        tabBarIcon: ({ focused, color }) => <CategoriesIcon focused={focused} color={color} />,
                     }}
-                    sceneContainerStyle={{
-                        backgroundColor: colors.background,
-                        paddingBottom: totalTabBarHeight, // Prevent content from being hidden behind tab bar
+                />
+                <Tab.Screen
+                    name="Orders"
+                    component={OrdersScreen}
+                    options={{
+                        tabBarIcon: ({ focused, color }) => <OrdersIcon focused={focused} color={color} />,
+                    }}
+                />
+                <Tab.Screen
+                    name="Cart"
+                    component={CartScreen}
+                    options={{
+                        tabBarIcon: ({ focused, color }) => <CartIcon focused={focused} color={color} />,
+                    }}
+                />
+                <Tab.Screen
+                    name="Profile"
+                    options={{
+                        tabBarLabel: 'Account',
+                        tabBarIcon: ({ focused, color }) => <ProfileIcon focused={focused} color={color} />,
                     }}
                 >
-                    <Tab.Screen
-                        name="Categories"
-                        component={CategoriesScreen}
-                        options={{
-                            tabBarIcon: ({ focused, color }) => <CategoriesIcon focused={focused} color={color} />,
-                        }}
-                    />
-                    <Tab.Screen
-                        name="Orders"
-                        component={OrdersScreen}
-                        options={{
-                            tabBarIcon: ({ focused, color }) => <OrdersIcon focused={focused} color={color} />,
-                        }}
-                    />
-                    <Tab.Screen
-                        name="Cart"
-                        component={CartScreen}
-                        options={{
-                            tabBarIcon: ({ focused, color }) => <CartIcon focused={focused} color={color} />,
-                        }}
-                    />
-                    <Tab.Screen
-                        name="Profile"
-                        options={{
-                            tabBarLabel: 'Account',
-                            tabBarIcon: ({ focused, color }) => <ProfileIcon focused={focused} color={color} />,
-                        }}
-                    >
-                        {(props) => <ProfileScreen {...props} onLogout={onLogout} />}
-                    </Tab.Screen>
-                </Tab.Navigator>
-            </KeyboardAvoidingView>
-            </View>
+                    {(props) => <ProfileScreen {...props} onLogout={onLogout} />}
+                </Tab.Screen>
+            </Tab.Navigator>
         </SafeAreaView>
     );
 };

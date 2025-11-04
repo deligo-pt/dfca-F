@@ -42,13 +42,13 @@ const LocationHeader = ({
     <View style={styles.wrapper}>
       <View style={styles.container}>
         {/* Deligo Logo/Brand */}
-        {/*<View style={styles.logoRow}>*/}
-        {/*  <Image*/}
-        {/*    source={require('../assets/images/logo.png')}*/}
-        {/*    style={styles.logoImage}*/}
-        {/*    resizeMode="contain"*/}
-        {/*  />*/}
-        {/*</View>*/}
+        <View style={styles.logoRow}>
+          <Image
+            source={require('../assets/images/logo.png')}
+            style={styles.logoImage}
+            resizeMode="contain"
+          />
+        </View>
 
         {/* Row 1: Deliver To Location */}
         <View style={styles.topRow}>
@@ -279,7 +279,6 @@ const styles = StyleSheet.create({
   },
   container: {
     backgroundColor: colors.primary,
-    paddingTop: spacing.md,
     paddingBottom: spacing.sm,
     paddingHorizontal: spacing.md,
     shadowColor: colors.shadow,
@@ -292,12 +291,13 @@ const styles = StyleSheet.create({
   },
   // Logo Row
   logoRow: {
+    paddingTop: spacing.md,
     marginBottom: spacing.xs,
     alignItems: 'center',
   },
   logoImage: {
-    width: 100,
-    height: 35,
+    width: 150,
+    height: 50,
   },
   // Row 1: Location & Cart - ALWAYS VISIBLE
   topRow: {
