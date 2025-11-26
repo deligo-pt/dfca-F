@@ -77,15 +77,41 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
     }
     setIsLoading(true);
     try {
-      await sendOTP(identifier, loginMethod);
-      setIsOtpSent(true);
-      showModal(
-        t('otpSent'),
-        t('checkOTP'),
-        () => setModalVisible(false)
-      );
+      // Call sendOTP and log the server response for debugging
+      const sendRes = await sendOTP(identifier, loginMethod);
+      console.log('[LoginScreen] sendOTP response:', sendRes);
+
+      // If API responded with success flag, proceed to OTP screen/modal
+      if (sendRes && (sendRes.success === true || sendRes.success === 'true')) {
+        setIsOtpSent(true);
+        showModal(
+          t('otpSent'),
+          // prefer server message if provided otherwise fallback to generic
+          sendRes.message || t('checkOTP'),
+          () => setModalVisible(false)
+        );
+      } else {
+        // API returned but indicates failure - show message from server if present
+        const msg = sendRes && (sendRes.message || sendRes.error || sendRes.msg) ? (sendRes.message || sendRes.error || sendRes.msg) : t('accountNotRegistered');
+        console.warn('[LoginScreen] sendOTP reported failure:', sendRes);
+        // Provide an action: navigate to HelpCenter so user can contact support or get help
+        showModal(t('notRegistered'), msg, () => navigation.navigate('HelpCenter'), false);
+      }
     } catch (error) {
-      showModal(t('notRegistered'), t('accountNotRegistered'));
+      // error may be a rejected API response (response.data) or a network error
+      console.error('[LoginScreen] sendOTP error:', error);
+
+      // Try to extract server-provided message
+      const serverMsg = error && (error.message || error.msg || error.error || error.message?.toString());
+
+      if (serverMsg) {
+        showModal(t('notRegistered'), serverMsg.toString(), () => navigation.navigate('HelpCenter'), false);
+      } else if (error && error.status === 404) {
+        showModal(t('notRegistered'), t('accountNotRegistered'), () => navigation.navigate('HelpCenter'), false);
+      } else {
+        // Generic fallback
+        showModal(t('error'), t('somethingWentWrong'));
+      }
     } finally {
       setIsLoading(false);
     }
@@ -103,24 +129,27 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
     setIsLoading(true);
     try {
       const response = await verifyOTP(identifier, otp, loginMethod);
-      // Don't save user data yet - wait for user to click OK on modal
-      const userData = response.user;
-      setModalTitle(t('success'));
-      setModalMessage(`${t('welcomeTo')} ${t('deligo')}, ${userData.name}!`);
-      setModalOnlyConfirm(true);
-      // Store the callback in ref instead of state
-      modalOnConfirmRef.current = () => {
-        console.log('Modal OK pressed, saving user data and navigating to home');
-        // Save user data and navigate only after OK is clicked
-        setTimeout(async () => {
-          await saveUserData(userData);
-          if (onLoginSuccess) {
-            console.log('Calling onLoginSuccess with user data:', userData);
-            onLoginSuccess(userData);
-          }
-        }, 0);
-      };
-      setModalVisible(true);
+      console.log('[LoginScreen] verifyOTP response:', response);
+
+      const accessToken = response?.accessToken;
+      const userData = response?.user || null;
+
+      // If backend didn't return token, treat as failure
+      if (!accessToken) {
+        showModal(t('error'), t('invalidOTP'));
+        return;
+      }
+
+      // Save user only if present
+      if (userData) {
+        await saveUserData(userData);
+      }
+
+      // Close modal and notify parent (pass userData or null)
+      setModalVisible(false);
+      if (onLoginSuccess) {
+        onLoginSuccess(userData);
+      }
     } catch (error) {
       showModal(t('error'), t('invalidOTP'));
     } finally {

@@ -1,9 +1,10 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Animated, Image, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
 import { getUserData, logoutUser } from '../utils/auth';
+import StorageService from '../utils/storage';
 import CustomModal from '../components/CustomModal';
 import { useLanguage } from '../utils/LanguageContext';
 
@@ -17,6 +18,7 @@ const ProfileScreen = ({ onLogout, navigation }) => {
   const [modalMessage, setModalMessage] = useState('');
   const [modalOnConfirm, setModalOnConfirm] = useState(null);
   const [modalOnlyConfirm, setModalOnlyConfirm] = useState(false);
+  const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   // Animation values for logout button
   const scaleAnim = useRef(new Animated.Value(1)).current;
@@ -59,11 +61,46 @@ const ProfileScreen = ({ onLogout, navigation }) => {
       t('logout'),
       'Are you sure you want to logout?',
       async () => {
-        setModalVisible(false);
-        await logoutUser();
-        if (onLogout) {
-          onLogout();
-        }
+        // Keep modal open while logout happens and show a loader in the button
+        setIsLoggingOut(true);
+        try {
+          // Read token from storage and pass it into logoutUser to ensure server receives the exact stored token
+          const tokenFromStorage = await (StorageService.getAccessToken ? StorageService.getAccessToken() : StorageService.getItem('userToken'));
+          const result = await logoutUser(tokenFromStorage);
+
+           // Stop loader and close the confirmation modal
+           setIsLoggingOut(false);
+           setModalVisible(false);
+
+           // Handle API result: success -> navigate; failure -> show informative modal
+           if (result && result.success) {
+             // Successful logout
+             if (onLogout) {
+               onLogout();
+             }
+             return;
+           }
+
+           // If unauthorized (token invalid/expired), still navigate to login but inform the user
+           if (result && result.status === 401) {
+             // Token invalid/expired: perform local logout/navigation immediately.
+             console.warn('[ProfileScreen] logout returned 401 - treating as session expired');
+             if (onLogout) onLogout();
+             return;
+           }
+
+           // Generic failure message
+           showModal(
+             t('error'),
+             result?.message || 'Logout failed. Please try again.',
+             () => setModalVisible(false),
+             true,
+           );
+         } catch (err) {
+           console.warn('[ProfileScreen] logout error:', err);
+           setIsLoggingOut(false);
+           setModalVisible(false);
+         }
       },
       false
     );
@@ -265,17 +302,29 @@ const ProfileScreen = ({ onLogout, navigation }) => {
           {/* Logout Button */}
           <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
             <TouchableOpacity
-              style={[styles.logoutButton, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              style={[
+                styles.logoutButton,
+                { backgroundColor: colors.surface, borderColor: colors.border },
+                isLoggingOut && { opacity: 0.7 },
+              ]}
               onPress={handleLogoutPress}
               activeOpacity={0.8}
+              disabled={isLoggingOut}
             >
               <View style={[styles.logoutIconContainer, { backgroundColor: `${colors.error}15` }]}>
                 <Ionicons name="log-out-outline" size={22} color={colors.error} />
               </View>
-              <Text style={[styles.logoutText, { color: colors.error }]}>{t('logout')}</Text>
-              <View style={styles.logoutArrow}>
-                <Ionicons name="arrow-forward" size={20} color={colors.error} />
-              </View>
+              {isLoggingOut ? (
+                <ActivityIndicator size="small" color={colors.error} style={{ flex: 1 }} />
+              ) : (
+                <>
+                  <Text style={[styles.logoutText, { color: colors.error }]}>{t('logout')}</Text>
+                  <View style={styles.logoutArrow}>
+                    <Ionicons name="arrow-forward" size={20} color={colors.error} />
+                  </View>
+                </>
+              )}
+
             </TouchableOpacity>
           </Animated.View>
 
