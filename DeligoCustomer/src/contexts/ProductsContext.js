@@ -51,6 +51,7 @@ export const ProductsProvider = ({ children }) => {
       const qs = new URLSearchParams();
       if (final.search) qs.set('search', final.search);
       if (final.category) qs.set('category', final.category);
+      if (final.vendorType) qs.set('vendorType', final.vendorType);
       if (final.tags) qs.set('tags', Array.isArray(final.tags) ? final.tags.join(',') : final.tags);
       if (final.lat) qs.set('lat', final.lat);
       if (final.lng) qs.set('lng', final.lng);

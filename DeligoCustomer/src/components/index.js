@@ -9,3 +9,6 @@ export { default as RestaurantCard } from './RestaurantCard';
 export { default as SectionHeader } from './SectionHeader';
 export { default as StickySearchHeader } from './StickySearchHeader';
 
+// Map new names requested by product (VendorType / Category) to existing components
+export { default as VendorType } from './Categories/CategoriesList';
+export { default as Category } from './Categories/CuisinesList';

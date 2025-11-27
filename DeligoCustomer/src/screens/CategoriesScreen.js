@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, StyleSheet, Animated } from 'react-native';
+import { View, StyleSheet, Animated, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { spacing } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
@@ -9,14 +9,14 @@ import {
   SectionHeader,
   StickySearchHeader,
 } from '../components';
-import mockData from '../data/mockData.json';
+import VendorType from '../components/Categories/CategoriesList';
+import Category from '../components/Categories/CuisinesList';
 import { useProducts } from '../contexts/ProductsContext';
+import StorageService from '../utils/storage';
 
 // Add new component imports
 import OfferModal from '../components/Categories/OfferModal';
 import useLocationHook from '../components/Categories/useLocation';
-import CategoriesList from '../components/Categories/CategoriesList';
-import CuisinesList from '../components/Categories/CuisinesList';
 import RestaurantsList from '../components/Categories/RestaurantsList';
 
 const CategoriesScreen = ({ navigation }) => {
@@ -24,9 +24,15 @@ const CategoriesScreen = ({ navigation }) => {
   const { t } = useLanguage();
   // useLocationHook provides location, area, loading, error and helpers
   const { location, area, loading, errorMsg, getLocation, setLocation, setArea } = useLocationHook();
+  const [selectedVendorType, setSelectedVendorType] = useState(null);
   const [selectedCuisine, setSelectedCuisine] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const scrollY = useRef(new Animated.Value(0)).current;
+
+  // Session-persistent static lists
+  const [staticVendorTypes, setStaticVendorTypes] = useState([]);
+  const [staticCuisines, setStaticCuisines] = useState([]);
+  const [sessionLoaded, setSessionLoaded] = useState(false);
 
   // Modal state for offer details
   const [offerModalVisible, setOfferModalVisible] = useState(false);
@@ -44,28 +50,159 @@ const CategoriesScreen = ({ navigation }) => {
     action: 'navigate_to_offers', // or offer ID
   };
 
-  // Featured shops can be loaded from API or mock data; using mock here
-  const featuredShops = mockData.featuredShops || [];
+  // Featured shops - default empty until API provides featured list
+  const featuredShops = [];
 
   // User name for personalized greeting (from auth context in real app)
   const userName = null; // Set to user's name or null
 
-  // Filter restaurants based on search query with null checks
-  const filteredRestaurants = searchQuery.trim()
-    ? (mockData.restaurants || []).filter(restaurant => {
-        if (!restaurant) return false;
-        const query = searchQuery.toLowerCase();
-        const name = (restaurant.name || '').toLowerCase();
-        const cuisine = (restaurant.cuisine || '').toLowerCase();
-        const description = (restaurant.description || '').toLowerCase();
-        return name.includes(query) || cuisine.includes(query) || description.includes(query);
-      })
-    : mockData.restaurants || [];
+  // Use products context for live data
+  const { products, fetchProducts, loading: productsLoading, error: productsError } = useProducts();
 
-  // Generate autocomplete suggestions (top 5 matches)
-  const searchSuggestions = searchQuery.trim()
-    ? filteredRestaurants.slice(0, 5)
-    : [];
+  // Derive vendor types (e.g. 'Resturent') from products' vendor.vendorType (computed but not used directly if static session exists)
+  const vendorTypesFromProducts = React.useMemo(() => {
+    const map = new Map();
+    (products || []).forEach((p) => {
+      const rawVendor = (p._raw && p._raw.vendor) || p.vendor || {};
+      const vendorType = rawVendor.vendorType;
+      if (vendorType && String(vendorType).trim()) {
+        const key = String(vendorType).trim();
+        if (!map.has(key)) map.set(key, { id: key, name: key });
+      }
+    });
+    return Array.from(map.values());
+  }, [products]);
+
+  // Derive cuisines (product.category) from products (computed but static session preferred)
+  const cuisinesFromProducts = React.useMemo(() => {
+    const map = new Map();
+    (products || []).forEach((p) => {
+      const category = p._raw?.category || p.category || (Array.isArray(p.tags) && p.tags[0]) || null;
+      if (category) {
+        const key = typeof category === 'string' ? category : String(category);
+        const prev = map.get(key) || { id: key, name: key, count: 0 };
+        prev.count = (prev.count || 0) + 1;
+        map.set(key, prev);
+      }
+    });
+    return Array.from(map.values()).map((c) => ({ id: c.id, name: c.name, restaurants: c.count }));
+  }, [products]);
+
+  // Load session-stored static lists and selected filters on mount
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const storedVendorTypes = await StorageService.getItem('vendorTypes');
+        const storedCuisines = await StorageService.getItem('cuisines');
+        const storedSelVendor = await StorageService.getItem('selectedVendorType');
+        const storedSelCuisine = await StorageService.getItem('selectedCuisine');
+        if (!mounted) return;
+        // Normalize storedVendorTypes: accept ['A','B'] or [{id,name}] or {data: [...]}
+        const normalizeList = (input) => {
+          if (!input) return [];
+          if (Array.isArray(input)) {
+            // array of strings -> convert
+            if (input.every(i => typeof i === 'string')) return input.map(s => ({ id: s, name: s }));
+            // array of objects -> ensure id/name
+            return input.map(i => (typeof i === 'string' ? { id: i, name: i } : { id: i.id || i.name || String(i), name: i.name || i.id || String(i) }));
+          }
+          // if object with data key
+          if (input && typeof input === 'object') {
+            const arr = input.data || input.items || input.list || null;
+            if (Array.isArray(arr)) return normalizeList(arr);
+          }
+          return [];
+        };
+
+        const normVendor = normalizeList(storedVendorTypes);
+        const normCuisines = normalizeList(storedCuisines);
+        if (normVendor.length) setStaticVendorTypes(normVendor);
+        if (normCuisines.length) setStaticCuisines(normCuisines);
+         if (storedSelVendor) setSelectedVendorType(storedSelVendor);
+         if (storedSelCuisine) setSelectedCuisine(storedSelCuisine);
+      } catch (e) {
+        console.debug('Failed to load session lists', e);
+      } finally {
+        if (mounted) setSessionLoaded(true);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  // When products arrive and session hasn't stored lists, persist derived lists as static session values
+  useEffect(() => {
+    if (!sessionLoaded) return; // wait until we've attempted to load session
+    (async () => {
+      try {
+        if ((!staticVendorTypes || staticVendorTypes.length === 0) && vendorTypesFromProducts.length > 0) {
+          setStaticVendorTypes(vendorTypesFromProducts);
+          // store normalized array of objects
+          await StorageService.setItem('vendorTypes', vendorTypesFromProducts.map(v => ({ id: v.id, name: v.name })));
+        }
+        if ((!staticCuisines || staticCuisines.length === 0) && cuisinesFromProducts.length > 0) {
+          setStaticCuisines(cuisinesFromProducts);
+          await StorageService.setItem('cuisines', cuisinesFromProducts.map(c => ({ id: c.id, name: c.name, restaurants: c.restaurants })));
+        }
+      } catch (e) {
+        console.debug('Failed to persist session lists', e);
+      }
+    })();
+  }, [sessionLoaded, products, vendorTypesFromProducts, cuisinesFromProducts]);
+
+  // Use the static lists if available, otherwise fall back to computed lists
+  const vendorTypes = Array.isArray(staticVendorTypes) && staticVendorTypes.length ? staticVendorTypes : (Array.isArray(vendorTypesFromProducts) ? vendorTypesFromProducts : []);
+  const cuisines = Array.isArray(staticCuisines) && staticCuisines.length ? staticCuisines : (Array.isArray(cuisinesFromProducts) ? cuisinesFromProducts : []);
+
+  // Debug values (now safe because cuisines is defined)
+  const debugVendorTypes = Array.isArray(vendorTypes) ? vendorTypes.map(v => v?.name || '').filter(Boolean).slice(0,5).join(', ') : '';
+  const debugCuisines = Array.isArray(cuisines) ? cuisines.map(c => c?.name || '').filter(Boolean).slice(0,5).join(', ') : '';
+
+  // Persist user selections in session
+  const persistSelection = async (key, value) => {
+    try {
+      // store null as null, strings as-is
+      await StorageService.setItem(key, value === null ? null : value);
+    } catch (e) { console.debug('Failed to persist selection', key, e); }
+  };
+
+  // Debounced search -> trigger context fetch
+  useEffect(() => {
+    const t = setTimeout(() => {
+      // include selected filters when searching
+      fetchProducts({ search: searchQuery, page: 1, vendorType: selectedVendorType || undefined, category: selectedCuisine || undefined });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchQuery, selectedVendorType, selectedCuisine]);
+
+  const handleVendorTypePress = (vendor) => {
+    const vendorId = vendor.id || vendor.name;
+    const newSel = selectedVendorType === vendorId ? null : vendorId;
+    setSelectedVendorType(newSel);
+    if (newSel === null) setSelectedCuisine(null);
+    persistSelection('selectedVendorType', newSel);
+    if (newSel === null) persistSelection('selectedCuisine', null);
+    // Fetch products filtered by vendorType
+    fetchProducts({ vendorType: newSel || undefined, category: undefined, page: 1 });
+  };
+
+  const handleCuisinePress = (cuisine) => {
+    const cuisineId = cuisine.id || cuisine.name;
+    const newSel = selectedCuisine === cuisineId ? null : cuisineId;
+    setSelectedCuisine(newSel);
+    persistSelection('selectedCuisine', newSel);
+    // Fetch products filtered by vendorType (if any) and category
+    fetchProducts({ vendorType: selectedVendorType || undefined, category: newSel || undefined, page: 1 });
+  };
+
+  const handleRestaurantPress = (restaurant) => {
+    console.log('Restaurant pressed:', restaurant.name);
+    navigation.navigate('RestaurantDetails', { restaurant });
+  };
+
+  // Suggestions based on current context products
+  const filteredRestaurants = products || [];
+  const searchSuggestions = searchQuery.trim() ? filteredRestaurants.slice(0, 5) : [];
 
   const handleSuggestionPress = (restaurant) => {
     console.log('Suggestion selected:', restaurant.name);
@@ -76,19 +213,6 @@ const CategoriesScreen = ({ navigation }) => {
   useEffect(() => {
     getLocation();
   }, []);
-
-  const handleCategoryPress = (category) => {
-    console.log('Category pressed:', category.name);
-  };
-
-  const handleCuisinePress = (cuisine) => {
-    setSelectedCuisine(selectedCuisine === cuisine.id ? null : cuisine.id);
-  };
-
-  const handleRestaurantPress = (restaurant) => {
-    console.log('Restaurant pressed:', restaurant.name);
-    navigation.navigate('RestaurantDetails', { restaurant });
-  };
 
   const handleCartPress = () => {
     console.log('🛒 CART BUTTON PRESSED - Navigating to Cart screen');
@@ -144,17 +268,6 @@ const CategoriesScreen = ({ navigation }) => {
     }
   };
 
-  // Use products context for live data
-  const { products, loading: _productsLoading, error: _productsError, fetchProducts } = useProducts();
-
-  // Debounced search -> trigger context fetch
-  useEffect(() => {
-    const t = setTimeout(() => {
-      fetchProducts({ search: searchQuery, page: 1 });
-    }, 300);
-    return () => clearTimeout(t);
-  }, [searchQuery]);
-
   return (
     <SafeAreaView style={styles(colors).safeArea} edges={['top']}>
       {/* Sticky Search Header - appears on scroll */}
@@ -169,6 +282,19 @@ const CategoriesScreen = ({ navigation }) => {
         suggestions={searchSuggestions}
         onSuggestionPress={handleSuggestionPress}
       />
+
+      {/* DEBUG: show products context state (remove in production) */}
+      <View style={{ paddingHorizontal: spacing.md, paddingVertical: 6 }}>
+        <Text style={{ color: colors.text.secondary, fontSize: 12 }}>
+          {productsLoading ? 'Loading products...' : `Products: ${products.length}`}{productsError ? ` • Error: ${String(productsError)}` : ''}
+        </Text>
+        <Text style={{ color: colors.text.secondary, fontSize: 11, marginTop: 4 }}>
+          {`vendorTypes: ${debugVendorTypes || '<none>'}`}
+        </Text>
+        <Text style={{ color: colors.text.secondary, fontSize: 11 }}>
+          {`cuisines: ${debugCuisines || '<none>'}`}
+        </Text>
+      </View>
 
       <Animated.ScrollView
         style={styles(colors).scrollView}
@@ -202,21 +328,47 @@ const CategoriesScreen = ({ navigation }) => {
 
         {/* Categories Section */}
         <SectionHeader title={t('whatDoYouNeed')} showSeeAll={false} />
-        <CategoriesList categories={mockData.categories} onPress={handleCategoryPress} />
+        {productsLoading && (!Array.isArray(vendorTypes) || vendorTypes.length === 0) ? (
+          <View style={{ paddingVertical: 16 }}>
+            <ActivityIndicator size="small" color={colors.primary} />
+          </View>
+        ) : (
+          <VendorType categories={Array.isArray(vendorTypes) ? vendorTypes : []} onPress={handleVendorTypePress} selectedId={selectedVendorType} />
+        )}
 
         {/* Cuisines Section */}
         <SectionHeader
           title={t('cuisines')}
           onSeeAll={() => console.log('See all cuisines')}
         />
-        <CuisinesList cuisines={mockData.cuisines} selectedCuisine={selectedCuisine} onPress={handleCuisinePress} />
+        {productsLoading && (!Array.isArray(cuisines) || cuisines.length === 0) ? (
+          <View style={{ paddingVertical: 12 }}>
+            <ActivityIndicator size="small" color={colors.primary} />
+          </View>
+        ) : (
+          <Category cuisines={Array.isArray(cuisines) ? cuisines : []} selectedCuisine={selectedCuisine} onPress={handleCuisinePress} />
+        )}
 
         {/* Restaurants Section */}
         <SectionHeader
           title={searchQuery ? `Search Results (${filteredRestaurants.length})` : t('popularRestaurants')}
           onSeeAll={!searchQuery ? () => console.log('See all restaurants') : undefined}
         />
-        <RestaurantsList restaurants={products} onPress={handleRestaurantPress} searchQuery={searchQuery} disableScroll={true} />
+        {productsLoading ? (
+          <View style={{ paddingVertical: 20 }}>
+            <ActivityIndicator size="large" color={colors.primary} />
+          </View>
+        ) : (!products || products.length === 0) ? (
+          <View style={styles(colors).noResultsContainer}>
+            <Text style={styles(colors).noResultsText}>{t('noRestaurantsFound') || 'No restaurants found'}</Text>
+            <Text style={styles(colors).noResultsSubtext}>{t('tryAdjustingFilters') || 'Try adjusting filters or retry.'}</Text>
+            <TouchableOpacity onPress={() => fetchProducts({ page: 1, vendorType: selectedVendorType || undefined, category: selectedCuisine || undefined })} style={{ marginTop: 12 }}>
+              <Text style={{ color: colors.primary, fontFamily: 'Poppins-SemiBold' }}>{t('retry') || 'Retry'}</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <RestaurantsList restaurants={products} onPress={handleRestaurantPress} searchQuery={searchQuery} disableScroll={true} />
+        )}
 
         <View style={{ height: 100 }} />
       </Animated.ScrollView>
