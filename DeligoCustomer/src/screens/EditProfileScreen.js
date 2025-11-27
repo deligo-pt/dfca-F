@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
@@ -12,7 +12,22 @@ const EditProfileScreen = ({ navigation, route }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
+  // Address object state: show and optionally edit address details
+  const [address, setAddress] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
+  const [profilePhoto, setProfilePhoto] = useState(null);
+
+  // sensible default address (from user's request)
+  const defaultAddress = {
+    city: 'Dhaka',
+    country: 'Bangladesh',
+    geoAccuracy: 5,
+    latitude: 23.7808875,
+    longitude: 90.4165875,
+    postalCode: '1212',
+    state: 'Badda',
+    street: 'House 32, Road 14',
+  };
 
   useEffect(() => {
     loadUserData();
@@ -28,6 +43,9 @@ const EditProfileScreen = ({ navigation, route }) => {
         setName(derivedName || routeUser.displayName || '');
         setEmail(routeUser.email || routeUser.contactEmail || '');
         setMobile(routeUser.contactNumber || routeUser.phone || routeUser.mobile || '');
+        setProfilePhoto(routeUser.profilePhoto || routeUser.photo || routeUser.avatar || routeUser.photoUrl || routeUser.avatarUrl || null);
+        // set address if present on route user, otherwise use provided default
+        setAddress(routeUser.address || routeUser.location || defaultAddress);
         return;
       }
 
@@ -35,6 +53,9 @@ const EditProfileScreen = ({ navigation, route }) => {
       setName(userData?.name || '');
       setEmail(userData?.email || '');
       setMobile(userData?.mobile || '');
+      setProfilePhoto(userData?.profilePhoto || userData?.photo || userData?.avatarUrl || userData?.avatar || null);
+      // prefer explicit address property, fall back to defaultAddress
+      setAddress(userData?.address || userData?.location || defaultAddress);
     } catch (err) {
       console.warn('[EditProfileScreen] loadUserData error', err);
     }
@@ -63,9 +84,13 @@ const EditProfileScreen = ({ navigation, route }) => {
         {/* Avatar Section */}
         <View style={[styles.avatarSection, { backgroundColor: colors.background }]}>
           <View style={[styles.avatarContainer, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }] }>
-            <Text style={[styles.avatarText, { color: colors.text.white }]}>
-              {name?.charAt(0)?.toUpperCase() || 'U'}
-            </Text>
+            {profilePhoto ? (
+              <Image source={{ uri: profilePhoto }} style={styles.avatarImage} resizeMode="cover" />
+            ) : (
+              <Text style={[styles.avatarText, { color: colors.text.white }]}>
+                {name?.charAt(0)?.toUpperCase() || 'U'}
+              </Text>
+            )}
           </View>
           {isEditing && (
             <TouchableOpacity style={[styles.changePhotoButton, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}>
@@ -123,6 +148,82 @@ const EditProfileScreen = ({ navigation, route }) => {
               />
             </View>
           </View>
+
+          {/* Address Section */}
+          <View style={styles.inputGroup}>
+            <Text style={[styles.label, { color: colors.text.primary }]}>{t('address')}</Text>
+            {address ? (
+              // show editable fields when editing, otherwise a read-only formatted view
+              isEditing ? (
+                <View>
+                  <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border, marginBottom: 8 }]}>
+                    <Ionicons name="home-outline" size={20} color={colors.text.secondary} />
+                    <TextInput
+                      style={[styles.input, { color: colors.text.primary }]}
+                      value={address.street}
+                      onChangeText={(val) => setAddress(prev => ({ ...prev, street: val }))}
+                      placeholder={t('street')}
+                      placeholderTextColor={colors.text.light}
+                    />
+                  </View>
+                  <View style={[styles.row, { justifyContent: 'space-between' }]}>
+                    <View style={[styles.inputContainer, { flex: 1, marginRight: 8, backgroundColor: colors.surface, borderColor: colors.border }]}>
+                      <TextInput
+                        style={[styles.input, { color: colors.text.primary }]}
+                        value={address.city}
+                        onChangeText={(val) => setAddress(prev => ({ ...prev, city: val }))}
+                        placeholder={t('city')}
+                        placeholderTextColor={colors.text.light}
+                      />
+                    </View>
+                    <View style={[styles.inputContainer, { flex: 1, backgroundColor: colors.surface, borderColor: colors.border }]}>
+                      <TextInput
+                        style={[styles.input, { color: colors.text.primary }]}
+                        value={address.state}
+                        onChangeText={(val) => setAddress(prev => ({ ...prev, state: val }))}
+                        placeholder={t('state')}
+                        placeholderTextColor={colors.text.light}
+                      />
+                    </View>
+                  </View>
+                  <View style={[styles.row, { justifyContent: 'space-between', marginTop: 8 }]}>
+                    <View style={[styles.inputContainer, { flex: 1, marginRight: 8, backgroundColor: colors.surface, borderColor: colors.border }]}>
+                      <TextInput
+                        style={[styles.input, { color: colors.text.primary }]}
+                        value={address.postalCode}
+                        onChangeText={(val) => setAddress(prev => ({ ...prev, postalCode: val }))}
+                        placeholder={t('postalCode')}
+                        placeholderTextColor={colors.text.light}
+                        keyboardType="numeric"
+                      />
+                    </View>
+                    <View style={[styles.inputContainer, { flex: 1, backgroundColor: colors.surface, borderColor: colors.border }]}>
+                      <TextInput
+                        style={[styles.input, { color: colors.text.primary }]}
+                        value={address.country}
+                        onChangeText={(val) => setAddress(prev => ({ ...prev, country: val }))}
+                        placeholder={t('country')}
+                        placeholderTextColor={colors.text.light}
+                      />
+                    </View>
+                  </View>
+                </View>
+              ) : (
+                <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border }] }>
+                  <Ionicons name="location-outline" size={20} color={colors.text.secondary} />
+                  <Text style={[styles.input, { color: colors.text.primary }]}>
+                    {`${address.street || ''}${address.street ? ', ' : ''}${address.city || ''}${address.state ? ', ' : ''}${address.state || ''}${address.postalCode ? ' - ' : ''}${address.postalCode || ''}${address.country ? ', ' : ''}${address.country || ''}`}
+                  </Text>
+                </View>
+              )
+            ) : (
+              <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border }] }>
+                <Ionicons name="location-outline" size={20} color={colors.text.secondary} />
+                <Text style={[styles.input, { color: colors.text.light }]}>{t('noAddress')}</Text>
+              </View>
+            )}
+          </View>
+
         </View>
 
         {/* Save Button */}
@@ -139,6 +240,10 @@ const EditProfileScreen = ({ navigation, route }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
+  },
+  row: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   header: {
     flexDirection: 'row',
@@ -191,6 +296,11 @@ const styles = StyleSheet.create({
     fontSize: 42,
     fontWeight: 'bold',
     fontFamily: 'Poppins-Bold',
+  },
+  avatarImage: {
+    width: 100,
+    height: 100,
+    borderRadius: 50,
   },
   changePhotoButton: {
     flexDirection: 'row',

@@ -1,28 +1,28 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, Text, StyleSheet, ScrollView, Animated, Modal, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Animated } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import * as Location from 'expo-location';
-import { Ionicons } from '@expo/vector-icons';
 import { spacing } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
 import {
   LocationHeader,
-  CategoryCard,
-  CuisineChip,
-  RestaurantCard,
   SectionHeader,
   StickySearchHeader,
 } from '../components';
 import mockData from '../data/mockData.json';
 
+// Add new component imports
+import OfferModal from '../components/Categories/OfferModal';
+import useLocationHook from '../components/Categories/useLocation';
+import CategoriesList from '../components/Categories/CategoriesList';
+import CuisinesList from '../components/Categories/CuisinesList';
+import RestaurantsList from '../components/Categories/RestaurantsList';
+
 const CategoriesScreen = ({ navigation }) => {
   const { colors } = useTheme();
   const { t } = useLanguage();
-  const [location, setLocation] = useState(null);
-  const [errorMsg, setErrorMsg] = useState(null);
-  const [loading, setLoading] = useState(false);
-  const [area, setArea] = useState(null);
+  // useLocationHook provides location, area, loading, error and helpers
+  const { location, area, loading, errorMsg, getLocation, setLocation, setArea } = useLocationHook();
   const [selectedCuisine, setSelectedCuisine] = useState(null);
   const [searchQuery, setSearchQuery] = useState('');
   const scrollY = useRef(new Animated.Value(0)).current;
@@ -35,73 +35,16 @@ const CategoriesScreen = ({ navigation }) => {
   const cartItemCount = 0;
 
   // Sample offer from API - set to null to test welcome greeting
-  const [activeOffer, setActiveOffer] = useState({
+  const activeOffer = {
     title: 'First Order Special! 🎉',
     subtitle: 'Get 50% OFF on your first order',
     code: 'DELIGO50',
     discount: '50%',
     action: 'navigate_to_offers', // or offer ID
-  });
+  };
 
-  // Sample featured shops from API - Using open-source/public domain logos
-  const [featuredShops, setFeaturedShops] = useState([
-    {
-      id: '1',
-      name: 'Pizza Palace',
-      logo: 'https://cdn-icons-png.flaticon.com/512/3132/3132691.png', // Pizza icon
-      cuisine: 'Italian',
-      rating: 4.5,
-      deliveryTime: '25-30 min',
-    },
-    {
-      id: '2',
-      name: 'Burger House',
-      logo: 'https://cdn-icons-png.flaticon.com/512/1046/1046784.png', // Burger icon
-      cuisine: 'American',
-      rating: 4.3,
-      deliveryTime: '20-25 min',
-    },
-    {
-      id: '3',
-      name: 'Sushi Master',
-      logo: 'https://cdn-icons-png.flaticon.com/512/1719/1719441.png', // Sushi icon
-      cuisine: 'Japanese',
-      rating: 4.7,
-      deliveryTime: '30-35 min',
-    },
-    {
-      id: '4',
-      name: 'Taco Fiesta',
-      logo: 'https://cdn-icons-png.flaticon.com/512/2553/2553691.png', // Taco icon
-      cuisine: 'Mexican',
-      rating: 4.4,
-      deliveryTime: '25-30 min',
-    },
-    {
-      id: '5',
-      name: 'Cafe Deluxe',
-      logo: 'https://cdn-icons-png.flaticon.com/512/924/924514.png', // Coffee icon
-      cuisine: 'Cafe & Drinks',
-      rating: 4.6,
-      deliveryTime: '15-20 min',
-    },
-    {
-      id: '6',
-      name: 'Asian Wok',
-      logo: 'https://cdn-icons-png.flaticon.com/512/2769/2769339.png', // Noodles icon
-      cuisine: 'Asian',
-      rating: 4.5,
-      deliveryTime: '25-30 min',
-    },
-    {
-      id: '7',
-      name: 'Dessert Heaven',
-      logo: 'https://cdn-icons-png.flaticon.com/512/3081/3081944.png', // Ice cream icon
-      cuisine: 'Desserts',
-      rating: 4.8,
-      deliveryTime: '20-25 min',
-    },
-  ]);
+  // Featured shops can be loaded from API or mock data; using mock here
+  const featuredShops = mockData.featuredShops || [];
 
   // User name for personalized greeting (from auth context in real app)
   const userName = null; // Set to user's name or null
@@ -127,41 +70,6 @@ const CategoriesScreen = ({ navigation }) => {
     console.log('Suggestion selected:', restaurant.name);
     setSearchQuery(''); // Clear search
     navigation.navigate('RestaurantDetails', { restaurant });
-  };
-
-  const getLocation = async () => {
-    setLoading(true);
-    setErrorMsg(null);
-    setArea(null);
-    try {
-      let { status } = await Location.requestForegroundPermissionsAsync();
-      if (status !== 'granted') {
-        setErrorMsg(t('locationDenied'));
-        setLoading(false);
-        return;
-      }
-      let loc = await Location.getCurrentPositionAsync({});
-      setLocation(loc.coords);
-      // Reverse geocode to get area name
-      let address = await Location.reverseGeocodeAsync({
-        latitude: loc.coords.latitude,
-        longitude: loc.coords.longitude,
-      });
-      if (address && address.length > 0) {
-        const addr = address[0];
-        const areaString = [addr.street, addr.city, addr.region]
-          .filter(Boolean)
-          .join(', ');
-        setArea(areaString || t('currentLocation'));
-      } else {
-        setArea(t('currentLocation'));
-      }
-    } catch (error) {
-      setErrorMsg(t('errorGettingLocation'));
-      setArea(t('setYourLocation'));
-    } finally {
-      setLoading(false);
-    }
   };
 
   useEffect(() => {
@@ -282,141 +190,26 @@ const CategoriesScreen = ({ navigation }) => {
 
         {/* Categories Section */}
         <SectionHeader title={t('whatDoYouNeed')} showSeeAll={false} />
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles(colors).categoriesContainer}
-        >
-          {mockData.categories.map((category) => (
-            <CategoryCard
-              key={category.id}
-              category={category}
-              onPress={() => handleCategoryPress(category)}
-            />
-          ))}
-        </ScrollView>
+        <CategoriesList categories={mockData.categories} onPress={handleCategoryPress} />
 
         {/* Cuisines Section */}
         <SectionHeader
           title={t('cuisines')}
           onSeeAll={() => console.log('See all cuisines')}
         />
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          contentContainerStyle={styles(colors).cuisinesContainer}
-        >
-          {mockData.cuisines.map((cuisine) => (
-            <CuisineChip
-              key={cuisine.id}
-              cuisine={cuisine}
-              onPress={() => handleCuisinePress(cuisine)}
-              isSelected={selectedCuisine === cuisine.id}
-            />
-          ))}
-        </ScrollView>
+        <CuisinesList cuisines={mockData.cuisines} selectedCuisine={selectedCuisine} onPress={handleCuisinePress} />
 
         {/* Restaurants Section */}
         <SectionHeader
           title={searchQuery ? `Search Results (${filteredRestaurants.length})` : t('popularRestaurants')}
           onSeeAll={!searchQuery ? () => console.log('See all restaurants') : undefined}
         />
-        <View style={styles(colors).restaurantsContainer}>
-          {filteredRestaurants.length > 0 ? (
-            filteredRestaurants.map((restaurant) => (
-              <RestaurantCard
-                key={restaurant.id}
-                restaurant={restaurant}
-                onPress={() => handleRestaurantPress(restaurant)}
-              />
-            ))
-          ) : searchQuery ? (
-            <View style={styles(colors).noResultsContainer}>
-              <Ionicons name="search-outline" size={48} color={colors.text.secondary} />
-              <Text style={styles(colors).noResultsText}>No restaurants found</Text>
-              <Text style={styles(colors).noResultsSubtext}>Try searching with different keywords</Text>
-            </View>
-          ) : null}
-        </View>
+        <RestaurantsList restaurants={filteredRestaurants} onPress={handleRestaurantPress} searchQuery={searchQuery} />
 
         <View style={{ height: 100 }} />
       </Animated.ScrollView>
 
-      {/* Offer Details Modal */}
-      <Modal
-        animationType="slide"
-        transparent={true}
-        visible={offerModalVisible}
-        onRequestClose={() => setOfferModalVisible(false)}
-      >
-        <View style={styles(colors).modalOverlay}>
-          <View style={styles(colors).modalContent}>
-            {/* Close Button */}
-            <TouchableOpacity
-              style={styles(colors).modalCloseButton}
-              onPress={() => setOfferModalVisible(false)}
-            >
-              <Ionicons name="close" size={24} color={colors.text.secondary} />
-            </TouchableOpacity>
-
-            {/* Modal Header */}
-            <View style={styles(colors).modalHeader}>
-              <Text style={styles(colors).modalIcon}>🎉</Text>
-              <Text style={styles(colors).modalTitle}>
-                {selectedOffer?.title || 'Special Offer'}
-              </Text>
-            </View>
-
-            {/* Modal Body */}
-            <View style={styles(colors).modalBody}>
-              <Text style={styles(colors).modalSubtitle}>
-                {selectedOffer?.subtitle || 'Limited time offer'}
-              </Text>
-
-              {selectedOffer?.code && (
-                <View style={styles(colors).modalPromoCodeContainer}>
-                  <Text style={styles(colors).modalPromoCodeLabel}>Promo Code:</Text>
-                  <View style={styles(colors).modalPromoCode}>
-                    <Text style={styles(colors).modalPromoCodeText}>
-                      {selectedOffer.code}
-                    </Text>
-                  </View>
-                  <Text style={styles(colors).modalCopyHint}>Tap to copy</Text>
-                </View>
-              )}
-
-              <View style={styles(colors).modalDiscountBadge}>
-                <Text style={styles(colors).modalDiscountText}>
-                  {selectedOffer?.discount || '50%'}
-                </Text>
-                <Text style={styles(colors).modalDiscountLabel}>OFF</Text>
-              </View>
-
-              <View style={styles(colors).modalTerms}>
-                <Text style={styles(colors).modalTermsTitle}>Terms & Conditions:</Text>
-                <Text style={styles(colors).modalTermsText}>
-                  • Valid for first-time users only{'\n'}
-                  • Minimum order value: €20{'\n'}
-                  • Not applicable with other offers{'\n'}
-                  • Valid until: December 31, 2025
-                </Text>
-              </View>
-            </View>
-
-            {/* Modal Footer */}
-            <TouchableOpacity
-              style={styles(colors).modalApplyButton}
-              onPress={() => {
-                setOfferModalVisible(false);
-                // Navigate to menu or apply code
-                console.log('Apply offer:', selectedOffer);
-              }}
-            >
-              <Text style={styles(colors).modalApplyButtonText}>Apply Offer</Text>
-            </TouchableOpacity>
-          </View>
-        </View>
-      </Modal>
+      <OfferModal visible={offerModalVisible} onClose={() => setOfferModalVisible(false)} offer={selectedOffer} onApply={(o) => console.log('Apply offer:', o)} />
     </SafeAreaView>
   );
 };
@@ -461,151 +254,6 @@ const styles = (colors) => StyleSheet.create({
     marginTop: spacing.xs,
     textAlign: 'center',
   },
-  // Offer Modal Styles
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: colors.overlay,
-    justifyContent: 'flex-end',
-  },
-  modalContent: {
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: 24,
-    borderTopRightRadius: 24,
-    paddingTop: spacing.lg,
-    paddingHorizontal: spacing.lg,
-    paddingBottom: spacing.xl + 10,
-    maxHeight: '80%',
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 12,
-    elevation: 8,
-  },
-  modalCloseButton: {
-    position: 'absolute',
-    top: spacing.md,
-    right: spacing.md,
-    zIndex: 10,
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.background,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  modalHeader: {
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  modalIcon: {
-    fontSize: 56,
-    marginBottom: spacing.sm,
-  },
-  modalTitle: {
-    fontSize: 22,
-    fontFamily: 'Poppins-Bold',
-    color: colors.text.primary,
-    textAlign: 'center',
-  },
-  modalBody: {
-    marginBottom: spacing.lg,
-  },
-  modalSubtitle: {
-    fontSize: 16,
-    fontFamily: 'Poppins-Regular',
-    color: colors.text.secondary,
-    textAlign: 'center',
-    marginBottom: spacing.lg,
-  },
-  modalPromoCodeContainer: {
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-  },
-  modalPromoCodeLabel: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Medium',
-    color: colors.text.secondary,
-    marginBottom: spacing.xs,
-  },
-  modalPromoCode: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm + 2,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: colors.primary,
-    borderStyle: 'dashed',
-    marginBottom: spacing.xs,
-  },
-  modalPromoCodeText: {
-    fontSize: 24,
-    fontFamily: 'Poppins-Black',
-    color: colors.text.white,
-    letterSpacing: 2,
-  },
-  modalCopyHint: {
-    fontSize: 12,
-    fontFamily: 'Poppins-Regular',
-    color: colors.text.light,
-  },
-  modalDiscountBadge: {
-    backgroundColor: colors.background === '#FFFFFF' ? '#FFF8E1' : 'rgba(255, 217, 61, 0.15)',
-    borderRadius: 16,
-    padding: spacing.lg,
-    alignItems: 'center',
-    marginBottom: spacing.lg,
-    borderWidth: 2,
-    borderColor: colors.background === '#FFFFFF' ? '#FFD93D' : 'rgba(255, 217, 61, 0.3)',
-  },
-  modalDiscountText: {
-    fontSize: 48,
-    fontFamily: 'Poppins-Black',
-    color: colors.primary,
-    lineHeight: 50,
-  },
-  modalDiscountLabel: {
-    fontSize: 18,
-    fontFamily: 'Poppins-Bold',
-    color: colors.primary,
-  },
-  modalTerms: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: spacing.md,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  modalTermsTitle: {
-    fontSize: 14,
-    fontFamily: 'Poppins-SemiBold',
-    color: colors.text.primary,
-    marginBottom: spacing.xs,
-  },
-  modalTermsText: {
-    fontSize: 13,
-    fontFamily: 'Poppins-Regular',
-    color: colors.text.secondary,
-    lineHeight: 20,
-  },
-  modalApplyButton: {
-    backgroundColor: colors.primary,
-    borderRadius: 14,
-    paddingVertical: spacing.md + 2,
-    alignItems: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    elevation: 6,
-  },
-  modalApplyButtonText: {
-    fontSize: 18,
-    fontFamily: 'Poppins-Bold',
-    color: colors.text.white,
-  },
 });
 
 export default CategoriesScreen;
-
