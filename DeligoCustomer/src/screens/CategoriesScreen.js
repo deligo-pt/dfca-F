@@ -10,6 +10,7 @@ import {
   StickySearchHeader,
 } from '../components';
 import mockData from '../data/mockData.json';
+import { useProducts } from '../contexts/ProductsContext';
 
 // Add new component imports
 import OfferModal from '../components/Categories/OfferModal';
@@ -143,6 +144,17 @@ const CategoriesScreen = ({ navigation }) => {
     }
   };
 
+  // Use products context for live data
+  const { products, loading: _productsLoading, error: _productsError, fetchProducts } = useProducts();
+
+  // Debounced search -> trigger context fetch
+  useEffect(() => {
+    const t = setTimeout(() => {
+      fetchProducts({ search: searchQuery, page: 1 });
+    }, 300);
+    return () => clearTimeout(t);
+  }, [searchQuery]);
+
   return (
     <SafeAreaView style={styles(colors).safeArea} edges={['top']}>
       {/* Sticky Search Header - appears on scroll */}
@@ -204,7 +216,7 @@ const CategoriesScreen = ({ navigation }) => {
           title={searchQuery ? `Search Results (${filteredRestaurants.length})` : t('popularRestaurants')}
           onSeeAll={!searchQuery ? () => console.log('See all restaurants') : undefined}
         />
-        <RestaurantsList restaurants={filteredRestaurants} onPress={handleRestaurantPress} searchQuery={searchQuery} disableScroll={true} />
+        <RestaurantsList restaurants={products} onPress={handleRestaurantPress} searchQuery={searchQuery} disableScroll={true} />
 
         <View style={{ height: 100 }} />
       </Animated.ScrollView>

@@ -6,11 +6,13 @@ import {
   ScrollView,
   TouchableOpacity,
   TextInput,
+  Image,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, fontSize, borderRadius } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
+import { useProducts } from '../contexts/ProductsContext';
 
 const RestaurantDetailsScreen = ({ route, navigation }) => {
   const { colors } = useTheme();
@@ -32,115 +34,28 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
 
-  // Mock menu data - in real app, this would come from API
-  const menuCategories = ['Popular', 'Burgers', 'Sides', 'Drinks', 'Desserts'];
+  // Use ProductsContext and show only items belonging to this vendor
+  const { products: allProducts, loading: productsLoading, error: productsError, fetchProducts } = useProducts();
 
-  const menuItems = {
-    Popular: [
-      {
-        id: 'm1',
-        name: 'Double Whopper',
-        description: 'Two flame-grilled beef patties with fresh ingredients',
-        price: 12.99,
-        image: '🍔',
-        isPopular: true,
-      },
-      {
-        id: 'm2',
-        name: 'Chicken Royal',
-        description: 'Crispy chicken fillet with lettuce and mayo',
-        price: 9.99,
-        image: '🍗',
-        isPopular: true,
-      },
-      {
-        id: 'm3',
-        name: 'Veggie Burger',
-        description: 'Plant-based patty with fresh vegetables',
-        price: 8.99,
-        image: '🥗',
-        isPopular: true,
-      },
-    ],
-    Burgers: [
-      {
-        id: 'm1',
-        name: 'Double Whopper',
-        description: 'Two flame-grilled beef patties with fresh ingredients',
-        price: 12.99,
-        image: '🍔',
-      },
-      {
-        id: 'm4',
-        name: 'Cheese Burger',
-        description: 'Classic burger with cheese',
-        price: 7.99,
-        image: '🍔',
-      },
-      {
-        id: 'm5',
-        name: 'Bacon Burger',
-        description: 'Beef patty with crispy bacon',
-        price: 10.99,
-        image: '🥓',
-      },
-    ],
-    Sides: [
-      {
-        id: 'm6',
-        name: 'French Fries',
-        description: 'Crispy golden fries',
-        price: 3.99,
-        image: '🍟',
-      },
-      {
-        id: 'm7',
-        name: 'Onion Rings',
-        description: 'Crispy battered onion rings',
-        price: 4.99,
-        image: '🧅',
-      },
-      {
-        id: 'm8',
-        name: 'Chicken Nuggets',
-        description: '6 pieces of tender chicken nuggets',
-        price: 5.99,
-        image: '🍗',
-      },
-    ],
-    Drinks: [
-      {
-        id: 'm9',
-        name: 'Coca Cola',
-        description: 'Chilled soft drink',
-        price: 2.99,
-        image: '🥤',
-      },
-      {
-        id: 'm10',
-        name: 'Orange Juice',
-        description: 'Fresh orange juice',
-        price: 3.99,
-        image: '🧃',
-      },
-    ],
-    Desserts: [
-      {
-        id: 'm11',
-        name: 'Ice Cream Sundae',
-        description: 'Vanilla ice cream with toppings',
-        price: 4.99,
-        image: '🍨',
-      },
-      {
-        id: 'm12',
-        name: 'Apple Pie',
-        description: 'Warm apple pie',
-        price: 3.99,
-        image: '🥧',
-      },
-    ],
-  };
+  const vendorId = (
+    restaurant?._raw?.vendor?.vendorId || restaurant?.vendor?.vendorId || restaurant?.vendorId || restaurant?._raw?.vendorId || null
+  );
+
+  // Filter products that belong to this vendor
+  const vendorProducts = (allProducts || []).filter((p) => {
+    const rawVendorId = p?._raw?.vendor?.vendorId || p?.vendor?.vendorId || p?.vendorId || null;
+    return rawVendorId && vendorId && String(rawVendorId) === String(vendorId);
+  });
+
+  // Derive menu categories for tabs (Popular + unique subCategory/category)
+  const derivedCategories = new Set();
+  vendorProducts.forEach((p) => {
+    const raw = p._raw || {};
+    if (raw.subCategory) derivedCategories.add(raw.subCategory);
+    else if (raw.category) derivedCategories.add(raw.category);
+    else if (Array.isArray(p.categories) && p.categories.length) p.categories.forEach(c => derivedCategories.add(c));
+  });
+  const menuCategories = ['Popular', ...Array.from(derivedCategories)];
 
   const addToCart = (item) => {
     setCart({
@@ -167,49 +82,68 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const getTotalPrice = () => {
     let total = 0;
     Object.keys(cart).forEach((itemId) => {
-      const item = Object.values(menuItems)
-        .flat()
-        .find((i) => i.id === itemId);
-      if (item && item.price) {
-        total += item.price * cart[itemId];
-      }
+      const product = vendorProducts.find(p => p.id === itemId);
+      const raw = product?._raw || {};
+      const price = raw.pricing?.price ?? raw.price ?? product?.price ?? 0;
+      if (price) total += Number(price) * cart[itemId];
     });
     return total.toFixed(2);
   };
 
   // Filter menu items based on search query
   const getFilteredMenuItems = () => {
-    if (!searchQuery.trim()) {
-      return menuItems[selectedCategory] || [];
+    let items = vendorProducts;
+    // filter by selectedCategory if not Popular
+    if (selectedCategory && selectedCategory !== 'Popular') {
+      items = items.filter((p) => {
+        const raw = p._raw || {};
+        const cat = raw.subCategory || raw.category || (Array.isArray(p.categories) && p.categories[0]) || '';
+        return String(cat) === String(selectedCategory);
+      });
+    } else if (selectedCategory === 'Popular') {
+      // Popular => meta.isFeatured === true or fallback to all
+      const popular = items.filter(p => (p._raw?.meta && p._raw.meta.isFeatured) || p._raw?.isFeatured);
+      if (popular.length) items = popular;
     }
 
-    const allItems = Object.values(menuItems).flat();
-    return allItems.filter(item =>
-      item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-      item.description.toLowerCase().includes(searchQuery.toLowerCase())
-    );
+    if (!searchQuery.trim()) return items;
+    const q = searchQuery.toLowerCase();
+    return items.filter((item) => {
+      const name = (item._raw?.name || item.name || '').toLowerCase();
+      const desc = (item._raw?.description || '').toLowerCase();
+      return name.includes(q) || desc.includes(q);
+    });
   };
 
-  const renderMenuItem = (item) => {
-    const quantity = cart[item.id] || 0;
+  const renderMenuItem = (product) => {
+    const quantity = cart[product.id] || 0;
+    const raw = product._raw || {};
+    const image = product.image || (Array.isArray(raw.images) && raw.images[0]);
+    const price = raw.pricing?.price ?? raw.price ?? product.price ?? 0;
+    const description = raw.description || raw.slug || '';
 
     return (
-      <View key={item.id} style={styles(colors).menuItem}>
+      <View key={product.id} style={styles(colors).menuItem}>
         <View style={styles(colors).menuItemLeft}>
-          <Text style={styles(colors).menuItemImage}>{item.image}</Text>
+          {image ? (
+            <Image source={{ uri: image }} style={{ width: 64, height: 48, marginRight: spacing.md, borderRadius: 8 }} />
+          ) : (
+            <Text style={styles(colors).menuItemImage}>🍽</Text>
+          )}
+
           <View style={styles(colors).menuItemInfo}>
-            <Text style={styles(colors).menuItemName}>{item.name}</Text>
+            <Text style={styles(colors).menuItemName}>{product.name || raw.name}</Text>
             <Text style={styles(colors).menuItemDescription} numberOfLines={2}>
-              {item.description}
+              {description}
             </Text>
-            <Text style={styles(colors).menuItemPrice}>€{item.price ? item.price.toFixed(2) : '0.00'}</Text>
+            <Text style={styles(colors).menuItemPrice}>{raw.pricing?.currency ?? ''} {price ? Number(price).toFixed(2) : '0.00'}</Text>
           </View>
         </View>
         <View style={styles(colors).menuItemRight}>
           {quantity === 0 ? (
             <TouchableOpacity
               style={styles(colors).addButton}
-              onPress={() => addToCart(item)}
+              onPress={() => addToCart(product)}
             >
               <Text style={styles(colors).addButtonText}>Add</Text>
             </TouchableOpacity>
@@ -217,14 +151,14 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
             <View style={styles(colors).quantityControl}>
               <TouchableOpacity
                 style={styles(colors).quantityButton}
-                onPress={() => removeFromCart(item)}
+                onPress={() => removeFromCart(product)}
               >
                 <Text style={styles(colors).quantityButtonText}>−</Text>
               </TouchableOpacity>
               <Text style={styles(colors).quantityText}>{quantity}</Text>
               <TouchableOpacity
                 style={styles(colors).quantityButton}
-                onPress={() => addToCart(item)}
+                onPress={() => addToCart(product)}
               >
                 <Text style={styles(colors).quantityButtonText}>+</Text>
               </TouchableOpacity>
@@ -278,17 +212,24 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
         {/* Restaurant Info */}
         <View style={styles(colors).restaurantInfo}>
           <View style={styles(colors).restaurantHeader}>
-            <Text style={styles(colors).restaurantIcon}>{restaurant.image}</Text>
+            <Image
+              source={
+                restaurant.image
+                  ? { uri: restaurant.image }
+                  : (restaurant._raw?.vendor?.storePhoto ? { uri: restaurant._raw.vendor.storePhoto } : require('../assets/images/logonew.png'))
+              }
+              style={styles(colors).restaurantIconImage}
+            />
             <View style={styles(colors).restaurantDetails}>
-              <Text style={styles(colors).restaurantName}>{restaurant.name}</Text>
+              <Text style={styles(colors).restaurantName}>{restaurant._raw?.vendor?.vendorName || restaurant.name}</Text>
               <Text style={styles(colors).restaurantCategories}>
-                {restaurant.categories?.join(' • ')}
+                {(restaurant.categories && restaurant.categories.length) ? restaurant.categories.join(' • ') : (restaurant._raw?.tags ? restaurant._raw.tags.join(' • ') : '')}
               </Text>
-              <View style={styles(colors).restaurantMeta}>
-                <View style={styles(colors).metaItem}>
-                  <Text style={styles(colors).metaIcon}>⭐</Text>
-                  <Text style={styles(colors).metaText}>{ratingValue !== null ? ratingValue : 'N/A'}</Text>
-                </View>
+               <View style={styles(colors).restaurantMeta}>
+                 <View style={styles(colors).metaItem}>
+                   <Text style={styles(colors).metaIcon}>⭐</Text>
+                   <Text style={styles(colors).metaText}>{ratingValue !== null ? ratingValue : 'N/A'}</Text>
+                 </View>
                 <View style={styles(colors).metaItem}>
                   <Text style={styles(colors).metaIcon}>🕐</Text>
                   <Text style={styles(colors).metaText}>{restaurant.deliveryTime}</Text>
@@ -346,17 +287,17 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
         {/* Menu Items */}
         <View style={styles(colors).menuSection}>
           <Text style={styles(colors).menuSectionTitle}>
-            {searchQuery ? `Search Results (${getFilteredMenuItems().length})` : selectedCategory}
+            {searchQuery ? `Search Results (${getFilteredMenuItems().length})` : 'Menu'}
           </Text>
           {getFilteredMenuItems().length > 0 ? (
             getFilteredMenuItems().map((item) => renderMenuItem(item))
           ) : (
-            <View style={styles(colors).noResultsContainer}>
-              <Ionicons name="search-outline" size={48} color={colors.text.secondary} />
-              <Text style={styles(colors).noResultsText}>No items found</Text>
-              <Text style={styles(colors).noResultsSubtext}>Try searching with different keywords</Text>
-            </View>
-          )}
+             <View style={styles(colors).noResultsContainer}>
+               <Ionicons name="search-outline" size={48} color={colors.text.secondary} />
+               <Text style={styles(colors).noResultsText}>No items found</Text>
+               <Text style={styles(colors).noResultsSubtext}>Try searching with different keywords</Text>
+             </View>
+           )}
         </View>
 
         {/* Cart Footer - Inside ScrollView */}
@@ -471,9 +412,12 @@ const styles = (colors) => StyleSheet.create({
     flexDirection: 'row',
     marginBottom: spacing.md,
   },
-  restaurantIcon: {
-    fontSize: 64,
+  restaurantIconImage: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
     marginRight: spacing.md,
+    backgroundColor: colors.border,
   },
   restaurantDetails: {
     flex: 1,
