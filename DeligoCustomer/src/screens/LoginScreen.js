@@ -18,6 +18,7 @@ import CustomModal from '../components/CustomModal';
 import OTPInput from '../components/OTPInput';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
+import { setAccessToken } from '../utils/storage';
 
 const LOGO = require('../assets/images/logo.png'); // Transparent logo icon
 
@@ -139,6 +140,9 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
         showModal(t('error'), t('invalidOTP'));
         return;
       }
+
+      // Save the access token to storage
+      await setAccessToken(accessToken);
 
       // Save user only if present
       if (userData) {
@@ -531,4 +535,3 @@ const styles = StyleSheet.create({
 });
 
 export default LoginScreen;
-

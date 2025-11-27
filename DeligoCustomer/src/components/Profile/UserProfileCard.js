@@ -1,76 +1,143 @@
-import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { useTheme } from '../../utils/ThemeContext'; // Adjust path as needed
-import { useLanguage } from '../../utils/LanguageContext'; // Adjust path as needed
+import React, { useEffect, useState } from 'react';
+import { View, Text, ActivityIndicator, StyleSheet, ScrollView } from 'react-native';
+import { getAccessToken } from '../../utils/storage';
+import { BASE_API_URL, API_ENDPOINTS } from '../../constants/config';
+const API_URL = `${BASE_API_URL}${API_ENDPOINTS.PROFILE.GET}`;
 
-const UserProfileCard = ({ user, navigation }) => {
-  const { colors } = useTheme();
-  const { t } = useLanguage();
+export default function ProfileScreen() {
+    const [profile, setProfile] = useState(null);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(null);
 
-  return (
-    <View style={[styles.profileCard, { backgroundColor: colors.surface }]}>
-      <View style={[styles.avatarContainer, { backgroundColor: colors.primary }]}>
-        <Text style={styles.avatarText}>
-          {user?.name?.charAt(0)?.toUpperCase() || 'U'}
-        </Text>
-      </View>
-      <View style={styles.userInfo}>
-        <Text style={[styles.userName, { color: colors.text.primary }]}>{user?.name || 'Guest User'}</Text>
-        <Text style={[styles.userContact, { color: colors.text.secondary }]}>{user?.email || user?.mobile || 'No contact info'}</Text>
-        <TouchableOpacity
-          style={[styles.editProfileButton, { backgroundColor: colors.background, borderColor: colors.border }]}
-          onPress={() => navigation.navigate('EditProfile')}
-        >
-          <Text style={[styles.editProfileText, { color: colors.primary }]}>{t('editProfile')}</Text>
-        </TouchableOpacity>
-      </View>
-    </View>
-  );
-};
+    useEffect(() => {
+        const fetchProfile = async () => {
+            try {
+                setLoading(true);
+                setError(null);
+
+                const authToken = await getAccessToken();
+
+                console.log('Hitting API:', API_URL);
+                console.log('With Auth Token:', authToken);
+
+                const response = await fetch(API_URL, {
+                    method: 'GET',
+                    headers: {
+                        'Authorization': authToken,
+                        'Accept': 'application/json',
+                    },
+                });
+
+                if (!response.ok) {
+                    throw new Error(`Error: ${response.status} ${response.statusText}`);
+                }
+
+                const json = await response.json();
+                console.log('resposnejson', json);
+                setProfile(json.data); // store only the "data" part
+
+            } catch (err) {
+                setError(err.message || 'Something went wrong');
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchProfile();
+    }, []);
+
+    if (loading) {
+        return (
+            <View style={styles.centered}>
+                <ActivityIndicator size="large" />
+                <Text>Loading profile...</Text>
+            </View>
+        );
+    }
+
+    if (error) {
+        return (
+            <View style={styles.centered}>
+                <Text style={styles.errorText}>Failed to load profile:</Text>
+                <Text style={styles.errorText}>{error}</Text>
+            </View>
+        );
+    }
+
+    if (!profile) {
+        return (
+            <View style={styles.centered}>
+                <Text>No profile data found.</Text>
+            </View>
+        );
+    }
+
+    return (
+        <ScrollView contentContainerStyle={styles.container}>
+            <Text style={styles.title}>My Profile</Text>
+
+            {/* Name Section */}
+            <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Name</Text>
+                <Text style={styles.item}>First Name: {profile.name?.firstName}</Text>
+                <Text style={styles.item}>Last Name: {profile.name?.lastName}</Text>
+            </View>
+
+            {/* Address Section */}
+            <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Address</Text>
+                <Text style={styles.item}>Street: {profile.address?.street}</Text>
+                <Text style={styles.item}>City: {profile.address?.city}</Text>
+                <Text style={styles.item}>State: {profile.address?.state}</Text>
+                <Text style={styles.item}>Country: {profile.address?.country}</Text>
+                <Text style={styles.item}>Postal Code: {profile.address?.postalCode}</Text>
+            </View>
+
+            {/* Orders Section */}
+            <View style={styles.section}>
+                <Text style={styles.sectionTitle}>Orders</Text>
+                <Text style={styles.item}>Total Orders: {profile.orders?.totalOrders}</Text>
+                <Text style={styles.item}>Total Spent: {profile.orders?.totalSpent}</Text>
+                <Text style={styles.item}>
+                    Last Order: {profile.orders?.lastOrderDate || "No orders yet"}
+                </Text>
+            </View>
+        </ScrollView>
+    );
+}
 
 const styles = StyleSheet.create({
-  profileCard: {
-    flexDirection: 'row',
-    padding: 20,
-    marginBottom: 12,
-    alignItems: 'center',
-  },
-  avatarContainer: {
-    width: 70,
-    height: 70,
-    borderRadius: 35,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  avatarText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    color: '#FFFFFF',
-    fontFamily: 'Poppins-Bold',
-  },
-  userInfo: {
-    flex: 1,
-  },
-  userName: {
-    fontSize: 20,
-    fontWeight: '700',
-    fontFamily: 'Poppins-Bold',
-    marginBottom: 4,
-  },
-  userContact: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Regular',
-    marginBottom: 8,
-  },
-  editProfileButton: {
-    alignSelf: 'flex-start',
-  },
-  editProfileText: {
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: 'Poppins-SemiBold',
-  },
+    centered: {
+        flex: 1, justifyContent: 'center', alignItems: 'center', padding: 16,
+    },
+    container: {
+        flexGrow: 1,
+        padding: 24,
+        backgroundColor: '#fff',
+    },
+    title: {
+        fontSize: 26,
+        fontWeight: 'bold',
+        marginBottom: 20,
+        textAlign: 'center',
+    },
+    section: {
+        backgroundColor: '#f5f5f5',
+        padding: 16,
+        borderRadius: 10,
+        marginBottom: 20,
+    },
+    sectionTitle: {
+        fontSize: 18,
+        fontWeight: 'bold',
+        marginBottom: 10,
+    },
+    item: {
+        fontSize: 16,
+        marginBottom: 6,
+    },
+    errorText: {
+        color: 'red',
+        textAlign: 'center',
+    },
 });
-
-export default UserProfileCard;
