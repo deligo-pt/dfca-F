@@ -6,6 +6,8 @@ export const STORAGE_KEYS = {
   // Backwards-compatible aliases used across the codebase
   ACCESS_TOKEN: 'userToken',
   USER: 'userData',
+  // Refresh token storage key
+  REFRESH_TOKEN: 'refreshToken',
 };
 
 export default STORAGE_KEYS;

@@ -94,6 +94,19 @@ const StorageService = {
     return await this.removeItem(STORAGE_KEYS.USER);
   },
 
+  // Refresh token helpers
+  async getRefreshToken() {
+    return await this.getItem(STORAGE_KEYS.REFRESH_TOKEN);
+  },
+
+  async setRefreshToken(token) {
+    return await this.setItem(STORAGE_KEYS.REFRESH_TOKEN, token);
+  },
+
+  async removeRefreshToken() {
+    return await this.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
+  },
+
   // Onboarding helpers expected by screens
   async setOnboardingCompleted() {
     return await this.setItem(STORAGE_KEYS.ONBOARDING_COMPLETED, true);
@@ -123,6 +136,18 @@ export const setAccessToken = async token => {
 
 export const removeAccessToken = async () => {
   return await StorageService.removeAccessToken();
+};
+
+export const getRefreshToken = async () => {
+  return await StorageService.getRefreshToken();
+};
+
+export const setRefreshToken = async token => {
+  return await StorageService.setRefreshToken(token);
+};
+
+export const removeRefreshToken = async () => {
+  return await StorageService.removeRefreshToken();
 };
 
 export const getUser = async () => {

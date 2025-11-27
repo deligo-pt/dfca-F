@@ -40,9 +40,25 @@ const AuthService = {
     if (userData !== undefined && userData !== null) {
       await StorageService.setItem(STORAGE_KEYS.USER, userData);
     }
-    if (token !== undefined && token !== null) {
-      await StorageService.setItem(STORAGE_KEYS.ACCESS_TOKEN, token);
+    // Backwards-compatible: `token` may be access token. Newer flows pass accessToken and refreshToken separately.
+    const accessToken = token && typeof token === 'string' ? token : undefined;
+    // If caller passed an object { accessToken, refreshToken }, handle that too
+    let refreshToken;
+    if (token && typeof token === 'object') {
+      refreshToken = token.refreshToken;
     }
+
+    if (accessToken !== undefined && accessToken !== null) {
+      // Prefer dedicated helper if available
+      if (StorageService.setAccessToken) await StorageService.setAccessToken(accessToken);
+      else await StorageService.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
+    }
+
+    if (refreshToken !== undefined && refreshToken !== null) {
+      if (StorageService.setRefreshToken) await StorageService.setRefreshToken(refreshToken);
+      else await StorageService.setItem(STORAGE_KEYS.REFRESH_TOKEN, refreshToken);
+    }
+
     return true;
   },
 
@@ -53,6 +69,8 @@ const AuthService = {
   async logout() {
     await StorageService.removeItem(STORAGE_KEYS.USER);
     await StorageService.removeItem(STORAGE_KEYS.ACCESS_TOKEN);
+    // Also clear refresh token if present
+    await StorageService.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
   },
 
   /**
@@ -112,11 +130,18 @@ export const verifyOTP = async (identifier, otp, method = 'mobile') => {
   // Normalize different backend response shapes
   // Example backend returns: { message: 'CUSTOMER Email verified successfully', data: { accessToken, refreshToken } }
   const accessToken = response?.data?.accessToken || response?.accessToken || response?.token;
+  const refreshToken = response?.data?.refreshToken || response?.refreshToken || null;
   const user = response?.data?.user || response?.user || null;
 
-  if (accessToken) {
-    // Save token; user may be null in some flows
-    await AuthService.login(user, accessToken);
+  // Build token payload: preserve backwards compatibility with string token
+  let tokenPayload = undefined;
+  if (accessToken && refreshToken) tokenPayload = { accessToken, refreshToken };
+  else if (accessToken) tokenPayload = accessToken;
+  else if (refreshToken) tokenPayload = { refreshToken };
+
+  if (tokenPayload) {
+    // Save token(s); user may be null in some flows
+    await AuthService.login(user, tokenPayload);
   }
 
   return { ...response, accessToken, user };

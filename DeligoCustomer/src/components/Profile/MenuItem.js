@@ -7,6 +7,8 @@ const MenuItem = ({ iconName, title, subtitle, onPress, showDivider = true, icon
   const { colors } = useTheme();
   const [pressed, setPressed] = useState(false);
 
+  const chevronColor = colors.text?.light || colors.text?.secondary || '#999';
+
   return (
     <>
       <TouchableOpacity
@@ -14,11 +16,11 @@ const MenuItem = ({ iconName, title, subtitle, onPress, showDivider = true, icon
         onPress={onPress}
         onPressIn={() => setPressed(true)}
         onPressOut={() => setPressed(false)}
-        activeOpacity={0.7}
+        activeOpacity={0.8}
       >
         <View style={[
           styles.menuIconContainer,
-          { backgroundColor: colors.background, borderColor: colors.border },
+          { backgroundColor: colors.surface, borderColor: colors.border },
           pressed && [styles.menuIconContainerPressed, { backgroundColor: colors.border }]
         ]}>
           <Ionicons
@@ -31,7 +33,7 @@ const MenuItem = ({ iconName, title, subtitle, onPress, showDivider = true, icon
           <Text style={[styles.menuText, { color: colors.text.primary }]}>{title}</Text>
           {subtitle && <Text style={[styles.menuSubtitle, { color: colors.text.secondary }]}>{subtitle}</Text>}
         </View>
-        <Ionicons name="chevron-forward" size={20} color={colors.text.light} />
+        <Ionicons name="chevron-forward" size={20} color={chevronColor} />
       </TouchableOpacity>
       {showDivider && <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />}
     </>
