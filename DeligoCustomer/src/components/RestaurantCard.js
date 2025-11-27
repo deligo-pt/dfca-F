@@ -1,203 +1,139 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
-import { spacing, fontSize, borderRadius } from '../theme';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { spacing } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
+import { Ionicons } from '@expo/vector-icons';
 
 const RestaurantCard = ({ restaurant, onPress }) => {
   const { colors } = useTheme();
 
+  // Accept either a mapped restaurant shape or raw product in restaurant._raw
+  const p = restaurant && restaurant._raw ? restaurant._raw : restaurant || {};
+  const vendor = p.vendor || {};
+
+  const imageUrl = vendor.storePhoto || (Array.isArray(p.images) && p.images[0]) || null;
+  const imageSource = imageUrl ? { uri: imageUrl } : require('../assets/images/logonew.png');
+
+  const vendorName = vendor.vendorName || p.vendorName || p.name || 'Unknown';
+  const isVerified = vendor.isVerified || false; // Assuming a isVerified flag
+
+  // rating normalization (average may be nested)
+  let ratingValue = null;
+  if (vendor && typeof vendor.rating === 'number') ratingValue = vendor.rating;
+  else if (p.rating && typeof p.rating === 'number') ratingValue = p.rating;
+  else if (p.rating && typeof p.rating === 'object' && typeof p.rating.average === 'number') ratingValue = p.rating.average;
+
+  // tags
+  const tags = Array.isArray(p.tags) ? p.tags : (Array.isArray(p.tags) ? p.tags : (p.tags || []));
+
   return (
     <TouchableOpacity
-      style={styles(colors).container}
-      onPress={onPress}
-      activeOpacity={0.8}
+      style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
+      activeOpacity={0.86}
+      onPress={() => onPress && onPress(restaurant)}
     >
-      <View style={styles(colors).imageContainer}>
-        <Text style={styles(colors).image}>{restaurant.image}</Text>
-        {restaurant.offer && (
-          <View style={styles(colors).offerBadge}>
-            <Text style={styles(colors).offerText}>{restaurant.offer}</Text>
-          </View>
-        )}
-        {restaurant.isNew && (
-          <View style={styles(colors).newBadge}>
-            <Text style={styles(colors).newText}>NEW</Text>
-          </View>
-        )}
-      </View>
+      <Image source={imageSource} style={styles.heroImage} />
 
-      <View style={styles(colors).content}>
-        <View style={styles(colors).header}>
-          <Text style={styles(colors).name} numberOfLines={1}>{restaurant.name}</Text>
-          {restaurant.isPandaPro && (
-            <View style={styles(colors).proBadge}>
-              <Text style={styles(colors).proText}>PRO</Text>
+      <View style={styles.infoContainer}>
+        <View style={styles.body}>
+          <View style={styles.rowTop}>
+            <View style={styles.nameContainer}>
+              <Text style={[styles.name, { color: colors.text.primary }]} numberOfLines={1}>{vendorName}</Text>
+              {isVerified && (
+                <View style={styles.verifiedBadge}>
+                  <Ionicons name="checkmark-circle" size={16} color="#28a745" />
+                </View>
+              )}
             </View>
-          )}
-        </View>
 
-        <Text style={styles(colors).categories} numberOfLines={1}>
-          {restaurant.categories.join(' • ')}
-        </Text>
-
-        <View style={styles(colors).footer}>
-          <View style={styles(colors).infoRow}>
-            <Text style={styles(colors).rating}>⭐ {restaurant.rating}</Text>
-            <Text style={styles(colors).dot}>•</Text>
-            <Text style={styles(colors).time}>{restaurant.deliveryTime}</Text>
-            <Text style={styles(colors).dot}>•</Text>
-            <Text style={styles(colors).distance}>{restaurant.distance}</Text>
+            <View style={[styles.ratingPill, { backgroundColor: colors.primary }]}>
+              <Ionicons name="star" size={12} color="#fff" />
+              <Text style={[styles.ratingPillText]}>{ratingValue !== null ? ` ${ratingValue}` : ' N/A'}</Text>
+            </View>
           </View>
-          <Text style={[
-            styles(colors).deliveryFee,
-            restaurant.deliveryFee === 'Free' && styles(colors).freeDelivery
-          ]}>
-            {restaurant.deliveryFee}
-          </Text>
+
+          <View style={styles.tagsRow}>
+            {tags.slice(0, 5).map((tag, i) => (
+              <View key={`${tag}-${i}`} style={[styles.tag, { backgroundColor: colors.background === '#FFFFFF' ? '#F2F2F2' : 'rgba(255,255,255,0.03)' }]}>
+                <Text style={[styles.tagText, { color: colors.text.secondary }]} numberOfLines={1}>{tag}</Text>
+              </View>
+            ))}
+          </View>
         </View>
       </View>
     </TouchableOpacity>
   );
 };
 
-const styles = (colors) => StyleSheet.create({
-  container: {
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    marginHorizontal: spacing.md,
+const styles = StyleSheet.create({
+  card: {
     marginBottom: spacing.md,
-    overflow: 'hidden',
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 3,
+    borderRadius: 12,
     borderWidth: 1,
-    borderColor: colors.border,
+    overflow: 'hidden',
   },
-  imageContainer: {
+  heroImage: {
     width: '100%',
-    height: 160,
-    backgroundColor: colors.background === '#FFFFFF' ? '#F5F5F5' : 'rgba(255, 255, 255, 0.05)',
+    height: 140,
+    backgroundColor: '#eee',
+  },
+  infoContainer: {
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingVertical: 12,
+    paddingHorizontal: 14,
+  },
+  body: {
+    flex: 1,
     justifyContent: 'center',
-    position: 'relative',
   },
-  image: {
-    fontSize: 60,
-  },
-  offerBadge: {
-    position: 'absolute',
-    top: spacing.sm,
-    left: spacing.sm,
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: borderRadius.sm,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  offerText: {
-    color: colors.text.white,
-    fontSize: fontSize.xs,
-    fontFamily: 'Poppins-Bold',
-  },
-  newBadge: {
-    position: 'absolute',
-    top: spacing.sm,
-    right: spacing.sm,
-    backgroundColor: colors.success,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: borderRadius.sm,
-    shadowColor: colors.success,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  newText: {
-    color: colors.text.white,
-    fontSize: fontSize.xs,
-    fontFamily: 'Poppins-Bold',
-  },
-  content: {
-    padding: spacing.md,
-    backgroundColor: colors.surface,
-  },
-  header: {
+  rowTop: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.xs,
+    marginBottom: 8,
+  },
+  nameContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 8,
   },
   name: {
-    flex: 1,
-    fontSize: fontSize.lg,
+    fontSize: 16,
     fontFamily: 'Poppins-SemiBold',
-    color: colors.text.primary,
+    marginRight: 6,
   },
-  proBadge: {
-    backgroundColor: '#FFD700',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 2,
-    borderRadius: borderRadius.sm,
-    marginLeft: spacing.xs,
+  verifiedBadge: {
+    // Optional: for additional styling
   },
-  proText: {
-    color: '#000',
-    fontSize: 10,
-    fontFamily: 'Poppins-Bold',
-  },
-  categories: {
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Regular',
-    color: colors.text.secondary,
-    marginBottom: spacing.sm,
-  },
-  footer: {
+  ratingPill: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
   },
-  infoRow: {
+  ratingPillText: {
+    color: '#fff',
+    fontSize: 12,
+    fontFamily: 'Poppins-Medium',
+  },
+  tagsRow: {
     flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
+    flexWrap: 'wrap',
   },
-  rating: {
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Medium',
-    color: colors.text.primary,
+  tag: {
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    borderRadius: 12,
+    marginRight: 8,
+    marginBottom: 6,
   },
-  dot: {
-    fontSize: fontSize.sm,
-    color: colors.text.light,
-    marginHorizontal: spacing.xs,
-  },
-  time: {
-    fontSize: fontSize.sm,
+  tagText: {
+    fontSize: 12,
     fontFamily: 'Poppins-Regular',
-    color: colors.text.secondary,
-  },
-  distance: {
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Regular',
-    color: colors.text.secondary,
-  },
-  deliveryFee: {
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Medium',
-    color: colors.text.secondary,
-  },
-  freeDelivery: {
-    color: colors.success,
-    fontFamily: 'Poppins-Bold',
   },
 });
 
 export default RestaurantCard;
-

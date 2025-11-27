@@ -15,6 +15,17 @@ import { useTheme } from '../utils/ThemeContext';
 const RestaurantDetailsScreen = ({ route, navigation }) => {
   const { colors } = useTheme();
   const { restaurant } = route.params;
+  // Normalize rating to a scalar (number) to avoid rendering an object in <Text>
+  const _r = restaurant || {};
+  let ratingValue = null;
+  if (_r.rating !== undefined && _r.rating !== null) {
+    if (typeof _r.rating === 'number') ratingValue = _r.rating;
+    else if (typeof _r.rating === 'object' && typeof _r.rating.average === 'number') ratingValue = _r.rating.average;
+  }
+  if ((ratingValue === null || ratingValue === undefined) && _r.vendor && typeof _r.vendor.rating === 'number') {
+    ratingValue = _r.vendor.rating;
+  }
+
   const insets = useSafeAreaInsets();
   const [selectedCategory, setSelectedCategory] = useState('Popular');
   const [cart, setCart] = useState({});
@@ -276,7 +287,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
               <View style={styles(colors).restaurantMeta}>
                 <View style={styles(colors).metaItem}>
                   <Text style={styles(colors).metaIcon}>⭐</Text>
-                  <Text style={styles(colors).metaText}>{restaurant.rating}</Text>
+                  <Text style={styles(colors).metaText}>{ratingValue !== null ? ratingValue : 'N/A'}</Text>
                 </View>
                 <View style={styles(colors).metaItem}>
                   <Text style={styles(colors).metaIcon}>🕐</Text>

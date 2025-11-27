@@ -204,7 +204,7 @@ const CategoriesScreen = ({ navigation }) => {
           title={searchQuery ? `Search Results (${filteredRestaurants.length})` : t('popularRestaurants')}
           onSeeAll={!searchQuery ? () => console.log('See all restaurants') : undefined}
         />
-        <RestaurantsList restaurants={filteredRestaurants} onPress={handleRestaurantPress} searchQuery={searchQuery} />
+        <RestaurantsList restaurants={filteredRestaurants} onPress={handleRestaurantPress} searchQuery={searchQuery} disableScroll={true} />
 
         <View style={{ height: 100 }} />
       </Animated.ScrollView>
