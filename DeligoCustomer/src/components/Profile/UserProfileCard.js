@@ -95,15 +95,24 @@ export default function UserProfileCard({ user: userProp, navigation }) {
 
     return (
         <View style={[styles.card, { backgroundColor: colors?.surface || '#fff', shadowColor: colors?.shadow || '#000' }]}>
-            <Image source={avatarSource} style={[styles.avatar, { borderColor: colors?.border || 'transparent' }]} />
+            <View style={[styles.avatarContainer, { shadowColor: colors?.shadow || '#000' }]}>
+                <Image source={avatarSource} style={[styles.avatar, { borderColor: colors?.border || 'transparent' }]} />
+            </View>
 
             {/* Right content: info stacked above a long button */}
             <View style={styles.contentColumn}>
                 <View style={styles.info}>
-                    <Text style={[styles.name, { color: colors?.text?.primary }]} numberOfLines={2} ellipsizeMode="tail">{fullName || 'Unnamed User'}</Text>
+                    <View style={styles.nameRow}>
+                        <Text style={[styles.name, { color: colors?.text?.primary }]} numberOfLines={2} ellipsizeMode="tail">{fullName || 'Unnamed User'}</Text>
+                        { (profile.verified || profile.isVerified) && (
+                            <Ionicons name="checkmark-circle" size={16} color={colors?.success || '#4CAF50'} style={styles.verifiedIcon} />
+                        )}
+                    </View>
                     <Text style={[styles.meta, { color: colors?.text?.secondary }]}>{email}</Text>
                     <Text style={[styles.meta, { color: colors?.text?.secondary }]}>{contact}</Text>
                 </View>
+
+                <View style={[styles.divider, { backgroundColor: colors?.border || '#eee' }]} />
 
                 {/* Long button stretched across the content area inside the card */}
                 {navigation && (
@@ -155,6 +164,21 @@ const styles = StyleSheet.create({
         marginRight: 12,
         backgroundColor: '#eee',
     },
+    avatarContainer: {
+        width: 80,
+        height: 80,
+        borderRadius: 40,
+        overflow: 'hidden',
+        marginRight: 12,
+        justifyContent: 'center',
+        alignItems: 'center',
+        // iOS shadow
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.12,
+        shadowRadius: 6,
+        elevation: 3,
+        backgroundColor: 'transparent',
+    },
     contentColumn: {
         flex: 1,
         flexDirection: 'column',
@@ -163,6 +187,14 @@ const styles = StyleSheet.create({
     info: {
         flex: 1,
         flexShrink: 1,
+    },
+    nameRow: {
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    verifiedIcon: {
+        marginLeft: 8,
+        marginTop: 2,
     },
     name: {
         fontSize: 18,
@@ -221,5 +253,11 @@ const styles = StyleSheet.create({
         fontFamily: 'Poppins-Medium',
         fontSize: 15,
         color: '#fff',
+    },
+    divider: {
+        height: 1,
+        marginTop: 10,
+        marginBottom: 8,
+        width: '100%',
     },
 });
