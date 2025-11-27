@@ -13,8 +13,8 @@ import VendorType from '../components/Categories/CategoriesList';
 import Category from '../components/Categories/CuisinesList';
 import { useProducts } from '../contexts/ProductsContext';
 import StorageService from '../utils/storage';
+import mockProductsRaw from '../data/mockData.json';
 
-// Add new component imports
 import OfferModal from '../components/Categories/OfferModal';
 import useLocationHook from '../components/Categories/useLocation';
 import RestaurantsList from '../components/Categories/RestaurantsList';
@@ -51,8 +51,62 @@ const CategoriesScreen = ({ navigation }) => {
   };
 
   // Use products context for live data
-  const { products, fetchProducts, loading: productsLoading, error: productsError } = useProducts();
+  const { products, fetchProducts, loading: productsLoading, error: productsError, lastUpdated } = useProducts();
   const [refreshing, setRefreshing] = useState(false);
+  // Local normalize function (same shape as ProductsContext.normalizeProduct)
+  const localNormalize = (p) => {
+    const vendor = p.vendor || {};
+    return {
+      _raw: p,
+      id: p._id || p.productId || vendor.vendorId || `${Math.random().toString(36).slice(2)}`,
+      image: vendor.storePhoto || (Array.isArray(p.images) && p.images[0]) || null,
+      name: vendor.vendorName || p.name || 'Unknown',
+      categories: Array.isArray(p.tags) ? p.tags : (p.category ? [p.category] : []),
+      rating: (p.rating && (typeof p.rating === 'number' ? p.rating : p.rating.average)) || vendor.rating || 0,
+      deliveryTime: p.deliveryTime || '',
+      distance: p.distance || '',
+      deliveryFee: (p.pricing && typeof p.pricing.price !== 'undefined') ? `${p.pricing.currency || ''} ${p.pricing.price}` : '',
+      offer: (p.pricing && p.pricing.discount) ? `${p.pricing.discount}% OFF` : null,
+    };
+  };
+
+  // Initialize displayedProducts from bundled mock so UI is immediate and not empty
+  const initialMockItems = (Array.isArray(mockProductsRaw) ? mockProductsRaw : (mockProductsRaw.data || mockProductsRaw.items || [])).map(p => localNormalize(p));
+  const [displayedProducts, setDisplayedProducts] = useState(initialMockItems || []);
+  // Cache TTL ms state (user selectable) - ensure it's declared before any effect or UI references
+  const [cacheTtlMs, setCacheTtlMs] = useState(5 * 60 * 1000);
+
+  // On mount attempt to read default cached products so we can display them instantly
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const qs = new URLSearchParams();
+        qs.set('page', 1);
+        qs.set('limit', 20);
+        const cacheKey = `productsCache:${qs.toString()}`;
+        const cached = await StorageService.getItem(cacheKey);
+        if (!mounted) return;
+        if (cached && Array.isArray(cached.items) && cached.items.length) {
+          const norm = cached.items.map(localNormalize);
+          setDisplayedProducts(norm);
+        } else {
+          // No cache found — fall back to bundled mock data so UI is instant
+          try {
+            const items = Array.isArray(mockProductsRaw) ? mockProductsRaw : (mockProductsRaw.data || mockProductsRaw.items || []);
+            if (items && items.length) {
+              setDisplayedProducts(items.map(localNormalize));
+            }
+          } catch (e) {
+            // ignore
+          }
+        }
+      } catch (e) {
+        console.debug('No default cache found on mount', e);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
 
   // Featured shops derived from products (those with meta.isFeatured)
   const featuredShops = React.useMemo(() => {
@@ -62,10 +116,17 @@ const CategoriesScreen = ({ navigation }) => {
   // User name for personalized greeting (from auth context in real app)
   const userName = null; // TODO: replace with real user name from auth when available
 
-  // Derive vendor types (e.g. 'Resturent') from products' vendor.vendorType (computed but not used directly if static session exists)
+  // Use displayedProducts as fallback source so UI can derive categories/vendor types from cache/mock immediately
+  const sourceProducts = React.useMemo(() => {
+    if (Array.isArray(products) && products.length) return products;
+    if (Array.isArray(displayedProducts) && displayedProducts.length) return displayedProducts;
+    return [];
+  }, [products, displayedProducts]);
+
+  // Derive vendor types (e.g. 'Resturent') from sourceProducts
   const vendorTypesFromProducts = React.useMemo(() => {
     const map = new Map();
-    (products || []).forEach((p) => {
+    (sourceProducts || []).forEach((p) => {
       const rawVendor = (p._raw && p._raw.vendor) || p.vendor || {};
       const vendorType = rawVendor.vendorType;
       if (vendorType && String(vendorType).trim()) {
@@ -74,12 +135,12 @@ const CategoriesScreen = ({ navigation }) => {
       }
     });
     return Array.from(map.values());
-  }, [products]);
+  }, [sourceProducts]);
 
-  // Derive cuisines (product.category) from products (computed but static session preferred)
+  // Derive cuisines (product.category) from sourceProducts
   const cuisinesFromProducts = React.useMemo(() => {
     const map = new Map();
-    (products || []).forEach((p) => {
+    (sourceProducts || []).forEach((p) => {
       const category = p._raw?.category || p.category || (Array.isArray(p.tags) && p.tags[0]) || null;
       if (category) {
         const key = typeof category === 'string' ? category : String(category);
@@ -89,7 +150,7 @@ const CategoriesScreen = ({ navigation }) => {
       }
     });
     return Array.from(map.values()).map((c) => ({ id: c.id, name: c.name, restaurants: c.count }));
-  }, [products]);
+  }, [sourceProducts]);
 
   // Load session-stored static lists and selected filters on mount
   useEffect(() => {
@@ -161,6 +222,53 @@ const CategoriesScreen = ({ navigation }) => {
   const debugVendorTypes = Array.isArray(vendorTypes) ? vendorTypes.map(v => v?.name || '').filter(Boolean).slice(0,5).join(', ') : '';
   const debugCuisines = Array.isArray(cuisines) ? cuisines.map(c => c?.name || '').filter(Boolean).slice(0,5).join(', ') : '';
 
+  // Load persisted TTL preference
+  useEffect(() => {
+    let mounted = true;
+    (async () => {
+      try {
+        const stored = await StorageService.getItem('PRODUCTS_CACHE_TTL_MS');
+        if (!mounted) return;
+        if (typeof stored === 'number' && !isNaN(stored) && stored > 0) setCacheTtlMs(stored);
+      } catch (e) {
+        console.debug('Failed to read stored TTL', e);
+      }
+    })();
+    return () => { mounted = false; };
+  }, []);
+
+  const formatAgo = (ts) => {
+    if (!ts) return 'never';
+    const sec = Math.floor((Date.now() - ts) / 1000);
+    if (sec < 60) return `${sec}s ago`;
+    const min = Math.floor(sec / 60);
+    if (min < 60) return `${min}m ago`;
+    const hr = Math.floor(min / 60);
+    return `${hr}h ago`;
+  };
+
+  const setTtl = async (ms) => {
+    try {
+      await StorageService.setItem('PRODUCTS_CACHE_TTL_MS', ms);
+      setCacheTtlMs(ms);
+    } catch (e) {
+      console.debug('Failed to persist TTL', e);
+    }
+  };
+
+  const clearProductCache = async () => {
+    try {
+      setRefreshing(true);
+      await StorageService.removeKeysByPrefix('productsCache:');
+      // force refresh
+      await fetchProducts({ page: 1, force: true });
+    } catch (e) {
+      console.debug('Failed to clear product cache', e);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   // Persist user selections in session
   const persistSelection = async (key, value) => {
     try {
@@ -178,6 +286,25 @@ const CategoriesScreen = ({ navigation }) => {
     return () => clearTimeout(t);
   }, [searchQuery, selectedVendorType, selectedCuisine]);
 
+  // Keep displayedProducts in sync with sourceProducts (cached/mock) and current filters
+  useEffect(() => {
+    // Use a stable filtering source: prefer fresh sourceProducts, otherwise fall back to the currently-displayed items
+    const filterSource = (Array.isArray(sourceProducts) && sourceProducts.length) ? sourceProducts : (Array.isArray(displayedProducts) ? displayedProducts : []);
+    // If no filters selected, show the available filterSource list
+    if (!selectedVendorType && !selectedCuisine) {
+      setDisplayedProducts(filterSource || []);
+      return;
+    }
+    // Otherwise filter locally from the filterSource to provide instant response
+    const filtered = (filterSource || []).filter((p) => {
+      const vendorType = p._raw?.vendor?.vendorType || p.vendor?.vendorType || null;
+      const category = p._raw?.category || p.category || (Array.isArray(p.tags) && p.tags[0]) || null;
+      return (!selectedVendorType || vendorType === selectedVendorType) && (!selectedCuisine || category === selectedCuisine);
+    });
+    // Only set displayedProducts if filtering source is valid; otherwise keep prior displayedProducts
+    setDisplayedProducts(filtered.length ? filtered : (displayedProducts || []));
+  }, [sourceProducts, selectedVendorType, selectedCuisine]);
+
   const handleVendorTypePress = (vendor) => {
     const vendorId = vendor.id || vendor.name;
     const newSel = selectedVendorType === vendorId ? null : vendorId;
@@ -185,7 +312,14 @@ const CategoriesScreen = ({ navigation }) => {
     if (newSel === null) setSelectedCuisine(null);
     persistSelection('selectedVendorType', newSel);
     if (newSel === null) persistSelection('selectedCuisine', null);
-    // Fetch products filtered by vendorType
+    // Filter using the freshest available source, but fall back to current displayedProducts if needed
+    const filterSource = (Array.isArray(sourceProducts) && sourceProducts.length) ? sourceProducts : (Array.isArray(displayedProducts) ? displayedProducts : []);
+    const filtered = (filterSource || []).filter((p) => {
+      const vendorType = p._raw?.vendor?.vendorType || p.vendor?.vendorType || null;
+      return !newSel || vendorType === newSel;
+    });
+    if (filtered.length) setDisplayedProducts(filtered);
+    // Trigger a background refresh for the selected filter (doesn't replace UI until network returns)
     fetchProducts({ vendorType: newSel || undefined, category: undefined, page: 1 });
   };
 
@@ -194,7 +328,15 @@ const CategoriesScreen = ({ navigation }) => {
     const newSel = selectedCuisine === cuisineId ? null : cuisineId;
     setSelectedCuisine(newSel);
     persistSelection('selectedCuisine', newSel);
-    // Fetch products filtered by vendorType (if any) and category
+    // Filter using the freshest available source, but fall back to current displayedProducts if needed
+    const filterSource = (Array.isArray(sourceProducts) && sourceProducts.length) ? sourceProducts : (Array.isArray(displayedProducts) ? displayedProducts : []);
+    const filtered = (filterSource || []).filter((p) => {
+      const vendorType = p._raw?.vendor?.vendorType || p.vendor?.vendorType || null;
+      const category = p._raw?.category || p.category || (Array.isArray(p.tags) && p.tags[0]) || null;
+      return (!selectedVendorType || vendorType === selectedVendorType) && (!newSel || category === newSel);
+    });
+    if (filtered.length) setDisplayedProducts(filtered);
+    // Background refresh
     fetchProducts({ vendorType: selectedVendorType || undefined, category: newSel || undefined, page: 1 });
   };
 
@@ -298,17 +440,34 @@ const CategoriesScreen = ({ navigation }) => {
         onSuggestionPress={handleSuggestionPress}
       />
 
-      {/* DEBUG: show products context state (remove in production) */}
-      <View style={{ paddingHorizontal: spacing.md, paddingVertical: 6 }}>
+      {/* DEBUG + controls: show products context state and cache controls */}
+      <View style={{ paddingHorizontal: spacing.md, paddingVertical: 8 }}>
         <Text style={{ color: colors.text.secondary, fontSize: 12 }}>
-          {productsLoading ? 'Loading products...' : `Products: ${products.length}`}{productsError ? ` • Error: ${String(productsError)}` : ''}
+          {(productsLoading && (!displayedProducts || displayedProducts.length === 0)) ? 'Loading products...' : `Products: ${displayedProducts ? displayedProducts.length : (products || []).length}`}{productsError ? ` • Error: ${String(productsError)}` : ''}
         </Text>
         <Text style={{ color: colors.text.secondary, fontSize: 11, marginTop: 4 }}>
-          {`vendorTypes: ${debugVendorTypes || '<none>'}`}
-        </Text>
-        <Text style={{ color: colors.text.secondary, fontSize: 11 }}>
-          {`cuisines: ${debugCuisines || '<none>'}`}
-        </Text>
+           {`vendorTypes: ${debugVendorTypes || '<none>'}`}
+         </Text>
+         <Text style={{ color: colors.text.secondary, fontSize: 11 }}>
+           {`cuisines: ${debugCuisines || '<none>'}`}
+         </Text>
+        <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
+          <Text style={{ color: colors.text.secondary, fontSize: 11 }}>{`Last updated: ${formatAgo(lastUpdated)}`}</Text>
+          <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TouchableOpacity onPress={() => setTtl(60 * 1000)} style={{ marginRight: 10 }}>
+              <Text style={{ color: cacheTtlMs === 60 * 1000 ? colors.primary : colors.text.secondary }}>1m</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setTtl(5 * 60 * 1000)} style={{ marginRight: 10 }}>
+              <Text style={{ color: cacheTtlMs === 5 * 60 * 1000 ? colors.primary : colors.text.secondary }}>5m</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={() => setTtl(15 * 60 * 1000)} style={{ marginRight: 12 }}>
+              <Text style={{ color: cacheTtlMs === 15 * 60 * 1000 ? colors.primary : colors.text.secondary }}>15m</Text>
+            </TouchableOpacity>
+            <TouchableOpacity onPress={clearProductCache}>
+              <Text style={{ color: colors.primary, fontFamily: 'Poppins-SemiBold' }}>Clear cache</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
       </View>
 
       <Animated.ScrollView
@@ -351,7 +510,7 @@ const CategoriesScreen = ({ navigation }) => {
 
         {/* Categories Section */}
         <SectionHeader title={t('whatDoYouNeed')} showSeeAll={false} />
-        {productsLoading && (!Array.isArray(vendorTypes) || vendorTypes.length === 0) ? (
+        {productsLoading && (!displayedProducts || displayedProducts.length === 0) ? (
           <View style={{ paddingVertical: 16 }}>
             <ActivityIndicator size="small" color={colors.primary} />
           </View>
@@ -364,7 +523,7 @@ const CategoriesScreen = ({ navigation }) => {
           title={t('cuisines')}
           onSeeAll={() => console.log('See all cuisines')}
         />
-        {productsLoading && (!Array.isArray(cuisines) || cuisines.length === 0) ? (
+        {productsLoading && (!displayedProducts || displayedProducts.length === 0) ? (
           <View style={{ paddingVertical: 12 }}>
             <ActivityIndicator size="small" color={colors.primary} />
           </View>
@@ -377,11 +536,12 @@ const CategoriesScreen = ({ navigation }) => {
           title={searchQuery ? `Search Results (${filteredRestaurants.length})` : t('popularRestaurants')}
           onSeeAll={!searchQuery ? () => console.log('See all restaurants') : undefined}
         />
-        {productsLoading ? (
+        {(!displayedProducts || displayedProducts.length === 0) && productsLoading ? (
+          // Only show loader if there are no displayed items to keep UI feeling static
           <View style={{ paddingVertical: 20 }}>
             <ActivityIndicator size="large" color={colors.primary} />
           </View>
-        ) : (!products || products.length === 0) ? (
+        ) : (!displayedProducts || displayedProducts.length === 0) ? (
           <View style={styles(colors).noResultsContainer}>
             <Text style={styles(colors).noResultsText}>{t('noRestaurantsFound') || 'No restaurants found'}</Text>
             <Text style={styles(colors).noResultsSubtext}>{t('tryAdjustingFilters') || 'Try adjusting filters or retry.'}</Text>
@@ -390,7 +550,7 @@ const CategoriesScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         ) : (
-          <RestaurantsList restaurants={products} onPress={handleRestaurantPress} searchQuery={searchQuery} disableScroll={true} />
+          <RestaurantsList restaurants={displayedProducts} onPress={handleRestaurantPress} searchQuery={searchQuery} disableScroll={true} />
         )}
 
         <View style={{ height: 100 }} />

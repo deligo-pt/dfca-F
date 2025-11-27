@@ -29,12 +29,13 @@ function normalizeProduct(p) {
 
 export const ProductsProvider = ({ children }) => {
   const [products, setProducts] = useState([]);
+  const [lastUpdated, setLastUpdated] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [params, setParams] = useState({ page: 1, limit: 20 });
 
   const fetchProducts = useCallback(async (overrides = {}) => {
-    setLoading(true);
+    // Do not set loading immediately to avoid UI flicker when we can serve cached data.
     setError(null);
     const final = { ...params, ...overrides };
 
@@ -74,25 +75,41 @@ export const ProductsProvider = ({ children }) => {
           try {
             const age = cachedRaw.ts ? (Date.now() - cachedRaw.ts) : null;
             console.debug('[ProductsContext] served cached products, age (ms):', age);
+            if (cachedRaw.ts) setLastUpdated(cachedRaw.ts);
           } catch (e) {}
         }
       } catch (e) {
         // ignore cache read failure
         cachedRaw = null;
       }
-      // If cached exists and is fresh (within TTL) and caller did not force, skip network to save requests
+      // Determine effective TTL (allow user override stored in storage)
+      let effectiveTTL = PRODUCTS_CACHE_TTL_MS;
+      try {
+        const storedTtl = await StorageService.getItem('PRODUCTS_CACHE_TTL_MS');
+        if (typeof storedTtl === 'number' && !isNaN(storedTtl) && storedTtl > 0) {
+          effectiveTTL = storedTtl;
+        }
+      } catch (e) {
+        console.debug('[ProductsContext] failed to read stored TTL', e);
+      }
+
+      // If cached exists and is fresh (within effectiveTTL) and caller did not force, skip network to save requests
       const cacheAge = cachedRaw && cachedRaw.ts ? (Date.now() - cachedRaw.ts) : Infinity;
-      if (!final.force && cachedRaw && Array.isArray(cachedRaw.items) && cacheAge < PRODUCTS_CACHE_TTL_MS) {
+      const hadCache = cachedRaw && Array.isArray(cachedRaw.items) && cachedRaw.items.length > 0;
+      if (!final.force && hadCache && cacheAge < effectiveTTL) {
         // Cache is fresh enough, avoid network call
         setParams(final);
-        setLoading(false);
+        // no network request performed, so keep loading=false to avoid flicker
         return;
       }
-       // helper to perform the GET
-       const doGet = async (u, h) => fetch(u, { method: 'GET', headers: h });
+      // helper to perform the GET
+      // If we have cached data, perform network fetch in background (don't set loading)
+      // If we don't have cached data, set loading to true to show spinner while fetching
+      if (!hadCache) setLoading(true);
+      const doGet = async (u, h) => fetch(u, { method: 'GET', headers: h });
 
-       console.debug('[ProductsContext] GET', url, 'headers.Authorization present?', !!headers.Authorization);
-       let res = await doGet(url, headers);
+      console.debug('[ProductsContext] GET', url, 'headers.Authorization present?', !!headers.Authorization);
+      let res = await doGet(url, headers);
       // log response body redacted for debugging
       try {
         const bodyText = await res.clone().text();
@@ -231,11 +248,13 @@ export const ProductsProvider = ({ children }) => {
       const newData = isNewData(cachedRaw, items);
       if (newData) {
         try {
-          await StorageService.setItem(cacheKey, { items, meta: json.meta || {}, ts: Date.now() });
+          const ts = Date.now();
+          await StorageService.setItem(cacheKey, { items, meta: json.meta || {}, ts });
         } catch (e) {
           console.debug('[ProductsContext] Failed to persist products cache', e);
         }
         setProducts(items.map(normalizeProduct));
+        setLastUpdated(Date.now());
       } else {
         // no new data: leave UI as-is (cached was used earlier);
         // but still update params so pagination/search state is current
@@ -256,7 +275,7 @@ export const ProductsProvider = ({ children }) => {
    }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
    return (
-     <ProductsContext.Provider value={{ products, loading, error, fetchProducts, setProducts, params, setParams }}>
+     <ProductsContext.Provider value={{ products, loading, error, fetchProducts, setProducts, params, setParams, lastUpdated }}>
        {children}
      </ProductsContext.Provider>
    );

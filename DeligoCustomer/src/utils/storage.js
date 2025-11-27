@@ -69,6 +69,24 @@ const StorageService = {
     }
   },
 
+  /**
+   * Remove all keys from storage that start with the given prefix.
+   * Useful for clearing product caches stored as `productsCache:<qs>`.
+   */
+  async removeKeysByPrefix(prefix) {
+    try {
+      const keys = await AsyncStorage.getAllKeys();
+      const matched = keys.filter(k => typeof k === 'string' && k.startsWith(prefix));
+      if (matched.length) {
+        await AsyncStorage.multiRemove(matched);
+      }
+      return true;
+    } catch (error) {
+      console.error(`Error removing keys by prefix "${prefix}":`, error);
+      return false;
+    }
+  },
+
   // Convenience helpers used by the app
   async getAccessToken() {
     return await this.getItem(STORAGE_KEYS.ACCESS_TOKEN);
