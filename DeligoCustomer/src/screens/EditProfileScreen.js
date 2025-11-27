@@ -2,13 +2,13 @@ import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../theme';
+import { useTheme } from '../utils/ThemeContext';
 import { getUserData } from '../utils/auth';
 import { useLanguage } from '../utils/LanguageContext';
 
-const EditProfileScreen = ({ navigation }) => {
+const EditProfileScreen = ({ navigation, route }) => {
   const { t } = useLanguage();
-  const [user, setUser] = useState(null);
+  const { colors } = useTheme();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
@@ -19,11 +19,25 @@ const EditProfileScreen = ({ navigation }) => {
   }, []);
 
   const loadUserData = async () => {
-    const userData = await getUserData();
-    setUser(userData);
-    setName(userData?.name || '');
-    setEmail(userData?.email || '');
-    setMobile(userData?.mobile || '');
+    try {
+      // Prefer route param if available (when navigating from profile card)
+      const routeUser = route?.params?.user;
+      if (routeUser) {
+        // derive name safely from possible shapes
+        const derivedName = `${(routeUser.name?.firstName || routeUser.firstName || routeUser.name || routeUser.fullName || '')} ${(routeUser.name?.lastName || routeUser.lastName || '')}`.trim();
+        setName(derivedName || routeUser.displayName || '');
+        setEmail(routeUser.email || routeUser.contactEmail || '');
+        setMobile(routeUser.contactNumber || routeUser.phone || routeUser.mobile || '');
+        return;
+      }
+
+      const userData = await getUserData();
+      setName(userData?.name || '');
+      setEmail(userData?.email || '');
+      setMobile(userData?.mobile || '');
+    } catch (err) {
+      console.warn('[EditProfileScreen] loadUserData error', err);
+    }
   };
 
   const handleSave = () => {
@@ -33,42 +47,42 @@ const EditProfileScreen = ({ navigation }) => {
   };
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
       {/* Header */}
-      <View style={styles.header}>
+      <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }] }>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerText}>{t('editProfile')}</Text>
+        <Text style={[styles.headerText, { color: colors.text.primary }]}>{t('editProfile')}</Text>
         <TouchableOpacity onPress={() => setIsEditing(!isEditing)} style={styles.editButton}>
-          <Text style={styles.editButtonText}>{isEditing ? t('cancel') : t('edit')}</Text>
+          <Text style={[styles.editButtonText, { color: colors.primary }]}>{isEditing ? t('cancel') : t('edit')}</Text>
         </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
         {/* Avatar Section */}
-        <View style={styles.avatarSection}>
-          <View style={styles.avatarContainer}>
-            <Text style={styles.avatarText}>
+        <View style={[styles.avatarSection, { backgroundColor: colors.background }]}>
+          <View style={[styles.avatarContainer, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }] }>
+            <Text style={[styles.avatarText, { color: colors.text.white }]}>
               {name?.charAt(0)?.toUpperCase() || 'U'}
             </Text>
           </View>
           {isEditing && (
-            <TouchableOpacity style={styles.changePhotoButton}>
+            <TouchableOpacity style={[styles.changePhotoButton, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1 }]}>
               <Ionicons name="camera" size={20} color={colors.primary} />
-              <Text style={styles.changePhotoText}>{t('changePhoto')}</Text>
+              <Text style={[styles.changePhotoText, { color: colors.primary }]}>{t('changePhoto')}</Text>
             </TouchableOpacity>
           )}
         </View>
 
         {/* Form Fields */}
-        <View style={styles.formSection}>
+        <View style={[styles.formSection, { backgroundColor: colors.background }]}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t('fullName')}</Text>
-            <View style={[styles.inputContainer, isEditing && styles.inputContainerActive]}>
+            <Text style={[styles.label, { color: colors.text.primary }]}>{t('fullName')}</Text>
+            <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border }, isEditing && { backgroundColor: colors.background, borderColor: colors.primary }]}>
               <Ionicons name="person-outline" size={20} color={colors.text.secondary} />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: colors.text.primary }]}
                 value={name}
                 onChangeText={setName}
                 placeholder={t('enterYourName')}
@@ -79,11 +93,11 @@ const EditProfileScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t('emailAddress')}</Text>
-            <View style={[styles.inputContainer, isEditing && styles.inputContainerActive]}>
+            <Text style={[styles.label, { color: colors.text.primary }]}>{t('emailAddress')}</Text>
+            <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border }, isEditing && { backgroundColor: colors.background, borderColor: colors.primary }]}>
               <Ionicons name="mail-outline" size={20} color={colors.text.secondary} />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: colors.text.primary }]}
                 value={email}
                 onChangeText={setEmail}
                 placeholder={t('enterYourEmail')}
@@ -95,11 +109,11 @@ const EditProfileScreen = ({ navigation }) => {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t('mobileNumber')}</Text>
-            <View style={[styles.inputContainer, isEditing && styles.inputContainerActive]}>
+            <Text style={[styles.label, { color: colors.text.primary }]}>{t('mobileNumber')}</Text>
+            <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border }, isEditing && { backgroundColor: colors.background, borderColor: colors.primary }]}>
               <Ionicons name="call-outline" size={20} color={colors.text.secondary} />
               <TextInput
-                style={styles.input}
+                style={[styles.input, { color: colors.text.primary }]}
                 value={mobile}
                 onChangeText={setMobile}
                 placeholder={t('enterYourMobile')}
@@ -113,8 +127,8 @@ const EditProfileScreen = ({ navigation }) => {
 
         {/* Save Button */}
         {isEditing && (
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-            <Text style={styles.saveButtonText}>{t('saveChanges')}</Text>
+          <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.primary, shadowColor: colors.primary }]} onPress={handleSave}>
+            <Text style={[styles.saveButtonText, { color: colors.text.white }]}>{t('saveChanges')}</Text>
           </TouchableOpacity>
         )}
       </ScrollView>
@@ -125,7 +139,6 @@ const EditProfileScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
   },
   header: {
     flexDirection: 'row',
@@ -133,9 +146,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     paddingHorizontal: 20,
     paddingVertical: 16,
-    backgroundColor: colors.background,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
   backButton: {
     width: 40,
@@ -145,19 +156,21 @@ const styles = StyleSheet.create({
   headerText: {
     fontSize: 18,
     fontWeight: '600',
-    color: colors.text.primary,
     fontFamily: 'Poppins-SemiBold',
     flex: 1,
     textAlign: 'center',
   },
   editButton: {
-    width: 60,
+    minWidth: 88, // allow longer localized labels like "Cancelar"
+    paddingHorizontal: 12,
     alignItems: 'flex-end',
+    justifyContent: 'center',
   },
   editButtonText: {
     fontSize: 16,
-    color: colors.primary,
     fontFamily: 'Poppins-Medium',
+    includeFontPadding: false,
+    textAlign: 'right',
   },
   content: {
     paddingBottom: 40,
@@ -165,13 +178,11 @@ const styles = StyleSheet.create({
   avatarSection: {
     alignItems: 'center',
     paddingVertical: 32,
-    backgroundColor: colors.background,
   },
   avatarContainer: {
     width: 100,
     height: 100,
     borderRadius: 50,
-    backgroundColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
     marginBottom: 16,
@@ -179,7 +190,6 @@ const styles = StyleSheet.create({
   avatarText: {
     fontSize: 42,
     fontWeight: 'bold',
-    color: colors.text.white,
     fontFamily: 'Poppins-Bold',
   },
   changePhotoButton: {
@@ -188,16 +198,14 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    backgroundColor: '#FFF0F6',
+    // backgroundColor set via theme in JSX
   },
   changePhotoText: {
     fontSize: 14,
-    color: colors.primary,
     fontFamily: 'Poppins-Medium',
     marginLeft: 6,
   },
   formSection: {
-    backgroundColor: colors.background,
     paddingHorizontal: 20,
     paddingVertical: 20,
     marginTop: 12,
@@ -208,39 +216,31 @@ const styles = StyleSheet.create({
   label: {
     fontSize: 14,
     fontWeight: '600',
-    color: colors.text.primary,
     fontFamily: 'Poppins-SemiBold',
     marginBottom: 8,
   },
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#F8F8F8',
+    // backgroundColor set via theme in JSX
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderWidth: 1,
-    borderColor: '#F0F0F0',
-  },
-  inputContainerActive: {
-    backgroundColor: colors.background,
-    borderColor: colors.primary,
+    // borderColor set via theme in JSX
   },
   input: {
     flex: 1,
     fontSize: 16,
-    color: colors.text.primary,
     fontFamily: 'Poppins-Regular',
     marginLeft: 12,
   },
   saveButton: {
-    backgroundColor: colors.primary,
     marginHorizontal: 20,
     marginTop: 20,
     paddingVertical: 16,
     borderRadius: 12,
     alignItems: 'center',
-    shadowColor: colors.primary,
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.3,
     shadowRadius: 8,
@@ -249,10 +249,8 @@ const styles = StyleSheet.create({
   saveButtonText: {
     fontSize: 16,
     fontWeight: '600',
-    color: colors.text.white,
     fontFamily: 'Poppins-SemiBold',
   },
 });
 
 export default EditProfileScreen;
-
