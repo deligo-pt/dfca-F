@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, StyleSheet, Animated, ActivityIndicator, Text, TouchableOpacity } from 'react-native';
+import { View, StyleSheet, Animated, ActivityIndicator, Text, TouchableOpacity, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { spacing } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
@@ -50,14 +50,17 @@ const CategoriesScreen = ({ navigation }) => {
     action: 'navigate_to_offers', // or offer ID
   };
 
-  // Featured shops - default empty until API provides featured list
-  const featuredShops = [];
-
-  // User name for personalized greeting (from auth context in real app)
-  const userName = null; // Set to user's name or null
-
   // Use products context for live data
   const { products, fetchProducts, loading: productsLoading, error: productsError } = useProducts();
+  const [refreshing, setRefreshing] = useState(false);
+
+  // Featured shops derived from products (those with meta.isFeatured)
+  const featuredShops = React.useMemo(() => {
+    return (products || []).filter((p) => p._raw?.meta?.isFeatured);
+  }, [products]);
+
+  // User name for personalized greeting (from auth context in real app)
+  const userName = null; // TODO: replace with real user name from auth when available
 
   // Derive vendor types (e.g. 'Resturent') from products' vendor.vendorType (computed but not used directly if static session exists)
   const vendorTypesFromProducts = React.useMemo(() => {
@@ -214,6 +217,18 @@ const CategoriesScreen = ({ navigation }) => {
     getLocation();
   }, []);
 
+  // Pull-to-refresh handler (calls fetchProducts with force to bypass TTL)
+  const handleRefresh = async () => {
+    try {
+      setRefreshing(true);
+      await fetchProducts({ page: 1, vendorType: selectedVendorType || undefined, category: selectedCuisine || undefined, force: true });
+    } catch (e) {
+      console.debug('handleRefresh failed', e);
+    } finally {
+      setRefreshing(false);
+    }
+  };
+
   const handleCartPress = () => {
     console.log('🛒 CART BUTTON PRESSED - Navigating to Cart screen');
     navigation.navigate('Cart');
@@ -301,6 +316,14 @@ const CategoriesScreen = ({ navigation }) => {
         showsVerticalScrollIndicator={false}
         bounces={true}
         scrollEventThrottle={16}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
         onScroll={Animated.event(
           [{ nativeEvent: { contentOffset: { y: scrollY } } }],
           { useNativeDriver: true }

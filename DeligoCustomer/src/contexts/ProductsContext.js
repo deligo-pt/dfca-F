@@ -1,8 +1,11 @@
 import React, { createContext, useContext, useCallback, useEffect, useState } from 'react';
 import { getAccessToken, getRefreshToken, setAccessToken, setRefreshToken } from '../utils/storage';
+import StorageService from '../utils/storage';
 import { BASE_API_URL, API_ENDPOINTS } from '../constants/config';
 
 const API_URL = `${BASE_API_URL}${API_ENDPOINTS.PRODUCTS.GET_ALL}`;
+// Cache TTL in milliseconds (default 5 minutes)
+const PRODUCTS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
 
 const ProductsContext = createContext(null);
 
@@ -59,11 +62,37 @@ export const ProductsProvider = ({ children }) => {
       qs.set('limit', final.limit || 20);
 
       const url = `${API_URL}?${qs.toString()}`;
-      // helper to perform the GET
-      const doGet = async (u, h) => fetch(u, { method: 'GET', headers: h });
+      const cacheKey = `productsCache:${qs.toString()}`;
+      // Try to read cached full response for this exact query string
+      let cachedRaw = null;
+      try {
+        cachedRaw = await StorageService.getItem(cacheKey);
+        if (cachedRaw && Array.isArray(cachedRaw.items) && cachedRaw.items.length > 0) {
+          // Use cached data immediately so UI feels static
+          setProducts((cachedRaw.items || []).map(normalizeProduct));
+          // Optionally expose last-updated via debug logs
+          try {
+            const age = cachedRaw.ts ? (Date.now() - cachedRaw.ts) : null;
+            console.debug('[ProductsContext] served cached products, age (ms):', age);
+          } catch (e) {}
+        }
+      } catch (e) {
+        // ignore cache read failure
+        cachedRaw = null;
+      }
+      // If cached exists and is fresh (within TTL) and caller did not force, skip network to save requests
+      const cacheAge = cachedRaw && cachedRaw.ts ? (Date.now() - cachedRaw.ts) : Infinity;
+      if (!final.force && cachedRaw && Array.isArray(cachedRaw.items) && cacheAge < PRODUCTS_CACHE_TTL_MS) {
+        // Cache is fresh enough, avoid network call
+        setParams(final);
+        setLoading(false);
+        return;
+      }
+       // helper to perform the GET
+       const doGet = async (u, h) => fetch(u, { method: 'GET', headers: h });
 
-      console.debug('[ProductsContext] GET', url, 'headers.Authorization present?', !!headers.Authorization);
-      let res = await doGet(url, headers);
+       console.debug('[ProductsContext] GET', url, 'headers.Authorization present?', !!headers.Authorization);
+       let res = await doGet(url, headers);
       // log response body redacted for debugging
       try {
         const bodyText = await res.clone().text();
@@ -173,36 +202,62 @@ export const ProductsProvider = ({ children }) => {
          }
        }
        if (res.status === 401) {
-        setError('Unauthorized');
-        setProducts([]);
-        setLoading(false);
-        return;
-      }
-      if (!res.ok) {
-        setError(`HTTP ${res.status}`);
-        setProducts([]);
-        setLoading(false);
-        return;
-      }
-      const json = await res.json();
+         setError('Unauthorized');
+         // keep cached data if available, otherwise clear
+         if (!cachedRaw) setProducts([]);
+         setLoading(false);
+         return;
+       }
+       if (!res.ok) {
+         setError(`HTTP ${res.status}`);
+         if (!cachedRaw) setProducts([]);
+         setLoading(false);
+         return;
+       }
+       const json = await res.json();
       const items = Array.isArray(json) ? json : (json.data || json.products || []);
-      setProducts(items.map(normalizeProduct));
+      // helper to determine whether API returned new data compared to cache
+      const isNewData = (cache, freshItems) => {
+        if (!cache || !Array.isArray(cache.items)) return true;
+        const cachedIds = new Set((cache.items || []).map(p => p._id || p.productId || p.id));
+        if ((cache.items || []).length !== (freshItems || []).length) return true;
+        for (const it of (freshItems || [])) {
+          const id = it._id || it.productId || it.id;
+          if (!cachedIds.has(id)) return true;
+        }
+        return false;
+      };
+
+      const newData = isNewData(cachedRaw, items);
+      if (newData) {
+        try {
+          await StorageService.setItem(cacheKey, { items, meta: json.meta || {}, ts: Date.now() });
+        } catch (e) {
+          console.debug('[ProductsContext] Failed to persist products cache', e);
+        }
+        setProducts(items.map(normalizeProduct));
+      } else {
+        // no new data: leave UI as-is (cached was used earlier);
+        // but still update params so pagination/search state is current
+      }
       setParams(final);
     } catch (err) {
       setError(err.message || err);
+      // on network error, keep cached products if any
     } finally {
       setLoading(false);
     }
-  }, [params]);
+   }, [params]);
 
-  // initial load
-  useEffect(() => {
-    fetchProducts();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+   // initial load
+   useEffect(() => {
+     // Trigger initial fetch using default params; fetchProducts will serve cache immediately if present
+     fetchProducts();
+   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  return (
-    <ProductsContext.Provider value={{ products, loading, error, fetchProducts, setProducts, params, setParams }}>
-      {children}
-    </ProductsContext.Provider>
-  );
-};
+   return (
+     <ProductsContext.Provider value={{ products, loading, error, fetchProducts, setProducts, params, setParams }}>
+       {children}
+     </ProductsContext.Provider>
+   );
+ };
