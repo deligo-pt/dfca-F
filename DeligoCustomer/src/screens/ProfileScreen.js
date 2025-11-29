@@ -2,8 +2,7 @@ import React, { useState, useEffect, useRef } from 'react';
 import { View, StyleSheet, ScrollView, Animated } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../utils/ThemeContext';
-import { getUserData, logoutUser } from '../utils/auth';
-import StorageService from '../utils/storage';
+import { useProfile } from '../contexts/ProfileContext';
 import CustomModal from '../components/CustomModal';
 import { useLanguage } from '../utils/LanguageContext';
 import MenuItem from '../components/Profile/MenuItem';
@@ -20,7 +19,7 @@ const ProfileScreen = ({ onLogout, navigation }) => {
   const { t } = useLanguage();
   const { colors } = useTheme();
   const insets = useSafeAreaInsets();
-  const [user, setUser] = useState(null);
+  const { user, fetchProfile, logout } = useProfile();
   const [modalVisible, setModalVisible] = useState(false);
   const [modalTitle, setModalTitle] = useState('');
   const [modalMessage, setModalMessage] = useState('');
@@ -31,15 +30,6 @@ const ProfileScreen = ({ onLogout, navigation }) => {
   // Animation values for logout button
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
-  useEffect(() => {
-    loadUserData();
-  }, []);
-
-  const loadUserData = async () => {
-    const userData = await getUserData();
-    setUser(userData);
-  };
-
   const showModal = (title, message, onConfirm = null, onlyConfirm = false) => {
     setModalTitle(title);
     setModalMessage(message);
@@ -47,6 +37,22 @@ const ProfileScreen = ({ onLogout, navigation }) => {
     setModalOnlyConfirm(onlyConfirm);
     setModalVisible(true);
   };
+
+  useEffect(() => {
+    // If caller wants fresh profile, fetch from server; otherwise context user is used
+    if (!user) {
+      (async () => {
+        const res = await fetchProfile().catch(e => e);
+        if (res && res.status === 401) {
+          // Session expired -> inform user and navigate to login
+          showModal(t('error'), t('sessionExpired') || 'Session expired. Please login again.', () => {
+            setModalVisible(false);
+            if (onLogout) onLogout();
+          }, true);
+        }
+      })();
+    }
+  }, []);
 
   const handleLogoutPress = () => {
     // Animate button press
@@ -72,43 +78,32 @@ const ProfileScreen = ({ onLogout, navigation }) => {
         // Keep modal open while logout happens and show a loader in the button
         setIsLoggingOut(true);
         try {
-          // Read token from storage and pass it into logoutUser to ensure server receives the exact stored token
-          const tokenFromStorage = await (StorageService.getAccessToken ? StorageService.getAccessToken() : StorageService.getItem('userToken'));
-          const result = await logoutUser(tokenFromStorage);
+          const result = await logout();
 
-           // Stop loader and close the confirmation modal
-           setIsLoggingOut(false);
-           setModalVisible(false);
+          setIsLoggingOut(false);
+          setModalVisible(false);
 
-           // Handle API result: success -> navigate; failure -> show informative modal
-           if (result && result.success) {
-             // Successful logout
-             if (onLogout) {
-               onLogout();
-             }
-             return;
-           }
+          if (result && result.success) {
+            if (onLogout) onLogout();
+            return;
+          }
 
-           // If unauthorized (token invalid/expired), still navigate to login but inform the user
-           if (result && result.status === 401) {
-             // Token invalid/expired: perform local logout/navigation immediately.
-             console.warn('[ProfileScreen] logout returned 401 - treating as session expired');
-             if (onLogout) onLogout();
-             return;
-           }
+          if (result && result.status === 401) {
+            if (onLogout) onLogout();
+            return;
+          }
 
-           // Generic failure message
-           showModal(
-             t('error'),
-             result?.message || 'Logout failed. Please try again.',
-             () => setModalVisible(false),
-             true,
-           );
-         } catch (err) {
-           console.warn('[ProfileScreen] logout error:', err);
-           setIsLoggingOut(false);
-           setModalVisible(false);
-         }
+          showModal(
+            t('error'),
+            result?.message || 'Logout failed. Please try again.',
+            () => setModalVisible(false),
+            true,
+          );
+        } catch (err) {
+          console.warn('[ProfileScreen] logout error:', err);
+          setIsLoggingOut(false);
+          setModalVisible(false);
+        }
       },
       false
     );
