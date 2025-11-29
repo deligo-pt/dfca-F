@@ -3,13 +3,12 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
-import { useProfile } from '../contexts/ProfileContext';
+import { getUserData } from '../utils/auth';
 import { useLanguage } from '../utils/LanguageContext';
 
 const EditProfileScreen = ({ navigation, route }) => {
   const { t } = useLanguage();
   const { colors } = useTheme();
-  const { user: profileUser, fetchProfile, updateProfile } = useProfile();
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
@@ -31,52 +30,39 @@ const EditProfileScreen = ({ navigation, route }) => {
   };
 
   useEffect(() => {
-    const loadUserData = async () => {
-      try {
-        // Prefer route param if available (when navigating from profile card)
-        const routeUser = route?.params?.user;
-        const sourceUser = routeUser || profileUser;
-        if (sourceUser) {
-          const derivedName = `${(sourceUser.name?.firstName || sourceUser.firstName || sourceUser.name || sourceUser.fullName || '')} ${(sourceUser.name?.lastName || sourceUser.lastName || '')}`.trim();
-          setName(derivedName || sourceUser.displayName || '');
-          setEmail(sourceUser.email || sourceUser.contactEmail || '');
-          setMobile(sourceUser.contactNumber || sourceUser.phone || sourceUser.mobile || '');
-          setProfilePhoto(sourceUser.profilePhoto || sourceUser.photo || sourceUser.avatar || sourceUser.photoUrl || sourceUser.avatarUrl || null);
-          setAddress(sourceUser.address || sourceUser.location || defaultAddress);
-          return;
-        }
-
-        // If no user available in context, attempt to fetch profile
-        if (!profileUser) {
-          await fetchProfile();
-        }
-      } catch (err) {
-        console.warn('[EditProfileScreen] loadUserData error', err);
-      }
-    };
     loadUserData();
-  }, [profileUser]);
+  }, []);
+
+  const loadUserData = async () => {
+    try {
+      // Prefer route param if available (when navigating from profile card)
+      const routeUser = route?.params?.user;
+      if (routeUser) {
+        // derive name safely from possible shapes
+        const derivedName = `${(routeUser.name?.firstName || routeUser.firstName || routeUser.name || routeUser.fullName || '')} ${(routeUser.name?.lastName || routeUser.lastName || '')}`.trim();
+        setName(derivedName || routeUser.displayName || '');
+        setEmail(routeUser.email || routeUser.contactEmail || '');
+        setMobile(routeUser.contactNumber || routeUser.phone || routeUser.mobile || '');
+        setProfilePhoto(routeUser.profilePhoto || routeUser.photo || routeUser.avatar || routeUser.photoUrl || routeUser.avatarUrl || null);
+        // set address if present on route user, otherwise use provided default
+        setAddress(routeUser.address || routeUser.location || defaultAddress);
+        return;
+      }
+
+      const userData = await getUserData();
+      setName(userData?.name || '');
+      setEmail(userData?.email || '');
+      setMobile(userData?.mobile || '');
+      setProfilePhoto(userData?.profilePhoto || userData?.photo || userData?.avatarUrl || userData?.avatar || null);
+      // prefer explicit address property, fall back to defaultAddress
+      setAddress(userData?.address || userData?.location || defaultAddress);
+    } catch (err) {
+      console.warn('[EditProfileScreen] loadUserData error', err);
+    }
+  };
 
   const handleSave = () => {
-    // TODO: call updateProfile API when implemented in backend
-    const payload = {
-      name,
-      email,
-      mobile,
-      address,
-      profilePhoto,
-    };
-    if (updateProfile) {
-      updateProfile(payload).then(() => {
-        Alert.alert(t('success'), t('profileUpdated'));
-        setIsEditing(false);
-      }).catch(err => {
-        console.warn('[EditProfileScreen] updateProfile error', err);
-        Alert.alert(t('error'), t('somethingWentWrong'));
-      });
-      return;
-    }
-
+    // TODO: Implement save functionality
     Alert.alert(t('success'), t('profileUpdated'));
     setIsEditing(false);
   };

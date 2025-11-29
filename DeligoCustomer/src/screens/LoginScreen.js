@@ -12,19 +12,19 @@ import {
   Easing,
   Image,
 } from 'react-native';
-import { useProfile } from '../contexts/ProfileContext';
+import { sendOTP, verifyOTP, saveUserData } from '../utils/auth';
 import CountryPicker from 'react-native-country-picker-modal';
 import CustomModal from '../components/CustomModal';
 import OTPInput from '../components/OTPInput';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
+import { setAccessToken } from '../utils/storage';
 
 const LOGO = require('../assets/images/logo.png'); // Transparent logo icon
 
 const LoginScreen = ({ onLoginSuccess, navigation }) => {
   const { t } = useLanguage();
   const { colors } = useTheme();
-  const { sendOtp, verifyOtp, resendOtp, user: profileUser } = useProfile();
   const BRAND_PINK = colors.primary;
   const GRAY = colors.text.secondary;
   const INFO_BG = colors.surface;
@@ -78,9 +78,9 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
     }
     setIsLoading(true);
     try {
-      // Call centralized sendOtp from ProfileContext
-      const sendRes = await sendOtp(identifier, loginMethod);
-      console.log('[LoginScreen] sendOtp response:', sendRes);
+      // Call sendOTP and log the server response for debugging
+      const sendRes = await sendOTP(identifier, loginMethod);
+      console.log('[LoginScreen] sendOTP response:', sendRes);
 
       // If API responded with success flag, proceed to OTP screen/modal
       if (sendRes && (sendRes.success === true || sendRes.success === 'true')) {
@@ -129,15 +129,24 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
     }
     setIsLoading(true);
     try {
-      const response = await verifyOtp(identifier, otp, loginMethod);
-      console.log('[LoginScreen] verifyOtp response:', response);
+      const response = await verifyOTP(identifier, otp, loginMethod);
+      console.log('[LoginScreen] verifyOTP response:', response);
 
-      const accessToken = response?.accessToken || response?.data?.accessToken || response?.token;
-      const userData = response?.user || response?.data?.user || profileUser || null;
+      const accessToken = response?.accessToken;
+      const userData = response?.user || null;
 
+      // If backend didn't return token, treat as failure
       if (!accessToken) {
         showModal(t('error'), t('invalidOTP'));
         return;
+      }
+
+      // Save the access token to storage
+      await setAccessToken(accessToken);
+
+      // Save user only if present
+      if (userData) {
+        await saveUserData(userData);
       }
 
       // Close modal and notify parent (pass userData or null)
@@ -152,14 +161,9 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
     }
   };
 
-  const handleResendOtp = async () => {
-    try {
-      setOtp('');
-      await resendOtp(identifier, loginMethod);
-      showModal(t('otpResent'), t('newOtpSent'));
-    } catch (err) {
-      showModal(t('error'), t('somethingWentWrong'));
-    }
+  const handleResendOtp = () => {
+    setOtp('');
+    showModal(t('otpResent'), t('newOtpSent'));
   };
 
   const handleChangeMethod = () => {

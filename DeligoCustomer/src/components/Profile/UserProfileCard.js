@@ -1,11 +1,142 @@
 import React, { useEffect, useState } from 'react';
 import { View, Text, ActivityIndicator, StyleSheet, Image, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { getAccessToken, getRefreshToken } from '../../utils/storage';
+import { getAccessToken, getRefreshToken, removeAccessToken, removeRefreshToken, removeUser } from '../../utils/storage';
 import { BASE_API_URL, API_ENDPOINTS } from '../../constants/config';
 import { useTheme } from '../../utils/ThemeContext';
 import { useLanguage } from '../../utils/LanguageContext';
 const API_URL = `${BASE_API_URL}${API_ENDPOINTS.PROFILE.GET}`;
+
+// Add logout URL constant
+const LOGOUT_URL = `${BASE_API_URL}${API_ENDPOINTS.AUTH.LOGOUT}`;
+
+// Logout API helper functions
+export const logoutApi = async (authToken, refreshToken) => {
+    // Helper to perform one fetch attempt
+    const doAttempt = async (attemptName, headersObj, bodyObj) => {
+        try {
+            const response = await fetch(LOGOUT_URL, {
+                method: 'POST',
+                headers: {
+                    Accept: 'application/json',
+                    'Content-Type': 'application/json',
+                    ...headersObj,
+                },
+                body: bodyObj ? JSON.stringify(bodyObj) : null,
+            });
+
+            const status = response.status;
+            const text = await response.text();
+            let json;
+            try { json = text ? JSON.parse(text) : null; } catch (_e) { json = { message: text }; }
+
+            if (!response.ok) {
+                return { success: false, status, message: json?.message || response.statusText, data: json, attempt: attemptName };
+            }
+
+            return { success: true, status, data: json, attempt: attemptName };
+        } catch (error) {
+            return { success: false, error: error.message || String(error), attempt: attemptName };
+        }
+    };
+
+    // Normalize tokens
+    const rawAuth = authToken || '';
+    const bearerAuth = rawAuth && rawAuth.startsWith('Bearer ') ? rawAuth : rawAuth ? `Bearer ${rawAuth}` : undefined;
+
+    // Define attempt variants in order of preference
+    const attempts = [
+        {
+            name: 'bearer-header+body-refresh',
+            headers: bearerAuth ? { Authorization: bearerAuth } : {},
+            body: refreshToken ? { refreshToken: refreshToken, token: refreshToken } : null,
+        },
+        {
+            name: 'raw-header+body-refresh',
+            headers: rawAuth ? { Authorization: rawAuth } : {},
+            body: refreshToken ? { refreshToken: refreshToken, token: refreshToken } : null,
+        },
+        {
+            name: 'no-header+body-refresh',
+            headers: {},
+            body: refreshToken ? { refreshToken: refreshToken } : null,
+        },
+        {
+            name: 'bearer-header+x-refresh-header',
+            headers: bearerAuth ? { Authorization: bearerAuth, 'x-refresh-token': refreshToken } : { 'x-refresh-token': refreshToken },
+            body: null,
+        },
+        {
+            name: 'body-accessToken',
+            headers: {},
+            body: rawAuth ? { accessToken: rawAuth } : null,
+        },
+        {
+            name: 'body-token-access',
+            headers: {},
+            body: rawAuth ? { token: rawAuth } : null,
+        },
+        {
+            name: 'body-both-tokens',
+            headers: {},
+            body: { accessToken: rawAuth, refreshToken: refreshToken, token: refreshToken },
+        },
+    ];
+
+    let lastErr = null;
+    for (let i = 0; i < attempts.length; i++) {
+        const a = attempts[i];
+        // skip attempts that have neither headers nor body (unlikely) but allow
+        const res = await doAttempt(a.name, a.headers, a.body);
+        if (res.success) return res;
+
+        // If unauthorized, try next variant
+        if (res.status === 401) {
+            console.warn(`[auth] logout attempt ${a.name} returned 401`);
+            lastErr = res;
+            continue;
+        }
+
+        // For other errors, return immediately (network issues or 4xx/5xx other than 401)
+        return res;
+    }
+
+    // If we exhausted attempts, return last error or a generic failure
+    return lastErr || { success: false, message: 'Logout failed after retries' };
+};
+
+export const performLogout = async () => {
+    let apiResult = null;
+    try {
+        const authToken = await getAccessToken();
+        const refreshToken = await getRefreshToken();
+
+        // Call the logout API
+        apiResult = await logoutApi(authToken, refreshToken);
+
+        // Log the attempt for debugging
+        if (apiResult) {
+            console.warn('[auth] logout result', { attempt: apiResult.attempt, status: apiResult.status, success: apiResult.success });
+        }
+
+        // Regardless of API result, remove tokens and user data from storage to ensure local logout
+        await removeAccessToken();
+        await removeRefreshToken();
+        await removeUser();
+
+        return apiResult || { success: true };
+    } catch (error) {
+        // Attempt to clear storage even if something threw
+        try {
+            await removeAccessToken();
+            await removeRefreshToken();
+            await removeUser();
+        } catch (e) {
+            // ignore
+        }
+        return { success: false, error: error.message || String(error) };
+    }
+};
 
 export default function UserProfileCard({ user: userProp, navigation }) {
     const { colors } = useTheme();

@@ -193,27 +193,91 @@ export const isUserAuthenticated = async () => {
  */
 export const logoutUser = async (tokenInput = null) => {
   try {
-    // Use provided token if available, otherwise read from storage
+    // Read tokens (prefer tokenInput param if provided)
     const storedToken = tokenInput
       ? tokenInput
       : (StorageService.getAccessToken ? await StorageService.getAccessToken() : await StorageService.getItem(STORAGE_KEYS.ACCESS_TOKEN));
 
-    const authHeader = storedToken
-      ? storedToken.startsWith('Bearer ')
-        ? storedToken
-        : `Bearer ${storedToken}`
-      : null;
+    const refreshToken = StorageService.getRefreshToken ? await StorageService.getRefreshToken() : await StorageService.getItem(STORAGE_KEYS.REFRESH_TOKEN);
 
-    console.log('[auth] logout using token (source):', tokenInput ? 'param' : 'storage', authHeader ? authHeader.replace(/\s.+/, ' [REDACTED]') : null);
+    const raw = storedToken || '';
+    const bearer = raw && raw.startsWith('Bearer ') ? raw : raw ? `Bearer ${raw}` : undefined;
 
-    // Call the logout endpoint; send no body and include Authorization if present
-    const config = authHeader ? { headers: { Authorization: authHeader } } : {};
-    const resp = await customerApi.post('/auth/logout', undefined, config);
-    console.log('[auth] logout response:', resp);
+    // helper to mask tokens for logs (dev-only)
+    const mask = token => {
+      try {
+        if (!token) return null;
+        const t = token.toString();
+        if (t.length <= 12) return `${t.slice(0,4)}...`;
+        return `${t.slice(0,8)}...${t.slice(-4)}`;
+      } catch (e) {
+        return null;
+      }
+    };
 
-    return { success: true, status: 200, data: resp };
+    console.log('[auth] logout using token (source):', tokenInput ? 'param' : 'storage', bearer ? 'Bearer [REDACTED]' : null);
+
+    // helper to call endpoint variant
+    const doAttempt = async (name, headersObj, bodyObj) => {
+      try {
+        console.warn('[auth] logout attempt START', { attempt: name, authHeader: headersObj?.Authorization ? (headersObj.Authorization.startsWith('Bearer ') ? 'Bearer [REDACTED]' : 'RAW [REDACTED]') : null, accessMask: mask(raw), refreshMask: mask(refreshToken), bodyKeys: bodyObj ? Object.keys(bodyObj) : null });
+      } catch (e) {}
+
+      try {
+        const resp = await fetch(`${customerApi.defaults.baseURL}/auth/logout`, {
+          method: 'POST',
+          headers: {
+            Accept: 'application/json',
+            'Content-Type': 'application/json',
+            ...headersObj,
+          },
+          body: bodyObj ? JSON.stringify(bodyObj) : null,
+        });
+
+        const status = resp.status;
+        const text = await resp.text();
+        let json;
+        try { json = text ? JSON.parse(text) : null; } catch (_e) { json = { message: text }; }
+
+        try { console.warn('[auth] logout attempt RESULT', { attempt: name, status, message: json?.message || null }); } catch (e) {}
+
+        if (!resp.ok) {
+          return { success: false, status, message: json?.message || resp.statusText, data: json, attempt: name };
+        }
+        return { success: true, status, data: json, attempt: name };
+      } catch (err) {
+        return { success: false, error: err.message || String(err), attempt: name };
+      }
+    };
+
+    // Try refresh-token-in-body first (common revoke API) then fallbacks
+    const attempts = [
+      { name: 'no-header+body-refresh', headers: {}, body: refreshToken ? { refreshToken } : null },
+      { name: 'bearer-header+body-refresh', headers: bearer ? { Authorization: bearer } : {}, body: refreshToken ? { refreshToken, token: refreshToken } : null },
+      { name: 'raw-header+body-refresh', headers: raw ? { Authorization: raw } : {}, body: refreshToken ? { refreshToken, token: refreshToken } : null },
+      { name: 'bearer-header+x-refresh', headers: bearer ? { Authorization: bearer, 'x-refresh-token': refreshToken } : { 'x-refresh-token': refreshToken }, body: null },
+      { name: 'body-accessToken', headers: {}, body: raw ? { accessToken: raw } : null },
+      { name: 'body-token-access', headers: {}, body: raw ? { token: raw } : null },
+      { name: 'body-both', headers: {}, body: { accessToken: raw, refreshToken, token: refreshToken } },
+    ];
+
+    let lastErr = null;
+    for (let a of attempts) {
+      const res = await doAttempt(a.name, a.headers, a.body);
+      if (res.success) {
+        return res;
+      }
+      if (res.status === 401) {
+        console.warn('[auth] logout attempt', a.name, 'returned 401');
+        lastErr = res;
+        continue;
+      }
+      // For other errors, return immediately
+      return res;
+    }
+
+    return lastErr || { success: false, message: 'Logout failed after retries' };
   } catch (err) {
-    // Normalize error information
     console.warn('[auth] logout API error:', err);
     const status = err?.err?.statusCode || err?.status || err?.statusCode || (err?.response && err.response.status) || 0;
     let message = 'Logout failed';
@@ -235,3 +299,5 @@ export const logoutUser = async (tokenInput = null) => {
     }
   }
 };
+
+// End of file

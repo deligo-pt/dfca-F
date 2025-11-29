@@ -1,12 +1,36 @@
-import React from 'react';
+import React, { useState } from 'react';
 import { Text, StyleSheet, TouchableOpacity, Animated, View, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../utils/ThemeContext';
 import { useLanguage } from '../../utils/LanguageContext';
+import { logoutUser } from '../../utils/auth';
 
-const LogoutButton = ({ onLogoutPress, isLoggingOut, scaleAnim }) => {
+const LogoutButton = ({ onLogoutPress, isLoggingOut: isLoggingOutProp, scaleAnim, onLogoutSuccess }) => {
   const { colors } = useTheme();
   const { t } = useLanguage();
+  const [localLoggingOut, setLocalLoggingOut] = useState(false);
+  const isLoggingOut = typeof isLoggingOutProp === 'boolean' ? isLoggingOutProp : localLoggingOut;
+
+  const internalLogout = async () => {
+    try {
+      setLocalLoggingOut(true);
+      const result = await logoutUser();
+      console.warn('[auth] logout button result', result);
+
+      if (result && result.success) {
+        if (onLogoutSuccess) onLogoutSuccess();
+      } else if (result && result.status === 401) {
+        // treat as session expired
+        if (onLogoutSuccess) onLogoutSuccess();
+      } else {
+        console.warn('[auth] logout failed from button', result);
+      }
+    } catch (err) {
+      console.warn('[auth] logout button error', err);
+    } finally {
+      setLocalLoggingOut(false);
+    }
+  };
 
   return (
     <Animated.View style={{ transform: [{ scale: scaleAnim }] }}>
@@ -16,7 +40,10 @@ const LogoutButton = ({ onLogoutPress, isLoggingOut, scaleAnim }) => {
           { backgroundColor: colors.surface, borderColor: colors.border },
           isLoggingOut && { opacity: 0.7 },
         ]}
-        onPress={onLogoutPress}
+        onPress={() => {
+          if (onLogoutPress) return onLogoutPress();
+          return internalLogout();
+        }}
         activeOpacity={0.8}
         disabled={isLoggingOut}
       >
