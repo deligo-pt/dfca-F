@@ -7,6 +7,9 @@ import {
   TouchableOpacity,
   TextInput,
   Image,
+  Modal,
+  Dimensions,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,6 +36,51 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const [cart, setCart] = useState({});
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Product modal state
+  const [productModalVisible, setProductModalVisible] = useState(false);
+  const [activeProduct, setActiveProduct] = useState(null);
+
+  // Handlers to open/close modal so setters are used
+  const openProductModal = (product) => {
+    setActiveProduct(product);
+    setProductModalVisible(true);
+  };
+
+  const closeProductModal = () => {
+    setActiveProduct(null);
+    setProductModalVisible(false);
+  };
+
+  // compute numeric modal image width (90% of screen) so Image gets explicit dimensions
+  const screenWidth = Dimensions.get('window').width;
+  const modalImageWidth = Math.round(screenWidth * 0.9);
+
+  // small helper component to show image with loader and error fallback
+  const ModalImage = ({ uri, style }) => {
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState(false);
+    return (
+      <View style={[style, { justifyContent: 'center', alignItems: 'center', backgroundColor: error ? '#f2f2f2' : undefined }]}>
+        {!error && (
+          <Image
+            source={{ uri }}
+            style={[{ width: style.width, height: style.height }]}
+            resizeMode="cover"
+            onLoadStart={() => setLoading(true)}
+            onLoadEnd={() => setLoading(false)}
+            onError={() => { setError(true); setLoading(false); }}
+          />
+        )}
+        {loading && !error && (
+          <ActivityIndicator size="small" color={colors.primary} style={{ position: 'absolute' }} />
+        )}
+        {error && (
+          <Text style={{ color: colors.text.secondary, fontSize: 12 }}>Image not available</Text>
+        )}
+      </View>
+    );
+  };
 
   // Use ProductsContext and show only items belonging to this vendor
   const { products: allProducts } = useProducts();
@@ -133,7 +181,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
     return (
       <View key={product.id} style={styles(colors).menuItem}>
-        <View style={styles(colors).menuItemLeft}>
+        <TouchableOpacity activeOpacity={0.9} onPress={() => openProductModal(product)} style={styles(colors).menuItemLeft}>
           {image ? (
             <Image source={{ uri: image }} style={{ width: 64, height: 48, marginRight: spacing.md, borderRadius: 8 }} />
           ) : (
@@ -147,7 +195,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
             </Text>
             <Text style={styles(colors).menuItemPrice}>{raw.pricing?.currency ?? ''} {price ? Number(price).toFixed(2) : '0.00'}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
         <View style={styles(colors).menuItemRight}>
           {quantity === 0 ? (
             <TouchableOpacity
@@ -175,6 +223,94 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
           )}
         </View>
       </View>
+    );
+  };
+
+  // Product detail modal
+  const renderProductModal = () => {
+    if (!activeProduct) return null;
+    const raw = activeProduct._raw || {};
+    const title = raw.product?.name || raw.name || raw.productName || activeProduct.name || '';
+    const images = Array.isArray(raw.images) && raw.images.length ? raw.images : (activeProduct.image ? [activeProduct.image] : []);
+    const productId = raw.productId || raw._id || activeProduct.id || '';
+    const sku = raw.sku || '';
+    const description = raw.longDescription || raw.description || raw.details || raw.slug || '';
+    const category = raw.category || '';
+    const subCategory = raw.subCategory || '';
+    const brand = raw.brand || '';
+    const tags = Array.isArray(raw.tags) ? raw.tags : [];
+    const attributes = raw.attributes || {};
+    const price = raw.pricing?.price ?? raw.price ?? activeProduct.price ?? 0;
+    const currency = raw.pricing?.currency ?? '';
+
+    return (
+      <Modal visible={productModalVisible} transparent animationType="slide" onRequestClose={closeProductModal}>
+        <View style={styles(colors).modalOverlay}>
+          <TouchableOpacity style={{ position: 'absolute', left: 0, right: 0, top: 0, bottom: 0 }} onPress={closeProductModal} />
+          <View style={styles(colors).modalCard}>
+            <ScrollView contentContainerStyle={{ paddingBottom: 24 }}>
+              {images.length ? (
+                <ScrollView horizontal pagingEnabled showsHorizontalScrollIndicator={false} style={[styles(colors).carousel, { width: modalImageWidth }]} contentContainerStyle={{ width: modalImageWidth * images.length }}>
+                  {images.map((uri, i) => (
+                    <ModalImage key={i} uri={uri} style={{ width: modalImageWidth, height: 240 }} />
+                  ))}
+                </ScrollView>
+              ) : null}
+
+              <View style={styles(colors).modalBody}>
+                <View style={styles(colors).modalHeaderRow}>
+                  <Text style={styles(colors).modalTitle}>{title}</Text>
+                  <Text style={styles(colors).modalPriceInline}>{currency} {price ? Number(price).toFixed(2) : '0.00'}</Text>
+                </View>
+
+                <View style={styles(colors).metaRow}>
+                  {productId ? <Text style={styles(colors).metaSmall}>ID: {productId}</Text> : null}
+                  {sku ? <Text style={[styles(colors).metaSmall, { marginLeft: 12 }]}>SKU: {sku}</Text> : null}
+                </View>
+
+                <View style={styles(colors).metaRow}>
+                  {category ? <Text style={styles(colors).metaChip}>{category}</Text> : null}
+                  {subCategory ? <Text style={[styles(colors).metaChip, { marginLeft: 8 }]}>{subCategory}</Text> : null}
+                  {brand ? <Text style={[styles(colors).metaChip, { marginLeft: 8 }]}>{brand}</Text> : null}
+                </View>
+
+                {tags && tags.length ? (
+                  <View style={styles(colors).tagsRow}>
+                    {tags.map(t => (
+                      <View key={t} style={styles(colors).tagChip}><Text style={styles(colors).tagText}>{t}</Text></View>
+                    ))}
+                  </View>
+                ) : null}
+
+                {description ? <Text style={styles(colors).modalDescription}>{description}</Text> : null}
+
+                {attributes && Object.keys(attributes).length ? (
+                  <View style={styles(colors).attributesContainer}>
+                    <Text style={styles(colors).attributesTitle}>Details</Text>
+                    <View style={styles(colors).attributesList}>
+                      {Object.entries(attributes).map(([k, v]) => (
+                        <View key={k} style={styles(colors).attributeRow}>
+                          <Text style={styles(colors).attributeKey}>{k}</Text>
+                          <Text style={styles(colors).attributeValue}>{Array.isArray(v) ? v.join(', ') : String(v)}</Text>
+                        </View>
+                      ))}
+                    </View>
+                  </View>
+                ) : null}
+
+                <View style={styles(colors).modalActions}>
+                  <TouchableOpacity style={styles(colors).modalCloseButton} onPress={closeProductModal}>
+                    <Text style={styles(colors).modalCloseButtonText}>Close</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity style={styles(colors).modalAddButton} onPress={() => { addToCart(activeProduct); closeProductModal(); }}>
+                    <Text style={styles(colors).modalAddButtonText}>Add to cart</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
     );
   };
 
@@ -332,6 +468,8 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
         {/* Bottom Spacing for tab bar + safe area */}
         <View style={{ height: Math.max(80, insets.bottom + 80) }} />
       </ScrollView>
+
+      {renderProductModal && renderProductModal()}
     </SafeAreaView>
   );
 };
@@ -715,7 +853,162 @@ const styles = (colors) => StyleSheet.create({
     color: colors.text.secondary,
     marginTop: spacing.xs,
   },
+  // Product detail modal styles
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.7)',
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  modalCard: {
+    width: '90%',
+    backgroundColor: colors.background,
+    borderRadius: borderRadius.lg,
+    overflow: 'hidden',
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 4,
+  },
+  carousel: {
+    width: '100%',
+    height: 240,
+  },
+  modalImage: {
+    width: '100%',
+    height: 240,
+    resizeMode: 'cover',
+  },
+  modalBody: {
+    padding: spacing.md,
+  },
+  modalHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: spacing.md,
+  },
+  modalTitle: {
+    fontSize: fontSize.xl,
+    fontFamily: 'Poppins-Bold',
+    color: colors.text.primary,
+    flex: 1,
+  },
+  modalPriceInline: {
+    fontSize: fontSize.xl,
+    fontFamily: 'Poppins-Bold',
+    color: colors.primary,
+    marginLeft: spacing.md,
+  },
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: spacing.sm,
+  },
+  metaSmall: {
+    fontSize: fontSize.sm,
+    fontFamily: 'Poppins-Regular',
+    color: colors.text.secondary,
+  },
+  metaChip: {
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.md,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    marginRight: 8,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  tagsRow: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    marginBottom: spacing.md,
+  },
+  tagChip: {
+    backgroundColor: colors.secondary,
+    borderRadius: borderRadius.md,
+    paddingVertical: 4,
+    paddingHorizontal: 8,
+    marginRight: 8,
+    marginBottom: 8,
+  },
+  tagText: {
+    fontSize: fontSize.sm,
+    fontFamily: 'Poppins-Medium',
+    color: colors.text.primary,
+  },
+  modalDescription: {
+    fontSize: fontSize.md,
+    fontFamily: 'Poppins-Regular',
+    color: colors.text.primary,
+    marginBottom: spacing.md,
+  },
+  attributesContainer: {
+    marginBottom: spacing.md,
+  },
+  attributesTitle: {
+    fontSize: fontSize.md,
+    fontFamily: 'Poppins-Bold',
+    color: colors.text.primary,
+    marginBottom: spacing.sm,
+  },
+  attributesList: {
+    backgroundColor: colors.surface,
+    borderRadius: borderRadius.md,
+    padding: spacing.md,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  attributeRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  attributeKey: {
+    fontSize: fontSize.sm,
+    fontFamily: 'Poppins-Medium',
+    color: colors.text.primary,
+  },
+  attributeValue: {
+    fontSize: fontSize.sm,
+    fontFamily: 'Poppins-Regular',
+    color: colors.text.secondary,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginTop: spacing.md,
+  },
+  modalCloseButton: {
+    flex: 1,
+    backgroundColor: colors.border,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: spacing.md,
+  },
+  modalCloseButtonText: {
+    fontSize: fontSize.md,
+    fontFamily: 'Poppins-SemiBold',
+    color: colors.text.primary,
+  },
+  modalAddButton: {
+    flex: 1,
+    backgroundColor: colors.primary,
+    borderRadius: borderRadius.lg,
+    paddingVertical: spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalAddButtonText: {
+    fontSize: fontSize.md,
+    fontFamily: 'Poppins-SemiBold',
+    color: colors.text.white,
+  },
 });
 
 export default RestaurantDetailsScreen;
-
