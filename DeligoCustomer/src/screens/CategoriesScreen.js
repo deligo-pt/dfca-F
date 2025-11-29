@@ -305,6 +305,30 @@ const CategoriesScreen = ({ navigation }) => {
     setDisplayedProducts(filtered.length ? filtered : (displayedProducts || []));
   }, [sourceProducts, selectedVendorType, selectedCuisine]);
 
+  // --- NEW: produce a deduplicated + sorted list by vendorName ---
+  // This ensures the restaurants list shows one entry per vendor (keyed by vendorName) and is sorted by vendorName.
+  const displayedByVendor = React.useMemo(() => {
+    try {
+      const arr = Array.isArray(displayedProducts) ? displayedProducts : [];
+      const map = new Map();
+      for (const p of arr) {
+        const vendorName = (p && (p._raw?.vendor?.vendorName || p.vendor?.vendorName || p.name)) || '';
+        const key = String(vendorName || '').trim().toLowerCase();
+        if (!map.has(key)) {
+          // ensure the item exposes a consistent `name` used for sorting/display
+          const item = { ...p, name: vendorName || (p && p.name) || '' };
+          map.set(key, item);
+        }
+      }
+      const list = Array.from(map.values());
+      list.sort((a, b) => (String(a.name || '').localeCompare(String(b.name || ''))));
+      return list;
+    } catch (e) {
+      // On any unexpected shape issues, fall back to raw displayedProducts
+      return Array.isArray(displayedProducts) ? displayedProducts : [];
+    }
+  }, [displayedProducts]);
+
   const handleVendorTypePress = (vendor) => {
     const vendorId = vendor.id || vendor.name;
     const newSel = selectedVendorType === vendorId ? null : vendorId;
@@ -550,7 +574,7 @@ const CategoriesScreen = ({ navigation }) => {
             </TouchableOpacity>
           </View>
         ) : (
-          <RestaurantsList restaurants={displayedProducts} onPress={handleRestaurantPress} searchQuery={searchQuery} disableScroll={true} />
+          <RestaurantsList restaurants={displayedByVendor} onPress={handleRestaurantPress} searchQuery={searchQuery} disableScroll={true} />
         )}
 
         <View style={{ height: 100 }} />

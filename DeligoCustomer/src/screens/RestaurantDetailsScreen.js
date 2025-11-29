@@ -35,7 +35,12 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
 
   // Use ProductsContext and show only items belonging to this vendor
-  const { products: allProducts, loading: productsLoading, error: productsError, fetchProducts } = useProducts();
+  const { products: allProducts } = useProducts();
+
+  // Prefer product name from multiple possible locations; fallback to vendor name
+  const displayName = (
+    restaurant?.name || restaurant?._raw?.name || restaurant?._raw?.product?.name || restaurant?.name || restaurant?._raw?.productName || restaurant?._raw?.vendor?.vendorName || 'Restaurant'
+  );
 
   const vendorId = (
     restaurant?._raw?.vendor?.vendorId || restaurant?.vendor?.vendorId || restaurant?.vendorId || restaurant?._raw?.vendorId || null
@@ -109,15 +114,19 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     if (!searchQuery.trim()) return items;
     const q = searchQuery.toLowerCase();
     return items.filter((item) => {
-      const name = (item._raw?.name || item.name || '').toLowerCase();
-      const desc = (item._raw?.description || '').toLowerCase();
-      return name.includes(q) || desc.includes(q);
+      // Prefer product-specific name fields from the raw payload to avoid showing vendorName
+      const rawItem = item._raw || {};
+      const itemName = (rawItem.product?.name || rawItem.name || rawItem.productName || item.name || '').toLowerCase();
+      const desc = (rawItem.description || rawItem.slug || '').toLowerCase();
+      return itemName.includes(q) || desc.includes(q);
     });
   };
 
   const renderMenuItem = (product) => {
     const quantity = cart[product.id] || 0;
     const raw = product._raw || {};
+    // Prefer product-level name fields to avoid showing vendorName which may have been stored in product.name during normalization
+    const displayProductName = raw.product?.name || raw.name || raw.productName || product.name || '';
     const image = product.image || (Array.isArray(raw.images) && raw.images[0]);
     const price = raw.pricing?.price ?? raw.price ?? product.price ?? 0;
     const description = raw.description || raw.slug || '';
@@ -132,7 +141,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
           )}
 
           <View style={styles(colors).menuItemInfo}>
-            <Text style={styles(colors).menuItemName}>{product.name || raw.name}</Text>
+            <Text style={styles(colors).menuItemName}>{displayProductName || (product.name || raw.name)}</Text>
             <Text style={styles(colors).menuItemDescription} numberOfLines={2}>
               {description}
             </Text>
@@ -179,7 +188,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
         >
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
-        <Text style={styles(colors).headerTitle}>{restaurant.name}</Text>
+        <Text style={styles(colors).headerTitle}>{displayName}</Text>
         <TouchableOpacity
           style={styles(colors).searchButton}
           onPress={() => setSearchVisible(!searchVisible)}
@@ -221,7 +230,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
               style={styles(colors).restaurantIconImage}
             />
             <View style={styles(colors).restaurantDetails}>
-              <Text style={styles(colors).restaurantName}>{restaurant._raw?.vendor?.vendorName || restaurant.name}</Text>
+              <Text style={styles(colors).restaurantName}>{displayName}</Text>
               <Text style={styles(colors).restaurantCategories}>
                 {(restaurant.categories && restaurant.categories.length) ? restaurant.categories.join(' • ') : (restaurant._raw?.tags ? restaurant._raw.tags.join(' • ') : '')}
               </Text>
