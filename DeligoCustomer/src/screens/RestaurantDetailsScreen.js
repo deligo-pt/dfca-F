@@ -16,9 +16,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { spacing, fontSize, borderRadius } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
 import { useProducts } from '../contexts/ProductsContext';
+import { useLanguage } from '../utils/LanguageContext';
 
 const RestaurantDetailsScreen = ({ route, navigation }) => {
   const { colors } = useTheme();
+  const { t } = useLanguage();
   const { restaurant } = route.params;
   // Normalize rating to a scalar (number) to avoid rendering an object in <Text>
   const _r = restaurant || {};
@@ -202,7 +204,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
               style={styles(colors).addButton}
               onPress={() => addToCart(product)}
             >
-              <Text style={styles(colors).addButtonText}>Add</Text>
+              <Text style={styles(colors).addButtonText}>{t('addItem') || 'Add'}</Text>
             </TouchableOpacity>
           ) : (
             <View style={styles(colors).quantityControl}>
@@ -264,8 +266,8 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                 </View>
 
                 <View style={styles(colors).metaRow}>
-                  {productId ? <Text style={styles(colors).metaSmall}>ID: {productId}</Text> : null}
-                  {sku ? <Text style={[styles(colors).metaSmall, { marginLeft: 12 }]}>SKU: {sku}</Text> : null}
+                  {productId ? <Text style={styles(colors).metaSmall}>{t('id') || 'ID'}: {productId}</Text> : null}
+                  {sku ? <Text style={[styles(colors).metaSmall, { marginLeft: 12 }]}>{t('sku') || 'SKU'}: {sku}</Text> : null}
                 </View>
 
                 <View style={styles(colors).metaRow}>
@@ -286,7 +288,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
                 {attributes && Object.keys(attributes).length ? (
                   <View style={styles(colors).attributesContainer}>
-                    <Text style={styles(colors).attributesTitle}>Details</Text>
+                    <Text style={styles(colors).attributesTitle}>{t('details') || 'Details'}</Text>
                     <View style={styles(colors).attributesList}>
                       {Object.entries(attributes).map(([k, v]) => (
                         <View key={k} style={styles(colors).attributeRow}>
@@ -300,10 +302,10 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
                 <View style={styles(colors).modalActions}>
                   <TouchableOpacity style={styles(colors).modalCloseButton} onPress={closeProductModal}>
-                    <Text style={styles(colors).modalCloseButtonText}>Close</Text>
+                    <Text style={styles(colors).modalCloseButtonText}>{t('close') || 'Close'}</Text>
                   </TouchableOpacity>
                   <TouchableOpacity style={styles(colors).modalAddButton} onPress={() => { addToCart(activeProduct); closeProductModal(); }}>
-                    <Text style={styles(colors).modalAddButtonText}>Add to cart</Text>
+                    <Text style={styles(colors).modalAddButtonText}>{t('addToCart') || 'Add to cart'}</Text>
                   </TouchableOpacity>
                 </View>
               </View>
@@ -339,7 +341,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
           <Ionicons name="search" size={20} color={colors.text.secondary} style={styles(colors).searchIcon} />
           <TextInput
             style={styles(colors).searchInput}
-            placeholder="Search menu items..."
+            placeholder={t('search') || 'Search menu items...'}
             placeholderTextColor={colors.text.secondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -390,7 +392,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
           {/* Delivery Info */}
           <View style={styles(colors).deliveryInfo}>
             <View style={styles(colors).deliveryInfoItem}>
-              <Text style={styles(colors).deliveryInfoLabel}>Delivery Fee</Text>
+              <Text style={styles(colors).deliveryInfoLabel}>{t('deliveryFee') || 'Delivery Fee'}</Text>
               <Text style={styles(colors).deliveryInfoValue}>{restaurant.deliveryFee}</Text>
             </View>
             {restaurant.offer && (
@@ -432,15 +434,15 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
         {/* Menu Items */}
         <View style={styles(colors).menuSection}>
           <Text style={styles(colors).menuSectionTitle}>
-            {searchQuery ? `Search Results (${getFilteredMenuItems().length})` : 'Menu'}
+            {searchQuery ? `${t('search') || 'Search'} (${getFilteredMenuItems().length})` : (t('menu') || 'Menu')}
           </Text>
           {getFilteredMenuItems().length > 0 ? (
             getFilteredMenuItems().map((item) => renderMenuItem(item))
           ) : (
              <View style={styles(colors).noResultsContainer}>
                <Ionicons name="search-outline" size={48} color={colors.text.secondary} />
-               <Text style={styles(colors).noResultsText}>No items found</Text>
-               <Text style={styles(colors).noResultsSubtext}>Try searching with different keywords</Text>
+               <Text style={styles(colors).noResultsText}>{t('noItemsFound') || 'No items found'}</Text>
+               <Text style={styles(colors).noResultsSubtext}>{t('tryAdjustingFilters') || 'Try searching with different keywords'}</Text>
              </View>
            )}
         </View>
@@ -449,7 +451,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
         {getTotalItems() > 0 && (
           <View style={styles(colors).cartFooterInline}>
             <View style={styles(colors).cartFooterLeft}>
-              <Text style={styles(colors).cartItemCount}>{getTotalItems()} items</Text>
+              <Text style={styles(colors).cartItemCount}>{getTotalItems()} {t('items') || 'items'}</Text>
               <Text style={styles(colors).cartTotal}>€{getTotalPrice()}</Text>
             </View>
             <TouchableOpacity
@@ -459,7 +461,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                 navigation.navigate('Main', { screen: 'Cart' });
               }}
             >
-              <Text style={styles(colors).viewCartButtonText}>View Cart</Text>
+              <Text style={styles(colors).viewCartButtonText}>{t('viewCart') || 'View Cart'}</Text>
               <Text style={styles(colors).viewCartButtonIcon}>→</Text>
             </TouchableOpacity>
           </View>
