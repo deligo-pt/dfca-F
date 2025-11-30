@@ -6,6 +6,7 @@ import { useTheme } from '../utils/ThemeContext';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import {Platform, KeyboardAvoidingView, Dimensions, View} from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import { useCart } from '../contexts/CartContext';
 
 const Tab = createBottomTabNavigator();
 
@@ -13,6 +14,8 @@ const BottomTabNavigator = ({ onLogout }) => {
     const { colors, isDarkMode } = useTheme();
     const insets = useSafeAreaInsets();
     const { height: screenHeight } = Dimensions.get('window');
+    const { cartsArray } = useCart();
+    const cartsCount = (cartsArray && cartsArray.length) ? cartsArray.length : 0;
 
     // Calculate proper bottom padding for tab bar
     // For large screens (> 800px height), ensure we account for proper spacing
@@ -105,6 +108,8 @@ const BottomTabNavigator = ({ onLogout }) => {
                         component={CartScreen}
                         options={{
                             tabBarIcon: ({ focused, color }) => <CartIcon focused={focused} color={color} />,
+                            tabBarBadge: cartsCount > 0 ? cartsCount : undefined,
+                            tabBarBadgeStyle: { backgroundColor: colors.primary, color: '#fff', fontFamily: 'Poppins-SemiBold' },
                         }}
                     />
                     <Tab.Screen

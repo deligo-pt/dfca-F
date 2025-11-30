@@ -3,7 +3,7 @@ import React, { useState, useEffect } from 'react';
 import { Text as RNText, TextInput as RNTextInput } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { OnboardingScreen, LoginScreen, TermsOfServiceScreen, PrivacyPolicyScreen, LocationAddressScreen, RestaurantDetailsScreen, TrackOrderScreen, CheckoutScreen, EditProfileScreen, VouchersScreen, SavedAddressesScreen, PaymentMethodsScreen, ReferralsScreen, NotificationsScreen, SettingsScreen, HelpCenterScreen } from './src/screens';
+import { OnboardingScreen, LoginScreen, TermsOfServiceScreen, PrivacyPolicyScreen, LocationAddressScreen, RestaurantDetailsScreen, TrackOrderScreen, CheckoutScreen, EditProfileScreen, VouchersScreen, SavedAddressesScreen, PaymentMethodsScreen, ReferralsScreen, NotificationsScreen, SettingsScreen, HelpCenterScreen, CartDetailScreen } from './src/screens';
 import { BottomTabNavigator } from './src/navigation';
 import { checkOnboardingStatus } from './src/utils/storage';
 import { isUserAuthenticated, getUserData } from './src/utils/auth';
@@ -149,6 +149,7 @@ export default function App() {
                 <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
                 <Stack.Screen name="LocationAddress" component={LocationAddressScreen} />
                 <Stack.Screen name="RestaurantDetails" component={RestaurantDetailsScreen} />
+                <Stack.Screen name="CartDetail" component={CartDetailScreen} />
                 <Stack.Screen name="TrackOrder" component={TrackOrderScreen} />
                 <Stack.Screen name="Checkout" component={CheckoutScreen} />
 

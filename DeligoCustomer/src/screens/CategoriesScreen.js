@@ -18,6 +18,7 @@ import mockProductsRaw from '../data/mockData.json';
 import OfferModal from '../components/Categories/OfferModal';
 import useLocationHook from '../components/Categories/useLocation';
 import RestaurantsList from '../components/Categories/RestaurantsList';
+import { useCart } from '../contexts/CartContext';
 
 const CategoriesScreen = ({ navigation }) => {
   const { colors } = useTheme();
@@ -38,8 +39,10 @@ const CategoriesScreen = ({ navigation }) => {
   const [offerModalVisible, setOfferModalVisible] = useState(false);
   const [selectedOffer, setSelectedOffer] = useState(null);
 
-  // Mock cart count - in real app, get from context/state
-  const cartItemCount = 0;
+  // Cart counts from context
+  const { cartsArray, cartItems } = useCart();
+  const cartVendorsCount = (cartsArray && cartsArray.length) ? cartsArray.length : 0; // number of vendor carts
+  const cartItemCount = cartItems ? cartItems.reduce((s, it) => s + (it.quantity || 0), 0) : 0; // total items across vendor carts
 
   // Sample offer from API - set to null to test welcome greeting
   const activeOffer = {
@@ -458,6 +461,7 @@ const CategoriesScreen = ({ navigation }) => {
         onLocationPress={handleLocationPress}
         area={area}
         cartItemCount={cartItemCount}
+        cartVendorsCount={cartVendorsCount}
         onSearch={setSearchQuery}
         searchQuery={searchQuery}
         suggestions={searchSuggestions}
@@ -521,6 +525,7 @@ const CategoriesScreen = ({ navigation }) => {
           onCartPress={handleCartPress}
           onLocationPress={handleLocationPress}
           cartItemCount={cartItemCount}
+          cartVendorsCount={cartVendorsCount}
           onSearch={setSearchQuery}
           searchQuery={searchQuery}
           suggestions={searchSuggestions}
