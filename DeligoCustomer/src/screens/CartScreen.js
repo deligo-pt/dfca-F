@@ -5,93 +5,53 @@ import { Ionicons } from '@expo/vector-icons';
 import { spacing, fontSize, borderRadius } from '../theme';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
+import { useCart } from '../contexts/CartContext';
 
 const CartScreen = ({ navigation }) => {
   const { t } = useLanguage();
   const { colors, isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
 
-  // Mock cart data - in real app, this would come from global state/context
-  const [cartItems, setCartItems] = useState([
-    {
-      id: 'm1',
-      name: 'Double Whopper',
-      description: 'Two flame-grilled beef patties with fresh ingredients',
-      price: 12.99,
-      quantity: 2,
-      image: '🍔',
-      restaurant: 'Burger King',
-    },
-    {
-      id: 'm6',
-      name: 'French Fries',
-      description: 'Crispy golden fries',
-      price: 3.99,
-      quantity: 1,
-      image: '🍟',
-      restaurant: 'Burger King',
-    },
-    {
-      id: 'm9',
-      name: 'Coca Cola',
-      description: 'Chilled soft drink',
-      price: 2.99,
-      quantity: 2,
-      image: '🥤',
-      restaurant: 'Burger King',
-    },
-  ]);
+  // Use Cart context for real data
+  const {
+    loading: cartLoading,
+    cartState,
+    cartItems,
+    itemCount,
+    subtotal,
+    deliveryFee,
+    serviceFee,
+    discount,
+    total,
+    updateQuantity,
+    removeItem,
+    clearCart,
+    applyPromoCode,
+    removeAppliedPromo,
+    setDeliveryInstructions,
+  } = useCart();
 
   const [promoCode, setPromoCode] = useState('');
-  const [appliedPromo, setAppliedPromo] = useState(null);
-  const [deliveryInstructions, setDeliveryInstructions] = useState('');
 
-  const deliveryFee = 0; // Free delivery
-  const serviceFee = 1.99;
-  const discount = appliedPromo ? 5.00 : 0;
+  const appliedPromo = cartState?.appliedPromo || null;
+  const deliveryInstructions = cartState?.deliveryInstructions || '';
 
-  const updateQuantity = (itemId, delta) => {
-    setCartItems((prevItems) =>
-      prevItems.map((item) => {
-        if (item.id === itemId) {
-          const newQuantity = item.quantity + delta;
-          return newQuantity > 0 ? { ...item, quantity: newQuantity } : item;
-        }
-        return item;
-      }).filter((item) => item.quantity > 0)
-    );
-  };
-
-  const removeItem = (itemId) => {
-    setCartItems((prevItems) => prevItems.filter((item) => item.id !== itemId));
-  };
-
-  const getSubtotal = () => {
-    return cartItems.reduce((sum, item) => sum + item.price * item.quantity, 0);
-  };
-
-  const getTotal = () => {
-    return getSubtotal() + deliveryFee + serviceFee - discount;
-  };
-
-  const applyPromoCode = () => {
-    if (promoCode.toUpperCase() === 'SAVE5') {
-      setAppliedPromo({ code: 'SAVE5', discount: 5.00 });
-    } else {
-      alert(t('invalidPromoCode'));
-    }
+  const onApplyPromo = () => {
+    const res = applyPromoCode(promoCode);
+    if (!res.ok) alert(t('invalidPromoCode'));
+    else setPromoCode('');
   };
 
   const renderCartItem = (item) => (
     <View key={item.id} style={[styles.cartItem, { borderBottomColor: colors.border }]}>
       <View style={styles.itemLeft}>
-        <Text style={styles.itemImage}>{item.image}</Text>
+        <Text style={styles.itemImage}>{item.product.image ? null : '🍽'}</Text>
         <View style={styles.itemInfo}>
-          <Text style={[styles.itemName, { color: colors.text.primary }]}>{item.name}</Text>
+          <Text style={[styles.itemName, { color: colors.text.primary }]}>{item.product.name}</Text>
           <Text style={[styles.itemDescription, { color: colors.text.secondary }]} numberOfLines={1}>
-            {item.description}
+            {item.product._raw?.description || ''}
           </Text>
-          <Text style={[styles.itemPrice, { color: colors.primary }]}>€{item.price.toFixed(2)}</Text>
+          <Text style={[styles.itemPrice, { color: colors.primary }]}>{item.product.currency || '€'}{Number(item.product.price).toFixed(2)}</Text>
         </View>
       </View>
       <View style={styles.itemRight}>
@@ -120,7 +80,7 @@ const CartScreen = ({ navigation }) => {
     </View>
   );
 
-  if (cartItems.length === 0) {
+  if (!cartItems || cartItems.length === 0) {
     return (
       <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
         <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
@@ -148,7 +108,7 @@ const CartScreen = ({ navigation }) => {
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <Text style={[styles.headerTitle, { color: colors.text.primary }]}>{t('cart')}</Text>
-        <TouchableOpacity onPress={() => setCartItems([])}>
+        <TouchableOpacity onPress={() => clearCart()}>
           <Text style={[styles.clearAllText, { color: colors.primary }]}>{t('clearAll')}</Text>
         </TouchableOpacity>
       </View>
@@ -171,13 +131,11 @@ const CartScreen = ({ navigation }) => {
           <View style={styles.restaurantHeader}>
             <Text style={styles.restaurantIcon}>🍔</Text>
             <View style={styles.restaurantInfo}>
-              <Text style={[styles.restaurantName, { color: colors.text.primary }]}>Burger King</Text>
+              <Text style={[styles.restaurantName, { color: colors.text.primary }]}>{cartState.vendorName || 'Restaurant'}</Text>
               <View style={styles.restaurantMeta}>
-                <Text style={[styles.metaText, { color: colors.text.secondary }]}>⭐ 4.5</Text>
+                <Text style={[styles.metaText, { color: colors.text.secondary }]}>⭐</Text>
                 <Text style={[styles.metaDot, { color: colors.text.light }]}>•</Text>
-                <Text style={[styles.metaText, { color: colors.text.secondary }]}>25-35 min</Text>
-                <Text style={[styles.metaDot, { color: colors.text.light }]}>•</Text>
-                <Text style={[styles.metaText, { color: colors.text.secondary }]}>1.2 km</Text>
+                <Text style={[styles.metaText, { color: colors.text.secondary }]}>{cartState.vendorId || ''}</Text>
               </View>
             </View>
           </View>
@@ -247,7 +205,7 @@ const CartScreen = ({ navigation }) => {
                   </Text>
                 </View>
               </View>
-              <TouchableOpacity onPress={() => setAppliedPromo(null)}>
+              <TouchableOpacity onPress={() => { removeAppliedPromo(); }}>
                 <Text style={styles.removePromoText}>✕</Text>
               </TouchableOpacity>
             </View>
@@ -261,7 +219,7 @@ const CartScreen = ({ navigation }) => {
                 onChangeText={setPromoCode}
                 autoCapitalize="characters"
               />
-              <TouchableOpacity style={[styles.applyButton, { backgroundColor: colors.primary }]} onPress={applyPromoCode}>
+              <TouchableOpacity style={[styles.applyButton, { backgroundColor: colors.primary }]} onPress={onApplyPromo}>
                 <Text style={styles.applyButtonText}>{t('apply')}</Text>
               </TouchableOpacity>
             </View>
@@ -311,19 +269,19 @@ const CartScreen = ({ navigation }) => {
           <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('billSummary')}</Text>
           <View style={styles.priceRow}>
             <Text style={[styles.priceLabel, { color: colors.text.secondary }]}>{t('subtotal')}</Text>
-            <Text style={[styles.priceValue, { color: colors.text.primary }]}>€{getSubtotal().toFixed(2)}</Text>
+            <Text style={[styles.priceValue, { color: colors.text.primary }]}>{cartItems[0]?.product?.currency || '€'}{Number(subtotal).toFixed(2)}</Text>
           </View>
           <View style={styles.priceRow}>
             <Text style={[styles.priceLabel, { color: colors.text.secondary }]}>{t('deliveryFee')}</Text>
             {deliveryFee === 0 ? (
               <Text style={[styles.priceFree, { color: colors.success }]}>{t('free')}</Text>
             ) : (
-              <Text style={[styles.priceValue, { color: colors.text.primary }]}>€{deliveryFee.toFixed(2)}</Text>
+              <Text style={[styles.priceValue, { color: colors.text.primary }]}>{cartItems[0]?.product?.currency || '€'}{Number(deliveryFee).toFixed(2)}</Text>
             )}
           </View>
           <View style={styles.priceRow}>
             <Text style={[styles.priceLabel, { color: colors.text.secondary }]}>{t('serviceFee')}</Text>
-            <Text style={[styles.priceValue, { color: colors.text.primary }]}>€{serviceFee.toFixed(2)}</Text>
+            <Text style={[styles.priceValue, { color: colors.text.primary }]}>{cartItems[0]?.product?.currency || '€'}{Number(serviceFee).toFixed(2)}</Text>
           </View>
           {discount > 0 && (
             <View style={styles.priceRow}>
@@ -334,7 +292,7 @@ const CartScreen = ({ navigation }) => {
           <View style={[styles.divider, { backgroundColor: colors.border }]} />
           <View style={styles.priceRow}>
             <Text style={[styles.totalLabel, { color: colors.text.primary }]}>{t('total')}</Text>
-            <Text style={[styles.totalValue, { color: colors.primary }]}>€{getTotal().toFixed(2)}</Text>
+            <Text style={[styles.totalValue, { color: colors.primary }]}>{cartItems[0]?.product?.currency || '€'}{Number(total).toFixed(2)}</Text>
           </View>
         </View>
 
@@ -352,9 +310,9 @@ const CartScreen = ({ navigation }) => {
           <View style={[styles.totalBarInline, { borderBottomColor: colors.border }]}>
             <View>
               <Text style={[styles.checkoutItemCount, { color: colors.text.secondary }]}>
-                {cartItems.reduce((sum, item) => sum + item.quantity, 0)} {t('items')}
+                {itemCount} {t('items')}
               </Text>
-              <Text style={[styles.checkoutTotal, { color: colors.primary }]}>€{getTotal().toFixed(2)}</Text>
+              <Text style={[styles.checkoutTotal, { color: colors.primary }]}>{cartItems[0]?.product?.currency || '€'}{Number(total).toFixed(2)}</Text>
             </View>
           </View>
           <TouchableOpacity
@@ -370,13 +328,15 @@ const CartScreen = ({ navigation }) => {
             onPress={() => {
               const cartData = {
                 items: cartItems,
-                subtotal: getSubtotal(),
-                deliveryFee: deliveryFee,
-                serviceFee: serviceFee,
-                discount: discount,
-                total: getTotal(),
-                deliveryInstructions: deliveryInstructions,
+                subtotal,
+                deliveryFee,
+                serviceFee,
+                discount,
+                total,
+                deliveryInstructions,
                 promoCode: appliedPromo?.code,
+                vendorId: cartState.vendorId,
+                vendorName: cartState.vendorName,
               };
               navigation.navigate('Checkout', { cartData });
             }}

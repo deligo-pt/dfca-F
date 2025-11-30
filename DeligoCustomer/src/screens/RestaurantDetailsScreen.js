@@ -17,6 +17,7 @@ import { spacing, fontSize, borderRadius } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
 import { useProducts } from '../contexts/ProductsContext';
 import { useLanguage } from '../utils/LanguageContext';
+import { useCart } from '../contexts/CartContext';
 
 const RestaurantDetailsScreen = ({ route, navigation }) => {
   const { colors } = useTheme();
@@ -35,9 +36,10 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
   const insets = useSafeAreaInsets();
   const [selectedCategory, setSelectedCategory] = useState('Popular');
-  const [cart, setCart] = useState({});
+  // Search state (was missing and caused ReferenceError)
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
+  const { addItem, updateQuantity: cartUpdateQuantity, itemsMap, cartItems } = useCart();
 
   // Product modal state
   const [productModalVisible, setProductModalVisible] = useState(false);
@@ -112,36 +114,30 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   });
   const menuCategories = ['Popular', ...Array.from(derivedCategories)];
 
-  const addToCart = (item) => {
-    setCart({
-      ...cart,
-      [item.id]: (cart[item.id] || 0) + 1,
-    });
-  };
-
-  const removeFromCart = (item) => {
-    if (cart[item.id] > 0) {
-      const newCart = { ...cart };
-      newCart[item.id] -= 1;
-      if (newCart[item.id] === 0) {
-        delete newCart[item.id];
-      }
-      setCart(newCart);
-    }
-  };
+  const addToCart = (item) => addItem(item, 1);
+  const removeFromCart = (item) => cartUpdateQuantity(item.id, -1);
 
   const getTotalItems = () => {
-    return Object.values(cart).reduce((sum, count) => sum + count, 0);
+    // itemsMap contains items across vendors; sum only those for this vendor
+    const ids = Object.keys(itemsMap || {});
+    return ids.reduce((s, id) => {
+      const it = itemsMap[id];
+      if (!it) return s;
+      const vendorIdOfItem = it.product.vendorId || it.product._raw?.vendor?.vendorId;
+      if (vendorIdOfItem && vendorIdOfItem === vendorId) return s + it.quantity;
+      return s;
+    }, 0);
   };
 
   const getTotalPrice = () => {
-    let total = 0;
-    Object.keys(cart).forEach((itemId) => {
-      const product = vendorProducts.find(p => p.id === itemId);
-      const raw = product?._raw || {};
-      const price = raw.pricing?.price ?? raw.price ?? product?.price ?? 0;
-      if (price) total += Number(price) * cart[itemId];
-    });
+    const ids = Object.keys(itemsMap || {});
+    const total = ids.reduce((s, id) => {
+      const it = itemsMap[id];
+      if (!it) return s;
+      const vendorIdOfItem = it.product.vendorId || it.product._raw?.vendor?.vendorId;
+      if (vendorIdOfItem && vendorIdOfItem === vendorId) return s + (Number(it.product.price || 0) * it.quantity);
+      return s;
+    }, 0);
     return total.toFixed(2);
   };
 
@@ -173,7 +169,8 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   };
 
   const renderMenuItem = (product) => {
-    const quantity = cart[product.id] || 0;
+    // Read quantity from cart items map provided by CartContext
+    const quantity = itemsMap?.[product.id]?.quantity || 0;
     const raw = product._raw || {};
     // Prefer product-level name fields to avoid showing vendorName which may have been stored in product.name during normalization
     const displayProductName = raw.product?.name || raw.name || raw.productName || product.name || '';

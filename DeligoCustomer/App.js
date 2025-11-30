@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import React, { useState, useEffect } from 'react';
-import { StyleSheet, Text as RNText, TextInput as RNTextInput } from 'react-native';
+import { Text as RNText, TextInput as RNTextInput } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { OnboardingScreen, LoginScreen, TermsOfServiceScreen, PrivacyPolicyScreen, LocationAddressScreen, RestaurantDetailsScreen, TrackOrderScreen, CheckoutScreen, EditProfileScreen, VouchersScreen, SavedAddressesScreen, PaymentMethodsScreen, ReferralsScreen, NotificationsScreen, SettingsScreen, HelpCenterScreen } from './src/screens';
@@ -14,6 +14,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { LanguageProvider } from './src/utils/LanguageContext';
 import { ThemeProvider } from './src/utils/ThemeContext';
 import { ProductsProvider } from './src/contexts/ProductsContext';
+import { CartProvider } from './src/contexts/CartContext';
 import * as SystemUI from 'expo-system-ui';
 
 // Keep the splash screen visible while we fetch resources
@@ -128,7 +129,8 @@ export default function App() {
       <ThemeProvider>
         <LanguageProvider>
           <ProductsProvider>
-            <NavigationContainer>
+            <CartProvider>
+             <NavigationContainer>
               <Stack.Navigator screenOptions={{ headerShown: false }}>
                 {showOnboarding ? (
                   <Stack.Screen name="Onboarding">
@@ -162,11 +164,10 @@ export default function App() {
               </Stack.Navigator>
               <StatusBar style="light" backgroundColor={colors.primary} />
             </NavigationContainer>
-          </ProductsProvider>
+            </CartProvider>
+           </ProductsProvider>
         </LanguageProvider>
       </ThemeProvider>
     </SafeAreaProvider>
   );
 }
-
-
