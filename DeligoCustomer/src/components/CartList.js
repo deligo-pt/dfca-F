@@ -1,5 +1,5 @@
-import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Image, Alert } from 'react-native';
+import React, { useState } from 'react';
+import { View, Text, TouchableOpacity, StyleSheet, Image, Pressable, ActivityIndicator } from 'react-native';
 import { useCart } from '../contexts/CartContext';
 import { useTheme } from '../utils/ThemeContext';
 import { spacing, fontSize, borderRadius } from '../theme';
@@ -9,34 +9,30 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 export default function CartList({ navigation }) {
   const { cartsArray, getVendorSubtotal, clearVendorCartAndSync } = useCart();
   const { colors } = useTheme();
+  const [menuForVendor, setMenuForVendor] = useState(null);
+  const [deletingVendorId, setDeletingVendorId] = useState(null);
 
   if (!cartsArray || cartsArray.length === 0) {
     return null;
   }
 
-  const confirmDeleteVendorCart = (vendorId) => {
+  const handleDeleteVendorCart = async (vendorId) => {
     if (!vendorId) return;
-    Alert.alert(
-      'Delete cart',
-      'Are you sure you want to remove all items from this cart?',
-      [
-        { text: 'Cancel', style: 'cancel' },
-        {
-          text: 'Delete',
-          style: 'destructive',
-          onPress: async () => {
-            const res = await clearVendorCartAndSync(vendorId);
-            if (!res.success) {
-              console.warn(res.error || 'Failed to delete cart');
-            }
-          }
-        }
-      ]
-    );
+    setDeletingVendorId(vendorId);
+    const res = await clearVendorCartAndSync(vendorId);
+    setDeletingVendorId(null);
+    setMenuForVendor(null);
+    if (!res.success) {
+      console.warn(res.error || 'Failed to delete cart');
+    }
   };
 
   return (
-    <View style={{ padding: spacing.md }}>
+    <View style={{ padding: spacing.md, position: 'relative' }}>
+      {/* Overlay to close menu when tapping outside */}
+      {menuForVendor && (
+        <Pressable onPress={() => setMenuForVendor(null)} style={[StyleSheet.absoluteFillObject, { zIndex: 1 }]} />
+      )}
       {cartsArray.map((cart) => {
         const itemCount = Object.keys(cart.items || {}).reduce((s, id) => s + (cart.items[id].quantity || 0), 0);
         const subtotal = getVendorSubtotal(cart.vendorId);
@@ -48,8 +44,10 @@ export default function CartList({ navigation }) {
         const vendorRating = firstItem?._raw?.vendor?.rating || '4.5';
         const vendorDeliveryTime = firstItem?._raw?.vendor?.deliveryTime || '30-40 min';
 
+        const isMenuOpen = menuForVendor === cart.vendorId;
+
         return (
-          <View key={cart.vendorId}>
+          <View key={cart.vendorId} style={{ position: 'relative' }}>
             <TouchableOpacity
               onPress={() => navigation.navigate('CartDetail', { vendorId: cart.vendorId })}
               activeOpacity={0.7}
@@ -99,7 +97,7 @@ export default function CartList({ navigation }) {
 
                   {/* Three dots menu trigger */}
                   <TouchableOpacity
-                    onPress={() => confirmDeleteVendorCart(cart.vendorId)}
+                    onPress={() => setMenuForVendor(isMenuOpen ? null : cart.vendorId)}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                     style={{ paddingLeft: spacing.sm, paddingVertical: spacing.xs }}
                   >
@@ -125,6 +123,26 @@ export default function CartList({ navigation }) {
                 </TouchableOpacity>
               </View>
             </TouchableOpacity>
+
+            {/* Inline popover menu */}
+            {isMenuOpen && (
+              <View style={{ position: 'absolute', top: 8, right: 12, zIndex: 2 }}>
+                <View style={{ backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingVertical: 4, width: 160, elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 8 }}>
+                  <TouchableOpacity
+                    disabled={deletingVendorId === cart.vendorId}
+                    onPress={() => handleDeleteVendorCart(cart.vendorId)}
+                    style={{ paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center' }}
+                  >
+                    {deletingVendorId === cart.vendorId ? (
+                      <ActivityIndicator size="small" color={colors.error || '#D32F2F'} />
+                    ) : (
+                      <Ionicons name="trash" size={16} color={colors.error || '#D32F2F'} />
+                    )}
+                    <Text style={{ marginLeft: 8, color: colors.error || '#D32F2F', fontFamily: 'Poppins-Medium' }}>Delete cart</Text>
+                  </TouchableOpacity>
+                </View>
+              </View>
+            )}
           </View>
         );
       })}
