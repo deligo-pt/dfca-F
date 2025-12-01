@@ -19,6 +19,7 @@ import OfferModal from '../components/Categories/OfferModal';
 import useLocationHook from '../components/Categories/useLocation';
 import RestaurantsList from '../components/Categories/RestaurantsList';
 import { useCart } from '../contexts/CartContext';
+import formatCurrency from '../utils/currency';
 
 const CategoriesScreen = ({ navigation }) => {
   const { colors } = useTheme();
@@ -68,7 +69,7 @@ const CategoriesScreen = ({ navigation }) => {
       rating: (p.rating && (typeof p.rating === 'number' ? p.rating : p.rating.average)) || vendor.rating || 0,
       deliveryTime: p.deliveryTime || '',
       distance: p.distance || '',
-      deliveryFee: (p.pricing && typeof p.pricing.price !== 'undefined') ? `${p.pricing.currency || ''} ${p.pricing.price}` : '',
+      deliveryFee: (p.pricing && typeof p.pricing.price !== 'undefined') ? formatCurrency(p.pricing.currency || '', p.pricing.price) : '',
       offer: (p.pricing && p.pricing.discount) ? `${p.pricing.discount}% OFF` : null,
     };
   };

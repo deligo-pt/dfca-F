@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, Image,
 import { useCart } from '../contexts/CartContext';
 import { useTheme } from '../utils/ThemeContext';
 import { spacing, fontSize, borderRadius } from '../theme';
+import formatCurrency from '../utils/currency';
 
 export default function CartDetail({ vendorId, navigation }) {
   const { getVendorCart, getVendorSubtotal, updateQuantity, removeItem, applyPromoCodeToVendor, removeAppliedPromoFromVendor, setDeliveryInstructionsForVendor } = useCart();
@@ -81,7 +82,7 @@ export default function CartDetail({ vendorId, navigation }) {
                 <View style={{ flex: 1, marginLeft: spacing.md }}>
                   <Text style={[styles.itemName, { color: colors.text.primary }]} numberOfLines={2}>{it.product.name}</Text>
                   <Text style={{ color: colors.text.secondary, marginTop: 6 }}>{it.product._raw?.description || ''}</Text>
-                  <Text style={[styles.itemPrice, { color: colors.text.primary, marginTop: 6 }]}>{it.product.currency || '€'}{Number(it.product.price).toFixed(2)}</Text>
+                  <Text style={[styles.itemPrice, { color: colors.text.primary, marginTop: 6 }]}>{formatCurrency(it.product.currency || '', it.product.price)}</Text>
                 </View>
                 <View style={{ alignItems: 'center' }}>
                   <View style={[styles.qtyPill, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -122,12 +123,12 @@ export default function CartDetail({ vendorId, navigation }) {
         {/* Price Breakdown */}
         <View style={{ padding: spacing.md }}>
           <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', marginBottom: 10 }}>Order summary</Text>
-          <View style={styles.rowBetween}><Text style={{ color: colors.text.secondary }}>Subtotal</Text><Text style={{ color: colors.text.primary }}>{items[0]?.product.currency || '€'}{Number(subtotal).toFixed(2)}</Text></View>
-          <View style={styles.rowBetween}><Text style={{ color: colors.text.secondary }}>Delivery fee</Text><Text style={{ color: colors.text.primary }}>{deliveryFee === 0 ? 'Free' : `${items[0]?.product.currency || '€'}${Number(deliveryFee).toFixed(2)}`}</Text></View>
-          <View style={styles.rowBetween}><Text style={{ color: colors.text.secondary }}>Service fee</Text><Text style={{ color: colors.text.primary }}>{items[0]?.product.currency || '€'}{Number(serviceFee).toFixed(2)}</Text></View>
-          {discount > 0 && <View style={styles.rowBetween}><Text style={{ color: colors.text.secondary }}>Discount</Text><Text style={{ color: colors.success || '#4CAF50' }}>-€{Number(discount).toFixed(2)}</Text></View>}
+          <View style={styles.rowBetween}><Text style={{ color: colors.text.secondary }}>Subtotal</Text><Text style={{ color: colors.text.primary }}>{formatCurrency(items[0]?.product.currency || '', subtotal)}</Text></View>
+          <View style={styles.rowBetween}><Text style={{ color: colors.text.secondary }}>Delivery fee</Text><Text style={{ color: colors.text.primary }}>{deliveryFee === 0 ? 'Free' : formatCurrency(items[0]?.product.currency || '', deliveryFee)}</Text></View>
+          <View style={styles.rowBetween}><Text style={{ color: colors.text.secondary }}>Service fee</Text><Text style={{ color: colors.text.primary }}>{formatCurrency(items[0]?.product.currency || '', serviceFee)}</Text></View>
+          {discount > 0 && <View style={styles.rowBetween}><Text style={{ color: colors.text.secondary }}>Discount</Text><Text style={{ color: colors.success || '#4CAF50' }}>-{formatCurrency(items[0]?.product.currency || '', discount)}</Text></View>}
           <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
-          <View style={styles.rowBetween}><Text style={{ color: colors.text.primary, fontFamily: 'Poppins-Bold' }}>Total</Text><Text style={{ color: colors.primary, fontFamily: 'Poppins-Bold' }}>{items[0]?.product.currency || '€'}{Number(total).toFixed(2)}</Text></View>
+          <View style={styles.rowBetween}><Text style={{ color: colors.text.primary, fontFamily: 'Poppins-Bold' }}>Total</Text><Text style={{ color: colors.primary, fontFamily: 'Poppins-Bold' }}>{formatCurrency(items[0]?.product.currency || '', total)}</Text></View>
         </View>
       </ScrollView>
 
@@ -135,7 +136,7 @@ export default function CartDetail({ vendorId, navigation }) {
       <View style={[styles.footer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
         <View style={{ flex: 1 }}>
           <Text style={{ color: colors.text.secondary, fontSize: 13 }}>{items.reduce((s, it) => s + it.quantity, 0)} items</Text>
-          <Text style={{ color: colors.primary, fontFamily: 'Poppins-Bold', fontSize: 18 }}>{items[0]?.product.currency || '€'}{Number(total).toFixed(2)}</Text>
+          <Text style={{ color: colors.primary, fontFamily: 'Poppins-Bold', fontSize: 18 }}>{formatCurrency(items[0]?.product.currency || '', total)}</Text>
         </View>
         <TouchableOpacity style={[styles.checkoutBtn, { backgroundColor: colors.primary }]} onPress={onCheckout}>
           <Text style={{ color: '#fff', fontFamily: 'Poppins-Bold', fontSize: 16 }}>Checkout</Text>

@@ -2,6 +2,7 @@ import React, { createContext, useContext, useCallback, useEffect, useState } fr
 import { getAccessToken, getRefreshToken, setAccessToken, setRefreshToken } from '../utils/storage';
 import StorageService from '../utils/storage';
 import { BASE_API_URL, API_ENDPOINTS } from '../constants/config';
+import formatCurrency from '../utils/currency';
 
 const API_URL = `${BASE_API_URL}${API_ENDPOINTS.PRODUCTS.GET_ALL}`;
 // Cache TTL in milliseconds (default 5 minutes)
@@ -22,7 +23,7 @@ function normalizeProduct(p) {
     rating: (p.rating && (typeof p.rating === 'number' ? p.rating : p.rating.average)) || vendor.rating || 0,
     deliveryTime: p.deliveryTime || '',
     distance: p.distance || '',
-    deliveryFee: (p.pricing && typeof p.pricing.price !== 'undefined') ? `${p.pricing.currency || ''} ${p.pricing.price}` : '',
+    deliveryFee: (p.pricing && typeof p.pricing.price !== 'undefined') ? formatCurrency(p.pricing.currency || '', p.pricing.price) : '',
     offer: (p.pricing && p.pricing.discount) ? `${p.pricing.discount}% OFF` : null,
   };
 }

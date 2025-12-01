@@ -3,6 +3,7 @@ import { View, Text, TouchableOpacity, StyleSheet, Image } from 'react-native';
 import { useCart } from '../contexts/CartContext';
 import { useTheme } from '../utils/ThemeContext';
 import { spacing, fontSize, borderRadius } from '../theme';
+import formatCurrency from '../utils/currency';
 
 export default function CartList({ navigation }) {
   const { cartsArray, getVendorSubtotal } = useCart();
@@ -43,7 +44,7 @@ export default function CartList({ navigation }) {
               </View>
 
               <View style={{ alignItems: 'flex-end' }}>
-                <Text style={[styles.subtotal, { color: colors.primary }]}>{firstItem?.currency || '€'}{Number(subtotal).toFixed(2)}</Text>
+                <Text style={[styles.subtotal, { color: colors.primary }]}>{formatCurrency(firstItem?.currency || '', subtotal)}</Text>
                 <View style={[styles.viewButton, { backgroundColor: colors.primary, marginTop: spacing.xs }]}>
                   <Text style={{ color: '#fff' }}>See your cart</Text>
                 </View>

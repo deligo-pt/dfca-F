@@ -18,6 +18,7 @@ import { useTheme } from '../utils/ThemeContext';
 import { useProducts } from '../contexts/ProductsContext';
 import { useLanguage } from '../utils/LanguageContext';
 import { useCart } from '../contexts/CartContext';
+import formatCurrency from '../utils/currency';
 
 const RestaurantDetailsScreen = ({ route, navigation }) => {
   const { colors } = useTheme();
@@ -39,7 +40,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   // Search state (was missing and caused ReferenceError)
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const { addItem, updateQuantity: cartUpdateQuantity, itemsMap, cartItems } = useCart();
+  const { addItem, updateQuantity: cartUpdateQuantity, itemsMap } = useCart();
 
   // Product modal state
   const [productModalVisible, setProductModalVisible] = useState(false);
@@ -104,6 +105,12 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     return rawVendorId && vendorId && String(rawVendorId) === String(vendorId);
   });
 
+  // Determine vendor currency (if any) so cart total uses the same symbol
+  const vendorCurrency = (() => {
+    const productWithCurrency = vendorProducts.find(p => p?._raw?.pricing?.currency || p?.pricing?.currency);
+    return productWithCurrency ? (productWithCurrency._raw?.pricing?.currency || productWithCurrency.pricing?.currency || '') : '';
+  })();
+
   // Derive menu categories for tabs (Popular + unique subCategory/category)
   const derivedCategories = new Set();
   vendorProducts.forEach((p) => {
@@ -129,17 +136,13 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     }, 0);
   };
 
-  const getTotalPrice = () => {
-    const ids = Object.keys(itemsMap || {});
-    const total = ids.reduce((s, id) => {
-      const it = itemsMap[id];
-      if (!it) return s;
-      const vendorIdOfItem = it.product.vendorId || it.product._raw?.vendor?.vendorId;
-      if (vendorIdOfItem && vendorIdOfItem === vendorId) return s + (Number(it.product.price || 0) * it.quantity);
-      return s;
-    }, 0);
-    return total.toFixed(2);
-  };
+  const getTotalPrice = () => Object.keys(itemsMap || {}).reduce((s, id) => {
+    const it = itemsMap[id];
+    if (!it) return s;
+    const vendorIdOfItem = it.product.vendorId || it.product._raw?.vendor?.vendorId;
+    if (vendorIdOfItem && vendorIdOfItem === vendorId) return s + (Number(it.product.price || 0) * it.quantity);
+    return s;
+  }, 0);
 
   // Filter menu items based on search query
   const getFilteredMenuItems = () => {
@@ -192,7 +195,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
             <Text style={styles(colors).menuItemDescription} numberOfLines={2}>
               {description}
             </Text>
-            <Text style={styles(colors).menuItemPrice}>{raw.pricing?.currency ?? ''} {price ? Number(price).toFixed(2) : '0.00'}</Text>
+            <Text style={styles(colors).menuItemPrice}>{formatCurrency(raw.pricing?.currency ?? '', price)}</Text>
           </View>
         </TouchableOpacity>
         <View style={styles(colors).menuItemRight}>
@@ -259,7 +262,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
               <View style={styles(colors).modalBody}>
                 <View style={styles(colors).modalHeaderRow}>
                   <Text style={styles(colors).modalTitle}>{title}</Text>
-                  <Text style={styles(colors).modalPriceInline}>{currency} {price ? Number(price).toFixed(2) : '0.00'}</Text>
+                  <Text style={styles(colors).modalPriceInline}>{formatCurrency(currency, price)}</Text>
                 </View>
 
                 <View style={styles(colors).metaRow}>
@@ -449,7 +452,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
           <View style={styles(colors).cartFooterInline}>
             <View style={styles(colors).cartFooterLeft}>
               <Text style={styles(colors).cartItemCount}>{getTotalItems()} {t('items') || 'items'}</Text>
-              <Text style={styles(colors).cartTotal}>€{getTotalPrice()}</Text>
+              <Text style={styles(colors).cartTotal}>{formatCurrency(vendorCurrency, getTotalPrice())}</Text>
             </View>
             <TouchableOpacity
               style={styles(colors).viewCartButton}
