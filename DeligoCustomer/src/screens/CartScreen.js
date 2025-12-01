@@ -1,6 +1,6 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import React from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, fontSize, borderRadius } from '../theme';
 import { useLanguage } from '../utils/LanguageContext';
@@ -10,22 +10,55 @@ import CartList from '../components/CartList';
 
 const CartScreen = ({ navigation }) => {
   const { t } = useLanguage();
-  const { colors, isDarkMode } = useTheme();
-  const insets = useSafeAreaInsets();
+  const { colors } = useTheme();
 
   // Use Cart context for real data (cartsArray provides multiple vendor carts)
-  const { cartsArray, clearCart } = useCart();
+  const { cartsArray, itemCount, syncing } = useCart();
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={[ 'top' ]}>
-      <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.text.primary }]}>{t('cart')}</Text>
-        <TouchableOpacity onPress={() => clearCart()}>
-          <Text style={[styles.clearAllText, { color: colors.primary }]}>{t('clearAll')}</Text>
-        </TouchableOpacity>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      {/* Modern Header with Badge */}
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <View style={styles.headerLeft}>
+          <Ionicons name="cart" size={28} color={colors.primary} />
+          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>{t('cart')}</Text>
+          {itemCount > 0 && (
+            <View style={[styles.badge, { backgroundColor: colors.primary }]}>
+              <Text style={styles.badgeText}>{itemCount}</Text>
+            </View>
+          )}
+        </View>
       </View>
-      <ScrollView>
-        <CartList navigation={navigation} />
+
+      {/* Syncing Indicator */}
+      {syncing && (
+        <View style={[styles.syncingBanner, { backgroundColor: colors.primary + '15' }]}>
+          <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 8 }} />
+          <Text style={[styles.syncingText, { color: colors.primary }]}>Syncing cart...</Text>
+        </View>
+      )}
+
+      <ScrollView showsVerticalScrollIndicator={false}>
+        {cartsArray.length === 0 ? (
+          <View style={styles.emptyContainer}>
+            <View style={[styles.emptyIconContainer, { backgroundColor: colors.primary + '10' }]}>
+              <Ionicons name="cart-outline" size={64} color={colors.primary} />
+            </View>
+            <Text style={[styles.emptyTitle, { color: colors.text.primary }]}>Your cart is empty</Text>
+            <Text style={[styles.emptySubtitle, { color: colors.text.secondary }]}>
+              Add delicious items from restaurants to get started
+            </Text>
+            <TouchableOpacity
+              style={[styles.browseButton, { backgroundColor: colors.primary }]}
+              onPress={() => navigation.navigate('Home')}
+            >
+              <Ionicons name="restaurant" size={20} color="#fff" style={{ marginRight: 8 }} />
+              <Text style={styles.browseButtonText}>Browse Restaurants</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <CartList navigation={navigation} />
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -39,348 +72,94 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    paddingHorizontal: spacing.md,
+    paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderBottomWidth: 1,
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 3,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
   },
   headerTitle: {
-    fontSize: fontSize.xl,
+    fontSize: fontSize.xxl,
+    fontFamily: 'Poppins-Bold',
+    marginLeft: spacing.sm,
+  },
+  badge: {
+    minWidth: 22,
+    height: 22,
+    borderRadius: 11,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginLeft: spacing.sm,
+    paddingHorizontal: 6,
+  },
+  badgeText: {
+    color: '#fff',
+    fontSize: 12,
     fontFamily: 'Poppins-Bold',
   },
-  clearAllText: {
+  syncingBanner: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: spacing.sm,
+  },
+  syncingText: {
     fontSize: fontSize.sm,
     fontFamily: 'Poppins-Medium',
   },
-  scrollView: {
+  emptyContainer: {
     flex: 1,
-  },
-  restaurantSection: {
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  restaurantHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  restaurantIcon: {
-    fontSize: 48,
-    marginRight: spacing.md,
-  },
-  restaurantInfo: {
-    flex: 1,
-  },
-  restaurantName: {
-    fontSize: fontSize.lg,
-    fontFamily: 'Poppins-Bold',
-    marginBottom: spacing.xs,
-  },
-  restaurantMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  metaText: {
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Regular',
-  },
-  metaDot: {
-    fontSize: fontSize.sm,
-    marginHorizontal: spacing.xs,
-  },
-  cartSection: {
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  sectionTitle: {
-    fontSize: fontSize.lg,
-    fontFamily: 'Poppins-Bold',
-    marginBottom: spacing.md,
-  },
-  cartItem: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-  },
-  itemLeft: {
-    flexDirection: 'row',
-    flex: 1,
-    marginRight: spacing.sm,
-  },
-  itemImage: {
-    fontSize: 40,
-    marginRight: spacing.sm,
-  },
-  itemInfo: {
-    flex: 1,
-  },
-  itemName: {
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-SemiBold',
-    marginBottom: spacing.xs,
-  },
-  itemDescription: {
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Regular',
-    marginBottom: spacing.xs,
-  },
-  itemPrice: {
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-Bold',
-  },
-  itemRight: {
-    alignItems: 'flex-end',
-    justifyContent: 'space-between',
-  },
-  quantityControl: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: borderRadius.lg,
-    padding: 4,
-  },
-  quantityButton: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
     alignItems: 'center',
     justifyContent: 'center',
-  },
-  quantityButtonText: {
-    fontSize: 18,
-    fontFamily: 'Poppins-Bold',
-    color: '#FFFFFF',
-  },
-  quantityText: {
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-SemiBold',
-    marginHorizontal: spacing.sm,
-    minWidth: 24,
-    textAlign: 'center',
-  },
-  removeButton: {
-    marginTop: spacing.xs,
-  },
-  removeButtonText: {
-    fontSize: 18,
-  },
-  addMoreButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: spacing.md,
-    marginBottom: spacing.sm,
-    borderWidth: 1,
-    borderStyle: 'dashed',
-  },
-  addMoreIcon: {
-    fontSize: fontSize.xl,
-    marginRight: spacing.sm,
-  },
-  addMoreText: {
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-SemiBold',
-  },
-  promoSection: {
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  promoInputContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  promoInput: {
-    flex: 1,
-    borderRadius: borderRadius.lg,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-Regular',
-    marginRight: spacing.sm,
-    borderWidth: 1,
-  },
-  applyButton: {
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm + 2,
-    borderRadius: borderRadius.lg,
-  },
-  applyButtonText: {
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#FFFFFF',
-  },
-  appliedPromo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: 'rgba(76, 175, 80, 0.12)',
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: 'rgba(76, 175, 80, 0.3)',
-  },
-  appliedPromoLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  appliedPromoIcon: {
-    fontSize: 24,
-    marginRight: spacing.sm,
-  },
-  appliedPromoCode: {
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-Bold',
-    color: '#4CAF50',
-  },
-  appliedPromoDiscount: {
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Regular',
-    color: '#4CAF50',
-  },
-  removePromoText: {
-    fontSize: fontSize.lg,
-    color: '#4CAF50',
-    paddingHorizontal: spacing.sm,
-  },
-  instructionsSection: {
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  instructionsInput: {
-    borderRadius: borderRadius.lg,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-Regular',
-    borderWidth: 1,
-    minHeight: 80,
-    textAlignVertical: 'top',
-  },
-  priceSection: {
-    padding: spacing.md,
-    marginBottom: spacing.sm,
-  },
-  priceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.sm,
-  },
-  priceLabel: {
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-Regular',
-  },
-  priceValue: {
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-SemiBold',
-  },
-  priceFree: {
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-Bold',
-  },
-  priceDiscount: {
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-Bold',
-  },
-  divider: {
-    height: 1,
-    marginVertical: spacing.sm,
-  },
-  totalLabel: {
-    fontSize: fontSize.lg,
-    fontFamily: 'Poppins-Bold',
-  },
-  totalValue: {
-    fontSize: fontSize.lg,
-    fontFamily: 'Poppins-Bold',
-  },
-  scrollContent: {
-    paddingBottom: 20,
-  },
-  checkoutButtonContainer: {
-    marginHorizontal: spacing.lg,
-    marginTop: 12,
-    marginBottom: 12,
-    padding: spacing.lg,
-    borderRadius: 16,
-    shadowOffset: { width: 0, height: 2 },
-    shadowRadius: 4,
-    borderWidth: 1,
-  },
-  totalBarInline: {
-    marginBottom: spacing.md,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-  },
-  checkoutItemCount: {
-    fontSize: 13,
-    fontFamily: 'Poppins-Medium',
-    marginBottom: 2,
-  },
-  checkoutTotal: {
-    fontSize: 26,
-    fontFamily: 'Poppins-Bold',
-    letterSpacing: -0.5,
-  },
-  checkoutButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 28,
-    paddingVertical: 16,
-    borderRadius: 16,
-    shadowOffset: { width: 0, height: 4 },
-    shadowRadius: 8,
-  },
-  checkoutButtonText: {
-    fontSize: 16,
-    fontFamily: 'Poppins-Bold',
-    color: '#FFFFFF',
-    marginRight: 8,
-  },
-  checkoutButtonArrow: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  checkoutButtonIcon: {
-    fontSize: 18,
-    color: '#FFFFFF',
-    fontWeight: 'bold',
-  },
-  emptyCart: {
-    flex: 1,
-    justifyContent: 'center',
-    alignItems: 'center',
+    paddingVertical: 100,
     paddingHorizontal: spacing.xl,
   },
-  emptyCartIcon: {
-    fontSize: 80,
+  emptyIconContainer: {
+    width: 120,
+    height: 120,
+    borderRadius: 60,
+    alignItems: 'center',
+    justifyContent: 'center',
     marginBottom: spacing.lg,
   },
-  emptyCartTitle: {
-    fontSize: fontSize.xl,
+  emptyTitle: {
+    fontSize: fontSize.xxl,
     fontFamily: 'Poppins-Bold',
     marginBottom: spacing.sm,
+    textAlign: 'center',
   },
-  emptyCartText: {
+  emptySubtitle: {
     fontSize: fontSize.md,
     fontFamily: 'Poppins-Regular',
     textAlign: 'center',
     marginBottom: spacing.xl,
+    lineHeight: 22,
   },
   browseButton: {
+    flexDirection: 'row',
+    alignItems: 'center',
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
-    borderRadius: borderRadius.lg,
+    borderRadius: borderRadius.full,
+    elevation: 3,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.2,
+    shadowRadius: 4,
   },
   browseButtonText: {
+    color: '#fff',
     fontSize: fontSize.md,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#FFFFFF',
+    fontFamily: 'Poppins-Bold',
   },
 });
 
 export default CartScreen;
+

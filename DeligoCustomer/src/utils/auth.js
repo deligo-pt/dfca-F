@@ -250,11 +250,12 @@ export const logoutUser = async (tokenInput = null) => {
       }
     };
 
-    // Try refresh-token-in-body first (common revoke API) then fallbacks
+    // Try the method that works with the current backend first (raw-header+body-refresh)
+    // then fallback to other common patterns
     const attempts = [
-      { name: 'no-header+body-refresh', headers: {}, body: refreshToken ? { refreshToken } : null },
-      { name: 'bearer-header+body-refresh', headers: bearer ? { Authorization: bearer } : {}, body: refreshToken ? { refreshToken, token: refreshToken } : null },
       { name: 'raw-header+body-refresh', headers: raw ? { Authorization: raw } : {}, body: refreshToken ? { refreshToken, token: refreshToken } : null },
+      { name: 'bearer-header+body-refresh', headers: bearer ? { Authorization: bearer } : {}, body: refreshToken ? { refreshToken, token: refreshToken } : null },
+      { name: 'no-header+body-refresh', headers: {}, body: refreshToken ? { refreshToken } : null },
       { name: 'bearer-header+x-refresh', headers: bearer ? { Authorization: bearer, 'x-refresh-token': refreshToken } : { 'x-refresh-token': refreshToken }, body: null },
       { name: 'body-accessToken', headers: {}, body: raw ? { accessToken: raw } : null },
       { name: 'body-token-access', headers: {}, body: raw ? { token: raw } : null },

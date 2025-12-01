@@ -38,7 +38,10 @@ export const ProductsProvider = ({ children }) => {
   const fetchProducts = useCallback(async (overrides = {}) => {
     // Do not set loading immediately to avoid UI flicker when we can serve cached data.
     setError(null);
-    const final = { ...params, ...overrides };
+
+    // Get current params and merge with overrides - do this synchronously
+    let final = { ...params, ...overrides };
+    setParams(final);
 
     try {
       let token = await getAccessToken();
@@ -99,7 +102,7 @@ export const ProductsProvider = ({ children }) => {
       const hadCache = cachedRaw && Array.isArray(cachedRaw.items) && cachedRaw.items.length > 0;
       if (!final.force && hadCache && cacheAge < effectiveTTL) {
         // Cache is fresh enough, avoid network call
-        setParams(final);
+        // params already updated at start of function
         // no network request performed, so keep loading=false to avoid flicker
         return;
       }
@@ -260,14 +263,14 @@ export const ProductsProvider = ({ children }) => {
         // no new data: leave UI as-is (cached was used earlier);
         // but still update params so pagination/search state is current
       }
-      setParams(final);
+      // params already updated at start of function via functional setParams
     } catch (err) {
       setError(err.message || err);
       // on network error, keep cached products if any
     } finally {
       setLoading(false);
     }
-   }, [params]);
+   }, [params]); // Include params so fetchProducts has access to current state
 
    // initial load
    useEffect(() => {

@@ -1,5 +1,7 @@
 import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
 import StorageService from '../utils/storage';
+import CartAPI from '../utils/cartApi';
+import { isValidObjectId } from '../utils/objectId';
 
 const STORAGE_KEY = 'cart:v1';
 
@@ -8,8 +10,46 @@ export const useCart = () => useContext(CartContext);
 
 function normalizeProductForCart(p) {
   const raw = p._raw || p;
+
+  // Collect all possible ID candidates
+  const candidates = [raw.productId, raw._id, raw.product?._id, p.id, raw.id];
+
+  // IMPORTANT: Prioritize PROD-XXXX format (SKU) as backend expects it
+  let chosen = null;
+  let source = null;
+
+  // First pass: Look for SKU format (PROD-XXXX)
+  for (const c of candidates) {
+    if (c && typeof c === 'string' && /^PROD-/i.test(c)) {
+      chosen = c;
+      source = c;
+      console.debug('[cart:id-debug] Found SKU format:', chosen);
+      break;
+    }
+  }
+
+  // Second pass: If no SKU, fall back to any valid ID
+  if (!chosen) {
+    for (const c of candidates) {
+      if (c && typeof c === 'string') {
+        chosen = c;
+        source = c;
+        break;
+      }
+    }
+  }
+
+  if (!chosen) {
+    console.warn('[cart:id-debug] normalizeProductForCart no ID found', { rawKeys: Object.keys(raw || {}) });
+  }
+
+  const style = isValidObjectId(chosen) ? 'objectId' : (/^PROD-/i.test(chosen || '') ? 'sku' : (chosen ? 'other' : 'none'));
+  console.debug('[cart:id-debug] normalizeProductForCart', { candidates, chosen, style });
+
   return {
-    id: p.id || raw._id || raw.productId || raw.id,
+    id: chosen,
+    idSource: source,
+    idStyle: style,
     name: raw.product?.name || raw.name || raw.productName || p.name || 'Item',
     price: Number(raw.pricing?.price ?? raw.price ?? p.price ?? 0) || 0,
     currency: raw.pricing?.currency ?? raw.currency ?? '',
@@ -24,6 +64,7 @@ function normalizeProductForCart(p) {
 export const CartProvider = ({ children }) => {
   const [state, setState] = useState({ carts: {} });
   const [loading, setLoading] = useState(true);
+  const [syncing, setSyncing] = useState(false);
 
   // Load persisted carts
   useEffect(() => {
@@ -77,10 +118,22 @@ export const CartProvider = ({ children }) => {
   };
 
   // Public API
-  const addItem = (product, quantity = 1, options = { replaceExisting: false }) => {
+  const maskToken = (t) => {
+    try {
+      if (!t) return null;
+      const s = t.toString();
+      if (s.length <= 12) return `${s.slice(0,4)}...`;
+      return `${s.slice(0,8)}...${s.slice(-4)}`;
+    } catch (e) { return null; }
+  };
+
+  const addItem = async (product, quantity = 1) => {
     const p = normalizeProductForCart(product);
-    if (!p.id) return;
+    if (!p.id) return { success: false, message: 'invalid product (missing id)' };
+    console.debug('[cart:id-debug] addItem init', { id: p.id, idSource: p.idSource, idStyle: p.idStyle, quantity, vendorId: p.vendorId });
     const vid = p.vendorId || 'unknown_vendor';
+
+    // Optimistic update
     setState(prev => {
       const carts = { ...(prev.carts || {}) };
       const vendorKey = String(vid);
@@ -92,23 +145,111 @@ export const CartProvider = ({ children }) => {
       carts[vendorKey] = cur;
       return { ...prev, carts };
     });
+
+    // Read and log token mask for debugging
+    try {
+      const rawToken = await StorageService.getAccessToken();
+      console.debug('[cart] addItem about to call API; token mask:', maskToken(rawToken));
+    } catch (e) {
+      console.debug('[cart] addItem token read error', e);
+    }
+
+    // Sync with backend - p.id now always contains the correct ID (SKU preferred)
+    try {
+      setSyncing(true);
+      const res = await CartAPI.addToCart([{ productId: p.id, quantity }]);
+      if (!res.success) {
+        console.warn('[cart] addToCart failed response:', res);
+        // If unauthorized, revert optimistic update and logout
+        if (res.status === 401) {
+          // revert
+          setState(prev => {
+            const carts = { ...(prev.carts || {}) };
+            const vendorKey = String(vid);
+            const cur = carts[vendorKey] ? { ...carts[vendorKey] } : null;
+            if (cur && cur.items && cur.items[p.id]) {
+              const nextQty = (cur.items[p.id].quantity || 0) - quantity;
+              if (nextQty <= 0) delete cur.items[p.id];
+              else cur.items[p.id] = { ...cur.items[p.id], quantity: nextQty };
+              if (!Object.keys(cur.items).length) delete carts[vendorKey];
+            }
+            return { ...prev, carts };
+          });
+
+          import('../utils/auth').then(mod => mod.logoutUser ? mod.logoutUser() : (mod.default && mod.default.logout()));
+          return { success: false, status: 401, message: res.error?.message || 'Unauthorized' };
+        }
+
+        // Other server-side errors: revert optimistic update partially
+        setState(prev => {
+          const carts = { ...(prev.carts || {}) };
+          const vendorKey = String(vid);
+          const cur = carts[vendorKey] ? { ...carts[vendorKey] } : null;
+          if (cur && cur.items && cur.items[p.id]) {
+            const nextQty = (cur.items[p.id].quantity || 0) - quantity;
+            if (nextQty <= 0) delete cur.items[p.id];
+            else cur.items[p.id] = { ...cur.items[p.id], quantity: nextQty };
+            if (!Object.keys(cur.items).length) delete carts[vendorKey];
+          }
+          return { ...prev, carts };
+        });
+
+        return { success: false, message: res.error || 'Failed to add item' };
+      }
+
+      return { success: true, data: res.data };
+    } catch (error) {
+      console.error('Failed to sync cart with backend:', error);
+      // revert optimistic update
+      setState(prev => {
+        const carts = { ...(prev.carts || {}) };
+        const vendorKey = String(vid);
+        const cur = carts[vendorKey] ? { ...carts[vendorKey] } : null;
+        if (cur && cur.items && cur.items[p.id]) {
+          const nextQty = (cur.items[p.id].quantity || 0) - quantity;
+          if (nextQty <= 0) delete cur.items[p.id];
+          else cur.items[p.id] = { ...cur.items[p.id], quantity: nextQty };
+          if (!Object.keys(cur.items).length) delete carts[vendorKey];
+        }
+        return { ...prev, carts };
+      });
+      return { success: false, error: error?.message || 'Sync error' };
+    } finally {
+      setSyncing(false);
+    }
   };
 
   // updateQuantity can accept vendorId; if omitted, it finds the item across carts
-  const updateQuantity = (itemId, delta, vendorId) => {
+  const updateQuantity = async (itemId, delta, vendorId) => {
+    if (!itemId) {
+      console.warn('[CartContext] updateQuantity called with invalid itemId');
+      return;
+    }
+
+    console.debug('[CartContext] updateQuantity', { itemId, delta, vendorId });
+
+    // Update local state immediately (optimistic update)
     setState(prev => {
       const carts = { ...(prev.carts || {}) };
       let modified = false;
       const applyToVendor = (vkey) => {
-        const cart = carts[vkey];
-        if (!cart || !cart.items || !cart.items[itemId]) return;
-        const nextQty = cart.items[itemId].quantity + delta;
+        const cart = { ...(carts[vkey] || {}) };
+        if (!cart.items || !cart.items[itemId]) return;
+
+        const currentItem = cart.items[itemId];
+        const nextQty = currentItem.quantity + delta;
+
+        console.debug('[CartContext] applyToVendor', { vkey, itemId, currentQty: currentItem.quantity, delta, nextQty });
+
         if (nextQty <= 0) {
-          delete cart.items[itemId];
+          const newItems = { ...cart.items };
+          delete newItems[itemId];
+          cart.items = newItems;
         } else {
-          cart.items[itemId] = { ...cart.items[itemId], quantity: nextQty };
+          cart.items = { ...cart.items, [itemId]: { ...currentItem, quantity: nextQty } };
         }
-        // clear vendor meta if no items
+
+        // clear vendor cart if no items
         if (Object.keys(cart.items).length === 0) {
           delete carts[vkey];
         } else {
@@ -129,12 +270,111 @@ export const CartProvider = ({ children }) => {
         }
       }
 
-      if (!modified) return prev;
+      if (!modified) {
+        console.warn('[CartContext] updateQuantity: item not found', { itemId, vendorId });
+        return prev;
+      }
       return { ...prev, carts };
     });
+
+    // Sync with backend
+    try {
+      setSyncing(true);
+      const action = delta > 0 ? 'increment' : 'decrement';
+      const res = await CartAPI.activateItem(itemId, Math.abs(delta), action);
+
+      if (!res.success) {
+        console.warn('[CartContext] updateQuantity API failed', res);
+        // Revert optimistic update on failure
+        setState(prev => {
+          const carts = { ...(prev.carts || {}) };
+          const revertDelta = -delta; // reverse the change
+
+          const applyToVendor = (vkey) => {
+            const cart = { ...(carts[vkey] || {}) };
+            if (!cart.items || !cart.items[itemId]) return;
+
+            const currentItem = cart.items[itemId];
+            const revertedQty = currentItem.quantity + revertDelta;
+
+            if (revertedQty <= 0) {
+              const newItems = { ...cart.items };
+              delete newItems[itemId];
+              cart.items = newItems;
+            } else {
+              cart.items = { ...cart.items, [itemId]: { ...currentItem, quantity: revertedQty } };
+            }
+
+            if (Object.keys(cart.items).length === 0) {
+              delete carts[vkey];
+            } else {
+              carts[vkey] = cart;
+            }
+          };
+
+          if (vendorId) {
+            applyToVendor(String(vendorId));
+          } else {
+            for (const vkey of Object.keys(carts)) {
+              if (carts[vkey].items && carts[vkey].items[itemId]) {
+                applyToVendor(vkey);
+                break;
+              }
+            }
+          }
+
+          return { ...prev, carts };
+        });
+      }
+    } catch (error) {
+      console.error('Failed to sync quantity update with backend:', error);
+      // Revert optimistic update on error
+      setState(prev => {
+        const carts = { ...(prev.carts || {}) };
+        const revertDelta = -delta;
+
+        const applyToVendor = (vkey) => {
+          const cart = { ...(carts[vkey] || {}) };
+          if (!cart.items || !cart.items[itemId]) return;
+
+          const currentItem = cart.items[itemId];
+          const revertedQty = currentItem.quantity + revertDelta;
+
+          if (revertedQty <= 0) {
+            const newItems = { ...cart.items };
+            delete newItems[itemId];
+            cart.items = newItems;
+          } else {
+            cart.items = { ...cart.items, [itemId]: { ...currentItem, quantity: revertedQty } };
+          }
+
+          if (Object.keys(cart.items).length === 0) {
+            delete carts[vkey];
+          } else {
+            carts[vkey] = cart;
+          }
+        };
+
+        if (vendorId) {
+          applyToVendor(String(vendorId));
+        } else {
+          for (const vkey of Object.keys(carts)) {
+            if (carts[vkey].items && carts[vkey].items[itemId]) {
+              applyToVendor(vkey);
+              break;
+            }
+          }
+        }
+
+        return { ...prev, carts };
+      });
+    } finally {
+      setSyncing(false);
+    }
   };
 
-  const removeItem = (itemId, vendorId) => {
+  const removeItem = async (itemId, vendorId) => {
+    // Update local state immediately
     setState(prev => {
       const carts = { ...(prev.carts || {}) };
       let modified = false;
@@ -158,6 +398,16 @@ export const CartProvider = ({ children }) => {
       if (!modified) return prev;
       return { ...prev, carts };
     });
+
+    // Sync with backend
+    try {
+      setSyncing(true);
+      await CartAPI.deleteItems([itemId]);
+    } catch (error) {
+      console.error('Failed to sync item removal with backend:', error);
+    } finally {
+      setSyncing(false);
+    }
   };
 
   const clearVendorCart = (vendorId) => {
@@ -170,9 +420,57 @@ export const CartProvider = ({ children }) => {
     });
   };
 
-  const clearCart = () => {
-    setState({ carts: {} });
+  // Delete entire vendor cart with backend sync (preferred over global clear)
+  const clearVendorCartAndSync = async (vendorId) => {
+    if (!vendorId) return { success: false, message: 'missing vendorId' };
+    const v = String(vendorId);
+
+    // Collect item IDs
+    const vendorCart = getVendorCart(v);
+    const itemIds = vendorCart && vendorCart.items ? Object.keys(vendorCart.items) : [];
+    if (itemIds.length === 0) return { success: true, message: 'nothing to clear' };
+
+    // Optimistic: remove vendor cart, keep previous copy for potential rollback
+    let prevVendorCart = null;
+    setState(prev => {
+      const carts = { ...(prev.carts || {}) };
+      if (carts[v]) {
+        prevVendorCart = carts[v];
+        delete carts[v];
+      }
+      return { ...prev, carts };
+    });
+
+    try {
+      setSyncing(true);
+      const res = await CartAPI.deleteItems(itemIds);
+      if (!res.success) {
+        console.warn('[cart] clearVendorCartAndSync failed', res);
+        // Rollback
+        setState(prev => {
+          const carts = { ...(prev.carts || {}) };
+          if (prevVendorCart) carts[v] = prevVendorCart;
+          return { ...prev, carts };
+        });
+        return { success: false, error: res.error || 'Failed to clear cart' };
+      }
+      return { success: true };
+    } catch (e) {
+      console.error('[cart] clearVendorCartAndSync error', e);
+      // Rollback
+      setState(prev => {
+        const carts = { ...(prev.carts || {}) };
+        if (prevVendorCart) carts[v] = prevVendorCart;
+        return { ...prev, carts };
+      });
+      return { success: false, error: e?.message || 'Network error' };
+    } finally {
+      setSyncing(false);
+    }
   };
+
+  // Note: clearCart API endpoint doesn't exist on backend (404)
+  // Individual items can be removed using removeItem or entire vendor cart using clearVendorCart
 
   const applyPromoCodeToVendor = (vendorId, code) => {
     if (!vendorId) return { ok: false, message: 'missing vendorId' };
@@ -236,21 +534,19 @@ export const CartProvider = ({ children }) => {
 
   return (
     <CartContext.Provider value={{
-      loading,
       state,
-      carts: state.carts,
-      cartsArray,
-      cartItems,
-      itemsMap,
-      itemCount,
-      total,
+      loading,
+      syncing,
       getVendorCart,
-      getVendorSubtotal,
+      cartsArray: getCartsArray(),
+      itemsMap: buildItemsMap(),
+      itemCount: Object.values(buildItemsMap()).reduce((s, it) => s + (it?.quantity || 0), 0),
       addItem,
       updateQuantity,
       removeItem,
       clearVendorCart,
-      clearCart,
+      clearVendorCartAndSync,
+      getVendorSubtotal,
       applyPromoCodeToVendor,
       removeAppliedPromoFromVendor,
       setDeliveryInstructionsForVendor,
@@ -263,3 +559,5 @@ export const CartProvider = ({ children }) => {
     </CartContext.Provider>
   );
 };
+
+export default CartProvider;
