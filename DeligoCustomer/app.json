@@ -81,7 +81,14 @@
           "locationAlwaysAndWhenInUsePermission": "Allow Deligo to use your location for order tracking and delivery."
         }
       ],
-      "expo-font"
+      "expo-font",
+      [
+        "@stripe/stripe-react-native",
+        {
+          "merchantIdentifier": "merchant.com.deligo.customer",
+          "enableGooglePay": true
+        }
+      ]
     ]
   }
 }

@@ -78,6 +78,7 @@ export const API_ENDPOINTS = {
   ORDERS: {
     LIST: '/orders',
     GET_BY_ID: '/orders/:id',
+    CREATE_ORDER: '/orders/create-order',
     PLACE_ORDER: '/orders/place',
     CANCEL: '/orders/:id/cancel',
     TRACK: '/orders/:id/track',
@@ -93,6 +94,16 @@ export const API_ENDPOINTS = {
     DELETE_ITEM: '/carts/delete-item',
     UPDATE_QUANTITY: '/carts/update-quantity',
     CLEAR: '/carts/clear',
+  },
+
+  // Checkout
+  CHECKOUT: {
+    CREATE: '/checkout',
+  },
+
+  // Payment (Stripe)
+  PAYMENT: {
+    CREATE_PAYMENT_INTENT: '/payment/stripe/create-payment-intent',
   },
 
   // General & Utility

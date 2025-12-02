@@ -17,21 +17,72 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLanguage } from '../utils/LanguageContext';
 import { useCart } from '../contexts/CartContext';
 import formatCurrency from '../utils/currency';
+import { setupPaymentSheet, openPaymentSheet } from '../utils/stripeService';
+import CheckoutAPI from '../utils/checkoutApi';
+import OrderAPI from '../utils/orderApi';
 
 const CheckoutScreen = ({ route, navigation }) => {
   const { colors } = useTheme();
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const { cartData } = route.params || {};
+
+  // Checkout response state (created on this screen, not passed from CartDetail)
+  const [checkoutResponse, setCheckoutResponse] = useState(null);
+  const [initializingCheckout, setInitializingCheckout] = useState(false);
+
   const [selectedPayment, setSelectedPayment] = useState('card');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [notes, setNotes] = useState('');
+  const [stripeReady, setStripeReady] = useState(false);
+  const [stripeError, setStripeError] = useState(null);
 
   // Get real cart data from CartContext
   const { getVendorCart } = useCart();
   const vendorId = cartData?.vendorId;
   const cart = getVendorCart(vendorId);
+
+  // Create checkout on mount (payment integration happens here, not in CartDetail)
+  useEffect(() => {
+    let canceled = false;
+
+    const createCheckoutOnEnter = async () => {
+      try {
+        setInitializingCheckout(true);
+        console.debug('[CheckoutScreen] Creating checkout via API with useCart=true');
+
+        const res = await CheckoutAPI.createCheckout(true);
+        console.debug('[CheckoutScreen] createCheckout result:', res);
+
+        if (canceled) return;
+
+        if (!res.success) {
+          setStripeError(res.error || 'Failed to initialize checkout');
+          setInitializingCheckout(false);
+          return;
+        }
+
+        // Store response for Stripe initialization
+        setCheckoutResponse(res.data);
+      } catch (err) {
+        console.error('[CheckoutScreen] createCheckout error:', err);
+        if (!canceled) {
+          setStripeError(err?.message || 'Failed to create checkout');
+        }
+      } finally {
+        if (!canceled) {
+          setInitializingCheckout(false);
+        }
+      }
+    };
+
+    createCheckoutOnEnter();
+
+    return () => {
+      canceled = true;
+    };
+  }, []);
 
   // Calculate real cart values
   const cartItems = cart?.items ? Object.keys(cart.items).map(id => {
@@ -110,21 +161,157 @@ const CheckoutScreen = ({ route, navigation }) => {
     { id: 'wallet', name: t('digitalWallet'), icon: 'wallet' },
   ];
 
-  const handlePlaceOrder = () => {
+  // Helper: robustly extract checkoutSummaryId from various backend response shapes
+  const extractCheckoutSummaryId = (checkoutResponse) => {
+    if (!checkoutResponse || typeof checkoutResponse !== 'object') return null;
+    const candidatePaths = [
+      // direct keys
+      ['CheckoutSummaryId'],
+      ['checkoutSummaryId'],
+      // nested under data
+      ['data', 'CheckoutSummaryId'],
+      ['data', 'checkoutSummaryId'],
+      // nested summary objects
+      ['data', 'checkoutSummary', '_id'],
+      ['checkoutSummary', '_id'],
+      // alternative snake/camel cases
+      ['checkout_summary_id'],
+      ['data', 'checkout_summary_id'],
+    ];
+    for (const path of candidatePaths) {
+      let cur = checkoutResponse;
+      let ok = true;
+      for (const segment of path) {
+        if (cur && Object.prototype.hasOwnProperty.call(cur, segment)) {
+          cur = cur[segment];
+        } else { ok = false; break; }
+      }
+      if (ok && cur && typeof cur === 'string') return cur;
+    }
+    // Try case-insensitive scan of top-level keys
+    for (const k of Object.keys(checkoutResponse)) {
+      if (/checkoutsummaryid/i.test(k)) return checkoutResponse[k];
+      const v = checkoutResponse[k];
+      if (v && typeof v === 'object') {
+        for (const vk of Object.keys(v)) {
+          if (/checkoutsummaryid/i.test(vk)) return v[vk];
+        }
+      }
+    }
+    return null;
+  };
+
+  useEffect(() => {
+    let cancelled = false;
+
+    async function initStripe() {
+      const checkoutSummaryId = extractCheckoutSummaryId(checkoutResponse);
+
+      if (!checkoutSummaryId) {
+        console.warn('[CheckoutScreen] No checkoutSummaryId found in checkout response', {
+          availableKeys: Object.keys(checkoutResponse || {})
+        });
+        setStripeError('Checkout session not initialized. Please try again.');
+        return;
+      }
+
+      const declaredFinalAmount = checkoutResponse?.data?.finalAmount || checkoutResponse?.finalAmount;
+      if (declaredFinalAmount && Math.abs(declaredFinalAmount - total) > 0.01) {
+        console.debug('[CheckoutScreen] finalAmount mismatch', {
+          declaredFinalAmount,
+          uiComputedTotal: total
+        });
+      }
+
+      console.debug('[CheckoutScreen] Initializing Stripe with checkoutSummaryId:', checkoutSummaryId);
+
+      const res = await setupPaymentSheet(checkoutSummaryId);
+
+      if (cancelled) return;
+
+      if (!res.success) {
+        // Check if it's a Stripe connection error from backend
+        const errorMsg = res.error || '';
+        if (errorMsg.includes('StripeConnectionError') || errorMsg.includes('connection to Stripe')) {
+          setStripeError('Backend cannot connect to Stripe. Please check server configuration.');
+        } else if (errorMsg.includes('Payment intent not found')) {
+          setStripeError('Payment setup failed. Please contact support.');
+        } else {
+          setStripeError(errorMsg);
+        }
+      } else {
+        setStripeReady(true);
+      }
+    }
+
+    // Initialize Stripe once we have a checkoutResponse
+    if (checkoutResponse) {
+      initStripe();
+    }
+
+    return () => {
+      cancelled = true;
+    };
+  }, [checkoutResponse, total]);
+
+  const handlePlaceOrder = async () => {
+    if (!stripeReady) {
+      setStripeError(stripeError || 'Payment not ready. Please wait...');
+      return;
+    }
+
+    const checkoutSummaryId = extractCheckoutSummaryId(checkoutResponse);
+
+    if (!checkoutSummaryId) {
+      setStripeError('Checkout session expired. Please try again.');
+      return;
+    }
+
     setIsProcessing(true);
 
-    setTimeout(() => {
-      setIsProcessing(false);
-      setShowSuccessModal(true);
+    // Step 1: Present payment sheet and process payment
+    const payRes = await openPaymentSheet();
 
-      setTimeout(() => {
-        setShowSuccessModal(false);
-        navigation.reset({
-          index: 0,
-          routes: [{ name: 'Main', params: { screen: 'Orders' } }],
-        });
-      }, 2000);
-    }, 1500);
+    if (!payRes.success) {
+      setIsProcessing(false);
+      setStripeError(payRes.error);
+      return;
+    }
+
+    // Step 2: Create order with checkoutSummaryId and paymentIntentId
+    const { paymentIntentId } = payRes;
+
+    if (!paymentIntentId) {
+      console.error('[CheckoutScreen] Payment succeeded but no paymentIntentId returned');
+      setIsProcessing(false);
+      setStripeError('Payment succeeded but order creation failed. Please contact support.');
+      return;
+    }
+
+    console.debug('[CheckoutScreen] Creating order with:', { checkoutSummaryId, paymentIntentId });
+
+    const orderRes = await OrderAPI.createOrder(checkoutSummaryId, paymentIntentId);
+
+    if (!orderRes.success) {
+      setIsProcessing(false);
+      setStripeError(orderRes.error || 'Failed to create order. Please contact support.');
+      console.error('[CheckoutScreen] Order creation failed:', orderRes);
+      return;
+    }
+
+    console.debug('[CheckoutScreen] Order created successfully:', orderRes.data);
+
+    // Step 3: Show success and navigate to orders
+    setIsProcessing(false);
+    setShowSuccessModal(true);
+
+    setTimeout(() => {
+      setShowSuccessModal(false);
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Main', params: { screen: 'Orders' } }]
+      });
+    }, 2000);
   };
 
   const renderSuccessModal = () => (
@@ -394,6 +581,21 @@ const CheckoutScreen = ({ route, navigation }) => {
           </View>
         </View>
 
+        {/* Payment Error Banner */}
+        {stripeError && (
+          <View style={{ backgroundColor: '#FFEBEE', padding: 12, borderRadius: 12, marginHorizontal: spacing.lg, marginBottom: 12, borderWidth: 1, borderColor: '#F44336' }}>
+            <Text style={{ color: '#D32F2F', fontFamily: 'Poppins-Medium', fontSize: 13 }}>{stripeError}</Text>
+          </View>
+        )}
+
+        {/* Checkout Initializing Banner */}
+        {initializingCheckout && (
+          <View style={{ backgroundColor: '#E3F2FD', padding: 12, borderRadius: 12, marginHorizontal: spacing.lg, marginBottom: 12, borderWidth: 1, borderColor: '#2196F3', flexDirection: 'row', alignItems: 'center' }}>
+            <ActivityIndicator size="small" color="#1976D2" style={{ marginRight: 8 }} />
+            <Text style={{ color: '#1565C0', fontFamily: 'Poppins-Medium', fontSize: 13 }}>Preparing checkout...</Text>
+          </View>
+        )}
+
         {/* Place Order Button */}
         <View style={styles(colors).checkoutButtonContainer}>
           <View style={styles(colors).totalBarInline}>
@@ -403,14 +605,20 @@ const CheckoutScreen = ({ route, navigation }) => {
           <TouchableOpacity
             style={[
               styles(colors).placeOrderBtn,
-              isProcessing && styles(colors).placeOrderBtnDisabled,
+              (isProcessing || initializingCheckout || !stripeReady) && styles(colors).placeOrderBtnDisabled,
             ]}
             onPress={handlePlaceOrder}
-            disabled={isProcessing}
+            disabled={isProcessing || initializingCheckout || !stripeReady}
             activeOpacity={0.85}
           >
             <Text style={styles(colors).placeOrderBtnText}>
-              {isProcessing ? t('processing') : t('placeOrder')}
+              {isProcessing
+                ? t('processing')
+                : initializingCheckout
+                  ? 'Preparing...'
+                  : !stripeReady
+                    ? 'Initializing Payment...'
+                    : t('placeOrder')}
             </Text>
             <View style={styles(colors).placeOrderArrow}>
               <Ionicons

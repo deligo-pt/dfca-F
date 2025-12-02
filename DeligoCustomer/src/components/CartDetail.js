@@ -5,6 +5,7 @@ import { useTheme } from '../utils/ThemeContext';
 import { spacing, fontSize, borderRadius } from '../theme';
 import formatCurrency from '../utils/currency';
 import { Ionicons } from '@expo/vector-icons';
+import CheckoutAPI from '../utils/checkoutApi';
 
 export default function CartDetail({ vendorId, navigation }) {
   const { getVendorCart, getVendorSubtotal, updateQuantity, removeItem, setDeliveryInstructionsForVendor } = useCart();
@@ -13,6 +14,7 @@ export default function CartDetail({ vendorId, navigation }) {
   const [promoInput, setPromoInput] = useState('');
   const [showPromoInput, setShowPromoInput] = useState(false);
   const [updatingItemId, setUpdatingItemId] = useState(null);
+  const [checkingOut, setCheckingOut] = useState(false);
 
   if (!cart) return <Text style={{ color: colors.text.secondary, padding: spacing.md }}>No cart found.</Text>;
 
@@ -63,25 +65,39 @@ export default function CartDetail({ vendorId, navigation }) {
     setTimeout(() => setUpdatingItemId(null), 300);
   };
 
-  const onCheckout = () => {
-    const cartData = {
-      vendorId,
-      vendorName: cart.vendorName,
-      items: items.map(it => ({
-        id: it.id,
-        name: it.product?.name,
-        quantity: it.qty,
-        price: it.basePrice,
-        discountPercent: it.discountPercent,
-        taxPercent: it.taxPercent,
-        finalPrice: it.finalUnit,
-        currency: it.currency,
-      })),
-      subtotal: subtotalAfterDiscount,
-      tax: taxTotal,
-      total,
-    };
-    navigation.navigate('Checkout', { cartData });
+  const onCheckout = async () => {
+    setCheckingOut(true);
+    try {
+      const response = await CheckoutAPI.createCheckout(true);
+      if (!response.success) {
+        console.error('[CartDetail] Checkout failed:', response.error);
+        setCheckingOut(false);
+        return;
+      }
+      const cartData = {
+        vendorId,
+        vendorName: cart.vendorName,
+        items: items.map(it => ({
+          id: it.id,
+          name: it.product?.name,
+          quantity: it.qty,
+          price: it.basePrice,
+          discountPercent: it.discountPercent,
+          taxPercent: it.taxPercent,
+          finalPrice: it.finalUnit,
+          currency: it.currency,
+        })),
+        subtotal: subtotalAfterDiscount,
+        tax: taxTotal,
+        total,
+        checkoutResponse: response.data,
+      };
+      navigation.navigate('Checkout', { cartData });
+    } catch (e) {
+      console.error('[CartDetail] Checkout error:', e);
+    } finally {
+      setCheckingOut(false);
+    }
   };
 
   // bottom bar height used to pad scroll area
@@ -250,9 +266,19 @@ export default function CartDetail({ vendorId, navigation }) {
           <Text style={{ color: colors.text.secondary, fontSize: 13 }}>{items.reduce((s, it) => s + it.qty, 0)} items</Text>
           <Text style={{ color: colors.primary, fontFamily: 'Poppins-Bold', fontSize: 20 }}>{formatCurrency(currency, total)}</Text>
         </View>
-        <TouchableOpacity style={[styles.checkoutBtn, { backgroundColor: colors.primary }]} onPress={onCheckout}>
-          <Text style={{ color: '#fff', fontFamily: 'Poppins-Bold', fontSize: 16 }}>Checkout</Text>
-          <Ionicons name="arrow-forward" size={20} color="#fff" style={{ marginLeft: spacing.xs }} />
+        <TouchableOpacity
+          style={[styles.checkoutBtn, { backgroundColor: colors.primary, opacity: checkingOut ? 0.7 : 1 }]}
+          onPress={onCheckout}
+          disabled={checkingOut}
+        >
+          {checkingOut ? (
+            <ActivityIndicator size="small" color="#fff" />
+          ) : (
+            <>
+              <Text style={{ color: '#fff', fontFamily: 'Poppins-Bold', fontSize: 16 }}>Checkout</Text>
+              <Ionicons name="arrow-forward" size={20} color="#fff" style={{ marginLeft: spacing.xs }} />
+            </>
+          )}
         </TouchableOpacity>
       </View>
     </View>

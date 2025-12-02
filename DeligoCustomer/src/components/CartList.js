@@ -7,10 +7,11 @@ import formatCurrency from '../utils/currency';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function CartList({ navigation }) {
-  const { cartsArray, getVendorSubtotal, clearVendorCartAndSync } = useCart();
+  const { cartsArray, getVendorSubtotal, clearVendorCartAndSync, enforceSingleVendor } = useCart();
   const { colors } = useTheme();
   const [menuForVendor, setMenuForVendor] = useState(null);
   const [deletingVendorId, setDeletingVendorId] = useState(null);
+  const [switchingVendorId, setSwitchingVendorId] = useState(null);
 
   if (!cartsArray || cartsArray.length === 0) {
     return null;
@@ -24,6 +25,18 @@ export default function CartList({ navigation }) {
     setMenuForVendor(null);
     if (!res.success) {
       console.warn(res.error || 'Failed to delete cart');
+    }
+  };
+
+  const handleSwitchVendor = async (vendorId) => {
+    if (!vendorId) return;
+    setSwitchingVendorId(vendorId);
+    try {
+      await enforceSingleVendor(vendorId);
+      setMenuForVendor(null);
+      navigation.navigate('CartDetail', { vendorId });
+    } finally {
+      setSwitchingVendorId(null);
     }
   };
 
@@ -127,7 +140,22 @@ export default function CartList({ navigation }) {
             {/* Inline popover menu */}
             {isMenuOpen && (
               <View style={{ position: 'absolute', top: 8, right: 12, zIndex: 2 }}>
-                <View style={{ backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingVertical: 4, width: 160, elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 8 }}>
+                <View style={{ backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, borderRadius: 10, paddingVertical: 4, width: 180, elevation: 6, shadowColor: '#000', shadowOffset: { width: 0, height: 2 }, shadowOpacity: 0.15, shadowRadius: 8 }}>
+                  <TouchableOpacity
+                    disabled={switchingVendorId === cart.vendorId}
+                    onPress={() => handleSwitchVendor(cart.vendorId)}
+                    style={{ paddingHorizontal: 12, paddingVertical: 10, flexDirection: 'row', alignItems: 'center' }}
+                  >
+                    {switchingVendorId === cart.vendorId ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                      <Ionicons name="repeat" size={16} color={colors.primary} />
+                    )}
+                    <Text style={{ marginLeft: 8, color: colors.text.primary, fontFamily: 'Poppins-Medium' }}>Make this cart active</Text>
+                  </TouchableOpacity>
+
+                  <View style={{ height: 1, backgroundColor: colors.border, marginHorizontal: 8 }} />
+
                   <TouchableOpacity
                     disabled={deletingVendorId === cart.vendorId}
                     onPress={() => handleDeleteVendorCart(cart.vendorId)}
