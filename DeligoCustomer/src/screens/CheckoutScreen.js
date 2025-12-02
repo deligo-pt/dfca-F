@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,8 @@ import { spacing } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLanguage } from '../utils/LanguageContext';
+import { useCart } from '../contexts/CartContext';
+import formatCurrency from '../utils/currency';
 
 const CheckoutScreen = ({ route, navigation }) => {
   const { colors } = useTheme();
@@ -29,12 +31,41 @@ const CheckoutScreen = ({ route, navigation }) => {
   const [showVoucherInput, setShowVoucherInput] = useState(false);
   const [notes, setNotes] = useState('');
 
-  const cartItems = cartData?.items || [];
-  const subtotal = cartData?.subtotal || 0;
+  // Get real cart data from CartContext
+  const { getVendorCart, getVendorSubtotal } = useCart();
+  const vendorId = cartData?.vendorId;
+  const cart = getVendorCart(vendorId);
+
+  // Calculate real cart values
+  const cartItems = cart?.items ? Object.keys(cart.items).map(id => ({
+    id,
+    name: cart.items[id].product.name,
+    price: cart.items[id].product.price,
+    quantity: cart.items[id].quantity,
+    image: cart.items[id].product.image,
+    currency: cart.items[id].product.currency,
+  })) : (cartData?.items || []);
+
+  const currency = cartItems.length > 0 ? (cartItems[0].currency || 'EUR') : 'EUR';
+  const subtotal = cart ? getVendorSubtotal(vendorId) : (cartData?.subtotal || 0);
   const deliveryFee = cartData?.deliveryFee || 0;
   const serviceFee = cartData?.serviceFee || 1.99;
-  const discount = cartData?.discount || 0;
-  const total = cartData?.total || 0;
+  const discount = cart?.appliedPromo?.discount || cartData?.discount || 0;
+  const total = subtotal + serviceFee + deliveryFee - discount;
+
+  // Set initial notes from cart delivery instructions
+  useEffect(() => {
+    if (cart?.deliveryInstructions) {
+      setNotes(cart.deliveryInstructions);
+    }
+  }, [cart?.deliveryInstructions]);
+
+  // Set initial voucher code if promo is applied
+  useEffect(() => {
+    if (cart?.appliedPromo?.code) {
+      setVoucherCode(cart.appliedPromo.code);
+    }
+  }, [cart?.appliedPromo?.code]);
   const paymentMethods = [
     {
       id: 'card',
@@ -47,9 +78,9 @@ const CheckoutScreen = ({ route, navigation }) => {
 
   const tipOptions = [
     { id: 0, label: t('noTip'), value: 0 },
-    { id: 1, label: '€2', value: 2 },
-    { id: 2, label: '€3', value: 3 },
-    { id: 3, label: '€5', value: 5 },
+    { id: 1, label: formatCurrency(currency, 2), value: 2 },
+    { id: 2, label: formatCurrency(currency, 3), value: 3 },
+    { id: 3, label: formatCurrency(currency, 5), value: 5 },
   ];
 
   const handlePlaceOrder = () => {
@@ -110,9 +141,9 @@ const CheckoutScreen = ({ route, navigation }) => {
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
         <View style={styles(colors).headerCenter}>
-          <Text style={styles(colors).headerTitle}>{t('checkout')}</Text>
+          <Text style={styles(colors).headerTitle}>{cart?.vendorName || cartData?.vendorName || t('checkout')}</Text>
           <Text style={styles(colors).headerSubtitle}>
-            {cartItems.length} {t('items')} • {t('estimated')} 25-35 {t('min')}
+            {cartItems.length} {cartItems.length === 1 ? 'item' : 'items'} • {t('estimated')} 25-35 {t('min')}
           </Text>
         </View>
         <View style={styles(colors).headerRight} />
@@ -160,11 +191,11 @@ const CheckoutScreen = ({ route, navigation }) => {
         </View>
 
         {/* Delivery Instructions */}
-        {false && ( // Replace 'false' with actual condition for deliveryInstructions
+        {notes && (
           <View style={styles(colors).instructionsContainer}>
             <View style={styles(colors).instructionsBadge}>
               <Ionicons name="alert-circle" size={16} color="#0288D1" />
-              <Text style={styles(colors).instructionsText}>Delivery instructions go here</Text>
+              <Text style={styles(colors).instructionsText}>{notes}</Text>
             </View>
           </View>
         )}
@@ -179,7 +210,7 @@ const CheckoutScreen = ({ route, navigation }) => {
           </View>
           <View style={styles(colors).orderItemsContainer}>
             {cartItems.map((item, index) => (
-              <View key={index} style={styles(colors).orderItemRow}>
+              <View key={item.id || index} style={styles(colors).orderItemRow}>
                 <View style={styles(colors).orderItemLeft}>
                   <View style={styles(colors).quantityBadge}>
                     <Text style={styles(colors).quantityText}>{item.quantity}</Text>
@@ -189,7 +220,7 @@ const CheckoutScreen = ({ route, navigation }) => {
                   </Text>
                 </View>
                 <Text style={styles(colors).itemPriceText}>
-                  €{(item.price * item.quantity).toFixed(2)}
+                  {formatCurrency(currency, item.price * item.quantity)}
                 </Text>
               </View>
             ))}
@@ -377,7 +408,7 @@ const CheckoutScreen = ({ route, navigation }) => {
           <View style={styles(colors).summaryRows}>
             <View style={styles(colors).summaryRow}>
               <Text style={styles(colors).summaryLabel}>{t('subtotal')}</Text>
-              <Text style={styles(colors).summaryValue}>€{subtotal.toFixed(2)}</Text>
+              <Text style={styles(colors).summaryValue}>{formatCurrency(currency, subtotal)}</Text>
             </View>
 
             <View style={styles(colors).summaryRow}>
@@ -385,19 +416,19 @@ const CheckoutScreen = ({ route, navigation }) => {
               {deliveryFee === 0 ? (
                 <Text style={styles(colors).summaryValueFree}>{t('free')}</Text>
               ) : (
-                <Text style={styles(colors).summaryValue}>€{deliveryFee.toFixed(2)}</Text>
+                <Text style={styles(colors).summaryValue}>{formatCurrency(currency, deliveryFee)}</Text>
               )}
             </View>
 
             <View style={styles(colors).summaryRow}>
               <Text style={styles(colors).summaryLabel}>{t('serviceFee')}</Text>
-              <Text style={styles(colors).summaryValue}>€{serviceFee.toFixed(2)}</Text>
+              <Text style={styles(colors).summaryValue}>{formatCurrency(currency, serviceFee)}</Text>
             </View>
 
             {selectedTip > 0 && (
               <View style={styles(colors).summaryRow}>
                 <Text style={styles(colors).summaryLabel}>{t('riderTip')}</Text>
-                <Text style={styles(colors).summaryValue}>€{selectedTip.toFixed(2)}</Text>
+                <Text style={styles(colors).summaryValue}>{formatCurrency(currency, selectedTip)}</Text>
               </View>
             )}
 
@@ -411,7 +442,7 @@ const CheckoutScreen = ({ route, navigation }) => {
                   />
                   <Text style={styles(colors).summaryLabelDiscount}>{t('discount')}</Text>
                 </View>
-                <Text style={styles(colors).summaryValueDiscount}>-€{discount.toFixed(2)}</Text>
+                <Text style={styles(colors).summaryValueDiscount}>-{formatCurrency(currency, discount)}</Text>
               </View>
             )}
 
@@ -420,7 +451,7 @@ const CheckoutScreen = ({ route, navigation }) => {
             <View style={styles(colors).totalSummaryRow}>
               <Text style={styles(colors).totalSummaryLabel}>{t('total')}</Text>
               <Text style={styles(colors).totalSummaryValue}>
-                €{(total + selectedTip).toFixed(2)}
+                {formatCurrency(currency, total + selectedTip)}
               </Text>
             </View>
           </View>
@@ -430,7 +461,7 @@ const CheckoutScreen = ({ route, navigation }) => {
         <View style={styles(colors).checkoutButtonContainer}>
           <View style={styles(colors).totalBarInline}>
             <Text style={styles(colors).totalBarLabel}>{t('total')}</Text>
-            <Text style={styles(colors).totalBarAmount}>€{(total + selectedTip).toFixed(2)}</Text>
+            <Text style={styles(colors).totalBarAmount}>{formatCurrency(currency, total + selectedTip)}</Text>
           </View>
           <TouchableOpacity
             style={[
