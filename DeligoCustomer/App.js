@@ -15,6 +15,7 @@ import { LanguageProvider } from './src/utils/LanguageContext';
 import { ThemeProvider } from './src/utils/ThemeContext';
 import { ProductsProvider } from './src/contexts/ProductsContext';
 import { CartProvider } from './src/contexts/CartContext';
+import { OrdersProvider } from './src/contexts/OrdersContext';
 import * as SystemUI from 'expo-system-ui';
 import { StripeProvider } from '@stripe/stripe-react-native';
 
@@ -138,41 +139,43 @@ export default function App() {
           <LanguageProvider>
             <ProductsProvider>
               <CartProvider>
-                <NavigationContainer>
-                  <Stack.Navigator screenOptions={{ headerShown: false }}>
-                    {showOnboarding ? (
-                      <Stack.Screen name="Onboarding">
-                        {(props) => <OnboardingScreen {...props} onDone={handleOnboardingDone} />}
-                      </Stack.Screen>
-                    ) : !isAuthenticated ? (
-                      <Stack.Screen name="Login">
-                        {(props) => <LoginScreen {...props} onLoginSuccess={handleLoginSuccess} />}
-                      </Stack.Screen>
-                    ) : (
-                      <Stack.Screen name="Main">
-                        {(props) => <BottomTabNavigator {...props} onLogout={handleLogout} />}
-                      </Stack.Screen>
-                    )}
-                    <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
-                    <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
-                    <Stack.Screen name="LocationAddress" component={LocationAddressScreen} />
-                    <Stack.Screen name="RestaurantDetails" component={RestaurantDetailsScreen} />
-                    <Stack.Screen name="CartDetail" component={CartDetailScreen} />
-                    <Stack.Screen name="TrackOrder" component={TrackOrderScreen} />
-                    <Stack.Screen name="Checkout" component={CheckoutScreen} />
+                <OrdersProvider>
+                  <NavigationContainer>
+                    <Stack.Navigator screenOptions={{ headerShown: false }}>
+                      {showOnboarding ? (
+                        <Stack.Screen name="Onboarding">
+                          {(props) => <OnboardingScreen {...props} onDone={handleOnboardingDone} />}
+                        </Stack.Screen>
+                      ) : !isAuthenticated ? (
+                        <Stack.Screen name="Login">
+                          {(props) => <LoginScreen {...props} onLoginSuccess={handleLoginSuccess} />}
+                        </Stack.Screen>
+                      ) : (
+                        <Stack.Screen name="Main">
+                          {(props) => <BottomTabNavigator {...props} onLogout={handleLogout} />}
+                        </Stack.Screen>
+                      )}
+                      <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
+                      <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+                      <Stack.Screen name="LocationAddress" component={LocationAddressScreen} />
+                      <Stack.Screen name="RestaurantDetails" component={RestaurantDetailsScreen} />
+                      <Stack.Screen name="CartDetail" component={CartDetailScreen} />
+                      <Stack.Screen name="TrackOrder" component={TrackOrderScreen} />
+                      <Stack.Screen name="Checkout" component={CheckoutScreen} />
 
-                    {/* Account Related Screens */}
-                    <Stack.Screen name="EditProfile" component={EditProfileScreen} />
-                    <Stack.Screen name="Vouchers" component={VouchersScreen} />
-                    <Stack.Screen name="SavedAddresses" component={SavedAddressesScreen} />
-                    <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
-                    <Stack.Screen name="Referrals" component={ReferralsScreen} />
-                    <Stack.Screen name="Notifications" component={NotificationsScreen} />
-                    <Stack.Screen name="Settings" component={SettingsScreen} />
-                    <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
-                  </Stack.Navigator>
-                  <StatusBar style="light" backgroundColor={colors.primary} />
-                </NavigationContainer>
+                      {/* Account Related Screens */}
+                      <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+                      <Stack.Screen name="Vouchers" component={VouchersScreen} />
+                      <Stack.Screen name="SavedAddresses" component={SavedAddressesScreen} />
+                      <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
+                      <Stack.Screen name="Referrals" component={ReferralsScreen} />
+                      <Stack.Screen name="Notifications" component={NotificationsScreen} />
+                      <Stack.Screen name="Settings" component={SettingsScreen} />
+                      <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
+                    </Stack.Navigator>
+                    <StatusBar style="light" backgroundColor={colors.primary} />
+                  </NavigationContainer>
+                </OrdersProvider>
               </CartProvider>
             </ProductsProvider>
           </LanguageProvider>

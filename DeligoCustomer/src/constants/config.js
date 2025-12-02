@@ -88,7 +88,7 @@ export const API_ENDPOINTS = {
 
   // Cart Management
   CART: {
-    GET: '/carts',
+    GET: '/carts/view-cart',
     ADD_TO_CART: '/carts/add-to-cart',
     ACTIVATE_ITEM: '/carts/activate-item/:productId',
     DELETE_ITEM: '/carts/delete-item',

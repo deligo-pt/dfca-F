@@ -4,31 +4,31 @@ import { CategoriesScreen, OrdersScreen, CartScreen, ProfileScreen } from '../sc
 import { CategoriesIcon, OrdersIcon, CartIcon, ProfileIcon } from '../components/TabBarIcons';
 import { useTheme } from '../utils/ThemeContext';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import {Platform, KeyboardAvoidingView, Dimensions, View} from 'react-native';
+import { Platform, KeyboardAvoidingView, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { useCart } from '../contexts/CartContext';
+import { useOrders } from '../contexts/OrdersContext';
 
 const Tab = createBottomTabNavigator();
 
 const BottomTabNavigator = ({ onLogout }) => {
     const { colors, isDarkMode } = useTheme();
     const insets = useSafeAreaInsets();
-    const { height: screenHeight } = Dimensions.get('window');
     const { cartsArray } = useCart();
+    const { ongoingOrders, ordersCount, fetchOrders } = useOrders();
     const cartsCount = (cartsArray && cartsArray.length) ? cartsArray.length : 0;
+    const ongoingCount = Array.isArray(ongoingOrders) ? ongoingOrders.length : 0;
+    const ordersBadge = ongoingCount > 0 ? ongoingCount : (ordersCount > 0 ? ordersCount : undefined);
 
     // Calculate proper bottom padding for tab bar
-    // For large screens (> 800px height), ensure we account for proper spacing
     const bottomPadding = Platform.select({
         ios: insets.bottom > 0 ? insets.bottom : 12,
-        android: Math.max(insets.bottom, 12), // Use at least 12, or actual inset if larger
+        android: Math.max(insets.bottom, 12),
     });
 
-    // Tab bar base height
     const tabBarBaseHeight = 64;
     const totalTabBarHeight = tabBarBaseHeight + bottomPadding;
 
-    // Floating, rounded, shadowed tab bar with safe area and Poppins font
     const tabBarStyle = {
         position: 'absolute',
         left: 0,
@@ -46,7 +46,7 @@ const BottomTabNavigator = ({ onLogout }) => {
         marginHorizontal: 0,
         ...Platform.select({
             ios: {
-                shadowColor: isDarkMode ? '#000' : '#000',
+                shadowColor: '#000',
                 shadowOffset: { width: 0, height: -4 },
                 shadowOpacity: isDarkMode ? 0.3 : 0.12,
                 shadowRadius: isDarkMode ? 20 : 16,
@@ -69,7 +69,7 @@ const BottomTabNavigator = ({ onLogout }) => {
                 <Tab.Navigator
                     screenOptions={{
                         headerShown: false,
-                        tabBarActiveTintColor: colors.primary, // #DC3173
+                        tabBarActiveTintColor: colors.primary,
                         tabBarInactiveTintColor: isDarkMode ? colors.text.light : '#999999',
                         tabBarStyle,
                         tabBarHideOnKeyboard: true,
@@ -86,7 +86,7 @@ const BottomTabNavigator = ({ onLogout }) => {
                     }}
                     sceneContainerStyle={{
                         backgroundColor: colors.background,
-                        paddingBottom: totalTabBarHeight, // Prevent content from being hidden behind tab bar
+                        paddingBottom: totalTabBarHeight,
                     }}
                 >
                     <Tab.Screen
@@ -101,6 +101,13 @@ const BottomTabNavigator = ({ onLogout }) => {
                         component={OrdersScreen}
                         options={{
                             tabBarIcon: ({ focused, color }) => <OrdersIcon focused={focused} color={color} />,
+                            tabBarBadge: ordersBadge,
+                            tabBarBadgeStyle: { backgroundColor: colors.primary, color: '#fff', fontFamily: 'Poppins-SemiBold' },
+                        }}
+                        listeners={{
+                            focus: () => {
+                                try { fetchOrders && fetchOrders(); } catch {}
+                            }
                         }}
                     />
                     <Tab.Screen

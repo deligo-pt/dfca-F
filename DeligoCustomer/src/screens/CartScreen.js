@@ -1,6 +1,7 @@
-import React from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator } from 'react-native';
+import React, { useCallback, useState, useRef, useEffect } from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, fontSize, borderRadius } from '../theme';
 import { useLanguage } from '../utils/LanguageContext';
@@ -11,9 +12,46 @@ import CartList from '../components/CartList';
 const CartScreen = ({ navigation }) => {
   const { t } = useLanguage();
   const { colors } = useTheme();
+  const [refreshing, setRefreshing] = useState(false);
 
   // Use Cart context for real data (cartsArray provides multiple vendor carts)
-  const { cartsArray, itemCount, syncing } = useCart();
+  const { cartsArray, itemCount, syncing, fetchCart } = useCart();
+
+  // Keep latest fetchCart in a ref to avoid useFocusEffect dependency churn
+  const fetchCartRef = useRef(fetchCart);
+  useEffect(() => { fetchCartRef.current = fetchCart; }, [fetchCart]);
+
+  // Fetch cart data when screen comes into focus (call the ref, no dependency on function identity)
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      const loadCart = async () => {
+        const fn = fetchCartRef.current;
+        if (fn && active) {
+          const result = await fn();
+          if (result?.skipped) {
+            console.debug('[CartScreen] fetch skipped:', result.reason);
+          } else if (!result?.success) {
+            console.warn('[CartScreen] Failed to fetch cart:', result?.error);
+          } else {
+            console.debug('[CartScreen] cart fetched');
+          }
+        }
+      };
+      loadCart();
+      return () => { active = false; };
+    }, [])
+  );
+
+  // Pull-to-refresh handler
+  const handleRefresh = useCallback(async () => {
+    setRefreshing(true);
+    const result = await fetchCart({ force: true });
+    if (!result.success) {
+      console.warn('[CartScreen] Failed to refresh cart:', result.error);
+    }
+    setRefreshing(false);
+  }, [fetchCart]);
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
@@ -38,7 +76,17 @@ const CartScreen = ({ navigation }) => {
         </View>
       )}
 
-      <ScrollView showsVerticalScrollIndicator={false}>
+      <ScrollView
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={handleRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
+      >
         {cartsArray.length === 0 ? (
           <View style={styles.emptyContainer}>
             <View style={[styles.emptyIconContainer, { backgroundColor: colors.primary + '10' }]}>
@@ -162,4 +210,3 @@ const styles = StyleSheet.create({
 });
 
 export default CartScreen;
-

@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useMemo, useState } from 'react';
+import React, { createContext, useContext, useEffect, useMemo, useState, useCallback, useRef } from 'react';
 import StorageService from '../utils/storage';
 import CartAPI from '../utils/cartApi';
 import { isValidObjectId } from '../utils/objectId';
@@ -65,6 +65,8 @@ export const CartProvider = ({ children }) => {
   const [state, setState] = useState({ carts: {} });
   const [loading, setLoading] = useState(true);
   const [syncing, setSyncing] = useState(false);
+  const fetchInFlightRef = useRef(false);
+  const lastFetchAtRef = useRef(0);
 
   // Load persisted carts
   useEffect(() => {
@@ -531,6 +533,108 @@ export const CartProvider = ({ children }) => {
     return incomingId;
   };
 
+  // Fetch cart from backend API (memoized to avoid changing identity)
+  const fetchCart = useCallback(async (options = {}) => {
+    const force = !!options.force;
+    const now = Date.now();
+    const minIntervalMs = 2000; // throttle window
+
+    if (fetchInFlightRef.current) {
+      console.debug('[CartContext] fetchCart skipped (in-flight)');
+      return { success: true, skipped: true, reason: 'in_flight' };
+    }
+    if (!force && now - (lastFetchAtRef.current || 0) < minIntervalMs) {
+      console.debug('[CartContext] fetchCart skipped (throttled)');
+      return { success: true, skipped: true, reason: 'throttled' };
+    }
+    fetchInFlightRef.current = true;
+    lastFetchAtRef.current = now;
+    try {
+      setSyncing(true);
+      const res = await CartAPI.getCart();
+
+      if (!res.success) {
+        console.warn('[CartContext] fetchCart failed', res);
+        return { success: false, error: res.error || 'Failed to fetch cart' };
+      }
+
+      const root = res.data;
+      try {
+        const keys = root && typeof root === 'object' ? Object.keys(root) : [];
+        console.debug('[CartContext] fetchCart data keys:', keys);
+      } catch {}
+
+      // Extract items from multiple possible shapes
+      let items = [];
+      if (Array.isArray(root)) {
+        items = root;
+      } else if (Array.isArray(root?.items)) {
+        items = root.items;
+      } else if (Array.isArray(root?.data?.items)) {
+        items = root.data.items;
+      } else if (Array.isArray(root?.cart?.items)) {
+        items = root.cart.items;
+      } else if (Array.isArray(root?.cartItems)) {
+        items = root.cartItems;
+      } else if (Array.isArray(root?.data?.cartItems)) {
+        items = root.data.cartItems;
+      } else if (Array.isArray(root?.data)) {
+        // Some APIs return items array in data directly
+        items = root.data;
+      }
+
+      console.debug('[CartContext] fetchCart received', { itemCount: items.length });
+
+      // Group items by vendor
+      const newCarts = {};
+      for (const item of items) {
+        if (!item) continue;
+        const rawProd = item.product || item; // support both nested and flat shapes
+        const normalized = normalizeProductForCart(rawProd);
+        const vid = normalized.vendorId || rawProd.vendorId || rawProd.vendor?.vendorId || 'unknown_vendor';
+        const vendorKey = String(vid);
+        const qty = Number(item.quantity ?? item.qty ?? item.count ?? 1) || 1;
+
+        if (!normalized.id) {
+          console.debug('[CartContext] skipping item without id', { rawKeys: Object.keys(rawProd || {}) });
+          continue;
+        }
+
+        if (!newCarts[vendorKey]) {
+          newCarts[vendorKey] = {
+            vendorId: vendorKey,
+            vendorName: normalized.vendorName || rawProd.vendorName || rawProd.vendor?.vendorName || '',
+            items: {},
+            appliedPromo: null,
+            deliveryInstructions: ''
+          };
+        }
+
+        newCarts[vendorKey].items[normalized.id] = {
+          product: normalized,
+          quantity: qty
+        };
+      }
+
+      setState(prev => {
+        // Avoid unnecessary state updates if equal (basic check)
+        const prevCarts = prev?.carts || {};
+        const prevKeys = Object.keys(prevCarts);
+        const nextKeys = Object.keys(newCarts);
+        const shallowEqual = prevKeys.length === nextKeys.length && prevKeys.every(k => prevCarts[k] && newCarts[k] && Object.keys(prevCarts[k].items||{}).length === Object.keys(newCarts[k].items||{}).length);
+        if (shallowEqual) return prev; // skip update to reduce re-renders
+        return { carts: newCarts };
+      });
+      return { success: true, data: res.data };
+    } catch (error) {
+      console.error('[CartContext] fetchCart error', error);
+      return { success: false, error: error?.message || 'Network error' };
+    } finally {
+      fetchInFlightRef.current = false;
+      setSyncing(false);
+    }
+  }, []);
+
   return (
     <CartContext.Provider value={{
       state,
@@ -550,6 +654,7 @@ export const CartProvider = ({ children }) => {
       applyPromoCodeToVendor,
       removeAppliedPromoFromVendor,
       setDeliveryInstructionsForVendor,
+      fetchCart,
       // backward-compat aliases
       applyPromoCode: applyPromoCodeToVendor,
       removeAppliedPromo: removeAppliedPromoFromVendor,
