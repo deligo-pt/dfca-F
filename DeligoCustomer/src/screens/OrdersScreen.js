@@ -1,74 +1,120 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  Image
+  Image,
+  ActivityIndicator,
+  RefreshControl
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
-
-// Mock data for orders
-const mockOrders = {
-  // ...existing code...
-  ongoing: [
-    {
-      id: '1',
-      restaurantName: 'Burger King',
-      restaurantImage: require('../assets/images/logo.png'),
-      items: ['Whopper Burger', 'French Fries', 'Coke'],
-      totalAmount: 450,
-      orderDate: '2024-01-15',
-      orderTime: '12:30 PM',
-      status: 'preparing',
-      estimatedTime: '15-20 min',
-      orderNumber: '#ORD-1234',
-    },
-  ],
-  history: [
-    {
-      id: '2',
-      restaurantName: 'Pizza Hut',
-      restaurantImage: require('../assets/images/logo.png'),
-      items: ['Large Pepperoni Pizza', 'Garlic Bread'],
-      totalAmount: 1250,
-      orderDate: '2024-01-14',
-      orderTime: '7:45 PM',
-      status: 'delivered',
-      orderNumber: '#ORD-1233',
-    },
-    {
-      id: '3',
-      restaurantName: 'KFC',
-      restaurantImage: require('../assets/images/logo.png'),
-      items: ['Zinger Burger', 'Hot Wings', 'Pepsi'],
-      totalAmount: 850,
-      orderDate: '2024-01-13',
-      orderTime: '2:15 PM',
-      status: 'delivered',
-      orderNumber: '#ORD-1232',
-    },
-  ],
-};
+import { BASE_API_URL, API_ENDPOINTS } from '../constants/config';
+import StorageService from '../utils/storage';
 
 const OrdersScreen = ({ navigation }) => {
   const { t } = useLanguage();
   const { colors } = useTheme();
   const [activeTab, setActiveTab] = useState('ongoing');
+  const [orders, setOrders] = useState([]);
+  const [loading, setLoading] = useState(true);
+  const [refreshing, setRefreshing] = useState(false);
+  const [error, setError] = useState(null);
+
+  // Fetch orders from API
+  const fetchOrders = async (isRefreshing = false) => {
+    try {
+      if (!isRefreshing) setLoading(true);
+      setError(null);
+
+      // Get auth token
+      let token = await StorageService.getAccessToken();
+      if (token && typeof token === 'object') {
+        token = token.accessToken || token.token || token.value;
+      }
+
+      const headers = {
+        'Content-Type': 'application/json',
+        'Accept': 'application/json',
+      };
+
+      if (token) {
+        const rawToken = token.startsWith('Bearer ') ? token.substring(7) : token;
+        headers.Authorization = rawToken;
+      }
+
+      console.debug('[OrdersScreen] Fetching orders from API');
+      const url = `${BASE_API_URL}${API_ENDPOINTS.ORDERS.LIST}`;
+
+      const response = await fetch(url, {
+        method: 'GET',
+        headers,
+      });
+
+      const responseData = await response.json();
+      console.debug('[OrdersScreen] Orders response:', responseData);
+
+      if (!response.ok) {
+        throw new Error(responseData?.message || 'Failed to fetch orders');
+      }
+
+      // Extract orders from response
+      const ordersData = responseData?.data || [];
+      setOrders(ordersData);
+
+    } catch (err) {
+      console.error('[OrdersScreen] Error fetching orders:', err);
+      setError(err.message || 'Failed to load orders');
+    } finally {
+      setLoading(false);
+      setRefreshing(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchOrders();
+  }, []);
+
+  const handleRefresh = () => {
+    setRefreshing(true);
+    fetchOrders(true);
+  };
+
+  // Separate orders into ongoing and history based on status
+  const getOngoingOrders = () => {
+    return orders.filter(order =>
+      ['PENDING', 'CONFIRMED', 'PREPARING', 'OUT_FOR_DELIVERY'].includes(order.orderStatus?.toUpperCase())
+    );
+  };
+
+  const getHistoryOrders = () => {
+    return orders.filter(order =>
+      ['DELIVERED', 'CANCELLED', 'COMPLETED'].includes(order.orderStatus?.toUpperCase())
+    );
+  };
+
+  const ongoingOrders = getOngoingOrders();
+  const historyOrders = getHistoryOrders();
 
   const getStatusIcon = (status) => {
-    switch (status) {
-      case 'preparing':
+    const statusUpper = status?.toUpperCase();
+    switch (statusUpper) {
+      case 'PENDING':
+      case 'CONFIRMED':
+        return { name: 'time', library: 'Ionicons', color: colors.warning };
+      case 'PREPARING':
         return { name: 'restaurant', library: 'MaterialIcons', color: colors.warning };
-      case 'on_the_way':
+      case 'OUT_FOR_DELIVERY':
+      case 'ON_THE_WAY':
         return { name: 'bicycle', library: 'Ionicons', color: colors.info };
-      case 'delivered':
+      case 'DELIVERED':
+      case 'COMPLETED':
         return { name: 'checkmark-circle', library: 'Ionicons', color: colors.success };
-      case 'cancelled':
+      case 'CANCELLED':
         return { name: 'close-circle', library: 'Ionicons', color: colors.error };
       default:
         return { name: 'time', library: 'Ionicons', color: colors.text.secondary };
@@ -76,14 +122,21 @@ const OrdersScreen = ({ navigation }) => {
   };
 
   const getStatusText = (status) => {
-    switch (status) {
-      case 'preparing':
+    const statusUpper = status?.toUpperCase();
+    switch (statusUpper) {
+      case 'PENDING':
+        return 'Pending';
+      case 'CONFIRMED':
+        return 'Confirmed';
+      case 'PREPARING':
         return t('preparing');
-      case 'on_the_way':
+      case 'OUT_FOR_DELIVERY':
+      case 'ON_THE_WAY':
         return t('onTheWay');
-      case 'delivered':
+      case 'DELIVERED':
+      case 'COMPLETED':
         return t('delivered');
-      case 'cancelled':
+      case 'CANCELLED':
         return 'Cancelled';
       default:
         return 'Processing';
@@ -91,35 +144,67 @@ const OrdersScreen = ({ navigation }) => {
   };
 
   const renderOrderCard = (order, isOngoing = false) => {
-    const statusIcon = getStatusIcon(order.status);
+    const statusIcon = getStatusIcon(order.orderStatus);
+
+    // Format date and time
+    const formatDate = (dateString) => {
+      try {
+        const date = new Date(dateString);
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+      } catch {
+        return 'N/A';
+      }
+    };
+
+    const formatTime = (dateString) => {
+      try {
+        const date = new Date(dateString);
+        return date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      } catch {
+        return 'N/A';
+      }
+    };
+
+    // Get items list as string
+    const itemsList = order.items?.map(item => `${item.quantity}x ${item.name}`).join(', ') || 'No items';
+
+    // Placeholder image (you can update with vendor logo later)
+    const restaurantImage = require('../assets/images/logo.png');
 
     return (
       <TouchableOpacity
-        key={order.id}
+        key={order._id || order.orderId}
         style={[styles.orderCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowColor: colors.shadow }]}
         activeOpacity={0.7}
-        onPress={() => isOngoing ? navigation.navigate('TrackOrder', { orderId: order.id }) : null}
+        onPress={() => isOngoing ? navigation.navigate('TrackOrder', { order }) : null}
       >
         {/* Order Header */}
         <View style={styles.orderHeader}>
           <Image
-            source={order.restaurantImage}
+            source={restaurantImage}
             style={[styles.restaurantImage, { backgroundColor: colors.background }]}
             resizeMode="cover"
           />
           <View style={styles.orderHeaderInfo}>
-            <Text style={[styles.restaurantName, { color: colors.text.primary }]}>{order.restaurantName}</Text>
-            <Text style={[styles.orderNumber, { color: colors.text.secondary }]}>{order.orderNumber}</Text>
+            <Text style={[styles.restaurantName, { color: colors.text.primary }]}>
+              {order.vendorId || 'Restaurant'}
+            </Text>
+            <Text style={[styles.orderNumber, { color: colors.text.secondary }]}>
+              {order.orderId}
+            </Text>
             <Text style={[styles.orderDateTime, { color: colors.text.light }]}>
-              {order.orderDate} • {order.orderTime}
+              {formatDate(order.createdAt)} • {formatTime(order.createdAt)}
             </Text>
           </View>
         </View>
 
         {/* Order Items */}
         <View style={[styles.orderItems, { borderTopColor: colors.border, borderBottomColor: colors.border }]}>
-          <Text style={[styles.itemsText, { color: colors.text.secondary }]}>
-            {order.items.join(', ')}
+          <Text style={[styles.itemsText, { color: colors.text.secondary }]} numberOfLines={2}>
+            {itemsList}
+          </Text>
+          <Text style={[styles.itemsCount, { color: colors.text.light }]}>
+            {order.totalItems} item{order.totalItems > 1 ? 's' : ''}
           </Text>
         </View>
 
@@ -132,18 +217,20 @@ const OrdersScreen = ({ navigation }) => {
               <MaterialIcons name={statusIcon.name} size={20} color={statusIcon.color} />
             )}
             <Text style={[styles.statusText, { color: statusIcon.color }]}>
-              {getStatusText(order.status)}
+              {getStatusText(order.orderStatus)}
             </Text>
           </View>
-          <Text style={[styles.totalAmount, { color: colors.text.primary }]}>€{order.totalAmount}</Text>
+          <Text style={[styles.totalAmount, { color: colors.text.primary }]}>
+            €{order.finalAmount?.toFixed(2) || order.totalPrice?.toFixed(2) || '0.00'}
+          </Text>
         </View>
 
         {/* Estimated Time for Ongoing Orders */}
-        {isOngoing && order.estimatedTime && (
+        {isOngoing && order.estimatedDeliveryTime && order.estimatedDeliveryTime !== 'N/A' && (
           <View style={[styles.estimatedTimeContainer, { borderTopColor: colors.border }]}>
             <Ionicons name="time-outline" size={16} color={colors.primary} />
             <Text style={[styles.estimatedTimeText, { color: colors.primary }]}>
-              {t('estimated')} {t('deliveryTime')}: {order.estimatedTime}
+              {t('estimated')} {t('deliveryTime')}: {order.estimatedDeliveryTime}
             </Text>
           </View>
         )}
@@ -227,9 +314,9 @@ const OrdersScreen = ({ navigation }) => {
             ]}>
               {t('ongoingOrders')}
             </Text>
-            {mockOrders.ongoing.length > 0 && (
+            {ongoingOrders.length > 0 && (
               <View style={[styles.badge, { backgroundColor: activeTab === 'ongoing' ? colors.text.white : colors.primary }]}>
-                <Text style={[styles.badgeText, { color: activeTab === 'ongoing' ? colors.primary : colors.text.white }]}>{mockOrders.ongoing.length}</Text>
+                <Text style={[styles.badgeText, { color: activeTab === 'ongoing' ? colors.primary : colors.text.white }]}>{ongoingOrders.length}</Text>
               </View>
             )}
           </TouchableOpacity>
@@ -252,25 +339,51 @@ const OrdersScreen = ({ navigation }) => {
         </View>
 
         {/* Orders List */}
-        <ScrollView
-          style={styles.scrollView}
-          contentContainerStyle={styles.scrollContent}
-          showsVerticalScrollIndicator={false}
-        >
-          {activeTab === 'ongoing' ? (
-            mockOrders.ongoing.length > 0 ? (
-              mockOrders.ongoing.map(order => renderOrderCard(order, true))
+        {loading && !refreshing ? (
+          <View style={styles.loadingContainer}>
+            <ActivityIndicator size="large" color={colors.primary} />
+            <Text style={[styles.loadingText, { color: colors.text.secondary }]}>Loading orders...</Text>
+          </View>
+        ) : error ? (
+          <View style={styles.errorContainer}>
+            <Ionicons name="alert-circle-outline" size={60} color={colors.error} />
+            <Text style={[styles.errorText, { color: colors.text.primary }]}>{error}</Text>
+            <TouchableOpacity
+              style={[styles.retryButton, { backgroundColor: colors.primary }]}
+              onPress={() => fetchOrders()}
+            >
+              <Text style={[styles.retryButtonText, { color: colors.text.white }]}>Retry</Text>
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <ScrollView
+            style={styles.scrollView}
+            contentContainerStyle={styles.scrollContent}
+            showsVerticalScrollIndicator={false}
+            refreshControl={
+              <RefreshControl
+                refreshing={refreshing}
+                onRefresh={handleRefresh}
+                colors={[colors.primary]}
+                tintColor={colors.primary}
+              />
+            }
+          >
+            {activeTab === 'ongoing' ? (
+              ongoingOrders.length > 0 ? (
+                ongoingOrders.map(order => renderOrderCard(order, true))
+              ) : (
+                renderEmptyState('ongoing')
+              )
             ) : (
-              renderEmptyState('ongoing')
-            )
-          ) : (
-            mockOrders.history.length > 0 ? (
-              mockOrders.history.map(order => renderOrderCard(order, false))
-            ) : (
-              renderEmptyState('history')
-            )
-          )}
-        </ScrollView>
+              historyOrders.length > 0 ? (
+                historyOrders.map(order => renderOrderCard(order, false))
+              ) : (
+                renderEmptyState('history')
+              )
+            )}
+          </ScrollView>
+        )}
       </View>
     </SafeAreaView>
   );
