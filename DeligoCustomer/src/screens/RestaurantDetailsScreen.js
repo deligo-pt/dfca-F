@@ -3,7 +3,7 @@
  * Professional restaurant menu with enhanced product modal
  */
 
-import React, { useState } from 'react';
+import React, { useState, useEffect } from 'react';
 import {
   View,
   Text,
@@ -15,6 +15,9 @@ import {
   Modal,
   ActivityIndicator,
   StatusBar,
+  LayoutAnimation,
+  Platform,
+  UIManager,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -44,7 +47,22 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const [selectedCategory, setSelectedCategory] = useState('Popular');
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const { addItem, updateQuantity: cartUpdateQuantity, itemsMap, syncing } = useCart();
+  const { addItem, updateQuantity: cartUpdateQuantity, itemsMap } = useCart();
+
+  // Enable LayoutAnimation on Android
+  useEffect(() => {
+    if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
+      UIManager.setLayoutAnimationEnabledExperimental(true);
+    }
+  }, []);
+
+  // Optimistic local quantity state
+  const [localQty, setLocalQty] = useState({});
+  const getQuantity = (productId) => {
+    const q = localQty[productId];
+    if (typeof q === 'number') return q;
+    return itemsMap?.[productId]?.quantity || 0;
+  };
 
   // Product modal state
   const [productModalVisible, setProductModalVisible] = useState(false);
@@ -94,16 +112,24 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   });
   const menuCategories = ['Popular', ...Array.from(derivedCategories)];
 
+  // Update add/remove with optimistic updates and animation
   const addToCart = async (item) => {
+    const current = getQuantity(item.id);
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setLocalQty((prev) => ({ ...prev, [item.id]: current + 1 }));
     setUpdatingProductId(item.id);
     await addItem(item, 1);
-    setTimeout(() => setUpdatingProductId(null), 300);
+    setTimeout(() => setUpdatingProductId(null), 250);
   };
 
   const removeFromCart = async (item) => {
+    const current = getQuantity(item.id);
+    if (current <= 0) return;
+    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    setLocalQty((prev) => ({ ...prev, [item.id]: Math.max(0, current - 1) }));
     setUpdatingProductId(item.id);
     await cartUpdateQuantity(item.id, -1);
-    setTimeout(() => setUpdatingProductId(null), 300);
+    setTimeout(() => setUpdatingProductId(null), 250);
   };
 
   const getTotalItems = () => {
@@ -150,7 +176,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   };
 
   const renderMenuItem = (product) => {
-    const quantity = itemsMap?.[product.id]?.quantity || 0;
+    const quantity = getQuantity(product.id);
     const raw = product._raw || {};
     const displayProductName = raw.product?.name || raw.name || raw.productName || product.name || '';
     const image = product.image || (Array.isArray(raw.images) && raw.images[0]);
@@ -159,14 +185,17 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     const isUpdating = updatingProductId === product.id;
 
     return (
-      <TouchableOpacity
+      <View
         key={product.id}
-        activeOpacity={0.9}
-        onPress={() => openProductModal(product)}
         style={[styles.menuItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
-        disabled={isUpdating}
       >
-        <View style={styles.menuItemContent}>
+        {/* Left: tap to open modal */}
+        <TouchableOpacity
+          activeOpacity={0.9}
+          onPress={() => openProductModal(product)}
+          style={styles.menuItemContent}
+          disabled={isUpdating}
+        >
           {image ? (
             <Image source={{ uri: image }} style={styles.menuItemImage} />
           ) : (
@@ -182,14 +211,16 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
             )}
             <Text style={[styles.menuItemPrice, { color: colors.primary }]}>{formatCurrency(raw.pricing?.currency ?? '', price)}</Text>
           </View>
-        </View>
+        </TouchableOpacity>
 
-        <View style={styles.menuItemActions}>
+        {/* Right: quantity control */}
+        <View style={styles.menuItemActions} pointerEvents="box-none">
           {quantity === 0 ? (
             <TouchableOpacity
               style={[styles.addButton, { backgroundColor: colors.primary }]}
               onPress={() => addToCart(product)}
               disabled={isUpdating}
+              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
             >
               {isUpdating ? (
                 <ActivityIndicator size="small" color="#fff" />
@@ -200,14 +231,15 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
           ) : (
             <View style={[styles.quantityControl, { borderColor: colors.border }]}>
               <TouchableOpacity
-                style={[styles.quantityButton, { backgroundColor: colors.background }]}
+                style={[styles.quantityButton, { backgroundColor: quantity > 0 ? colors.background : colors.border }]}
                 onPress={() => removeFromCart(product)}
-                disabled={isUpdating}
+                disabled={quantity === 0 || isUpdating}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 {isUpdating ? (
-                  <ActivityIndicator size="small" color={colors.primary} />
+                  <ActivityIndicator size="small" color={quantity > 0 ? colors.primary : colors.text.light} />
                 ) : (
-                  <Ionicons name="remove" size={16} color={colors.primary} />
+                  <Ionicons name="remove" size={16} color={quantity > 0 ? colors.primary : colors.text.light} />
                 )}
               </TouchableOpacity>
               <Text style={[styles.quantityText, { color: colors.text.primary }]}>{quantity}</Text>
@@ -215,6 +247,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                 style={[styles.quantityButton, { backgroundColor: colors.primary }]}
                 onPress={() => addToCart(product)}
                 disabled={isUpdating}
+                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
               >
                 {isUpdating ? (
                   <ActivityIndicator size="small" color="#fff" />
@@ -225,7 +258,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
             </View>
           )}
         </View>
-      </TouchableOpacity>
+      </View>
     );
   };
 
@@ -238,7 +271,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     const description = raw.longDescription || raw.description || raw.details || raw.slug || '';
     const price = raw.pricing?.price ?? raw.price ?? activeProduct.price ?? 0;
     const currency = raw.pricing?.currency ?? '';
-    const quantity = itemsMap?.[activeProduct.id]?.quantity || 0;
+    const quantity = getQuantity(activeProduct.id);
     const isUpdating = updatingProductId === activeProduct.id;
 
     return (

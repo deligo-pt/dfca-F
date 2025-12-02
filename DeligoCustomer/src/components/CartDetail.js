@@ -7,7 +7,7 @@ import formatCurrency from '../utils/currency';
 import { Ionicons } from '@expo/vector-icons';
 
 export default function CartDetail({ vendorId, navigation }) {
-  const { getVendorCart, getVendorSubtotal, updateQuantity, removeItem, applyPromoCodeToVendor, removeAppliedPromoFromVendor, setDeliveryInstructionsForVendor, syncing } = useCart();
+  const { getVendorCart, getVendorSubtotal, updateQuantity, removeItem, setDeliveryInstructionsForVendor } = useCart();
   const cart = getVendorCart(vendorId);
   const { colors } = useTheme();
   const [promoInput, setPromoInput] = useState('');
@@ -16,25 +16,46 @@ export default function CartDetail({ vendorId, navigation }) {
 
   if (!cart) return <Text style={{ color: colors.text.secondary, padding: spacing.md }}>No cart found.</Text>;
 
-  const items = Object.keys(cart.items || {}).map(id => ({ id, ...cart.items[id] }));
-  const subtotal = getVendorSubtotal(vendorId);
-  const serviceFee = 1.99;
-  const deliveryFee = (cart.vendorMeta && Number(cart.vendorMeta.deliveryFee)) || Number(cart._raw?.vendor?.deliveryFee ?? cart._raw?.vendor?.delivery_fee ?? 0) || 2.99;
-  const discount = cart.appliedPromo?.discount || 0;
-  const total = (Number(subtotal) + Number(serviceFee) + Number(deliveryFee) - Number(discount));
+  const rawItems = Object.keys(cart.items || {}).map(id => ({ id, ...cart.items[id] }));
+  // Build detailed pricing per item from product.pricing
+  const items = rawItems.map(it => {
+    const p = it.product || {};
+    const pricing = p?._raw?.pricing || p?.pricing || {};
+    const basePrice = Number(pricing.price ?? p.price ?? 0) || 0;
+    const discountRaw = pricing.discount;
+    const taxRaw = pricing.tax;
+    const discountPercent = (discountRaw != null && !isNaN(Number(discountRaw))) ? (Number(discountRaw) <= 1 ? Number(discountRaw) * 100 : Number(discountRaw)) : 0;
+    const taxPercent = (taxRaw != null && !isNaN(Number(taxRaw))) ? (Number(taxRaw) <= 1 ? Number(taxRaw) * 100 : Number(taxRaw)) : 0;
+    const discountUnit = basePrice * (discountPercent / 100);
+    const afterDiscount = basePrice - discountUnit;
+    const taxUnit = afterDiscount * (taxPercent / 100);
+    const finalUnitFromPricing = pricing.finalPrice != null ? Number(pricing.finalPrice) : null;
+    const finalUnit = Number.isFinite(finalUnitFromPricing) ? finalUnitFromPricing : (afterDiscount + taxUnit);
+    return {
+      ...it,
+      product: p,
+      qty: it.quantity || 0,
+      currency: pricing.currency || p.currency || '',
+      basePrice,
+      discountPercent,
+      discountUnit,
+      afterDiscount,
+      taxPercent,
+      taxUnit,
+      finalUnit,
+    };
+  });
+
+  const currency = items[0]?.currency || '';
+  const baseSubtotal = items.reduce((s, it) => s + it.basePrice * it.qty, 0);
+  const discountTotal = items.reduce((s, it) => s + it.discountUnit * it.qty, 0);
+  const subtotalAfterDiscount = baseSubtotal - discountTotal;
+  const taxTotal = items.reduce((s, it) => s + it.taxUnit * it.qty, 0);
+  const total = items.reduce((s, it) => s + it.finalUnit * it.qty, 0);
 
   const vendorImage = items.length ? (items[0].product._raw?.vendor?.storePhoto || items[0].product.image) : null;
   const vendorRating = items.length ? (items[0].product._raw?.vendor?.rating || '4.5') : '4.5';
   const vendorDeliveryTime = items.length ? (items[0].product._raw?.vendor?.deliveryTime || '30-40 min') : '30-40 min';
-
-  const onApplyPromo = () => {
-    const res = applyPromoCodeToVendor(vendorId, promoInput);
-    if (!res.ok) alert(res.message || 'Invalid promo');
-    else {
-      setPromoInput('');
-      setShowPromoInput(false);
-    }
-  };
 
   const handleUpdateQuantity = async (itemId, delta) => {
     setUpdatingItemId(itemId);
@@ -46,12 +67,18 @@ export default function CartDetail({ vendorId, navigation }) {
     const cartData = {
       vendorId,
       vendorName: cart.vendorName,
-      items,
-      subtotal,
-      serviceFee,
-      deliveryFee,
-      promoCode: cart.appliedPromo?.code,
-      deliveryInstructions: cart.deliveryInstructions,
+      items: items.map(it => ({
+        id: it.id,
+        name: it.product?.name,
+        quantity: it.qty,
+        price: it.basePrice,
+        discountPercent: it.discountPercent,
+        taxPercent: it.taxPercent,
+        finalPrice: it.finalUnit,
+        currency: it.currency,
+      })),
+      subtotal: subtotalAfterDiscount,
+      tax: taxTotal,
       total,
     };
     navigation.navigate('Checkout', { cartData });
@@ -108,7 +135,13 @@ export default function CartDetail({ vendorId, navigation }) {
                   {it.product._raw?.description && (
                     <Text style={{ color: colors.text.secondary, fontSize: 12, marginTop: 2 }} numberOfLines={2}>{it.product._raw.description}</Text>
                   )}
-                  <Text style={[styles.itemPrice, { color: colors.text.primary, marginTop: 6 }]}>{formatCurrency(it.product.currency || '', it.product.price)}</Text>
+                  {/* Pricing breakdown */}
+                  <Text style={{ color: colors.text.secondary, fontSize: 12, marginTop: 6, fontFamily: 'Poppins-Regular' }}>
+                    {formatCurrency(it.currency, it.basePrice)}
+                    {it.discountPercent > 0 ? ` • -${Math.round(it.discountPercent)}%` : ''}
+                    {it.taxPercent > 0 ? ` • +${Math.round(it.taxPercent)}%` : ''}
+                    {` • = ${formatCurrency(it.currency, it.finalUnit)}`}
+                  </Text>
                 </View>
               </View>
 
@@ -117,12 +150,12 @@ export default function CartDetail({ vendorId, navigation }) {
                   <TouchableOpacity
                     onPress={() => handleUpdateQuantity(it.id, -1)}
                     style={[styles.qtyBtn, { backgroundColor: colors.background }]}
-                    disabled={updatingItemId === it.id || it.quantity <= 1}
+                    disabled={updatingItemId === it.id || it.qty <= 1}
                   >
-                    {updatingItemId === it.id && it.quantity > 1 ? (
+                    {updatingItemId === it.id && it.qty > 1 ? (
                       <ActivityIndicator size="small" color={colors.primary} />
                     ) : (
-                      <Ionicons name="remove" size={18} color={it.quantity <= 1 ? colors.text.light : colors.primary} />
+                      <Ionicons name="remove" size={18} color={it.qty <= 1 ? colors.text.light : colors.primary} />
                     )}
                   </TouchableOpacity>
                   <Text style={{
@@ -133,7 +166,7 @@ export default function CartDetail({ vendorId, navigation }) {
                     fontFamily: 'Poppins-SemiBold',
                     fontSize: fontSize.md
                   }}>
-                    {it.quantity}
+                    {it.qty}
                   </Text>
                   <TouchableOpacity
                     onPress={() => handleUpdateQuantity(it.id, 1)}
@@ -147,61 +180,20 @@ export default function CartDetail({ vendorId, navigation }) {
                     )}
                   </TouchableOpacity>
                 </View>
-                <TouchableOpacity onPress={() => removeItem(it.id, vendorId)} style={{ marginTop: spacing.sm }}>
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                    <Ionicons name="trash-outline" size={16} color="#D32F2F" />
-                    <Text style={{ color: '#D32F2F', marginLeft: 4, fontSize: 13, fontFamily: 'Poppins-Medium' }}>Remove</Text>
-                  </View>
-                </TouchableOpacity>
+                <View>
+                  <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-Bold' }}>
+                    {formatCurrency(it.currency, it.finalUnit * it.qty)}
+                  </Text>
+                  <TouchableOpacity onPress={() => removeItem(it.id, vendorId)} style={{ marginTop: spacing.xs }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <Ionicons name="trash-outline" size={16} color="#D32F2F" />
+                      <Text style={{ color: '#D32F2F', marginLeft: 4, fontSize: 13, fontFamily: 'Poppins-Medium' }}>Remove</Text>
+                    </View>
+                  </TouchableOpacity>
+                </View>
               </View>
             </View>
           ))}
-        </View>
-
-        {/* Promo Section */}
-        <View style={{ padding: spacing.md }}>
-          <TouchableOpacity
-            onPress={() => setShowPromoInput(!showPromoInput)}
-            style={[styles.promoToggle, { backgroundColor: colors.surface, borderColor: colors.border }]}
-          >
-            <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-              <Ionicons name="pricetag" size={20} color={colors.primary} />
-              <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', marginLeft: spacing.sm }}>Have a promo code?</Text>
-            </View>
-            <Ionicons name={showPromoInput ? "chevron-up" : "chevron-down"} size={20} color={colors.text.secondary} />
-          </TouchableOpacity>
-
-          {showPromoInput && (
-            <View style={{ marginTop: spacing.sm }}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <TextInput
-                  value={promoInput}
-                  onChangeText={setPromoInput}
-                  placeholder="Enter promo code"
-                  placeholderTextColor={colors.text.light}
-                  style={[styles.promoInput, { borderColor: colors.border, color: colors.text.primary, backgroundColor: colors.surface }]}
-                  autoCapitalize="characters"
-                />
-                <TouchableOpacity onPress={onApplyPromo} style={[styles.applyBtn, { backgroundColor: colors.primary }]}>
-                  <Text style={{ color: '#fff', fontFamily: 'Poppins-SemiBold' }}>Apply</Text>
-                </TouchableOpacity>
-              </View>
-            </View>
-          )}
-
-          {cart.appliedPromo && (
-            <View style={[styles.appliedPromo, { backgroundColor: '#E8F5E9', borderColor: '#4CAF50' }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                <Ionicons name="checkmark-circle" size={20} color="#4CAF50" />
-                <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', marginLeft: spacing.sm }}>
-                  {cart.appliedPromo.code} • -{formatCurrency(items[0]?.product.currency || '', cart.appliedPromo.discount)}
-                </Text>
-              </View>
-              <TouchableOpacity onPress={() => removeAppliedPromoFromVendor(vendorId)}>
-                <Ionicons name="close-circle" size={20} color="#D32F2F" />
-              </TouchableOpacity>
-            </View>
-          )}
         </View>
 
         {/* Delivery Instructions */}
@@ -230,28 +222,24 @@ export default function CartDetail({ vendorId, navigation }) {
 
           <View style={styles.rowBetween}>
             <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>Subtotal</Text>
-            <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>{formatCurrency(items[0]?.product.currency || '', subtotal)}</Text>
+            <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>{formatCurrency(currency, baseSubtotal)}</Text>
           </View>
-          <View style={styles.rowBetween}>
-            <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>Delivery fee</Text>
-            <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>{deliveryFee === 0 ? 'Free' : formatCurrency(items[0]?.product.currency || '', deliveryFee)}</Text>
-          </View>
-          <View style={styles.rowBetween}>
-            <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>Service fee</Text>
-            <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>{formatCurrency(items[0]?.product.currency || '', serviceFee)}</Text>
-          </View>
-          {discount > 0 && (
+          {discountTotal > 0 && (
             <View style={styles.rowBetween}>
-              <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>🎟️ Discount</Text>
-              <Text style={{ color: '#4CAF50', fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>-{formatCurrency(items[0]?.product.currency || '', discount)}</Text>
+              <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>Discount</Text>
+              <Text style={{ color: '#4CAF50', fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>-{formatCurrency(currency, discountTotal)}</Text>
             </View>
           )}
+          <View style={styles.rowBetween}>
+            <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>Tax</Text>
+            <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>{formatCurrency(currency, taxTotal)}</Text>
+          </View>
 
           <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
 
           <View style={styles.rowBetween}>
             <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-Bold', fontSize: fontSize.lg }}>Total</Text>
-            <Text style={{ color: colors.primary, fontFamily: 'Poppins-Bold', fontSize: fontSize.xl }}>{formatCurrency(items[0]?.product.currency || '', total)}</Text>
+            <Text style={{ color: colors.primary, fontFamily: 'Poppins-Bold', fontSize: fontSize.xl }}>{formatCurrency(currency, total)}</Text>
           </View>
         </View>
       </ScrollView>
@@ -259,8 +247,8 @@ export default function CartDetail({ vendorId, navigation }) {
       {/* Sticky footer */}
       <View style={[styles.footer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
         <View style={{ flex: 1 }}>
-          <Text style={{ color: colors.text.secondary, fontSize: 13 }}>{items.reduce((s, it) => s + it.quantity, 0)} items</Text>
-          <Text style={{ color: colors.primary, fontFamily: 'Poppins-Bold', fontSize: 20 }}>{formatCurrency(items[0]?.product.currency || '', total)}</Text>
+          <Text style={{ color: colors.text.secondary, fontSize: 13 }}>{items.reduce((s, it) => s + it.qty, 0)} items</Text>
+          <Text style={{ color: colors.primary, fontFamily: 'Poppins-Bold', fontSize: 20 }}>{formatCurrency(currency, total)}</Text>
         </View>
         <TouchableOpacity style={[styles.checkoutBtn, { backgroundColor: colors.primary }]} onPress={onCheckout}>
           <Text style={{ color: '#fff', fontFamily: 'Poppins-Bold', fontSize: 16 }}>Checkout</Text>
@@ -438,4 +426,3 @@ const styles = StyleSheet.create({
     shadowRadius: 4,
   }
 });
-

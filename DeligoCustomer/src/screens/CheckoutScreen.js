@@ -26,32 +26,72 @@ const CheckoutScreen = ({ route, navigation }) => {
   const [selectedPayment, setSelectedPayment] = useState('card');
   const [isProcessing, setIsProcessing] = useState(false);
   const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [selectedTip, setSelectedTip] = useState(0);
-  const [voucherCode, setVoucherCode] = useState('');
-  const [showVoucherInput, setShowVoucherInput] = useState(false);
   const [notes, setNotes] = useState('');
 
   // Get real cart data from CartContext
-  const { getVendorCart, getVendorSubtotal } = useCart();
+  const { getVendorCart } = useCart();
   const vendorId = cartData?.vendorId;
   const cart = getVendorCart(vendorId);
 
   // Calculate real cart values
-  const cartItems = cart?.items ? Object.keys(cart.items).map(id => ({
-    id,
-    name: cart.items[id].product.name,
-    price: cart.items[id].product.price,
-    quantity: cart.items[id].quantity,
-    image: cart.items[id].product.image,
-    currency: cart.items[id].product.currency,
-  })) : (cartData?.items || []);
+  const cartItems = cart?.items ? Object.keys(cart.items).map(id => {
+    const p = cart.items[id].product;
+    const rawPricing = p?._raw?.pricing || p?.pricing || null;
+    const basePrice = Number((rawPricing && rawPricing.price) ?? p.price ?? 0) || 0;
+    const discountRaw = rawPricing?.discount;
+    const taxRaw = rawPricing?.tax;
+    const discountPercent = (discountRaw != null && !isNaN(Number(discountRaw))) ? (Number(discountRaw) <= 1 ? Number(discountRaw) * 100 : Number(discountRaw)) : 0;
+    const taxPercent = (taxRaw != null && !isNaN(Number(taxRaw))) ? (Number(taxRaw) <= 1 ? Number(taxRaw) * 100 : Number(taxRaw)) : (Number(cart?.vendorMeta?.taxRate ?? 0) * 100);
+    const finalUnitFromPricing = rawPricing && rawPricing.finalPrice != null ? Number(rawPricing.finalPrice) : null;
+    const computedFinalUnit = basePrice * (1 - (discountPercent / 100)) * (1 + (taxPercent / 100));
+    const finalUnitPrice = Number.isFinite(finalUnitFromPricing) ? finalUnitFromPricing : computedFinalUnit;
+
+    return ({
+      id,
+      name: p?.name,
+      price: basePrice,
+      finalPrice: finalUnitPrice,
+      discountPercent,
+      taxPercent,
+      quantity: cart.items[id].quantity,
+      image: p?.image,
+      currency: (rawPricing && rawPricing.currency) || p?.currency,
+    });
+  }) : (cartData?.items || []);
 
   const currency = cartItems.length > 0 ? (cartItems[0].currency || 'EUR') : 'EUR';
-  const subtotal = cart ? getVendorSubtotal(vendorId) : (cartData?.subtotal || 0);
+  // Compute item-level subtotal (after item discounts, before tax) and tax
+  const itemsSubtotal = cartItems.reduce((sum, it) => {
+    const unitDiscount = (it.price || 0) * ((it.discountPercent || 0) / 100);
+    const unitTaxable = (it.price || 0) - unitDiscount;
+    return sum + unitTaxable * (it.quantity || 0);
+  }, 0);
+  const itemsTax = cartItems.reduce((sum, it) => {
+    const unitDiscount = (it.price || 0) * ((it.discountPercent || 0) / 100);
+    const unitTaxable = (it.price || 0) - unitDiscount;
+    const unitTax = unitTaxable * ((it.taxPercent || 0) / 100);
+    return sum + unitTax * (it.quantity || 0);
+  }, 0);
+
+  // Fees and promo discount
   const deliveryFee = cartData?.deliveryFee || 0;
   const serviceFee = cartData?.serviceFee || 1.99;
   const discount = cart?.appliedPromo?.discount || cartData?.discount || 0;
-  const total = subtotal + serviceFee + deliveryFee - discount;
+
+  // Build baseSubtotal/discountTotal/taxAmount/total to match CartDetail
+  const baseSubtotal = cartItems.reduce((sum, it) => sum + (it.price || 0) * (it.quantity || 0), 0);
+  const discountTotal = cartItems.reduce((sum, it) => {
+    const unitDiscount = (it.price || 0) * ((it.discountPercent || 0) / 100);
+    return sum + unitDiscount * (it.quantity || 0);
+  }, 0);
+  const subtotalAfterDiscount = baseSubtotal - discountTotal;
+  const taxAmount = cartItems.reduce((sum, it) => {
+    const unitDiscount = (it.price || 0) * ((it.discountPercent || 0) / 100);
+    const unitTaxable = (it.price || 0) - unitDiscount;
+    const unitTax = unitTaxable * ((it.taxPercent || 0) / 100);
+    return sum + unitTax * (it.quantity || 0);
+  }, 0);
+  const total = subtotalAfterDiscount + taxAmount;
 
   // Set initial notes from cart delivery instructions
   useEffect(() => {
@@ -60,12 +100,6 @@ const CheckoutScreen = ({ route, navigation }) => {
     }
   }, [cart?.deliveryInstructions]);
 
-  // Set initial voucher code if promo is applied
-  useEffect(() => {
-    if (cart?.appliedPromo?.code) {
-      setVoucherCode(cart.appliedPromo.code);
-    }
-  }, [cart?.appliedPromo?.code]);
   const paymentMethods = [
     {
       id: 'card',
@@ -74,13 +108,6 @@ const CheckoutScreen = ({ route, navigation }) => {
       badge: t('recommended'),
     },
     { id: 'wallet', name: t('digitalWallet'), icon: 'wallet' },
-  ];
-
-  const tipOptions = [
-    { id: 0, label: t('noTip'), value: 0 },
-    { id: 1, label: formatCurrency(currency, 2), value: 2 },
-    { id: 2, label: formatCurrency(currency, 3), value: 3 },
-    { id: 3, label: formatCurrency(currency, 5), value: 5 },
   ];
 
   const handlePlaceOrder = () => {
@@ -215,92 +242,24 @@ const CheckoutScreen = ({ route, navigation }) => {
                   <View style={styles(colors).quantityBadge}>
                     <Text style={styles(colors).quantityText}>{item.quantity}</Text>
                   </View>
-                  <Text style={styles(colors).itemNameText} numberOfLines={2}>
-                    {item.name}
-                  </Text>
+                  <View style={{ flex: 1 }}>
+                    <Text style={styles(colors).itemNameText} numberOfLines={2}>
+                      {item.name}
+                    </Text>
+                    {/* Pricing breakdown */}
+                    <Text style={{ fontSize: 12, fontFamily: 'Poppins-Regular', color: colors.text.secondary, marginTop: 4 }}>
+                      {formatCurrency(currency, item.price)}
+                      {item.discountPercent > 0 ? ` • -${Math.round(item.discountPercent)}%` : ''}
+                      {item.taxPercent > 0 ? ` • +${Math.round(item.taxPercent)}%` : ''}
+                      {` • = ${formatCurrency(currency, item.finalPrice || item.price)}`}
+                    </Text>
+                  </View>
                 </View>
+                {/* Line total uses final price if available */}
                 <Text style={styles(colors).itemPriceText}>
-                  {formatCurrency(currency, item.price * item.quantity)}
+                  {formatCurrency(currency, (item.finalPrice || item.price) * item.quantity)}
                 </Text>
               </View>
-            ))}
-          </View>
-        </View>
-
-        {/* Voucher */}
-        <View style={styles(colors).section}>
-          <TouchableOpacity
-            style={styles(colors).voucherButton}
-            onPress={() => setShowVoucherInput(!showVoucherInput)}
-            activeOpacity={0.7}
-          >
-            <View style={styles(colors).voucherLeft}>
-              <View style={styles(colors).voucherIconBadge}>
-                <MaterialCommunityIcons
-                  name="ticket-percent"
-                  size={24}
-                  color={colors.primary}
-                />
-              </View>
-              <Text style={styles(colors).voucherButtonText}>
-                {voucherCode ? t('voucherApplied') : t('applyVoucher')}
-              </Text>
-            </View>
-            <Ionicons
-              name={showVoucherInput ? 'chevron-up' : 'chevron-forward'}
-              size={24}
-              color={colors.text.secondary}
-            />
-          </TouchableOpacity>
-          {showVoucherInput && (
-            <View style={styles(colors).voucherInputContainer}>
-              <TextInput
-                style={styles(colors).voucherInput}
-                placeholder={t('enterPromoCode')}
-                placeholderTextColor={colors.text.light}
-                value={voucherCode}
-                onChangeText={setVoucherCode}
-                autoCapitalize="characters"
-              />
-              <TouchableOpacity style={styles(colors).applyVoucherButton} activeOpacity={0.8}>
-                <Text style={styles(colors).applyVoucherText}>{t('apply')}</Text>
-              </TouchableOpacity>
-            </View>
-          )}
-        </View>
-
-        {/* Rider Tip */}
-        <View style={styles(colors).section}>
-          <View style={styles(colors).sectionHeader}>
-            <View style={styles(colors).sectionTitleRow}>
-              <MaterialCommunityIcons name="bike-fast" size={20} color={colors.primary} />
-              <Text style={styles(colors).sectionTitle}>{t('tipYourRider')}</Text>
-            </View>
-            <Text style={styles(colors).optionalText}>{t('optional')}</Text>
-          </View>
-          <Text style={styles(colors).tipDescription}>
-            {t('showAppreciation')}
-          </Text>
-          <View style={styles(colors).tipOptionsContainer}>
-            {tipOptions.map((tip) => (
-              <TouchableOpacity
-                key={tip.id}
-                style={[
-                  styles(colors).tipOption,
-                  selectedTip === tip.value && styles(colors).tipOptionSelected,
-                ]}
-                onPress={() => setSelectedTip(tip.value)}
-                activeOpacity={0.7}
-              >
-                <Text
-                  style={[
-                    styles(colors).tipOptionText,
-                    selectedTip === tip.value && styles(colors).tipOptionTextSelected,
-                  ]}
-                >
-                  {tip.label}
-                </Text>
-              </TouchableOpacity>
             ))}
           </View>
         </View>
@@ -408,60 +367,38 @@ const CheckoutScreen = ({ route, navigation }) => {
           <View style={styles(colors).summaryRows}>
             <View style={styles(colors).summaryRow}>
               <Text style={styles(colors).summaryLabel}>{t('subtotal')}</Text>
-              <Text style={styles(colors).summaryValue}>{formatCurrency(currency, subtotal)}</Text>
+              <Text style={styles(colors).summaryValue}>{formatCurrency(currency, baseSubtotal)}</Text>
             </View>
 
-            <View style={styles(colors).summaryRow}>
-              <Text style={styles(colors).summaryLabel}>{t('deliveryFee')}</Text>
-              {deliveryFee === 0 ? (
-                <Text style={styles(colors).summaryValueFree}>{t('free')}</Text>
-              ) : (
-                <Text style={styles(colors).summaryValue}>{formatCurrency(currency, deliveryFee)}</Text>
-              )}
-            </View>
-
-            <View style={styles(colors).summaryRow}>
-              <Text style={styles(colors).summaryLabel}>{t('serviceFee')}</Text>
-              <Text style={styles(colors).summaryValue}>{formatCurrency(currency, serviceFee)}</Text>
-            </View>
-
-            {selectedTip > 0 && (
-              <View style={styles(colors).summaryRow}>
-                <Text style={styles(colors).summaryLabel}>{t('riderTip')}</Text>
-                <Text style={styles(colors).summaryValue}>{formatCurrency(currency, selectedTip)}</Text>
-              </View>
-            )}
-
-            {discount > 0 && (
+            {discountTotal > 0 && (
               <View style={styles(colors).summaryRow}>
                 <View style={styles(colors).discountRow}>
-                  <MaterialCommunityIcons
-                    name="ticket-percent"
-                    size={16}
-                    color={colors.success}
-                  />
+                  <MaterialCommunityIcons name="ticket-percent" size={16} color={colors.success} />
                   <Text style={styles(colors).summaryLabelDiscount}>{t('discount')}</Text>
                 </View>
-                <Text style={styles(colors).summaryValueDiscount}>-{formatCurrency(currency, discount)}</Text>
+                <Text style={styles(colors).summaryValueDiscount}>-{formatCurrency(currency, discountTotal)}</Text>
               </View>
             )}
+
+            <View style={styles(colors).summaryRow}>
+              <Text style={styles(colors).summaryLabel}>{t('tax')}</Text>
+              <Text style={styles(colors).summaryValue}>{formatCurrency(currency, taxAmount)}</Text>
+            </View>
 
             <View style={styles(colors).summaryDivider} />
 
             <View style={styles(colors).totalSummaryRow}>
               <Text style={styles(colors).totalSummaryLabel}>{t('total')}</Text>
-              <Text style={styles(colors).totalSummaryValue}>
-                {formatCurrency(currency, total + selectedTip)}
-              </Text>
+              <Text style={styles(colors).totalSummaryValue}>{formatCurrency(currency, total)}</Text>
             </View>
           </View>
         </View>
 
-        {/* Place Order Button - Inside ScrollView */}
+        {/* Place Order Button */}
         <View style={styles(colors).checkoutButtonContainer}>
           <View style={styles(colors).totalBarInline}>
             <Text style={styles(colors).totalBarLabel}>{t('total')}</Text>
-            <Text style={styles(colors).totalBarAmount}>{formatCurrency(currency, total + selectedTip)}</Text>
+            <Text style={styles(colors).totalBarAmount}>{formatCurrency(currency, total)}</Text>
           </View>
           <TouchableOpacity
             style={[
