@@ -36,7 +36,7 @@ export const translations = {
     viewAll: 'View All',
 
     // Categories Screen
-    whatDoYouNeed: 'What do you need?',
+    whatDoYouNeed: "What's on your mind?",
     cuisines: 'Cuisines',
     locationDenied: 'Location denied',
     errorGettingLocation: 'Error getting location',
@@ -125,8 +125,6 @@ export const translations = {
     deliveries: 'deliveries',
     callDriver: 'Call Driver',
     messageDriver: 'Message Driver',
-    deliveryTo: 'Delivery To',
-    items: 'Items',
     totalAmount: 'Total Amount',
     paid: 'PAID',
     callRestaurant: 'Call Restaurant',
@@ -453,7 +451,7 @@ export const translations = {
     viewAll: 'Ver Todos',
 
     // Categories Screen
-    whatDoYouNeed: 'O que você precisa?',
+    whatDoYouNeed: 'O que está em sua mente?',
     cuisines: 'Cozinhas',
     locationDenied: 'Localização negada',
     errorGettingLocation: 'Erro ao obter localização',
@@ -543,8 +541,6 @@ export const translations = {
     deliveries: 'entregas',
     callDriver: 'Ligar para Entregador',
     messageDriver: 'Mensagem para Entregador',
-    deliveryTo: 'Entregar em',
-    items: 'Itens',
     totalAmount: 'Valor Total',
     paid: 'PAGO',
     callRestaurant: 'Ligar para Restaurante',
@@ -839,4 +835,3 @@ export const translations = {
 export const getLanguageTranslations = (language = 'en') => {
   return translations[language] || translations['en'];
 };
-

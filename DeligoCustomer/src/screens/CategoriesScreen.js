@@ -139,19 +139,37 @@ const CategoriesScreen = ({ navigation }) => {
     return Array.from(map.values());
   }, [sourceProducts]);
 
-  // Derive cuisines (product.category) from sourceProducts
+  // Derive cuisines from products, optionally filtered by selected vendorType
+  const cuisinesForSelectedVendor = React.useMemo(() => {
+    const map = new Map();
+    const arr = Array.isArray(sourceProducts) ? sourceProducts : [];
+    for (const p of arr) {
+      const vtRaw = p._raw?.vendor?.vendorType ?? p.vendor?.vendorType ?? null;
+      const vt = vtRaw != null ? String(vtRaw).trim() : null;
+      if (selectedVendorType && vt !== selectedVendorType) continue;
+      const catRaw = p._raw?.category ?? p.category ?? (Array.isArray(p.tags) ? p.tags[0] : null);
+      const cat = catRaw != null ? String(catRaw).trim() : null;
+      if (!cat) continue;
+      const rec = map.get(cat) || { id: cat, name: cat, restaurants: 0 };
+      rec.restaurants += 1;
+      map.set(cat, rec);
+    }
+    return Array.from(map.values());
+  }, [sourceProducts, selectedVendorType]);
+
+  // Derive cuisines (unfiltered) from sourceProducts
   const cuisinesFromProducts = React.useMemo(() => {
     const map = new Map();
-    (sourceProducts || []).forEach((p) => {
-      const category = p._raw?.category || p.category || (Array.isArray(p.tags) && p.tags[0]) || null;
-      if (category) {
-        const key = typeof category === 'string' ? category : String(category);
-        const prev = map.get(key) || { id: key, name: key, count: 0 };
-        prev.count = (prev.count || 0) + 1;
-        map.set(key, prev);
-      }
-    });
-    return Array.from(map.values()).map((c) => ({ id: c.id, name: c.name, restaurants: c.count }));
+    const arr = Array.isArray(sourceProducts) ? sourceProducts : [];
+    for (const p of arr) {
+      const catRaw = p._raw?.category ?? p.category ?? (Array.isArray(p.tags) ? p.tags[0] : null);
+      const cat = catRaw != null ? String(catRaw).trim() : null;
+      if (!cat) continue;
+      const rec = map.get(cat) || { id: cat, name: cat, restaurants: 0 };
+      rec.restaurants += 1;
+      map.set(cat, rec);
+    }
+    return Array.from(map.values());
   }, [sourceProducts]);
 
   // Load session-stored static lists and selected filters on mount
@@ -206,19 +224,21 @@ const CategoriesScreen = ({ navigation }) => {
           // store normalized array of objects
           await StorageService.setItem('vendorTypes', vendorTypesFromProducts.map(v => ({ id: v.id, name: v.name })));
         }
-        if ((!staticCuisines || staticCuisines.length === 0) && cuisinesFromProducts.length > 0) {
-          setStaticCuisines(cuisinesFromProducts);
-          await StorageService.setItem('cuisines', cuisinesFromProducts.map(c => ({ id: c.id, name: c.name, restaurants: c.restaurants })));
+        const baseCuisines = selectedVendorType ? cuisinesForSelectedVendor : cuisinesFromProducts;
+        if ((!staticCuisines || staticCuisines.length === 0) && baseCuisines.length > 0) {
+          setStaticCuisines(baseCuisines);
+          await StorageService.setItem('cuisines', baseCuisines.map(c => ({ id: c.id, name: c.name, restaurants: c.restaurants })));
         }
       } catch (e) {
         console.debug('Failed to persist session lists', e);
       }
     })();
-  }, [sessionLoaded, products, vendorTypesFromProducts, cuisinesFromProducts]);
+  }, [sessionLoaded, vendorTypesFromProducts, cuisinesFromProducts, cuisinesForSelectedVendor]);
 
   // Use the static lists if available, otherwise fall back to computed lists
   const vendorTypes = Array.isArray(staticVendorTypes) && staticVendorTypes.length ? staticVendorTypes : (Array.isArray(vendorTypesFromProducts) ? vendorTypesFromProducts : []);
-  const cuisines = Array.isArray(staticCuisines) && staticCuisines.length ? staticCuisines : (Array.isArray(cuisinesFromProducts) ? cuisinesFromProducts : []);
+  // When a vendorType is selected, show cuisines filtered to that vendor; else show all cuisines
+  const cuisines = (selectedVendorType ? cuisinesForSelectedVendor : (Array.isArray(staticCuisines) && staticCuisines.length ? staticCuisines : (Array.isArray(cuisinesFromProducts) ? cuisinesFromProducts : [])));
 
   // Debug values (now safe because cuisines is defined)
   const debugVendorTypes = Array.isArray(vendorTypes) ? vendorTypes.map(v => v?.name || '').filter(Boolean).slice(0,5).join(', ') : '';
@@ -288,25 +308,21 @@ const CategoriesScreen = ({ navigation }) => {
     return () => clearTimeout(t);
   }, [searchQuery, selectedVendorType, selectedCuisine, fetchProducts]);
 
-  // Keep displayedProducts in sync with sourceProducts (cached/mock) and current filters
+  // Keep displayedProducts in sync with sourceProducts and current filters (normalized comparisons)
   useEffect(() => {
-    // Use sourceProducts as the source - don't read displayedProducts to avoid infinite loop
-    const filterSource = Array.isArray(sourceProducts) && sourceProducts.length ? sourceProducts : [];
-
-    // If no valid source, don't update (keep existing displayedProducts)
-    if (filterSource.length === 0) return;
-
-    // If no filters selected, show all sourceProducts
+    const arr = Array.isArray(sourceProducts) ? sourceProducts : [];
+    if (arr.length === 0) return;
+    // If no filters selected, show all
     if (!selectedVendorType && !selectedCuisine) {
-      setDisplayedProducts(filterSource);
+      setDisplayedProducts(arr);
       return;
     }
-
-    // Otherwise filter locally from sourceProducts
-    const filtered = filterSource.filter((p) => {
-      const vendorType = p._raw?.vendor?.vendorType || p.vendor?.vendorType || null;
-      const category = p._raw?.category || p.category || (Array.isArray(p.tags) && p.tags[0]) || null;
-      return (!selectedVendorType || vendorType === selectedVendorType) && (!selectedCuisine || category === selectedCuisine);
+    const filtered = arr.filter((p) => {
+      const vtRaw = p._raw?.vendor?.vendorType ?? p.vendor?.vendorType ?? null;
+      const vt = vtRaw != null ? String(vtRaw).trim() : null;
+      const catRaw = p._raw?.category ?? p.category ?? (Array.isArray(p.tags) ? p.tags[0] : null);
+      const cat = catRaw != null ? String(catRaw).trim() : null;
+      return (!selectedVendorType || vt === selectedVendorType) && (!selectedCuisine || cat === selectedCuisine);
     });
 
     setDisplayedProducts(filtered);
@@ -343,18 +359,6 @@ const CategoriesScreen = ({ navigation }) => {
     if (newSel === null) setSelectedCuisine(null);
     persistSelection('selectedVendorType', newSel);
     if (newSel === null) persistSelection('selectedCuisine', null);
-
-    // Filter using ONLY sourceProducts to avoid circular dependency
-    const filterSource = Array.isArray(sourceProducts) ? sourceProducts : [];
-    const filtered = filterSource.filter((p) => {
-      const vendorType = p._raw?.vendor?.vendorType || p.vendor?.vendorType || null;
-      return !newSel || vendorType === newSel;
-    });
-
-    // ALWAYS update displayedProducts (even if empty) to avoid flickering
-    setDisplayedProducts(filtered);
-
-    // Trigger a background refresh for the selected filter
     fetchProducts({ vendorType: newSel || undefined, category: undefined, page: 1 });
   };
 
@@ -363,19 +367,6 @@ const CategoriesScreen = ({ navigation }) => {
     const newSel = selectedCuisine === cuisineId ? null : cuisineId;
     setSelectedCuisine(newSel);
     persistSelection('selectedCuisine', newSel);
-
-    // Filter using ONLY sourceProducts to avoid circular dependency
-    const filterSource = Array.isArray(sourceProducts) ? sourceProducts : [];
-    const filtered = filterSource.filter((p) => {
-      const vendorType = p._raw?.vendor?.vendorType || p.vendor?.vendorType || null;
-      const category = p._raw?.category || p.category || (Array.isArray(p.tags) && p.tags[0]) || null;
-      return (!selectedVendorType || vendorType === selectedVendorType) && (!newSel || category === newSel);
-    });
-
-    // ALWAYS update displayedProducts (even if empty) to avoid flickering
-    setDisplayedProducts(filtered);
-
-    // Background refresh
     fetchProducts({ vendorType: selectedVendorType || undefined, category: newSel || undefined, page: 1 });
   };
 
@@ -463,6 +454,13 @@ const CategoriesScreen = ({ navigation }) => {
       navigation.navigate('RestaurantDetails', { restaurant: shop });
     }
   };
+
+  const prevNonEmptyRef = useRef(initialMockItems || []);
+  useEffect(() => {
+    if (Array.isArray(displayedProducts) && displayedProducts.length > 0) {
+      prevNonEmptyRef.current = displayedProducts;
+    }
+  }, [displayedProducts]);
 
   return (
     <SafeAreaView style={styles(colors).safeArea} edges={['top']}>
@@ -577,53 +575,38 @@ const CategoriesScreen = ({ navigation }) => {
           title={searchQuery ? `Search Results (${filteredRestaurants.length})` : t('popularRestaurants')}
           onSeeAll={!searchQuery ? () => console.log('See all restaurants') : undefined}
         />
-        {(!displayedProducts || displayedProducts.length === 0) ? (
-          // Show subtle loading state when fetching, or empty state when truly no results
-          productsLoading ? (
-            // Skeleton loader - native feel like Uber Eats
-            <View style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}>
-              {[1, 2, 3].map((i) => (
-                <View key={i} style={styles(colors).skeletonCard}>
-                  <View style={styles(colors).skeletonImage} />
-                  <View style={{ flex: 1, marginLeft: 12 }}>
-                    <View style={[styles(colors).skeletonLine, { width: '70%', marginBottom: 8 }]} />
-                    <View style={[styles(colors).skeletonLine, { width: '50%', height: 12 }]} />
-                  </View>
-                </View>
-              ))}
-            </View>
-          ) : (
-            // Empty state - only shown when not loading and truly no results
-            <View style={styles(colors).noResultsContainer}>
-              <Text style={styles(colors).noResultsText}>
-                {selectedVendorType || selectedCuisine
-                  ? (t('noRestaurantsInFilter') || 'No restaurants match your selection')
-                  : (t('noRestaurantsFound') || 'No restaurants found')
-                }
-              </Text>
-              <Text style={styles(colors).noResultsSubtext}>
-                {selectedVendorType || selectedCuisine
-                  ? (t('tryDifferentFilter') || 'Try a different category or cuisine')
-                  : (t('tryAdjustingFilters') || 'Try adjusting filters or pull to refresh')
-                }
-              </Text>
-              {(selectedVendorType || selectedCuisine) && (
-                <TouchableOpacity
-                  onPress={() => {
-                    setSelectedVendorType(null);
-                    setSelectedCuisine(null);
-                    persistSelection('selectedVendorType', null);
-                    persistSelection('selectedCuisine', null);
-                  }}
-                  style={styles(colors).clearFiltersButton}
-                >
-                  <Text style={styles(colors).clearFiltersText}>{t('clearFilters') || 'Clear Filters'}</Text>
-                </TouchableOpacity>
-              )}
-            </View>
-          )
-        ) : (
+        {(displayedByVendor.length > 0) ? (
           <RestaurantsList restaurants={displayedByVendor} onPress={handleRestaurantPress} searchQuery={searchQuery} disableScroll={true} />
+        ) : (prevNonEmptyRef.current.length > 0 && (selectedVendorType || selectedCuisine)) ? (
+          <RestaurantsList restaurants={prevNonEmptyRef.current} onPress={handleRestaurantPress} searchQuery={searchQuery} disableScroll={true} />
+        ) : (
+          <View style={styles(colors).noResultsContainer}>
+            <Text style={styles(colors).noResultsText}>
+              {selectedVendorType || selectedCuisine
+                ? (t('noRestaurantsInFilter') || 'No restaurants match your selection')
+                : (t('noRestaurantsFound') || 'No restaurants found')
+              }
+            </Text>
+            <Text style={styles(colors).noResultsSubtext}>
+              {selectedVendorType || selectedCuisine
+                ? (t('tryDifferentFilter') || 'Try a different category or cuisine')
+                : (t('tryAdjustingFilters') || 'Try adjusting filters or pull to refresh')
+              }
+            </Text>
+            {(selectedVendorType || selectedCuisine) && (
+              <TouchableOpacity
+                onPress={() => {
+                  setSelectedVendorType(null);
+                  setSelectedCuisine(null);
+                  persistSelection('selectedVendorType', null);
+                  persistSelection('selectedCuisine', null);
+                }}
+                style={styles(colors).clearFiltersButton}
+              >
+                <Text style={styles(colors).clearFiltersText}>{t('clearFilters') || 'Clear Filters'}</Text>
+              </TouchableOpacity>
+            )}
+          </View>
         )}
 
         <View style={{ height: 100 }} />
