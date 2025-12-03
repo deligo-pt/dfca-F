@@ -120,12 +120,10 @@ const CategoriesScreen = ({ navigation }) => {
   // User name for personalized greeting (from auth context in real app)
   const userName = null; // TODO: replace with real user name from auth when available
 
-  // Use displayedProducts as fallback source so UI can derive categories/vendor types from cache/mock immediately
+  // Use products from context as the source - do not include displayedProducts to avoid circular dependency
   const sourceProducts = React.useMemo(() => {
-    if (Array.isArray(products) && products.length) return products;
-    if (Array.isArray(displayedProducts) && displayedProducts.length) return displayedProducts;
-    return [];
-  }, [products, displayedProducts]);
+    return Array.isArray(products) && products.length ? products : [];
+  }, [products]);
 
   // Derive vendor types (e.g. 'Resturent') from sourceProducts
   const vendorTypesFromProducts = React.useMemo(() => {
@@ -288,25 +286,30 @@ const CategoriesScreen = ({ navigation }) => {
       fetchProducts({ search: searchQuery, page: 1, vendorType: selectedVendorType || undefined, category: selectedCuisine || undefined });
     }, 300);
     return () => clearTimeout(t);
-  }, [searchQuery, selectedVendorType, selectedCuisine]);
+  }, [searchQuery, selectedVendorType, selectedCuisine, fetchProducts]);
 
   // Keep displayedProducts in sync with sourceProducts (cached/mock) and current filters
   useEffect(() => {
-    // Use a stable filtering source: prefer fresh sourceProducts, otherwise fall back to the currently-displayed items
-    const filterSource = (Array.isArray(sourceProducts) && sourceProducts.length) ? sourceProducts : (Array.isArray(displayedProducts) ? displayedProducts : []);
-    // If no filters selected, show the available filterSource list
+    // Use sourceProducts as the source - don't read displayedProducts to avoid infinite loop
+    const filterSource = Array.isArray(sourceProducts) && sourceProducts.length ? sourceProducts : [];
+
+    // If no valid source, don't update (keep existing displayedProducts)
+    if (filterSource.length === 0) return;
+
+    // If no filters selected, show all sourceProducts
     if (!selectedVendorType && !selectedCuisine) {
-      setDisplayedProducts(filterSource || []);
+      setDisplayedProducts(filterSource);
       return;
     }
-    // Otherwise filter locally from the filterSource to provide instant response
-    const filtered = (filterSource || []).filter((p) => {
+
+    // Otherwise filter locally from sourceProducts
+    const filtered = filterSource.filter((p) => {
       const vendorType = p._raw?.vendor?.vendorType || p.vendor?.vendorType || null;
       const category = p._raw?.category || p.category || (Array.isArray(p.tags) && p.tags[0]) || null;
       return (!selectedVendorType || vendorType === selectedVendorType) && (!selectedCuisine || category === selectedCuisine);
     });
-    // Only set displayedProducts if filtering source is valid; otherwise keep prior displayedProducts
-    setDisplayedProducts(filtered.length ? filtered : (displayedProducts || []));
+
+    setDisplayedProducts(filtered);
   }, [sourceProducts, selectedVendorType, selectedCuisine]);
 
   // --- NEW: produce a deduplicated + sorted list by vendorName ---
@@ -340,14 +343,18 @@ const CategoriesScreen = ({ navigation }) => {
     if (newSel === null) setSelectedCuisine(null);
     persistSelection('selectedVendorType', newSel);
     if (newSel === null) persistSelection('selectedCuisine', null);
-    // Filter using the freshest available source, but fall back to current displayedProducts if needed
-    const filterSource = (Array.isArray(sourceProducts) && sourceProducts.length) ? sourceProducts : (Array.isArray(displayedProducts) ? displayedProducts : []);
-    const filtered = (filterSource || []).filter((p) => {
+
+    // Filter using ONLY sourceProducts to avoid circular dependency
+    const filterSource = Array.isArray(sourceProducts) ? sourceProducts : [];
+    const filtered = filterSource.filter((p) => {
       const vendorType = p._raw?.vendor?.vendorType || p.vendor?.vendorType || null;
       return !newSel || vendorType === newSel;
     });
-    if (filtered.length) setDisplayedProducts(filtered);
-    // Trigger a background refresh for the selected filter (doesn't replace UI until network returns)
+
+    // ALWAYS update displayedProducts (even if empty) to avoid flickering
+    setDisplayedProducts(filtered);
+
+    // Trigger a background refresh for the selected filter
     fetchProducts({ vendorType: newSel || undefined, category: undefined, page: 1 });
   };
 
@@ -356,14 +363,18 @@ const CategoriesScreen = ({ navigation }) => {
     const newSel = selectedCuisine === cuisineId ? null : cuisineId;
     setSelectedCuisine(newSel);
     persistSelection('selectedCuisine', newSel);
-    // Filter using the freshest available source, but fall back to current displayedProducts if needed
-    const filterSource = (Array.isArray(sourceProducts) && sourceProducts.length) ? sourceProducts : (Array.isArray(displayedProducts) ? displayedProducts : []);
-    const filtered = (filterSource || []).filter((p) => {
+
+    // Filter using ONLY sourceProducts to avoid circular dependency
+    const filterSource = Array.isArray(sourceProducts) ? sourceProducts : [];
+    const filtered = filterSource.filter((p) => {
       const vendorType = p._raw?.vendor?.vendorType || p.vendor?.vendorType || null;
       const category = p._raw?.category || p.category || (Array.isArray(p.tags) && p.tags[0]) || null;
       return (!selectedVendorType || vendorType === selectedVendorType) && (!newSel || category === newSel);
     });
-    if (filtered.length) setDisplayedProducts(filtered);
+
+    // ALWAYS update displayedProducts (even if empty) to avoid flickering
+    setDisplayedProducts(filtered);
+
     // Background refresh
     fetchProducts({ vendorType: selectedVendorType || undefined, category: newSel || undefined, page: 1 });
   };
@@ -566,19 +577,51 @@ const CategoriesScreen = ({ navigation }) => {
           title={searchQuery ? `Search Results (${filteredRestaurants.length})` : t('popularRestaurants')}
           onSeeAll={!searchQuery ? () => console.log('See all restaurants') : undefined}
         />
-        {(!displayedProducts || displayedProducts.length === 0) && productsLoading ? (
-          // Only show loader if there are no displayed items to keep UI feeling static
-          <View style={{ paddingVertical: 20 }}>
-            <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        ) : (!displayedProducts || displayedProducts.length === 0) ? (
-          <View style={styles(colors).noResultsContainer}>
-            <Text style={styles(colors).noResultsText}>{t('noRestaurantsFound') || 'No restaurants found'}</Text>
-            <Text style={styles(colors).noResultsSubtext}>{t('tryAdjustingFilters') || 'Try adjusting filters or retry.'}</Text>
-            <TouchableOpacity onPress={() => fetchProducts({ page: 1, vendorType: selectedVendorType || undefined, category: selectedCuisine || undefined })} style={{ marginTop: 12 }}>
-              <Text style={{ color: colors.primary, fontFamily: 'Poppins-SemiBold' }}>{t('retry') || 'Retry'}</Text>
-            </TouchableOpacity>
-          </View>
+        {(!displayedProducts || displayedProducts.length === 0) ? (
+          // Show subtle loading state when fetching, or empty state when truly no results
+          productsLoading ? (
+            // Skeleton loader - native feel like Uber Eats
+            <View style={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}>
+              {[1, 2, 3].map((i) => (
+                <View key={i} style={styles(colors).skeletonCard}>
+                  <View style={styles(colors).skeletonImage} />
+                  <View style={{ flex: 1, marginLeft: 12 }}>
+                    <View style={[styles(colors).skeletonLine, { width: '70%', marginBottom: 8 }]} />
+                    <View style={[styles(colors).skeletonLine, { width: '50%', height: 12 }]} />
+                  </View>
+                </View>
+              ))}
+            </View>
+          ) : (
+            // Empty state - only shown when not loading and truly no results
+            <View style={styles(colors).noResultsContainer}>
+              <Text style={styles(colors).noResultsText}>
+                {selectedVendorType || selectedCuisine
+                  ? (t('noRestaurantsInFilter') || 'No restaurants match your selection')
+                  : (t('noRestaurantsFound') || 'No restaurants found')
+                }
+              </Text>
+              <Text style={styles(colors).noResultsSubtext}>
+                {selectedVendorType || selectedCuisine
+                  ? (t('tryDifferentFilter') || 'Try a different category or cuisine')
+                  : (t('tryAdjustingFilters') || 'Try adjusting filters or pull to refresh')
+                }
+              </Text>
+              {(selectedVendorType || selectedCuisine) && (
+                <TouchableOpacity
+                  onPress={() => {
+                    setSelectedVendorType(null);
+                    setSelectedCuisine(null);
+                    persistSelection('selectedVendorType', null);
+                    persistSelection('selectedCuisine', null);
+                  }}
+                  style={styles(colors).clearFiltersButton}
+                >
+                  <Text style={styles(colors).clearFiltersText}>{t('clearFilters') || 'Clear Filters'}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )
         ) : (
           <RestaurantsList restaurants={displayedByVendor} onPress={handleRestaurantPress} searchQuery={searchQuery} disableScroll={true} />
         )}
@@ -630,6 +673,42 @@ const styles = (colors) => StyleSheet.create({
     color: colors.text.secondary,
     marginTop: spacing.xs,
     textAlign: 'center',
+  },
+  clearFiltersButton: {
+    marginTop: spacing.lg,
+    paddingVertical: spacing.sm,
+    paddingHorizontal: spacing.xl,
+    backgroundColor: colors.primary,
+    borderRadius: 20,
+  },
+  clearFiltersText: {
+    color: '#fff',
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 14,
+  },
+  // Skeleton loader styles for native feel
+  skeletonCard: {
+    flexDirection: 'row',
+    backgroundColor: colors.surface,
+    borderRadius: 12,
+    padding: spacing.md,
+    marginBottom: spacing.sm,
+    shadowColor: colors.shadow,
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.1,
+    shadowRadius: 4,
+    elevation: 2,
+  },
+  skeletonImage: {
+    width: 80,
+    height: 80,
+    borderRadius: 8,
+    backgroundColor: colors.border,
+  },
+  skeletonLine: {
+    height: 16,
+    backgroundColor: colors.border,
+    borderRadius: 4,
   },
 });
 

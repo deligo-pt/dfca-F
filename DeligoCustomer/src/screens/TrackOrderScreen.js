@@ -22,6 +22,25 @@ import { useTheme } from '../utils/ThemeContext';
 
 const { height } = Dimensions.get('window');
 
+// Helper: format address object to single-line string
+const formatAddress = (addr) => {
+  try {
+    if (!addr) return '';
+    if (typeof addr === 'string') return addr;
+    if (typeof addr === 'object') {
+      const parts = [addr.street, addr.city, addr.state, addr.postalCode, addr.country]
+        .filter(Boolean)
+        .map(String)
+        .map(s => s.trim())
+        .filter(s => s.length > 0);
+      return parts.join(', ');
+    }
+    return String(addr);
+  } catch {
+    return '';
+  }
+};
+
 const TrackOrderScreen = ({ route, navigation }) => {
   const { t, language } = useLanguage();
   const { colors } = useTheme();
@@ -51,6 +70,8 @@ const TrackOrderScreen = ({ route, navigation }) => {
       return item;
     }) || [];
 
+    const deliveryAddrStr = formatAddress(data.deliveryAddress) || '456 Park Avenue, Apartment 5B, 2nd Floor';
+
     return {
       id: data.id || '1',
       orderNumber: data.orderNumber || '#DLG-2024-1234',
@@ -69,7 +90,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
       totalAmount: data.totalAmount || 0,
       estimatedTime: data.estimatedTime || '20-25 min',
       estimatedArrival: data.estimatedArrival || '3:10 PM',
-      deliveryAddress: data.deliveryAddress || '456 Park Avenue, Apartment 5B, 2nd Floor',
+      deliveryAddress: deliveryAddrStr,
       deliveryLandmark: data.deliveryLandmark || 'Near Central Park',
       deliveryInstructions: data.deliveryInstructions || 'Please ring the bell twice',
       driverName: data.driverName || 'Michael Rodriguez',
@@ -2002,4 +2023,3 @@ const TrackOrderScreen = ({ route, navigation }) => {
 };
 
 export default TrackOrderScreen;
-

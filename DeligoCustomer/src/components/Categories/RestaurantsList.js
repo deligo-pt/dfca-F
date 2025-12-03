@@ -1,27 +1,18 @@
 import React from "react";
 import {
     View,
-    Text,
-    ActivityIndicator,
     FlatList,
-    StyleSheet,
 } from "react-native";
 
-import { useTheme } from "../../utils/ThemeContext";
-import { useLanguage } from "../../utils/LanguageContext";
 import RestaurantCard from '../RestaurantCard';
 import { spacing } from '../../theme';
 import { useProducts } from '../../contexts/ProductsContext';
 
 export function RestaurantsList({ restaurants = [], onPress = () => {}, searchQuery: _searchQuery = '', disableScroll = false }) {
-    const { colors } = useTheme();
-    const { t } = useLanguage();
-    const { products: ctxProducts, loading: ctxLoading, error: ctxError } = useProducts();
+    const { products: ctxProducts } = useProducts();
 
     // Prefer passed-in restaurants prop, otherwise use context products
     const data = (restaurants && restaurants.length) ? restaurants : (ctxProducts || []);
-    const loading = !!ctxLoading;
-    const error = ctxError;
 
     const renderItem = ({ item }) => (
         <RestaurantCard
@@ -30,23 +21,8 @@ export function RestaurantsList({ restaurants = [], onPress = () => {}, searchQu
         />
     );
 
-    if (loading) {
-        return (
-            <View style={styles.centered}>
-                <ActivityIndicator size="large" color={colors.primary} />
-                <Text style={[styles.loadingText, { color: colors.text.primary }]}>{t('loadingProducts') || 'Loading...'}</Text>
-            </View>
-        );
-    }
-
-    if (error) {
-        return (
-            <View style={styles.centered}>
-                <Text style={[styles.errorText, { color: colors.error }]}>Failed to load products</Text>
-                <Text style={[styles.errorText, { color: colors.error }]}>{String(error)}</Text>
-            </View>
-        );
-    }
+    // Don't show loading/error states here - let parent handle them with skeleton
+    // This prevents flickering when switching filters
 
     // If this list is being rendered inside another vertical ScrollView, avoid nesting a FlatList.
     if (disableScroll) {
@@ -69,25 +45,5 @@ export function RestaurantsList({ restaurants = [], onPress = () => {}, searchQu
     );
 }
 
-const styles = StyleSheet.create({
-    centered: {
-        flex: 1,
-        justifyContent: "center",
-        alignItems: "center",
-        padding: 20,
-    },
-    loadingText: {
-        fontFamily: "Poppins-Regular",
-        marginTop: 10,
-    },
-    errorText: {
-        textAlign: "center",
-        fontFamily: "Poppins-Regular",
-    },
-    noDataText: {
-        fontFamily: "Poppins-Regular",
-        fontSize: 16,
-    },
-});
 
 export default RestaurantsList;

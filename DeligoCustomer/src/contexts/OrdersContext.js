@@ -1,4 +1,4 @@
-import React, { createContext, useContext, useEffect, useState, useCallback } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
 import StorageService from '../utils/storage';
 import { BASE_API_URL, API_ENDPOINTS } from '../constants/config';
 
@@ -43,23 +43,33 @@ export const OrdersProvider = ({ children }) => {
 
   useEffect(() => {
     fetchOrders();
-  }, [fetchOrders]);
+  }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
-  const ongoingOrders = orders.filter(order => ['PENDING','CONFIRMED','PREPARING','OUT_FOR_DELIVERY','ON_THE_WAY'].includes(order.orderStatus?.toUpperCase()));
-  const pastOrders = orders.filter(order => ['DELIVERED','COMPLETED','CANCELLED'].includes(order.orderStatus?.toUpperCase()));
+  const ongoingOrders = useMemo(() =>
+    orders.filter(order =>
+      ['PENDING', 'ACCEPTED', 'APPROVED', 'CONFIRMED', 'PREPARING', 'ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'ON_THE_WAY'].includes(order.orderStatus?.toUpperCase())
+    ), [orders]
+  );
+
+  const pastOrders = useMemo(() =>
+    orders.filter(order =>
+      ['DELIVERED', 'COMPLETED', 'CANCELLED', 'CANCELED', 'REJECTED'].includes(order.orderStatus?.toUpperCase())
+    ), [orders]
+  );
+
+  const contextValue = useMemo(() => ({
+    orders,
+    ongoingOrders,
+    pastOrders,
+    loading,
+    error,
+    fetchOrders,
+    ordersCount: orders.length
+  }), [orders, ongoingOrders, pastOrders, loading, error, fetchOrders]);
 
   return (
-    <OrdersContext.Provider value={{
-      orders,
-      ongoingOrders,
-      pastOrders,
-      loading,
-      error,
-      fetchOrders,
-      ordersCount: orders.length
-    }}>
+    <OrdersContext.Provider value={contextValue}>
       {children}
     </OrdersContext.Provider>
   );
 };
-

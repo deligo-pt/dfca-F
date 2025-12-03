@@ -84,16 +84,16 @@ const OrdersScreen = ({ navigation }) => {
     fetchOrders(true);
   };
 
-  // Separate orders into ongoing and history based on status
+  // Separate orders into ongoing and history based on the provided status list
   const getOngoingOrders = () => {
     return orders.filter(order =>
-      ['PENDING', 'CONFIRMED', 'PREPARING', 'OUT_FOR_DELIVERY'].includes(order.orderStatus?.toUpperCase())
+      ['PENDING', 'ACCEPTED', 'ASSIGNED', 'PICKED_UP', 'ON_THE_WAY'].includes(order.orderStatus?.toUpperCase())
     );
   };
 
   const getHistoryOrders = () => {
     return orders.filter(order =>
-      ['DELIVERED', 'CANCELLED', 'COMPLETED'].includes(order.orderStatus?.toUpperCase())
+      ['DELIVERED', 'CANCELED', 'REJECTED'].includes(order.orderStatus?.toUpperCase())
     );
   };
 
@@ -104,20 +104,22 @@ const OrdersScreen = ({ navigation }) => {
     const statusUpper = status?.toUpperCase();
     switch (statusUpper) {
       case 'PENDING':
-      case 'CONFIRMED':
-        return { name: 'time', library: 'Ionicons', color: colors.warning };
-      case 'PREPARING':
-        return { name: 'restaurant', library: 'MaterialIcons', color: colors.warning };
-      case 'OUT_FOR_DELIVERY':
+        return { name: 'time', library: 'Ionicons', color: colors.warning || '#FFA500' };
+      case 'ACCEPTED':
+        return { name: 'checkmark-circle', library: 'Ionicons', color: colors.success || '#4CAF50' };
+      case 'ASSIGNED':
+        return { name: 'person-outline', library: 'Ionicons', color: colors.info || '#2196F3' };
+      case 'PICKED_UP':
+        return { name: 'bicycle', library: 'Ionicons', color: colors.info || '#2196F3' };
       case 'ON_THE_WAY':
-        return { name: 'bicycle', library: 'Ionicons', color: colors.info };
+        return { name: 'bicycle', library: 'Ionicons', color: colors.info || '#2196F3' };
       case 'DELIVERED':
-      case 'COMPLETED':
-        return { name: 'checkmark-circle', library: 'Ionicons', color: colors.success };
-      case 'CANCELLED':
-        return { name: 'close-circle', library: 'Ionicons', color: colors.error };
+        return { name: 'checkmark-circle', library: 'Ionicons', color: colors.success || '#4CAF50' };
+      case 'CANCELED':
+      case 'REJECTED':
+        return { name: 'close-circle', library: 'Ionicons', color: colors.error || '#F44336' };
       default:
-        return { name: 'time', library: 'Ionicons', color: colors.text.secondary };
+        return { name: 'time', library: 'Ionicons', color: colors.text?.secondary || '#999' };
     }
   };
 
@@ -126,18 +128,20 @@ const OrdersScreen = ({ navigation }) => {
     switch (statusUpper) {
       case 'PENDING':
         return 'Pending';
-      case 'CONFIRMED':
-        return 'Confirmed';
-      case 'PREPARING':
-        return t('preparing');
-      case 'OUT_FOR_DELIVERY':
+      case 'ACCEPTED':
+        return 'Accepted';
+      case 'ASSIGNED':
+        return 'Assigned';
+      case 'PICKED_UP':
+        return 'Picked Up';
       case 'ON_THE_WAY':
         return t('onTheWay');
       case 'DELIVERED':
-      case 'COMPLETED':
         return t('delivered');
-      case 'CANCELLED':
-        return 'Cancelled';
+      case 'CANCELED':
+        return 'Canceled';
+      case 'REJECTED':
+        return 'Rejected';
       default:
         return 'Processing';
     }
