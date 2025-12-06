@@ -15,6 +15,7 @@ import { useTheme } from "../utils/ThemeContext";
 import { getUserData } from "../utils/auth";
 import { useLanguage } from "../utils/LanguageContext";
 import { LocationDetails } from "../components/Profile";
+import { useAppDispatch, useAppSelector } from "../store/store";
 
 const EditProfileScreen = ({ navigation, route }) => {
   const { t } = useLanguage();

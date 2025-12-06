@@ -1,35 +1,57 @@
-import { StatusBar } from 'expo-status-bar';
-import React, { useState, useEffect } from 'react';
-import { Text as RNText, TextInput as RNTextInput } from 'react-native';
-import { NavigationContainer } from '@react-navigation/native';
-import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { OnboardingScreen, LoginScreen, TermsOfServiceScreen, PrivacyPolicyScreen, LocationAddressScreen, RestaurantDetailsScreen, TrackOrderScreen, CheckoutScreen, EditProfileScreen, VouchersScreen, SavedAddressesScreen, PaymentMethodsScreen, ReferralsScreen, NotificationsScreen, SettingsScreen, HelpCenterScreen, CartDetailScreen } from './src/screens';
-import { BottomTabNavigator } from './src/navigation';
-import { checkOnboardingStatus } from './src/utils/storage';
-import { isUserAuthenticated, getUserData } from './src/utils/auth';
-import { colors } from './src/theme';
-import * as Font from 'expo-font';
-import * as SplashScreen from 'expo-splash-screen';
-import { createStackNavigator } from '@react-navigation/stack';
-import { LanguageProvider } from './src/utils/LanguageContext';
-import { ThemeProvider } from './src/utils/ThemeContext';
-import { ProductsProvider } from './src/contexts/ProductsContext';
-import { CartProvider } from './src/contexts/CartContext';
-import { OrdersProvider } from './src/contexts/OrdersContext';
-import * as SystemUI from 'expo-system-ui';
-import { StripeProvider } from '@stripe/stripe-react-native';
+import { StatusBar } from "expo-status-bar";
+import React, { useState, useEffect } from "react";
+import { Text as RNText, TextInput as RNTextInput } from "react-native";
+import { NavigationContainer } from "@react-navigation/native";
+import { SafeAreaProvider } from "react-native-safe-area-context";
+import {
+  OnboardingScreen,
+  LoginScreen,
+  TermsOfServiceScreen,
+  PrivacyPolicyScreen,
+  LocationAddressScreen,
+  RestaurantDetailsScreen,
+  TrackOrderScreen,
+  CheckoutScreen,
+  EditProfileScreen,
+  VouchersScreen,
+  SavedAddressesScreen,
+  PaymentMethodsScreen,
+  ReferralsScreen,
+  NotificationsScreen,
+  SettingsScreen,
+  HelpCenterScreen,
+  CartDetailScreen,
+} from "./src/screens";
+import { BottomTabNavigator } from "./src/navigation";
+import { checkOnboardingStatus } from "./src/utils/storage";
+import { isUserAuthenticated, getUserData } from "./src/utils/auth";
+import { colors } from "./src/theme";
+import * as Font from "expo-font";
+import * as SplashScreen from "expo-splash-screen";
+import { createStackNavigator } from "@react-navigation/stack";
+import { LanguageProvider } from "./src/utils/LanguageContext";
+import { ThemeProvider } from "./src/utils/ThemeContext";
+import { ProductsProvider } from "./src/contexts/ProductsContext";
+import { CartProvider } from "./src/contexts/CartContext";
+import { OrdersProvider } from "./src/contexts/OrdersContext";
+import * as SystemUI from "expo-system-ui";
+import { StripeProvider } from "@stripe/stripe-react-native";
+import { Provider } from "react-redux";
+import { store } from "./src/store/store";
 
 // Minimal publishable key fallback (use env in production)
-const STRIPE_PUBLISHABLE_KEY = process.env.STRIPE_PUBLISHABLE_KEY || 'pk_test_51PT3CjP0xY0uRyP02HGOUxxzweu1yv7l8GMyECLggN1LJrLsbLfGb1lgMuqQHoADgb1LFYC9tDgRcmkaCLGvNFJR00CgHAWWNK';
+const STRIPE_PUBLISHABLE_KEY =
+  process.env.STRIPE_PUBLISHABLE_KEY ||
+  "pk_test_51PT3CjP0xY0uRyP02HGOUxxzweu1yv7l8GMyECLggN1LJrLsbLfGb1lgMuqQHoADgb1LFYC9tDgRcmkaCLGvNFJR00CgHAWWNK";
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
 
 // Set default font for all Text and TextInput components
 RNText.defaultProps = RNText.defaultProps || {};
-RNText.defaultProps.style = [{ fontFamily: 'Poppins-Regular' }];
+RNText.defaultProps.style = [{ fontFamily: "Poppins-Regular" }];
 RNTextInput.defaultProps = RNTextInput.defaultProps || {};
-RNTextInput.defaultProps.style = [{ fontFamily: 'Poppins-Regular' }];
+RNTextInput.defaultProps.style = [{ fontFamily: "Poppins-Regular" }];
 
 const Stack = createStackNavigator();
 
@@ -42,24 +64,24 @@ export default function App() {
   // Load Poppins fonts
   const loadFonts = async () => {
     await Font.loadAsync({
-      'Poppins-Black': require('./src/assets/fonts/Poppins/Poppins-Black.ttf'),
-      'Poppins-BlackItalic': require('./src/assets/fonts/Poppins/Poppins-BlackItalic.ttf'),
-      'Poppins-Bold': require('./src/assets/fonts/Poppins/Poppins-Bold.ttf'),
-      'Poppins-BoldItalic': require('./src/assets/fonts/Poppins/Poppins-BoldItalic.ttf'),
-      'Poppins-ExtraBold': require('./src/assets/fonts/Poppins/Poppins-ExtraBold.ttf'),
-      'Poppins-ExtraBoldItalic': require('./src/assets/fonts/Poppins/Poppins-ExtraBoldItalic.ttf'),
-      'Poppins-ExtraLight': require('./src/assets/fonts/Poppins/Poppins-ExtraLight.ttf'),
-      'Poppins-ExtraLightItalic': require('./src/assets/fonts/Poppins/Poppins-ExtraLightItalic.ttf'),
-      'Poppins-Italic': require('./src/assets/fonts/Poppins/Poppins-Italic.ttf'),
-      'Poppins-Light': require('./src/assets/fonts/Poppins/Poppins-Light.ttf'),
-      'Poppins-LightItalic': require('./src/assets/fonts/Poppins/Poppins-LightItalic.ttf'),
-      'Poppins-Medium': require('./src/assets/fonts/Poppins/Poppins-Medium.ttf'),
-      'Poppins-MediumItalic': require('./src/assets/fonts/Poppins/Poppins-MediumItalic.ttf'),
-      'Poppins-Regular': require('./src/assets/fonts/Poppins/Poppins-Regular.ttf'),
-      'Poppins-SemiBold': require('./src/assets/fonts/Poppins/Poppins-SemiBold.ttf'),
-      'Poppins-SemiBoldItalic': require('./src/assets/fonts/Poppins/Poppins-SemiBoldItalic.ttf'),
-      'Poppins-Thin': require('./src/assets/fonts/Poppins/Poppins-Thin.ttf'),
-      'Poppins-ThinItalic': require('./src/assets/fonts/Poppins/Poppins-ThinItalic.ttf'),
+      "Poppins-Black": require("./src/assets/fonts/Poppins/Poppins-Black.ttf"),
+      "Poppins-BlackItalic": require("./src/assets/fonts/Poppins/Poppins-BlackItalic.ttf"),
+      "Poppins-Bold": require("./src/assets/fonts/Poppins/Poppins-Bold.ttf"),
+      "Poppins-BoldItalic": require("./src/assets/fonts/Poppins/Poppins-BoldItalic.ttf"),
+      "Poppins-ExtraBold": require("./src/assets/fonts/Poppins/Poppins-ExtraBold.ttf"),
+      "Poppins-ExtraBoldItalic": require("./src/assets/fonts/Poppins/Poppins-ExtraBoldItalic.ttf"),
+      "Poppins-ExtraLight": require("./src/assets/fonts/Poppins/Poppins-ExtraLight.ttf"),
+      "Poppins-ExtraLightItalic": require("./src/assets/fonts/Poppins/Poppins-ExtraLightItalic.ttf"),
+      "Poppins-Italic": require("./src/assets/fonts/Poppins/Poppins-Italic.ttf"),
+      "Poppins-Light": require("./src/assets/fonts/Poppins/Poppins-Light.ttf"),
+      "Poppins-LightItalic": require("./src/assets/fonts/Poppins/Poppins-LightItalic.ttf"),
+      "Poppins-Medium": require("./src/assets/fonts/Poppins/Poppins-Medium.ttf"),
+      "Poppins-MediumItalic": require("./src/assets/fonts/Poppins/Poppins-MediumItalic.ttf"),
+      "Poppins-Regular": require("./src/assets/fonts/Poppins/Poppins-Regular.ttf"),
+      "Poppins-SemiBold": require("./src/assets/fonts/Poppins/Poppins-SemiBold.ttf"),
+      "Poppins-SemiBoldItalic": require("./src/assets/fonts/Poppins/Poppins-SemiBoldItalic.ttf"),
+      "Poppins-Thin": require("./src/assets/fonts/Poppins/Poppins-Thin.ttf"),
+      "Poppins-ThinItalic": require("./src/assets/fonts/Poppins/Poppins-ThinItalic.ttf"),
     });
   };
 
@@ -79,7 +101,9 @@ export default function App() {
         const elapsedTime = Date.now() - startTime;
         const minimumTime = 2000; // 2 seconds
         if (elapsedTime < minimumTime) {
-          await new Promise(resolve => setTimeout(resolve, minimumTime - elapsedTime));
+          await new Promise((resolve) =>
+            setTimeout(resolve, minimumTime - elapsedTime)
+          );
         }
       } catch (e) {
         console.warn(e);
@@ -105,7 +129,7 @@ export default function App() {
         setIsAuthenticated(true);
       }
     } catch (error) {
-      console.error('Error initializing app:', error);
+      console.error("Error initializing app:", error);
     }
   };
 
@@ -135,51 +159,116 @@ export default function App() {
       merchantIdentifier="merchant.com.deligo.customer"
     >
       <SafeAreaProvider>
-        <ThemeProvider>
-          <LanguageProvider>
-            <ProductsProvider>
-              <CartProvider>
-                <OrdersProvider>
-                  <NavigationContainer>
-                    <Stack.Navigator screenOptions={{ headerShown: false }}>
-                      {showOnboarding ? (
-                        <Stack.Screen name="Onboarding">
-                          {(props) => <OnboardingScreen {...props} onDone={handleOnboardingDone} />}
-                        </Stack.Screen>
-                      ) : !isAuthenticated ? (
-                        <Stack.Screen name="Login">
-                          {(props) => <LoginScreen {...props} onLoginSuccess={handleLoginSuccess} />}
-                        </Stack.Screen>
-                      ) : (
-                        <Stack.Screen name="Main">
-                          {(props) => <BottomTabNavigator {...props} onLogout={handleLogout} />}
-                        </Stack.Screen>
-                      )}
-                      <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
-                      <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
-                      <Stack.Screen name="LocationAddress" component={LocationAddressScreen} />
-                      <Stack.Screen name="RestaurantDetails" component={RestaurantDetailsScreen} />
-                      <Stack.Screen name="CartDetail" component={CartDetailScreen} />
-                      <Stack.Screen name="TrackOrder" component={TrackOrderScreen} />
-                      <Stack.Screen name="Checkout" component={CheckoutScreen} />
+        <Provider store={store}>
+          <ThemeProvider>
+            <LanguageProvider>
+              <ProductsProvider>
+                <CartProvider>
+                  <OrdersProvider>
+                    <NavigationContainer>
+                      <Stack.Navigator screenOptions={{ headerShown: false }}>
+                        {showOnboarding ? (
+                          <Stack.Screen name="Onboarding">
+                            {(props) => (
+                              <OnboardingScreen
+                                {...props}
+                                onDone={handleOnboardingDone}
+                              />
+                            )}
+                          </Stack.Screen>
+                        ) : !isAuthenticated ? (
+                          <Stack.Screen name="Login">
+                            {(props) => (
+                              <LoginScreen
+                                {...props}
+                                onLoginSuccess={handleLoginSuccess}
+                              />
+                            )}
+                          </Stack.Screen>
+                        ) : (
+                          <Stack.Screen name="Main">
+                            {(props) => (
+                              <BottomTabNavigator
+                                {...props}
+                                onLogout={handleLogout}
+                              />
+                            )}
+                          </Stack.Screen>
+                        )}
+                        <Stack.Screen
+                          name="TermsOfService"
+                          component={TermsOfServiceScreen}
+                        />
+                        <Stack.Screen
+                          name="PrivacyPolicy"
+                          component={PrivacyPolicyScreen}
+                        />
+                        <Stack.Screen
+                          name="LocationAddress"
+                          component={LocationAddressScreen}
+                        />
+                        <Stack.Screen
+                          name="RestaurantDetails"
+                          component={RestaurantDetailsScreen}
+                        />
+                        <Stack.Screen
+                          name="CartDetail"
+                          component={CartDetailScreen}
+                        />
+                        <Stack.Screen
+                          name="TrackOrder"
+                          component={TrackOrderScreen}
+                        />
+                        <Stack.Screen
+                          name="Checkout"
+                          component={CheckoutScreen}
+                        />
 
-                      {/* Account Related Screens */}
-                      <Stack.Screen name="EditProfile" component={EditProfileScreen} />
-                      <Stack.Screen name="Vouchers" component={VouchersScreen} />
-                      <Stack.Screen name="SavedAddresses" component={SavedAddressesScreen} />
-                      <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
-                      <Stack.Screen name="Referrals" component={ReferralsScreen} />
-                      <Stack.Screen name="Notifications" component={NotificationsScreen} />
-                      <Stack.Screen name="Settings" component={SettingsScreen} />
-                      <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
-                    </Stack.Navigator>
-                    <StatusBar style="light" backgroundColor={colors.primary} />
-                  </NavigationContainer>
-                </OrdersProvider>
-              </CartProvider>
-            </ProductsProvider>
-          </LanguageProvider>
-        </ThemeProvider>
+                        {/* Account Related Screens */}
+                        <Stack.Screen
+                          name="EditProfile"
+                          component={EditProfileScreen}
+                        />
+                        <Stack.Screen
+                          name="Vouchers"
+                          component={VouchersScreen}
+                        />
+                        <Stack.Screen
+                          name="SavedAddresses"
+                          component={SavedAddressesScreen}
+                        />
+                        <Stack.Screen
+                          name="PaymentMethods"
+                          component={PaymentMethodsScreen}
+                        />
+                        <Stack.Screen
+                          name="Referrals"
+                          component={ReferralsScreen}
+                        />
+                        <Stack.Screen
+                          name="Notifications"
+                          component={NotificationsScreen}
+                        />
+                        <Stack.Screen
+                          name="Settings"
+                          component={SettingsScreen}
+                        />
+                        <Stack.Screen
+                          name="HelpCenter"
+                          component={HelpCenterScreen}
+                        />
+                      </Stack.Navigator>
+                      <StatusBar
+                        style="light"
+                        backgroundColor={colors.primary}
+                      />
+                    </NavigationContainer>
+                  </OrdersProvider>
+                </CartProvider>
+              </ProductsProvider>
+            </LanguageProvider>
+          </ThemeProvider>
+        </Provider>
       </SafeAreaProvider>
     </StripeProvider>
   );
