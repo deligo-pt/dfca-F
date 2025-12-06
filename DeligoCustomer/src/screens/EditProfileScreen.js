@@ -18,6 +18,8 @@ import { LocationDetails } from "../components/Profile";
 import { useAppDispatch, useAppSelector } from "../store/store";
 import FormInput from "../components/Profile/FormInput";
 import { setContact } from "../store/state-management/map";
+import { useGetLoginUserQuery } from "../store/api-queries/profile";
+import GlobalLoader from "../components/GlobalLoader";
 
 const EditProfileScreen = ({ navigation, route }) => {
   const { t } = useLanguage();
@@ -33,6 +35,11 @@ const EditProfileScreen = ({ navigation, route }) => {
   // Redux
   const dispatch = useAppDispatch();
   const contactNumber = useAppSelector((state) => state.contactInfo);
+  // === profile ===
+  const { data, isLoading, isFetching } = useGetLoginUserQuery({});
+
+  const user = data?.data;
+  console.log("user: ", user);
 
   // sensible default address (from user's request)
   const defaultAddress = {
@@ -110,14 +117,13 @@ const EditProfileScreen = ({ navigation, route }) => {
       style={[styles.container, { backgroundColor: colors.background }]}
       edges={["top"]}
     >
+      {(isLoading || isFetching) && <GlobalLoader visible={isLoading} />}
       {/* Header */}
       <View
         style={[
           styles.header,
           {
-            backgroundColor: colors.background,
             borderBottomColor: colors.border,
-            flex: 1,
           },
         ]}
       >
@@ -264,13 +270,85 @@ const EditProfileScreen = ({ navigation, route }) => {
               />
             </View>
           </View>
+
+          {/* reusable user form */}
           <FormInput
             label="Mobile number"
-            value={contactNumber}
+            value={user?.contactNumber}
             onChangeText={(text) => dispatch(setContact(text))}
-            placeholder="Enter your mobile"
+            placeholder={t("enterYourMobileNumber")}
             keyboardType="phone-pad"
             iconName="call-outline"
+            disabled={isEditing ? false : true}
+          />
+
+          {/* ---------- NAME FIELDS ---------- */}
+          <FormInput
+            label="First Name"
+            value={user?.name?.firstName}
+            onChangeText={() => {}}
+            placeholder="Enter first name"
+            iconName="person-outline"
+            disabled={isEditing ? false : true}
+          />
+
+          <FormInput
+            label="Last Name"
+            value={user?.name?.lastName}
+            onChangeText={() => {}}
+            placeholder="Enter last name"
+            iconName="person-circle-outline"
+            disabled={isEditing ? false : true}
+          />
+
+          {/* ---------- EMAIL ---------- */}
+          <FormInput
+            label="Email"
+            value={user?.email}
+            onChangeText={() => {}}
+            placeholder="Enter email"
+            keyboardType="email-address"
+            iconName="mail-outline"
+            disabled={isEditing ? false : true}
+          />
+
+          {/* ---------- PHONE ---------- */}
+          <FormInput
+            label="Mobile Number"
+            value={user?.contactNumber}
+            onChangeText={() => {}}
+            placeholder="Enter phone number"
+            keyboardType="phone-pad"
+            iconName="call-outline"
+            disabled={isEditing ? false : true}
+          />
+
+          {/* ---------- ADDRESS FIELDS ---------- */}
+          <FormInput
+            label="Street"
+            value={user?.address?.street}
+            onChangeText={() => {}}
+            placeholder="Street address"
+            iconName="home-outline"
+            disabled={isEditing ? false : true}
+          />
+
+          <FormInput
+            label="City"
+            value={user?.address?.city}
+            onChangeText={() => {}}
+            placeholder="City"
+            iconName="business-outline"
+            disabled={isEditing ? false : true}
+          />
+
+          <FormInput
+            label="State"
+            value={user?.address?.state}
+            onChangeText={() => {}}
+            placeholder="State"
+            iconName="location-outline"
+            disabled={isEditing ? false : true}
           />
 
           {/* Location details component */}
