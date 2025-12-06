@@ -14,6 +14,7 @@ import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../utils/ThemeContext";
 import { getUserData } from "../utils/auth";
 import { useLanguage } from "../utils/LanguageContext";
+import { LocationDetails } from "../components/Profile";
 
 const EditProfileScreen = ({ navigation, route }) => {
   const { t } = useLanguage();
@@ -465,6 +466,17 @@ const EditProfileScreen = ({ navigation, route }) => {
               </View>
             )}
           </View>
+        </View>
+
+        {/* LocationDetails */}
+
+        <View
+          style={{
+            flex: 1,
+            backgroundColor: "red",
+          }}
+        >
+          <LocationDetails />
         </View>
 
         {/* Save Button */}
