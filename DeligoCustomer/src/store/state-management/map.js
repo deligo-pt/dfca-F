@@ -34,6 +34,11 @@ const mapSlice = createSlice({
   name: "map",
   initialState,
   reducers: {
+    // contact info set
+    setContact: (state, action) => {
+      state.contactInfo.contactNumber = action.payload;
+    },
+
     // Toggle fullscreen mode
     setMapFullScreen: (state, action) => {
       state.isMapFullScreen = action.payload;
@@ -84,6 +89,7 @@ export const {
   setLocationPermission,
   setMapRegion,
   setContactLocation,
+  setContact,
 } = mapSlice.actions;
 
 export default mapSlice.reducer;

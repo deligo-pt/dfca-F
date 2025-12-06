@@ -16,6 +16,8 @@ import { getUserData } from "../utils/auth";
 import { useLanguage } from "../utils/LanguageContext";
 import { LocationDetails } from "../components/Profile";
 import { useAppDispatch, useAppSelector } from "../store/store";
+import FormInput from "../components/Profile/FormInput";
+import { setContact } from "../store/state-management/map";
 
 const EditProfileScreen = ({ navigation, route }) => {
   const { t } = useLanguage();
@@ -27,6 +29,10 @@ const EditProfileScreen = ({ navigation, route }) => {
   const [address, setAddress] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState(null);
+
+  // Redux
+  const dispatch = useAppDispatch();
+  const contactNumber = useAppSelector((state) => state.contactInfo);
 
   // sensible default address (from user's request)
   const defaultAddress = {
@@ -228,7 +234,6 @@ const EditProfileScreen = ({ navigation, route }) => {
               />
             </View>
           </View>
-
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.text.primary }]}>
               {t("emailAddress")}
@@ -259,40 +264,18 @@ const EditProfileScreen = ({ navigation, route }) => {
               />
             </View>
           </View>
-
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text.primary }]}>
-              {t("mobileNumber")}
-            </Text>
-            <View
-              style={[
-                styles.inputContainer,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-                isEditing && {
-                  backgroundColor: colors.background,
-                  borderColor: colors.primary,
-                },
-              ]}
-            >
-              <Ionicons
-                name="call-outline"
-                size={20}
-                color={colors.text.secondary}
-              />
-              <TextInput
-                style={[styles.input, { color: colors.text.primary }]}
-                value={mobile}
-                onChangeText={setMobile}
-                placeholder={t("enterYourMobile")}
-                keyboardType="phone-pad"
-                editable={isEditing}
-                placeholderTextColor={colors.text.light}
-              />
-            </View>
-          </View>
+          <FormInput
+            label="Mobile number"
+            value={contactNumber}
+            onChangeText={(text) => dispatch(setContact(text))}
+            placeholder="Enter your mobile"
+            keyboardType="phone-pad"
+            iconName="call-outline"
+          />
 
           {/* Location details component */}
           {isEditing && <LocationDetails />}
+          {/* all values */}
         </View>
 
         {/* Save Button */}

@@ -1,4 +1,4 @@
-import React from "react";
+import React, { useState } from "react";
 import {
   View,
   Text,
@@ -22,10 +22,9 @@ import {
 import * as Location from "expo-location";
 import axios from "axios"; // or use fetch
 
-const LocationDetails = ({
-  isLoadingLocation = false,
-  locationPermission = true,
+const GOOGLE_PLACES_API_KEY = "AIzaSyCZ1jixNYbSRM21Uq82a6KXNO_FSpLUwaQ";
 
+const LocationDetails = ({
   setMapRegion = () => {},
   setMarkerCoordinate = () => {},
   setSearchLocation = () => {},
@@ -42,9 +41,6 @@ const LocationDetails = ({
   searchLocation = "",
   streetAddress = "",
   streetNumber = "",
-  city = "",
-  postalCode = "",
-
   // Complex object defaults
   fieldErrors = {},
 }) => {
@@ -55,87 +51,170 @@ const LocationDetails = ({
 
   const region = useAppSelector((state) => state.map.mapRegion);
   const isMapFullScreen = useAppSelector((state) => state.map.isMapFullScreen);
+  const isLoadingLocation = useAppSelector(
+    (state) => state.map.isLoadingLocation
+  );
+  const address = useAppSelector((state) => state.map.contactInfo.address);
   const dispatch = useAppDispatch();
 
-  const getCurrentLocation = async (
-    dispatch,
-    setMarkerCoordinate,
-    setStreetAddress,
-    setCity,
-    setPostalCode,
-    setStreetNumber
-  ) => {
-    dispatch(setLoadingLocation(true));
+  const locationPermission = false;
+
+  const [searchText, setSearchText] = useState("");
+  const [suggestions, setSuggestions] = useState([]);
+
+  const {
+    street = "",
+    city = "",
+    state = "",
+    country = "",
+    postalCode = "",
+  } = address;
+
+  // Search Places
+  const searchPlaces = async (text) => {
+    setSearchText(text);
+    if (text.length < 3) {
+      setSuggestions([]);
+      return;
+    }
 
     try {
-      // 1. Get GPS coordinates
-      const location = await Location.getCurrentPositionAsync({
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/place/autocomplete/json?input=${encodeURIComponent(
+          text
+        )}&key=${GOOGLE_PLACES_API_KEY}&language=en`
+      );
+      const data = await response.json();
+      setSuggestions(data.predictions || []);
+    } catch (err) {
+      console.log("Search error:", err);
+    }
+  };
+
+  // Get Place Details + Fill All Fields
+  const selectPlace = async (placeId) => {
+    try {
+      // ... fetches place details ...
+      const place = result.result;
+
+      if (place.geometry) {
+        const lat = place.geometry.location.lat;
+        const lng = place.geometry.location.lng;
+
+        // Update map (Dispatched to Redux: state.map.mapRegion)
+        dispatch(
+          setMapRegion({
+            latitude: lat,
+            longitude: lng,
+            latitudeDelta: 0.008,
+            longitudeDelta: 0.008,
+          })
+        );
+
+        // Parse address components
+        let street = "",
+          streetNumber = "",
+          city = "",
+          state = "",
+          country = "",
+          postalCode = "";
+
+        // **This is where the address components are extracted from the Google API response**
+        place.address_components.forEach((comp) => {
+          const types = comp.types;
+          if (types.includes("street_number")) streetNumber = comp.long_name;
+          if (types.includes("route")) street = comp.long_name;
+          // ... (other types like locality, administrative_area_level_1, country, postal_code) ...
+        });
+
+        const fullAddress = {
+          street: street
+            ? `${streetNumber ? streetNumber + " " : ""}${street}`.trim()
+            : "",
+          city: city || "",
+          state: state || "",
+          country: country || "",
+          postalCode: postalCode || "",
+          latitude: lat,
+          longitude: lng,
+        };
+
+        // **This is the critical line that sets the values in Redux**
+        dispatch(setContactLocation({ address: fullAddress }));
+        setSuggestions([]);
+        setSearchText(
+          place.formatted_address ||
+            fullAddress.street + ", " + fullAddress.city
+        );
+      }
+    } catch (err) {
+      Alert.alert("Error", "Could not load place details");
+    }
+  };
+
+  // Use GPS
+  const getCurrentLocation = async () => {
+    dispatch(setLoadingLocation(true));
+    try {
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== "granted") {
+        Alert.alert("Permission Required", "Please allow location access");
+        return;
+      }
+
+      const loc = await Location.getCurrentPositionAsync({
         accuracy: Location.Accuracy.High,
-        timeout: 15000,
       });
+      const { latitude, longitude } = loc.coords;
 
-      const { latitude, longitude } = location.coords;
-
-      // 2. Update map + marker
-      const newRegion = {
-        latitude,
-        longitude,
-        latitudeDelta: 0.01,
-        longitudeDelta: 0.01,
-      };
-      dispatch(setMapRegion(newRegion));
-      dispatch(setConfirmedMapRegion(newRegion)); // optional: save as confirmed
-      setMarkerCoordinate({ latitude, longitude });
-
-      // 3. Reverse geocode using Google Geocoding API (most accurate)
-      const response = await axios.get(
-        `https://maps.googleapis.com/maps/api/geocode/json`,
-        {
-          params: {
-            latlng: `${latitude},${longitude}`,
-            key: "AIzaSyCZ1jixNYbSRM21Uq82a6KXNO_FSpLUwaQ", // same key from app.json
-            language: "en",
-          },
-        }
+      dispatch(
+        setMapRegion({
+          latitude,
+          longitude,
+          latitudeDelta: 0.008,
+          longitudeDelta: 0.008,
+        })
       );
 
-      const results = response.data.results[0];
-      if (!results) throw new Error("No address found");
-
-      const address = results.formatted_address;
-      const components = results.address_components;
-
-      let street = "",
-        streetNumber = "",
-        city = "",
-        postalCode = "";
-
-      components.forEach((comp) => {
-        const types = comp.types;
-        if (types.includes("street_number")) streetNumber = comp.long_name;
-        if (types.includes("route")) street = comp.long_name;
-        if (types.includes("locality")) city = comp.long_name;
-        if (types.includes("postal_code")) postalCode = comp.long_name;
-      });
-
-      // Fill the form automatically
-      setStreetAddress(
-        street
-          ? `${streetNumber ? streetNumber + " " : ""}${street}`.trim()
-          : ""
+      // Reverse geocode
+      const response = await fetch(
+        `https://maps.googleapis.com/maps/api/geocode/json?latlng=${latitude},${longitude}&key=${GOOGLE_PLACES_API_KEY}`
       );
-      setStreetNumber(streetNumber || "");
-      setCity(city || "");
-      setPostalCode(postalCode || "");
+      const data = await response.json();
+      const result = data.results[0];
 
-      // Optional: show success toast
-      // Alert.alert("Success", `Location set to: ${city}`);
-    } catch (error) {
-      console.log("GPS Error:", error);
-      Alert.alert(
-        "Location Error",
-        "Could not get your location. Please try again."
-      );
+      if (result) {
+        let street = "",
+          streetNumber = "",
+          city = "",
+          state = "",
+          country = "",
+          postalCode = "";
+        result.address_components.forEach((comp) => {
+          const t = comp.types;
+          if (t.includes("street_number")) streetNumber = comp.long_name;
+          if (t.includes("route")) street = comp.long_name;
+          if (t.includes("locality")) city = comp.long_name;
+          if (t.includes("administrative_area_level_1")) state = comp.long_name;
+          if (t.includes("country")) country = comp.long_name;
+          if (t.includes("postal_code")) postalCode = comp.long_name;
+        });
+
+        const addr = {
+          street: street ? `${streetNumber} ${street}`.trim() : "",
+          city,
+          state,
+          country,
+          postalCode,
+          latitude,
+          longitude,
+        };
+
+        dispatch(setContactLocation({ address: addr }));
+        setSearchText(result.formatted_address);
+      }
+    } catch (err) {
+      Alert.alert("Error", "Could not get location");
     } finally {
       dispatch(setLoadingLocation(false));
     }
@@ -267,7 +346,7 @@ const LocationDetails = ({
                     : "#CCCCCC",
                 },
               ]}
-              /* onPress={async () => {
+              /*   onPress={async () => {
                 if (markerCoordinate) {
                   await reverseGeocode(
                     markerCoordinate.latitude,
@@ -276,8 +355,7 @@ const LocationDetails = ({
                   dispatch(setMapFullScreen(false));
                 }
               }}
-              disabled={!markerCoordinate || isLoadingLocation}
- */
+              disabled={!markerCoordinate || isLoadingLocation} */
               onPress={() => {
                 getCurrentLocation(
                   dispatch,
@@ -345,11 +423,11 @@ const LocationDetails = ({
                 ]}
                 placeholder="Search for your business address..."
                 placeholderTextColor="#9CA3AF"
-                value={searchLocation}
-                onChangeText={setSearchLocation}
                 onSubmitEditing={searchAddress}
                 returnKeyType="search"
                 editable={!isLoadingLocation}
+                value={searchText} // <-- Use local state searchText instead of searchLocation prop
+                onChangeText={searchPlaces} // <-- Call the function that fetches suggestions
               />
               {searchLocation.length > 0 ? (
                 <View style={styles.searchBarActions}>
@@ -617,7 +695,7 @@ const LocationDetails = ({
                   { color: colors.text.primary },
                 ]}
               >
-                Building / Suite Number
+                Full Address
               </Text>
               <View
                 style={[styles.internationalInput, { borderColor: "#E5E7EB" }]}
@@ -628,7 +706,7 @@ const LocationDetails = ({
                     styles.internationalInputText,
                     { color: colors.text.primary },
                   ]}
-                  placeholder="Building 123, Suite 456"
+                  placeholder="Address"
                   placeholderTextColor="#9CA3AF"
                   value={streetNumber}
                   onChangeText={setStreetNumber}
