@@ -12,6 +12,8 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import MapView, { PROVIDER_GOOGLE } from "react-native-maps";
 import { useTheme } from "../../utils/ThemeContext";
+import { useLanguage } from "../../utils/LanguageContext";
+import { useAppDispatch, useAppSelector } from "../../store/store";
 
 const LocationDetails = ({
   // Boolean/State defaults
@@ -51,24 +53,13 @@ const LocationDetails = ({
   fieldErrors = {},
 }) => {
   const { colors } = useTheme();
+  const { t } = useLanguage();
+  const dispatch = useAppDispatch();
+  const region = useAppSelector((state) => state.map.mapRegion);
+  console.log("region: ", region);
+
   return (
     <View style={styles.professionalLocationWrapper}>
-      <View style={styles.professionalHeader}>
-        <Text
-          style={[styles.professionalTitle, { color: colors.text.primary }]}
-        >
-          Business Location
-        </Text>
-        <Text
-          style={[
-            styles.professionalSubtitle,
-            { color: colors.text.secondary },
-          ]}
-        >
-          Set your precise location for accurate service delivery
-        </Text>
-      </View>
-
       <Modal
         visible={isMapFullScreen}
         animationType="slide"
@@ -227,6 +218,20 @@ const LocationDetails = ({
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.professionalScrollContent}
         >
+          <Text
+            style={[
+              styles.internationalFieldLabel,
+              {
+                color: colors.text.primary,
+                paddingVertical: 14,
+                paddingHorizontal: 14,
+                marginBottom: 0,
+              },
+            ]}
+          >
+            {t("Location")}
+          </Text>
+
           <View style={styles.internationalSearchContainer}>
             <View
               style={[
@@ -463,20 +468,6 @@ const LocationDetails = ({
           )}
 
           <View style={styles.internationalFormSection}>
-            <Text
-              style={[styles.formSectionTitle, { color: colors.text.primary }]}
-            >
-              Address Details
-            </Text>
-            <Text
-              style={[
-                styles.formSectionSubtitle,
-                { color: colors.text.secondary },
-              ]}
-            >
-              Please verify and complete your business address
-            </Text>
-
             <View style={styles.internationalFieldGroup}>
               <Text
                 style={[
@@ -705,25 +696,6 @@ const LocationDetails = ({
 const styles = StyleSheet.create({
   professionalLocationWrapper: {
     flex: 1,
-    backgroundColor: "#F9FAFB",
-  },
-  professionalHeader: {
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-    backgroundColor: "#FFFFFF",
-    borderBottomWidth: 1,
-    borderBottomColor: "#E5E7EB",
-  },
-  professionalTitle: {
-    fontSize: 24,
-    fontWeight: "700",
-    fontFamily: "Poppins-Bold",
-    marginBottom: 6,
-  },
-  professionalSubtitle: {
-    fontSize: 14,
-    fontFamily: "Poppins-Regular",
-    lineHeight: 20,
   },
   professionalScrollView: {
     flex: 1,
@@ -733,7 +705,6 @@ const styles = StyleSheet.create({
   },
   internationalSearchContainer: {
     paddingHorizontal: 16,
-    paddingTop: 16,
     paddingBottom: 12,
   },
   internationalSearchBar: {
