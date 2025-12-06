@@ -9,14 +9,18 @@ import {
   Modal,
   ActivityIndicator,
   Alert,
-  Button,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import MapView, { PROVIDER_GOOGLE } from "react-native-maps";
 import { useTheme } from "../../utils/ThemeContext";
 import { useLanguage } from "../../utils/LanguageContext";
 import { useAppDispatch, useAppSelector } from "../../store/store";
-import { setMapFullScreen } from "../../store/state-management/map";
+import {
+  setLoadingLocation,
+  setMapFullScreen,
+} from "../../store/state-management/map";
+import * as Location from "expo-location";
+import axios from "axios"; // or use fetch
 
 const LocationDetails = ({
   isLoadingLocation = false,
@@ -30,7 +34,7 @@ const LocationDetails = ({
   setCity = () => {},
   setPostalCode = () => {},
   clearFieldError = () => {},
-  getCurrentLocation = () => {},
+
   searchAddress = () => {},
   reverseGeocode = () => {},
 
@@ -52,6 +56,90 @@ const LocationDetails = ({
   const region = useAppSelector((state) => state.map.mapRegion);
   const isMapFullScreen = useAppSelector((state) => state.map.isMapFullScreen);
   const dispatch = useAppDispatch();
+
+  const getCurrentLocation = async (
+    dispatch,
+    setMarkerCoordinate,
+    setStreetAddress,
+    setCity,
+    setPostalCode,
+    setStreetNumber
+  ) => {
+    dispatch(setLoadingLocation(true));
+
+    try {
+      // 1. Get GPS coordinates
+      const location = await Location.getCurrentPositionAsync({
+        accuracy: Location.Accuracy.High,
+        timeout: 15000,
+      });
+
+      const { latitude, longitude } = location.coords;
+
+      // 2. Update map + marker
+      const newRegion = {
+        latitude,
+        longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      };
+      dispatch(setMapRegion(newRegion));
+      dispatch(setConfirmedMapRegion(newRegion)); // optional: save as confirmed
+      setMarkerCoordinate({ latitude, longitude });
+
+      // 3. Reverse geocode using Google Geocoding API (most accurate)
+      const response = await axios.get(
+        `https://maps.googleapis.com/maps/api/geocode/json`,
+        {
+          params: {
+            latlng: `${latitude},${longitude}`,
+            key: "AIzaSyCZ1jixNYbSRM21Uq82a6KXNO_FSpLUwaQ", // same key from app.json
+            language: "en",
+          },
+        }
+      );
+
+      const results = response.data.results[0];
+      if (!results) throw new Error("No address found");
+
+      const address = results.formatted_address;
+      const components = results.address_components;
+
+      let street = "",
+        streetNumber = "",
+        city = "",
+        postalCode = "";
+
+      components.forEach((comp) => {
+        const types = comp.types;
+        if (types.includes("street_number")) streetNumber = comp.long_name;
+        if (types.includes("route")) street = comp.long_name;
+        if (types.includes("locality")) city = comp.long_name;
+        if (types.includes("postal_code")) postalCode = comp.long_name;
+      });
+
+      // Fill the form automatically
+      setStreetAddress(
+        street
+          ? `${streetNumber ? streetNumber + " " : ""}${street}`.trim()
+          : ""
+      );
+      setStreetNumber(streetNumber || "");
+      setCity(city || "");
+      setPostalCode(postalCode || "");
+
+      // Optional: show success toast
+      // Alert.alert("Success", `Location set to: ${city}`);
+    } catch (error) {
+      console.log("GPS Error:", error);
+      Alert.alert(
+        "Location Error",
+        "Could not get your location. Please try again."
+      );
+    } finally {
+      dispatch(setLoadingLocation(false));
+    }
+  };
 
   return (
     <View style={styles.professionalLocationWrapper}>
@@ -179,7 +267,7 @@ const LocationDetails = ({
                     : "#CCCCCC",
                 },
               ]}
-              onPress={async () => {
+              /* onPress={async () => {
                 if (markerCoordinate) {
                   await reverseGeocode(
                     markerCoordinate.latitude,
@@ -189,6 +277,18 @@ const LocationDetails = ({
                 }
               }}
               disabled={!markerCoordinate || isLoadingLocation}
+ */
+              onPress={() => {
+                getCurrentLocation(
+                  dispatch,
+                  setMarkerCoordinate,
+                  setStreetAddress,
+                  setCity,
+                  setPostalCode,
+                  setStreetNumber
+                );
+              }}
+              disabled={isLoadingLocation}
             >
               {isLoadingLocation ? (
                 <>

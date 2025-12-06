@@ -70,6 +70,11 @@ const mapSlice = createSlice({
         };
       }
     },
+
+    setConfirmedMapRegion: (state, action) => {
+      state.confirmedMapRegion = action.payload; // ← This will be the final saved one
+      state.mapRegion = action.payload; // Also update current view
+    },
   },
 });
 
