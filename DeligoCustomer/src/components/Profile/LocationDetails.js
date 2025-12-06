@@ -8,21 +8,20 @@ import {
   ScrollView,
   Modal,
   ActivityIndicator,
+  Alert,
+  Button,
 } from "react-native";
 import { Ionicons } from "@expo/vector-icons";
 import MapView, { PROVIDER_GOOGLE } from "react-native-maps";
 import { useTheme } from "../../utils/ThemeContext";
 import { useLanguage } from "../../utils/LanguageContext";
 import { useAppDispatch, useAppSelector } from "../../store/store";
+import { setMapFullScreen } from "../../store/state-management/map";
 
 const LocationDetails = ({
-  // Boolean/State defaults
-  isMapFullScreen = false,
   isLoadingLocation = false,
   locationPermission = true,
 
-  // Setters (Functions must default to empty function to avoid crashes)
-  setIsMapFullScreen = () => {},
   setMapRegion = () => {},
   setMarkerCoordinate = () => {},
   setSearchLocation = () => {},
@@ -35,13 +34,6 @@ const LocationDetails = ({
   searchAddress = () => {},
   reverseGeocode = () => {},
 
-  // Data/Value defaults
-  mapRegion = {
-    latitude: 23.7648, // Tejgaon, Dhaka
-    longitude: 90.4078, // Tejgaon, Dhaka
-    latitudeDelta: 0.02, // Zoomed in nicely (you can adjust)
-    longitudeDelta: 0.02,
-  },
   markerCoordinate = null, // Use null or a safe initial coordinate
   searchLocation = "",
   streetAddress = "",
@@ -54,23 +46,26 @@ const LocationDetails = ({
 }) => {
   const { colors } = useTheme();
   const { t } = useLanguage();
-  const dispatch = useAppDispatch();
+
+  //   =============  Redux Toolkit =================
+
   const region = useAppSelector((state) => state.map.mapRegion);
-  console.log("region: ", region);
+  const isMapFullScreen = useAppSelector((state) => state.map.isMapFullScreen);
+  const dispatch = useAppDispatch();
 
   return (
     <View style={styles.professionalLocationWrapper}>
       <Modal
         visible={isMapFullScreen}
         animationType="slide"
-        onRequestClose={() => setIsMapFullScreen(false)}
+        onRequestClose={() => dispatch(setMapFullScreen(false))}
         statusBarTranslucent
       >
         <View style={styles.fullScreenMapContainer}>
           <MapView
             style={styles.fullScreenMap}
             provider={PROVIDER_GOOGLE}
-            region={mapRegion}
+            region={region}
             onRegionChangeComplete={(region) => {
               setMapRegion(region);
               setMarkerCoordinate({
@@ -109,8 +104,11 @@ const LocationDetails = ({
 
           <View style={styles.fullScreenControls}>
             <TouchableOpacity
-              style={[styles.fullScreenButton, { backgroundColor: "#fff" }]}
-              onPress={() => setIsMapFullScreen(false)}
+              style={[
+                styles.fullScreenButton,
+                { backgroundColor: "#fff", zIndex: 50 },
+              ]}
+              onPress={() => dispatch(setMapFullScreen(false))}
             >
               <Ionicons name="contract" size={20} color={colors.primary} />
               <Text
@@ -187,7 +185,7 @@ const LocationDetails = ({
                     markerCoordinate.latitude,
                     markerCoordinate.longitude
                   );
-                  setIsMapFullScreen(false);
+                  dispatch(setMapFullScreen(false));
                 }
               }}
               disabled={!markerCoordinate || isLoadingLocation}
@@ -327,7 +325,7 @@ const LocationDetails = ({
                   borderColor: "#E5E7EB",
                 },
               ]}
-              onPress={() => setIsMapFullScreen(true)}
+              onPress={() => dispatch(setMapFullScreen(true))}
             >
               <Ionicons name="expand" size={20} color="#6B7280" />
               <Text style={[styles.quickActionText, { color: "#6B7280" }]}>
@@ -339,13 +337,13 @@ const LocationDetails = ({
           <View style={styles.internationalMapPreview}>
             <TouchableOpacity
               style={styles.mapPreviewTouchable}
-              onPress={() => setIsMapFullScreen(true)}
+              onPress={() => dispatch(setMapFullScreen(true))}
               activeOpacity={0.9}
             >
               <MapView
                 style={styles.mapPreview}
                 provider={PROVIDER_GOOGLE}
-                region={mapRegion}
+                region={region}
                 scrollEnabled={false}
                 zoomEnabled={false}
                 pitchEnabled={false}
