@@ -55,14 +55,36 @@ const EditProfileScreen = ({ navigation, route }) => {
     }
   }, [user]);
 
+  // --- PICK IMAGE ---
+  const pickImage = async () => {
+    try {
+      const result = await ImagePicker.launchImageLibraryAsync({
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        allowsEditing: true,
+        quality: 0.8,
+      });
+
+      if (!result.canceled && result.assets?.[0]?.uri) {
+        const selectedUri = result.assets[0].uri;
+
+        // Update Redux store directly
+        dispatch(updateField({ key: "profilePhoto", value: selectedUri }));
+      }
+    } catch (err) {
+      console.error("Image picking failed:", err);
+      Alert.alert("Failed to pick image", "Please try again.");
+    }
+  };
+
+  // --- SAVE PROFILE ---
   const handleSave = async () => {
     if (!edited || !user) return;
 
     try {
-      // Prepare a copy of edited to send
+      // 1️⃣ Prepare profileData copy
       const profileData = { ...edited };
 
-      // Prepare imageFile if profile photo changed
+      // 2️⃣ Handle profile photo
       let imageFile = null;
       if (edited.profilePhoto && edited.profilePhoto !== user?.profilePhoto) {
         const uriParts = edited.profilePhoto.split("/");
@@ -75,11 +97,11 @@ const EditProfileScreen = ({ navigation, route }) => {
           type: fileType,
         };
 
-        // Remove from profileData since it's sent as file
+        // Remove from profileData because sent as file
         delete profileData.profilePhoto;
       }
 
-      // Merge nested objects (like address) with original to preserve unchanged fields
+      // 3️⃣ Merge nested objects (address, etc.)
       if (edited.address) {
         profileData.address = {
           ...user.address,
@@ -87,9 +109,9 @@ const EditProfileScreen = ({ navigation, route }) => {
         };
       }
 
-      // Detect if anything actually changed
-      const changesExist =
-        JSON.stringify(user) !== JSON.stringify({ ...user, ...profileData });
+      // 4️⃣ Detect if anything actually changed
+      const mergedUser = { ...user, ...profileData };
+      const changesExist = JSON.stringify(user) !== JSON.stringify(mergedUser);
 
       if (!changesExist) {
         console.log("No changes detected");
@@ -97,7 +119,7 @@ const EditProfileScreen = ({ navigation, route }) => {
         return;
       }
 
-      // Call the API
+      // 5️⃣ Call the API
       const result = await updateProfile({
         customerId: userId,
         imageFile,
@@ -106,39 +128,19 @@ const EditProfileScreen = ({ navigation, route }) => {
 
       if (result.success || result.data?.success) {
         Alert.alert("Profile updated successfully!");
+
+        // Reset edited state
         dispatch(resetProfileChanges());
+
+        // Exit editing mode
         setIsEditing(false);
-        refetch(); // refresh user data
+
+        // Refresh user data
+        refetch();
       }
     } catch (err) {
       console.error("Update failed:", err);
       Alert.alert("Update failed!", "Please try again.");
-    }
-  };
-
-  if (!edited) return null;
-
-  const pickImage = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== "granted") {
-      alert("Permission required!");
-      return;
-    }
-
-    const result = await ImagePicker.launchImageLibraryAsync({
-      mediaTypes: ImagePicker.MediaTypeOptions.Images,
-      allowsEditing: true,
-      aspect: [1, 1],
-      quality: 0.8,
-    });
-
-    if (!result.canceled) {
-      const newUri = result.assets[0].uri;
-
-      // Update Redux slice edited state
-      dispatch(updateField({ key: "profilePhoto", value: newUri }));
-
-      console.log("New image URI:", newUri);
     }
   };
 
@@ -201,7 +203,7 @@ const EditProfileScreen = ({ navigation, route }) => {
       >
         {/* Avatar */}
         <Avatar
-          uri={user?.profilePhoto || profilePhoto}
+          uri={edited.profilePhoto || user?.profilePhoto}
           isEditing={isEditing}
           colors={colors}
           onChangePhoto={() => {
