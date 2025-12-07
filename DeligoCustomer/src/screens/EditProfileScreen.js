@@ -5,6 +5,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
 import { getUserData } from '../utils/auth';
 import { useLanguage } from '../utils/LanguageContext';
+import LocationDetails from '../components/Profile/LocationDetails';
+import * as Location from 'expo-location';
+import Constants from 'expo-constants';
 
 const EditProfileScreen = ({ navigation, route }) => {
   const { t } = useLanguage();
@@ -29,6 +32,42 @@ const EditProfileScreen = ({ navigation, route }) => {
     street: 'House 32, Road 14',
   };
 
+  // Location details state
+  const [isMapFullScreen, setIsMapFullScreen] = useState(false);
+  const [mapRegion, setMapRegion] = useState({
+    latitude: defaultAddress.latitude,
+    longitude: defaultAddress.longitude,
+    latitudeDelta: 0.01,
+    longitudeDelta: 0.01,
+  });
+  const [markerCoordinate, setMarkerCoordinate] = useState({
+    latitude: defaultAddress.latitude,
+    longitude: defaultAddress.longitude,
+  });
+  const [locationPermission, setLocationPermission] = useState(false);
+  const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const [searchLocation, setSearchLocation] = useState('');
+  const [streetAddress, setStreetAddress] = useState(defaultAddress.street);
+  const [city, setCity] = useState(defaultAddress.city);
+  const [postalCode, setPostalCode] = useState(defaultAddress.postalCode);
+  const [fieldErrors, setFieldErrors] = useState({});
+
+  // Function to construct address object from individual fields
+  const constructAddressFromFields = () => {
+    const newAddress = {
+      street: streetAddress || '',
+      city: city || '',
+      state: defaultAddress.state, // Use default state since it's not editable in the form
+      country: defaultAddress.country, // Use default country since it's not editable in the form
+      postalCode: postalCode || '',
+      latitude: markerCoordinate.latitude,
+      longitude: markerCoordinate.longitude,
+      geoAccuracy: 5,
+    };
+    console.log('🏗️ Constructed address from fields:', newAddress);
+    setAddress(newAddress);
+  };
+
   useEffect(() => {
     loadUserData();
   }, []);
@@ -45,7 +84,22 @@ const EditProfileScreen = ({ navigation, route }) => {
         setMobile(routeUser.contactNumber || routeUser.phone || routeUser.mobile || '');
         setProfilePhoto(routeUser.profilePhoto || routeUser.photo || routeUser.avatar || routeUser.photoUrl || routeUser.avatarUrl || null);
         // set address if present on route user, otherwise use provided default
-        setAddress(routeUser.address || routeUser.location || defaultAddress);
+        const addr = routeUser.address || routeUser.location || defaultAddress;
+        setAddress(addr);
+        // Update location details state
+        setMapRegion({
+          latitude: addr.latitude || defaultAddress.latitude,
+          longitude: addr.longitude || defaultAddress.longitude,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        });
+        setMarkerCoordinate({
+          latitude: addr.latitude || defaultAddress.latitude,
+          longitude: addr.longitude || defaultAddress.longitude,
+        });
+        setStreetAddress(addr.street || defaultAddress.street);
+        setCity(addr.city || defaultAddress.city);
+        setPostalCode(addr.postalCode || defaultAddress.postalCode);
         return;
       }
 
@@ -55,7 +109,22 @@ const EditProfileScreen = ({ navigation, route }) => {
       setMobile(userData?.mobile || '');
       setProfilePhoto(userData?.profilePhoto || userData?.photo || userData?.avatarUrl || userData?.avatar || null);
       // prefer explicit address property, fall back to defaultAddress
-      setAddress(userData?.address || userData?.location || defaultAddress);
+      const addr = userData?.address || userData?.location || defaultAddress;
+      setAddress(addr);
+      // Update location details state
+      setMapRegion({
+        latitude: addr.latitude || defaultAddress.latitude,
+        longitude: addr.longitude || defaultAddress.longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      });
+      setMarkerCoordinate({
+        latitude: addr.latitude || defaultAddress.latitude,
+        longitude: addr.longitude || defaultAddress.longitude,
+      });
+      setStreetAddress(addr.street || defaultAddress.street);
+      setCity(addr.city || defaultAddress.city);
+      setPostalCode(addr.postalCode || defaultAddress.postalCode);
     } catch (err) {
       console.warn('[EditProfileScreen] loadUserData error', err);
     }
@@ -65,6 +134,212 @@ const EditProfileScreen = ({ navigation, route }) => {
     // TODO: Implement save functionality
     Alert.alert(t('success'), t('profileUpdated'));
     setIsEditing(false);
+  };
+
+  const clearFieldError = (field) => {
+    setFieldErrors(prev => ({ ...prev, [field]: null }));
+  };
+
+  const getCurrentLocation = async () => {
+    setIsLoadingLocation(true);
+    try {
+      let { status } = await Location.requestForegroundPermissionsAsync();
+      if (status !== 'granted') {
+        Alert.alert('Permission Denied', 'Location permission is required to get current location.');
+        setIsLoadingLocation(false);
+        return;
+      }
+      setLocationPermission(true);
+      let loc = await Location.getCurrentPositionAsync({});
+      const { latitude, longitude } = loc.coords;
+      setMapRegion({
+        latitude,
+        longitude,
+        latitudeDelta: 0.01,
+        longitudeDelta: 0.01,
+      });
+      setMarkerCoordinate({ latitude, longitude });
+      await reverseGeocode(latitude, longitude);
+    } catch (error) {
+      console.error('Error getting location:', error);
+      Alert.alert('Error', 'Failed to get current location.');
+    } finally {
+      setIsLoadingLocation(false);
+    }
+  };
+
+  const searchAddress = async () => {
+    if (!searchLocation.trim()) return;
+    setIsLoadingLocation(true);
+    try {
+      // Get Google Maps API key from app config
+      const googleMapsApiKey = Constants.expoConfig?.ios?.config?.googleMapsApiKey ||
+                              Constants.expoConfig?.android?.config?.googleMaps?.apiKey;
+
+      if (!googleMapsApiKey) {
+        Alert.alert('Error', 'Google Maps API key not configured');
+        return;
+      }
+
+      console.log('🔍 Searching for address:', searchLocation);
+
+      // Step 1: Use Google Places API Text Search to find places
+      const textSearchResponse = await fetch(
+        `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(searchLocation)}&key=${googleMapsApiKey}`
+      );
+
+      const textSearchData = await textSearchResponse.json();
+      console.log('📡 Google Places Text Search Response:', textSearchData);
+
+      if (textSearchData.status === 'OK' && textSearchData.results && textSearchData.results.length > 0) {
+        const place = textSearchData.results[0];
+        const placeId = place.place_id;
+        const { lat, lng } = place.geometry.location;
+
+        console.log('📍 Selected place from text search:', place);
+        console.log('📍 Place ID:', placeId);
+
+        // Step 2: Get detailed place information including address_components
+        const placeDetailsResponse = await fetch(
+          `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=address_components,formatted_address,geometry,name&key=${googleMapsApiKey}`
+        );
+
+        const placeDetailsData = await placeDetailsResponse.json();
+        console.log('📋 Google Places Details Response:', placeDetailsData);
+
+        let detailedPlace = place; // fallback to text search result
+        if (placeDetailsData.status === 'OK' && placeDetailsData.result) {
+          detailedPlace = placeDetailsData.result;
+          console.log('📍 Detailed place with address components:', detailedPlace);
+        }
+
+        console.log('📍 Place geometry:', detailedPlace.geometry);
+        console.log('📍 Place address components:', detailedPlace.address_components);
+
+        // Update map region and marker
+        setMapRegion({
+          latitude: lat,
+          longitude: lng,
+          latitudeDelta: 0.01,
+          longitudeDelta: 0.01,
+        });
+        setMarkerCoordinate({ latitude: lat, longitude: lng });
+
+        // Update address fields - keep it simple, just use formatted address for street
+        setStreetAddress(detailedPlace.formatted_address || detailedPlace.name || '');
+
+        // Extract only city and postal code - no building number extraction needed
+        let cityComponent = null;
+        let postalComponent = null;
+
+        if (detailedPlace.address_components) {
+          cityComponent = detailedPlace.address_components.find(component =>
+            component.types.includes('locality') || component.types.includes('administrative_area_level_2')
+          );
+          postalComponent = detailedPlace.address_components.find(component =>
+            component.types.includes('postal_code')
+          );
+
+          console.log('🏙️ City component:', cityComponent);
+          console.log('📮 Postal component:', postalComponent);
+
+          if (cityComponent) {
+            setCity(cityComponent.long_name);
+          }
+          if (postalComponent) {
+            setPostalCode(postalComponent.long_name);
+          }
+        } else {
+          console.log('⚠️ No address components available from Place Details API');
+        }
+
+        // Update the main address state - simple structure as requested
+        const updatedAddress = {
+          street: detailedPlace.formatted_address || detailedPlace.name || '',
+          city: cityComponent?.long_name || 'Dhaka',
+          state: 'Badda', // Default state
+          country: 'Bangladesh', // Default country
+          postalCode: postalComponent?.long_name || '1212',
+          latitude: lat,
+          longitude: lng,
+          geoAccuracy: 5,
+        };
+
+        console.log('📝 Updated address object:', updatedAddress);
+        setAddress(updatedAddress);
+
+        // Clear search input
+        setSearchLocation('');
+      } else {
+        console.log('❌ No results found for query:', searchLocation);
+        Alert.alert('No Results', 'No places found for the search query. Please try a different search term.');
+      }
+    } catch (error) {
+      console.error('❌ Error searching address:', error);
+      Alert.alert('Error', 'Failed to search for the address. Please try again.');
+    } finally {
+      setIsLoadingLocation(false);
+    }
+  };
+
+  const reverseGeocode = async (latitude, longitude) => {
+    try {
+      let addresses = await Location.reverseGeocodeAsync({ latitude, longitude });
+      if (addresses && addresses.length > 0) {
+        const addr = addresses[0];
+        console.log('🔄 Reverse geocoded address:', addr);
+
+        setStreetAddress(addr.street || '');
+        setCity(addr.city || '');
+        setPostalCode(addr.postalCode || '');
+
+        // Use streetNumber from Expo Location API if available
+        if (addr.streetNumber) {
+          setStreetNumber(addr.streetNumber);
+          console.log('🏠 Street number from GPS:', addr.streetNumber);
+        }
+
+        // Note: Expo Location API provides streetNumber but NOT building/suite numbers
+        // Building/suite numbers are only available from Google Places API (subpremise component)
+
+        // Update address state
+        setAddress(prev => ({
+          ...prev,
+          street: addr.street || prev?.street || '',
+          city: addr.city || prev?.city || '',
+          state: addr.region || prev?.state || '',
+          postalCode: addr.postalCode || prev?.postalCode || '',
+          country: addr.country || prev?.country || '',
+          latitude,
+          longitude,
+          geoAccuracy: 5, // Default accuracy value
+        }));
+      }
+    } catch (error) {
+      console.error('Error reverse geocoding:', error);
+    }
+  };
+
+  // Custom setters that also construct address object
+  const setStreetAddressWithConstruct = (value) => {
+    setStreetAddress(value);
+    // Delay to allow state update, then construct address
+    setTimeout(constructAddressFromFields, 0);
+  };
+
+  const setCityWithConstruct = (value) => {
+    setCity(value);
+    setTimeout(constructAddressFromFields, 0);
+  };
+
+  const setPostalCodeWithConstruct = (value) => {
+    setPostalCode(value);
+    setTimeout(constructAddressFromFields, 0);
+  };
+
+  const setMarkerCoordinateWithConstruct = (coordinate) => {
+    setMarkerCoordinate(coordinate);
+    setTimeout(constructAddressFromFields, 0);
   };
 
   return (
@@ -155,59 +430,30 @@ const EditProfileScreen = ({ navigation, route }) => {
             {address ? (
               // show editable fields when editing, otherwise a read-only formatted view
               isEditing ? (
-                <View>
-                  <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border, marginBottom: 8 }]}>
-                    <Ionicons name="home-outline" size={20} color={colors.text.secondary} />
-                    <TextInput
-                      style={[styles.input, { color: colors.text.primary }]}
-                      value={address.street}
-                      onChangeText={(val) => setAddress(prev => ({ ...prev, street: val }))}
-                      placeholder={t('street')}
-                      placeholderTextColor={colors.text.light}
-                    />
-                  </View>
-                  <View style={[styles.row, { justifyContent: 'space-between' }]}>
-                    <View style={[styles.inputContainer, { flex: 1, marginRight: 8, backgroundColor: colors.surface, borderColor: colors.border }]}>
-                      <TextInput
-                        style={[styles.input, { color: colors.text.primary }]}
-                        value={address.city}
-                        onChangeText={(val) => setAddress(prev => ({ ...prev, city: val }))}
-                        placeholder={t('city')}
-                        placeholderTextColor={colors.text.light}
-                      />
-                    </View>
-                    <View style={[styles.inputContainer, { flex: 1, backgroundColor: colors.surface, borderColor: colors.border }]}>
-                      <TextInput
-                        style={[styles.input, { color: colors.text.primary }]}
-                        value={address.state}
-                        onChangeText={(val) => setAddress(prev => ({ ...prev, state: val }))}
-                        placeholder={t('state')}
-                        placeholderTextColor={colors.text.light}
-                      />
-                    </View>
-                  </View>
-                  <View style={[styles.row, { justifyContent: 'space-between', marginTop: 8 }]}>
-                    <View style={[styles.inputContainer, { flex: 1, marginRight: 8, backgroundColor: colors.surface, borderColor: colors.border }]}>
-                      <TextInput
-                        style={[styles.input, { color: colors.text.primary }]}
-                        value={address.postalCode}
-                        onChangeText={(val) => setAddress(prev => ({ ...prev, postalCode: val }))}
-                        placeholder={t('postalCode')}
-                        placeholderTextColor={colors.text.light}
-                        keyboardType="numeric"
-                      />
-                    </View>
-                    <View style={[styles.inputContainer, { flex: 1, backgroundColor: colors.surface, borderColor: colors.border }]}>
-                      <TextInput
-                        style={[styles.input, { color: colors.text.primary }]}
-                        value={address.country}
-                        onChangeText={(val) => setAddress(prev => ({ ...prev, country: val }))}
-                        placeholder={t('country')}
-                        placeholderTextColor={colors.text.light}
-                      />
-                    </View>
-                  </View>
-                </View>
+                <LocationDetails
+                  colors={colors}
+                  isMapFullScreen={isMapFullScreen}
+                  setIsMapFullScreen={setIsMapFullScreen}
+                  mapRegion={mapRegion}
+                  setMapRegion={setMapRegion}
+                  markerCoordinate={markerCoordinate}
+                  setMarkerCoordinate={setMarkerCoordinateWithConstruct}
+                  locationPermission={locationPermission}
+                  isLoadingLocation={isLoadingLocation}
+                  searchLocation={searchLocation}
+                  setSearchLocation={setSearchLocation}
+                  streetAddress={streetAddress}
+                  setStreetAddress={setStreetAddressWithConstruct}
+                  city={city}
+                  setCity={setCityWithConstruct}
+                  postalCode={postalCode}
+                  setPostalCode={setPostalCodeWithConstruct}
+                  fieldErrors={fieldErrors}
+                  clearFieldError={clearFieldError}
+                  getCurrentLocation={getCurrentLocation}
+                  searchAddress={searchAddress}
+                  reverseGeocode={reverseGeocode}
+                />
               ) : (
                 <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border }] }>
                   <Ionicons name="location-outline" size={20} color={colors.text.secondary} />
