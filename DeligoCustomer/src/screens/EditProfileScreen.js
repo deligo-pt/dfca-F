@@ -32,13 +32,13 @@ const EditProfileScreen = ({ navigation, route }) => {
 
   // Redux
   const dispatch = useAppDispatch();
-  const contactNumber = useAppSelector((state) => state.contactInfo);
   // === profile ===
-  const { data, isLoading, isFetching } = useGetLoginUserQuery({});
+  const { data, isLoading, isFetching, refetch } = useGetLoginUserQuery({});
   const [updateProfile, { isLoading: isLoadingUpdate, isSuccess, error }] =
     useUpdateProfileMutation();
 
   const user = data?.data;
+  const userId = user?.userId;
   console.log("user: ", user);
 
   const { edited, isProfileUpdated } = useAppSelector((state) => state.profile);
@@ -95,8 +95,6 @@ const EditProfileScreen = ({ navigation, route }) => {
         return;
       }
 
-      console.log("Changed fields to send:", changes);
-
       // Prepare image file for FormData if exists
       let imageFile = null;
       if (changes.profilePhoto) {
@@ -115,18 +113,18 @@ const EditProfileScreen = ({ navigation, route }) => {
       }
 
       // Call the API
-      /*  const result = await updateProfile({
+      const result = await updateProfile({
+        customerId: userId,
         imageFile,
         profileData: changes,
-      }).unwrap(); */
-      console.log("Profile update changes:", changes);
-      console.log("Profile update imageFile:", imageFile);
+      }).unwrap();
 
-      /* if (result.success || result.data?.success) {
+      if (result.success || result.data?.success) {
         Alert.alert("Profile updated successfully!");
         dispatch(resetProfileChanges());
         setIsEditing(false);
-      } */
+        refetch();
+      }
     } catch (err) {
       console.error("Update failed:", err);
       Alert.alert("Update failed!", "Please try again.");
@@ -218,7 +216,7 @@ const EditProfileScreen = ({ navigation, route }) => {
       >
         {/* Avatar */}
         <Avatar
-          uri={profilePhoto || user?.profilePhoto}
+          uri={user?.profilePhoto || profilePhoto}
           isEditing={isEditing}
           colors={colors}
           onChangePhoto={() => {
@@ -332,6 +330,23 @@ const EditProfileScreen = ({ navigation, route }) => {
             )
           }
           placeholder="State"
+          iconName="location-outline"
+          disabled={!isEditing}
+        />
+
+        {/* POSTAL CODE */}
+        <FormInput
+          label="postalCode"
+          value={edited.address?.postalCode}
+          onChangeText={(text) =>
+            dispatch(
+              updateField({
+                key: "address",
+                value: { ...edited.address, postalCode: text },
+              })
+            )
+          }
+          placeholder="postalCode"
           iconName="location-outline"
           disabled={!isEditing}
         />

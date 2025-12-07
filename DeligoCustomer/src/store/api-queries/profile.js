@@ -12,7 +12,7 @@ const profileApi = apiSlice.injectEndpoints({
     }),
     // === Update Profile ===
     updateProfile: builder.mutation({
-      query: ({ imageFile, profileData }) => {
+      query: ({ customerId, imageFile, profileData }) => {
         // profileData is an object containing name, contactNumber, address etc.
 
         const formData = new FormData();
@@ -30,7 +30,7 @@ const profileApi = apiSlice.injectEndpoints({
         formData.append("data", JSON.stringify(profileData));
 
         return {
-          url: "/profile",
+          url: `/customers/${customerId}`,
           method: "PATCH",
           body: formData,
           headers: {
