@@ -64,8 +64,6 @@ const EditProfileScreen = ({ navigation, route }) => {
   });
   console.log("user?.profilePhoto", edit.profilePhoto);
 
-  const [isUpdateEnabled, setUpdateEnabled] = useState(false);
-
   // Load API data into Redux
   useEffect(() => {
     if (user) {
@@ -74,36 +72,79 @@ const EditProfileScreen = ({ navigation, route }) => {
   }, [user]);
 
   const handleSave = async () => {
-    console.log("FINAL DATA TO UPDATE:", edited);
-    setIsEditing(false);
-    dispatch(resetProfileChanges());
-
-    const profileData = {
-      name: { firstName: "Nishk", lastName: "VKLLL" },
-      contactNumber: "+8801712241050",
-      address: {
-        street: "Rua de São Bento 121",
-        city: "Lisbon",
-        state: "Lisbon",
-        country: "Portugal",
-        postalCode: "1200-820",
-        latitude: 38.716173,
-        longitude: -9.141589,
-        geoAccuracy: 5,
-      },
-    };
+    if (!edited || !user) return;
 
     try {
-      const result = await updateProfile({
-        imageFile: edit.profilePhoto, // object from ImagePicker { uri, type, name }
-        profileData,
-      }).unwrap();
+      const changes = {};
 
-      if (result.data.success) {
-        Alert.alert("Profile Update Successfully!!");
+      // Helper function to detect nested changes
+      const getChanges = (orig, edit) => {
+        const result = {};
+        Object.keys(edit).forEach((key) => {
+          const editValue = edit[key];
+          const origValue = orig[key];
+
+          if (
+            typeof editValue === "object" &&
+            editValue !== null &&
+            !Array.isArray(editValue)
+          ) {
+            const nested = getChanges(origValue || {}, editValue);
+            if (Object.keys(nested).length > 0) result[key] = nested;
+          } else if (editValue !== origValue) {
+            result[key] = editValue;
+          }
+        });
+        return result;
+      };
+
+      Object.assign(changes, getChanges(user, edited));
+
+      // Include profilePhoto if it changed
+      if (edited.profilePhoto && edited.profilePhoto !== user?.profilePhoto) {
+        changes.profilePhoto = edited.profilePhoto;
+      }
+
+      if (Object.keys(changes).length === 0) {
+        console.log("No changes detected");
+        Alert.alert("No changes detected");
+        return;
+      }
+
+      console.log("Changed fields to send:", changes);
+
+      // Prepare image file for FormData if exists
+      let imageFile = null;
+      if (changes.profilePhoto) {
+        const uriParts = changes.profilePhoto.split("/");
+        const fileName = uriParts[uriParts.length - 1];
+        const fileType = `image/${fileName.split(".").pop()}`;
+
+        imageFile = {
+          uri: changes.profilePhoto,
+          name: fileName,
+          type: fileType,
+        };
+
+        // Remove from profileData since it's sent as file
+        delete changes.profilePhoto;
+      }
+
+      // Call the API
+      const result = await updateProfile({
+        imageFile,
+        profileData: changes,
+      }).unwrap();
+      console.log("Profile update result:", result);
+
+      if (result.success || result.data?.success) {
+        Alert.alert("Profile updated successfully!");
+        dispatch(resetProfileChanges());
+        setIsEditing(false);
       }
     } catch (err) {
       console.error("Update failed:", err);
+      Alert.alert("Update failed!", "Please try again.");
     }
   };
 
@@ -111,8 +152,6 @@ const EditProfileScreen = ({ navigation, route }) => {
 
   const pickImage = async () => {
     const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    console.log("Permission:", status);
-
     if (status !== "granted") {
       alert("Permission required!");
       return;
@@ -125,18 +164,18 @@ const EditProfileScreen = ({ navigation, route }) => {
       quality: 0.8,
     });
 
-    console.log("Picker result:", result);
-
     if (!result.canceled) {
       const newUri = result.assets[0].uri;
-      setEdited((prev) => ({ ...prev, profilePhoto: newUri }));
-      setIsEditing(true);
+
+      // Update Redux slice edited state
+      dispatch(updateField({ key: "profilePhoto", value: newUri }));
+
       console.log("New image URI:", newUri);
     }
   };
 
   // sensible default address (from user's request)
-  const defaultAddress = {
+  /*  const defaultAddress = {
     city: "Dhaka",
     country: "Bangladesh",
     geoAccuracy: 5,
@@ -198,7 +237,7 @@ const EditProfileScreen = ({ navigation, route }) => {
     } catch (err) {
       console.warn("[EditProfileScreen] loadUserData error", err);
     }
-  };
+  }; */
 
   /* const handleSave = () => {
     // TODO: Implement save functionality
@@ -310,7 +349,7 @@ const EditProfileScreen = ({ navigation, route }) => {
           }
           placeholder="Enter email"
           iconName="mail-outline"
-          disabled={!isEditing}
+          disabled={true}
         />
 
         {/* PHONE */}
@@ -323,7 +362,7 @@ const EditProfileScreen = ({ navigation, route }) => {
           placeholder="Enter phone number"
           keyboardType="phone-pad"
           iconName="call-outline"
-          disabled={!isEditing}
+          disabled={true}
         />
 
         {/* STREET */}
@@ -410,19 +449,9 @@ const EditProfileScreen = ({ navigation, route }) => {
             }}
             onPress={handleSave}
           >
-            {isLoadingUpdate ? (
-              <Text
-                style={{ color: "#fff", textAlign: "center", fontSize: 16 }}
-              >
-                Updating...
-              </Text>
-            ) : (
-              <Text
-                style={{ color: "#fff", textAlign: "center", fontSize: 16 }}
-              >
-                Save Changes
-              </Text>
-            )}
+            <Text style={{ color: "#fff", textAlign: "center", fontSize: 16 }}>
+              {isLoadingUpdate ? "Updating..." : "Save Changes"}
+            </Text>
           </TouchableOpacity>
         )}
       </ScrollView>
