@@ -10,7 +10,37 @@ const profileApi = apiSlice.injectEndpoints({
       }),
       providesTags: ["PROFILE"],
     }),
+    // === Update Profile ===
+    updateProfile: builder.mutation({
+      query: ({ imageFile, profileData }) => {
+        // profileData is an object containing name, contactNumber, address etc.
+
+        const formData = new FormData();
+
+        // Append image file if provided
+        if (imageFile) {
+          formData.append("file", {
+            uri: imageFile.uri, // e.g., from ImagePicker
+            name: imageFile.name || "profile.jpg",
+            type: imageFile.type || "image/jpeg",
+          });
+        }
+
+        // Append other data as JSON string
+        formData.append("data", JSON.stringify(profileData));
+
+        return {
+          url: "/profile",
+          method: "PATCH",
+          body: formData,
+          headers: {
+            "Content-Type": "multipart/form-data",
+          },
+        };
+      },
+      invalidatesTags: ["PROFILE"], // optionally refetch profile
+    }),
   }),
 });
 
-export const { useGetLoginUserQuery } = profileApi;
+export const { useGetLoginUserQuery, useUpdateProfileMutation } = profileApi;

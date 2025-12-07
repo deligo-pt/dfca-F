@@ -19,7 +19,10 @@ import { LocationDetails } from "../components/Profile";
 import { useAppDispatch, useAppSelector } from "../store/store";
 import FormInput from "../components/Profile/FormInput";
 import { setContact } from "../store/state-management/map";
-import { useGetLoginUserQuery } from "../store/api-queries/profile";
+import {
+  useGetLoginUserQuery,
+  useUpdateProfileMutation,
+} from "../store/api-queries/profile";
 import GlobalLoader from "../components/GlobalLoader";
 import {
   resetProfileChanges,
@@ -45,6 +48,8 @@ const EditProfileScreen = ({ navigation, route }) => {
   const contactNumber = useAppSelector((state) => state.contactInfo);
   // === profile ===
   const { data, isLoading, isFetching } = useGetLoginUserQuery({});
+  const [updateProfile, { isLoading: isLoadingUpdate, isSuccess, error }] =
+    useUpdateProfileMutation();
 
   const user = data?.data;
   console.log("user: ", user);
@@ -57,7 +62,7 @@ const EditProfileScreen = ({ navigation, route }) => {
   const [edit, setEdited] = useState({
     profilePhoto: user?.profilePhoto,
   });
-  console.log("edit", edit.profilePhoto);
+  console.log("user?.profilePhoto", edit.profilePhoto);
 
   const [isUpdateEnabled, setUpdateEnabled] = useState(false);
 
@@ -68,10 +73,38 @@ const EditProfileScreen = ({ navigation, route }) => {
     }
   }, [user]);
 
-  const handleSave = () => {
+  const handleSave = async () => {
     console.log("FINAL DATA TO UPDATE:", edited);
     setIsEditing(false);
     dispatch(resetProfileChanges());
+
+    const profileData = {
+      name: { firstName: "Nishk", lastName: "VKLLL" },
+      contactNumber: "+8801712241050",
+      address: {
+        street: "Rua de São Bento 121",
+        city: "Lisbon",
+        state: "Lisbon",
+        country: "Portugal",
+        postalCode: "1200-820",
+        latitude: 38.716173,
+        longitude: -9.141589,
+        geoAccuracy: 5,
+      },
+    };
+
+    try {
+      const result = await updateProfile({
+        imageFile: edit.profilePhoto, // object from ImagePicker { uri, type, name }
+        profileData,
+      }).unwrap();
+
+      if (result.data.success) {
+        Alert.alert("Profile Update Successfully!!");
+      }
+    } catch (err) {
+      console.error("Update failed:", err);
+    }
   };
 
   if (!edited) return null;
@@ -377,9 +410,19 @@ const EditProfileScreen = ({ navigation, route }) => {
             }}
             onPress={handleSave}
           >
-            <Text style={{ color: "#fff", textAlign: "center", fontSize: 16 }}>
-              Save Changes
-            </Text>
+            {isLoadingUpdate ? (
+              <Text
+                style={{ color: "#fff", textAlign: "center", fontSize: 16 }}
+              >
+                Updating...
+              </Text>
+            ) : (
+              <Text
+                style={{ color: "#fff", textAlign: "center", fontSize: 16 }}
+              >
+                Save Changes
+              </Text>
+            )}
           </TouchableOpacity>
         )}
       </ScrollView>
