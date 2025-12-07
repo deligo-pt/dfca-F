@@ -31,7 +31,9 @@
       "icon": "./src/assets/icon.png",
       "infoPlist": {
         "UIViewControllerBasedStatusBarAppearance": false,
-        "UIStatusBarStyle": "UIStatusBarStyleLightContent"
+        "UIStatusBarStyle": "UIStatusBarStyleLightContent",
+        "NSPhotoLibraryUsageDescription": "Allow Deligo to access your photo library to select profile pictures.",
+        "NSCameraUsageDescription": "Allow Deligo to access your camera to take profile pictures."
       },
       "config": {
         "googleMapsApiKey": "AIzaSyCZ1jixNYbSRM21Uq82a6KXNO_FSpLUwaQ"
@@ -55,7 +57,10 @@
       },
       "permissions": [
         "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
+        "ACCESS_COARSE_LOCATION",
+        "CAMERA",
+        "READ_EXTERNAL_STORAGE",
+        "WRITE_EXTERNAL_STORAGE"
       ],
       "config": {
         "googleMaps": {
