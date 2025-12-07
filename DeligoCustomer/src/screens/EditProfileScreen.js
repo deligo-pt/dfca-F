@@ -5,20 +5,14 @@ import {
   StyleSheet,
   ScrollView,
   TouchableOpacity,
-  TextInput,
   Alert,
-  Image,
-  Button,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
 import { useTheme } from "../utils/ThemeContext";
-import { getUserData } from "../utils/auth";
 import { useLanguage } from "../utils/LanguageContext";
-import { LocationDetails } from "../components/Profile";
 import { useAppDispatch, useAppSelector } from "../store/store";
 import FormInput from "../components/Profile/FormInput";
-import { setContact } from "../store/state-management/map";
 import {
   useGetLoginUserQuery,
   useUpdateProfileMutation,
@@ -35,13 +29,6 @@ import * as ImagePicker from "expo-image-picker";
 const EditProfileScreen = ({ navigation, route }) => {
   const { t } = useLanguage();
   const { colors } = useTheme();
-  const [name, setName] = useState("");
-  const [email, setEmail] = useState("");
-  const [mobile, setMobile] = useState("");
-  // Address object state: show and optionally edit address details
-  const [address, setAddress] = useState(null);
-  // const [isEditing, setIsEditing] = useState(false);
-  const [profilePhoto, setProfilePhoto] = useState(null);
 
   // Redux
   const dispatch = useAppDispatch();
@@ -57,12 +44,9 @@ const EditProfileScreen = ({ navigation, route }) => {
   const { edited, isProfileUpdated } = useAppSelector((state) => state.profile);
 
   const [isEditing, setIsEditing] = useState(false);
-
-  // photo picker state
-  const [edit, setEdited] = useState({
-    profilePhoto: user?.profilePhoto,
-  });
-  console.log("user?.profilePhoto", edit.profilePhoto);
+  const profilePhoto = useAppSelector(
+    (state) => state.profile.edited.profilePhoto
+  );
 
   // Load API data into Redux
   useEffect(() => {
@@ -131,17 +115,18 @@ const EditProfileScreen = ({ navigation, route }) => {
       }
 
       // Call the API
-      const result = await updateProfile({
+      /*  const result = await updateProfile({
         imageFile,
         profileData: changes,
-      }).unwrap();
-      console.log("Profile update result:", result);
+      }).unwrap(); */
+      console.log("Profile update changes:", changes);
+      console.log("Profile update imageFile:", imageFile);
 
-      if (result.success || result.data?.success) {
+      /* if (result.success || result.data?.success) {
         Alert.alert("Profile updated successfully!");
         dispatch(resetProfileChanges());
         setIsEditing(false);
-      }
+      } */
     } catch (err) {
       console.error("Update failed:", err);
       Alert.alert("Update failed!", "Please try again.");
@@ -173,77 +158,6 @@ const EditProfileScreen = ({ navigation, route }) => {
       console.log("New image URI:", newUri);
     }
   };
-
-  // sensible default address (from user's request)
-  /*  const defaultAddress = {
-    city: "Dhaka",
-    country: "Bangladesh",
-    geoAccuracy: 5,
-    latitude: 23.7808875,
-    longitude: 90.4165875,
-    postalCode: "1212",
-    state: "Badda",
-    street: "House 32, Road 14",
-  };
-
-  useEffect(() => {
-    loadUserData();
-  }, []);
-
-  const loadUserData = async () => {
-    try {
-      // Prefer route param if available (when navigating from profile card)
-      const routeUser = route?.params?.user;
-      if (routeUser) {
-        // derive name safely from possible shapes
-        const derivedName = `${
-          routeUser.name?.firstName ||
-          routeUser.firstName ||
-          routeUser.name ||
-          routeUser.fullName ||
-          ""
-        } ${routeUser.name?.lastName || routeUser.lastName || ""}`.trim();
-        setName(derivedName || routeUser.displayName || "");
-        setEmail(routeUser.email || routeUser.contactEmail || "");
-        setMobile(
-          routeUser.contactNumber || routeUser.phone || routeUser.mobile || ""
-        );
-        setProfilePhoto(
-          routeUser.profilePhoto ||
-            routeUser.photo ||
-            routeUser.avatar ||
-            routeUser.photoUrl ||
-            routeUser.avatarUrl ||
-            null
-        );
-        // set address if present on route user, otherwise use provided default
-        setAddress(routeUser.address || routeUser.location || defaultAddress);
-        return;
-      }
-
-      const userData = await getUserData();
-      setName(userData?.name || "");
-      setEmail(userData?.email || "");
-      setMobile(userData?.mobile || "");
-      setProfilePhoto(
-        userData?.profilePhoto ||
-          userData?.photo ||
-          userData?.avatarUrl ||
-          userData?.avatar ||
-          null
-      );
-      // prefer explicit address property, fall back to defaultAddress
-      setAddress(userData?.address || userData?.location || defaultAddress);
-    } catch (err) {
-      console.warn("[EditProfileScreen] loadUserData error", err);
-    }
-  }; */
-
-  /* const handleSave = () => {
-    // TODO: Implement save functionality
-    Alert.alert(t("success"), t("profileUpdated"));
-    setIsEditing(false);
-  }; */
 
   return (
     <SafeAreaView
@@ -282,8 +196,14 @@ const EditProfileScreen = ({ navigation, route }) => {
         >
           {t("editProfile")}
         </Text>
+
         <TouchableOpacity
-          onPress={() => setIsEditing(!isEditing)}
+          onPress={() => {
+            if (isEditing) {
+              dispatch(resetProfileChanges());
+            }
+            setIsEditing(!isEditing);
+          }}
           style={styles.editButton}
         >
           <Text style={[styles.editButtonText, { color: colors.primary }]}>
@@ -298,7 +218,7 @@ const EditProfileScreen = ({ navigation, route }) => {
       >
         {/* Avatar */}
         <Avatar
-          uri={edit?.profilePhoto}
+          uri={profilePhoto || user?.profilePhoto}
           isEditing={isEditing}
           colors={colors}
           onChangePhoto={() => {

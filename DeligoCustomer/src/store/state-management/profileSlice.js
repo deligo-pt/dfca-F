@@ -30,10 +30,20 @@ const profileSlice = createSlice({
       state.edited = state.original;
       state.isProfileUpdated = false;
     },
+
+    updateProfilePhoto(state, action) {
+      state.edited.profilePhoto = action.payload;
+      state.isProfileUpdated =
+        JSON.stringify(state.original) !== JSON.stringify(state.edited);
+    },
   },
 });
 
-export const { setOriginalProfile, updateField, resetProfileChanges } =
-  profileSlice.actions;
+export const {
+  setOriginalProfile,
+  updateField,
+  resetProfileChanges,
+  updateProfilePhoto,
+} = profileSlice.actions;
 
 export default profileSlice.reducer;
