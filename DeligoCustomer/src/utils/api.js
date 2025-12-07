@@ -149,7 +149,7 @@ customerApi.interceptors.response.use(
       return refreshPromise;
     }
 
-    return Promise.reject(error.response && error.response.data ? error.response.data : error);
+    return Promise.reject(error);
   },
 );
 

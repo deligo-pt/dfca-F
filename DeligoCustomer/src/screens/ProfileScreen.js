@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, StyleSheet, ScrollView, Animated } from 'react-native';
+import React, { useState, useRef, useCallback } from 'react';
+import { View, StyleSheet, ScrollView, Animated, RefreshControl } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../utils/ThemeContext';
 import { getUserData, logoutUser } from '../utils/auth';
@@ -15,6 +15,7 @@ import ReferralBanner from '../components/Profile/ReferralBanner';
 import LogoutButton from '../components/Profile/LogoutButton';
 import ProfileSection from '../components/Profile/ProfileSection';
 import AppVersionText from '../components/Profile/AppVersionText'; // Import the new AppVersionText component
+import { useFocusEffect } from '@react-navigation/native';
 
 const ProfileScreen = ({ onLogout, navigation }) => {
   const { t } = useLanguage();
@@ -27,17 +28,20 @@ const ProfileScreen = ({ onLogout, navigation }) => {
   const [modalOnConfirm, setModalOnConfirm] = useState(null);
   const [modalOnlyConfirm, setModalOnlyConfirm] = useState(false);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const [refreshing, setRefreshing] = useState(false);
 
   // Animation values for logout button
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
-  useEffect(() => {
-    loadUserData();
-  }, []);
+  useFocusEffect(
+    useCallback(() => {
+      loadUserData();
+    }, [])
+  );
 
   const loadUserData = async () => {
     const userData = await getUserData();
-    setUser(userData);
+    setUser(JSON.parse(JSON.stringify(userData)));
   };
 
   const showModal = (title, message, onConfirm = null, onlyConfirm = false) => {
@@ -114,12 +118,21 @@ const ProfileScreen = ({ onLogout, navigation }) => {
     );
   };
 
+  const onRefresh = async () => {
+    setRefreshing(true);
+    await loadUserData();
+    setRefreshing(false);
+  };
+
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: Math.max(100, insets.bottom + 90) }]}
           showsVerticalScrollIndicator={false}
+          refreshControl={
+            <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
+          }
         >
           {/* Header - Scrolls with content */}
           <ProfileHeader />

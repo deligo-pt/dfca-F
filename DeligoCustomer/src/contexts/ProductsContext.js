@@ -190,8 +190,9 @@ export const ProductsProvider = ({ children }) => {
                        const tryHeaders2 = { ...headers };
                        // remove Authorization if present
                        delete tryHeaders2.Authorization;
+                       tryHeaders2['x-access-token'] = newAccess;
                        try {
-                         console.debug('[ProductsContext] Retry attempt with x-access-token (prefix shown)');
+                         console.debug('[ProductsContext] Retry attempt with x-access-token');
                          retryRes = await doGet(url, tryHeaders2);
                          const bodyText2 = await retryRes.clone().text().catch(() => null);
                          console.debug('[ProductsContext] Retry GET status (x-access-token)', retryRes.status, 'body:', bodyText2 ? (bodyText2.length > 200 ? bodyText2.slice(0,200) + '...' : bodyText2) : '<empty>');

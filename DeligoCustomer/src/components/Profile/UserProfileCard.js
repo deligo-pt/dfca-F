@@ -7,12 +7,9 @@ import { useTheme } from '../../utils/ThemeContext';
 import { useLanguage } from '../../utils/LanguageContext';
 const API_URL = `${BASE_API_URL}${API_ENDPOINTS.PROFILE.GET}`;
 
-// Add logout URL constant
 const LOGOUT_URL = `${BASE_API_URL}${API_ENDPOINTS.AUTH.LOGOUT}`;
 
-// Logout API helper functions
 export const logoutApi = async (authToken, refreshToken) => {
-    // Helper to perform one fetch attempt
     const doAttempt = async (attemptName, headersObj, bodyObj) => {
         try {
             const response = await fetch(LOGOUT_URL, {
@@ -40,11 +37,9 @@ export const logoutApi = async (authToken, refreshToken) => {
         }
     };
 
-    // Normalize tokens
     const rawAuth = authToken || '';
     const bearerAuth = rawAuth && rawAuth.startsWith('Bearer ') ? rawAuth : rawAuth ? `Bearer ${rawAuth}` : undefined;
 
-    // Define attempt variants in order of preference
     const attempts = [
         {
             name: 'bearer-header+body-refresh',
@@ -86,22 +81,17 @@ export const logoutApi = async (authToken, refreshToken) => {
     let lastErr = null;
     for (let i = 0; i < attempts.length; i++) {
         const a = attempts[i];
-        // skip attempts that have neither headers nor body (unlikely) but allow
         const res = await doAttempt(a.name, a.headers, a.body);
         if (res.success) return res;
 
-        // If unauthorized, try next variant
         if (res.status === 401) {
-            console.warn(`[auth] logout attempt ${a.name} returned 401`);
             lastErr = res;
             continue;
         }
 
-        // For other errors, return immediately (network issues or 4xx/5xx other than 401)
         return res;
     }
 
-    // If we exhausted attempts, return last error or a generic failure
     return lastErr || { success: false, message: 'Logout failed after retries' };
 };
 
@@ -111,28 +101,23 @@ export const performLogout = async () => {
         const authToken = await getAccessToken();
         const refreshToken = await getRefreshToken();
 
-        // Call the logout API
         apiResult = await logoutApi(authToken, refreshToken);
 
-        // Log the attempt for debugging
         if (apiResult) {
             console.warn('[auth] logout result', { attempt: apiResult.attempt, status: apiResult.status, success: apiResult.success });
         }
 
-        // Regardless of API result, remove tokens and user data from storage to ensure local logout
         await removeAccessToken();
         await removeRefreshToken();
         await removeUser();
 
         return apiResult || { success: true };
     } catch (error) {
-        // Attempt to clear storage even if something threw
         try {
             await removeAccessToken();
             await removeRefreshToken();
             await removeUser();
         } catch (e) {
-            // ignore
         }
         return { success: false, error: error.message || String(error) };
     }
@@ -146,7 +131,6 @@ export default function UserProfileCard({ user: userProp, navigation }) {
     const [error, setError] = useState(null);
 
     useEffect(() => {
-        // If user prop is provided, no need to fetch; otherwise fetch from API
         if (userProp) return;
 
         const fetchProfile = async () => {
@@ -159,7 +143,6 @@ export default function UserProfileCard({ user: userProp, navigation }) {
 
                 console.log('Hitting API:', API_URL);
                 console.log('With Auth Token:', authToken);
-                // Avoid logging full refresh token in production; mask for dev debugging
                 console.log('Refresh Token (masked):', refreshToken ? `${refreshToken.slice(0,6)}...${refreshToken.slice(-4)}` : null);
 
                 const response = await fetch(API_URL, {
@@ -178,7 +161,7 @@ export default function UserProfileCard({ user: userProp, navigation }) {
 
                 const json = await response.json();
                 console.log('resposnejson', json);
-                setProfile(json.data); // store only the "data" part
+                setProfile(json.data);
 
             } catch (err) {
                 setError(err.message || 'Something went wrong');
@@ -188,6 +171,14 @@ export default function UserProfileCard({ user: userProp, navigation }) {
         };
 
         fetchProfile();
+    }, [userProp]);
+
+    useEffect(() => {
+        if (userProp) {
+            setProfile(userProp);
+            setLoading(false);
+            setError(null);
+        }
     }, [userProp]);
 
     if (loading) {
@@ -216,7 +207,6 @@ export default function UserProfileCard({ user: userProp, navigation }) {
         );
     }
 
-    // Determine avatar source - try common fields then fallback to local image
     const avatarUri = profile.avatar || profile.profilePhoto || profile.image || null;
     const avatarSource = avatarUri ? { uri: avatarUri } : require('../../assets/images/logonew.png');
 
@@ -230,7 +220,6 @@ export default function UserProfileCard({ user: userProp, navigation }) {
                 <Image source={avatarSource} style={[styles.avatar, { borderColor: colors?.border || 'transparent' }]} />
             </View>
 
-            {/* Right content: info stacked above a long button */}
             <View style={styles.contentColumn}>
                 <View style={styles.info}>
                     <View style={styles.nameRow}>
@@ -245,7 +234,6 @@ export default function UserProfileCard({ user: userProp, navigation }) {
 
                 <View style={[styles.divider, { backgroundColor: colors?.border || '#eee' }]} />
 
-                {/* Long button stretched across the content area inside the card */}
                 {navigation && (
                     <TouchableOpacity
                         onPress={() => navigation.navigate('EditProfile', { user: profile })}
@@ -303,7 +291,6 @@ const styles = StyleSheet.create({
         marginRight: 12,
         justifyContent: 'center',
         alignItems: 'center',
-        // iOS shadow
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.12,
         shadowRadius: 6,

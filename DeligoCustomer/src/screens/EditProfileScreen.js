@@ -1,13 +1,16 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Alert, Image } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
-import { getUserData } from '../utils/auth';
+import { getUserData, saveUserData } from '../utils/auth';
 import { useLanguage } from '../utils/LanguageContext';
 import LocationDetails from '../components/Profile/LocationDetails';
 import * as Location from 'expo-location';
 import Constants from 'expo-constants';
+import { customerApi } from '../utils/api';
+import Config from '../constants/config';
+import CustomModal from '../components/CustomModal';
 
 const EditProfileScreen = ({ navigation, route }) => {
   const { t } = useLanguage();
@@ -15,12 +18,13 @@ const EditProfileScreen = ({ navigation, route }) => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
-  // Address object state: show and optionally edit address details
   const [address, setAddress] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState(null);
+  const [userData, setUserDataState] = useState(null);
+  const [modalVisible, setModalVisible] = useState(false);
+  const [modalConfig, setModalConfig] = useState({ title: '', message: '', onConfirm: null, onlyConfirm: false });
 
-  // sensible default address (from user's request)
   const defaultAddress = {
     city: 'Dhaka',
     country: 'Bangladesh',
@@ -32,7 +36,6 @@ const EditProfileScreen = ({ navigation, route }) => {
     street: 'House 32, Road 14',
   };
 
-  // Location details state
   const [isMapFullScreen, setIsMapFullScreen] = useState(false);
   const [mapRegion, setMapRegion] = useState({
     latitude: defaultAddress.latitude,
@@ -52,19 +55,17 @@ const EditProfileScreen = ({ navigation, route }) => {
   const [postalCode, setPostalCode] = useState(defaultAddress.postalCode);
   const [fieldErrors, setFieldErrors] = useState({});
 
-  // Function to construct address object from individual fields
   const constructAddressFromFields = () => {
     const newAddress = {
       street: streetAddress || '',
       city: city || '',
-      state: defaultAddress.state, // Use default state since it's not editable in the form
-      country: defaultAddress.country, // Use default country since it's not editable in the form
+      state: defaultAddress.state,
+      country: defaultAddress.country,
       postalCode: postalCode || '',
       latitude: markerCoordinate.latitude,
       longitude: markerCoordinate.longitude,
       geoAccuracy: 5,
     };
-    console.log('🏗️ Constructed address from fields:', newAddress);
     setAddress(newAddress);
   };
 
@@ -74,19 +75,20 @@ const EditProfileScreen = ({ navigation, route }) => {
 
   const loadUserData = async () => {
     try {
-      // Prefer route param if available (when navigating from profile card)
       const routeUser = route?.params?.user;
+
       if (routeUser) {
-        // derive name safely from possible shapes
+        setUserDataState(routeUser);
+
         const derivedName = `${(routeUser.name?.firstName || routeUser.firstName || routeUser.name || routeUser.fullName || '')} ${(routeUser.name?.lastName || routeUser.lastName || '')}`.trim();
         setName(derivedName || routeUser.displayName || '');
         setEmail(routeUser.email || routeUser.contactEmail || '');
         setMobile(routeUser.contactNumber || routeUser.phone || routeUser.mobile || '');
         setProfilePhoto(routeUser.profilePhoto || routeUser.photo || routeUser.avatar || routeUser.photoUrl || routeUser.avatarUrl || null);
-        // set address if present on route user, otherwise use provided default
+
         const addr = routeUser.address || routeUser.location || defaultAddress;
         setAddress(addr);
-        // Update location details state
+
         setMapRegion({
           latitude: addr.latitude || defaultAddress.latitude,
           longitude: addr.longitude || defaultAddress.longitude,
@@ -103,15 +105,16 @@ const EditProfileScreen = ({ navigation, route }) => {
         return;
       }
 
-      const userData = await getUserData();
-      setName(userData?.name || '');
-      setEmail(userData?.email || '');
-      setMobile(userData?.mobile || '');
-      setProfilePhoto(userData?.profilePhoto || userData?.photo || userData?.avatarUrl || userData?.avatar || null);
-      // prefer explicit address property, fall back to defaultAddress
-      const addr = userData?.address || userData?.location || defaultAddress;
+      const localUserData = await getUserData();
+      setUserDataState(localUserData);
+      setName(localUserData?.name ? `${localUserData.name.firstName} ${localUserData.name.lastName}`.trim() : '');
+      setEmail(localUserData?.email || '');
+      setMobile(localUserData?.contactNumber || '');
+      setProfilePhoto(localUserData?.profilePhoto || localUserData?.photo || localUserData?.avatarUrl || localUserData?.avatar || null);
+
+      const addr = localUserData?.address || localUserData?.location || defaultAddress;
       setAddress(addr);
-      // Update location details state
+
       setMapRegion({
         latitude: addr.latitude || defaultAddress.latitude,
         longitude: addr.longitude || defaultAddress.longitude,
@@ -130,10 +133,131 @@ const EditProfileScreen = ({ navigation, route }) => {
     }
   };
 
-  const handleSave = () => {
-    // TODO: Implement save functionality
-    Alert.alert(t('success'), t('profileUpdated'));
-    setIsEditing(false);
+  const showModal = (title, message, onConfirm = null, onlyConfirm = false) => {
+    setModalConfig({ title, message, onConfirm, onlyConfirm });
+    setModalVisible(true);
+  };
+
+  const updateProfile = async (profileData, imageFile = null, userInfo = null) => {
+    try {
+      const currentUser = userInfo || await getUserData();
+      const customerId = currentUser?.userId || currentUser?.id || currentUser?._id;
+
+      if (!customerId) {
+        console.error('No customer ID found:', currentUser);
+        throw new Error('Customer ID not found. Please log in again.');
+      }
+
+      const formData = new FormData();
+
+      const nameParts = name.trim().split(' ');
+      const firstName = nameParts[0] || '';
+      const lastName = nameParts.slice(1).join(' ') || '';
+
+      const updatedProfileData = {
+        name: { firstName, lastName },
+        contactNumber: mobile,
+        ...profileData,
+      };
+
+      formData.append('data', JSON.stringify(updatedProfileData));
+
+      if (imageFile && imageFile.uri) {
+        formData.append('file', {
+          uri: imageFile.uri,
+          type: imageFile.type || 'image/jpeg',
+          name: imageFile.name || `profile-${Date.now()}.jpg`
+        });
+      }
+
+      console.log('Updating profile for customer:', customerId);
+      console.log('Profile data:', updatedProfileData);
+
+      const response = await customerApi.patch(
+        `/customers/${customerId}`,
+        formData,
+        {
+          headers: {
+            'Content-Type': 'multipart/form-data',
+          },
+          timeout: 30000,
+        }
+      );
+
+      console.log('Profile updated successfully');
+      return response;
+
+    } catch (error) {
+      console.error('Profile update failed:', error);
+
+      if (error.response) {
+        const status = error.response.status;
+        const message = error.response.data?.message || error.response.data?.error;
+
+        if (status === 401) {
+          throw new Error('Session expired. Please log in again.');
+        } else if (status === 404) {
+          throw new Error('Customer profile not found.');
+        } else if (status >= 500) {
+          throw new Error('Server error. Please try again later.');
+        } else {
+          throw new Error(message || 'Failed to update profile');
+        }
+      } else if (error.request) {
+        throw new Error('Network error. Please check your connection.');
+      } else {
+        throw new Error(error.message || 'An unexpected error occurred');
+      }
+    }
+  };
+
+  const handleSave = async () => {
+    try {
+      if (!name.trim()) {
+        showModal('Error', 'Please enter your full name', null, true);
+        return;
+      }
+
+      if (!mobile.trim()) {
+        showModal('Error', 'Please enter your mobile number', null, true);
+        return;
+      }
+
+      if (!address) {
+        showModal('Error', 'Please provide your address', null, true);
+        return;
+      }
+      // Send the update to the server
+      await updateProfile({ address }, profilePhoto, userData);
+
+      // After a successful API call, manually update the local user data.
+      // This is more reliable than depending on the API response body.
+      const currentLocalUser = await getUserData();
+      const nameParts = name.trim().split(' ');
+      const updatedUser = {
+          ...currentLocalUser,
+          name: {
+              firstName: nameParts[0] || '',
+              lastName: nameParts.slice(1).join(' ') || ''
+          },
+          contactNumber: mobile,
+          address: address,
+          profilePhoto: profilePhoto || currentLocalUser.profilePhoto,
+      };
+
+      // Save the merged user object back to storage.
+      await saveUserData(updatedUser);
+
+      showModal(t('success'), t('profileUpdated'), () => {
+        setModalVisible(false);
+        setIsEditing(false);
+        navigation.goBack();
+      }, true);
+
+    } catch (error) {
+      console.error('Save failed:', error);
+      showModal('Error', error.message || 'Failed to save changes', null, true);
+    }
   };
 
   const clearFieldError = (field) => {
@@ -145,7 +269,7 @@ const EditProfileScreen = ({ navigation, route }) => {
     try {
       let { status } = await Location.requestForegroundPermissionsAsync();
       if (status !== 'granted') {
-        Alert.alert('Permission Denied', 'Location permission is required to get current location.');
+        showModal('Permission Denied', 'Location permission is required to get current location.', null, true);
         setIsLoadingLocation(false);
         return;
       }
@@ -162,7 +286,7 @@ const EditProfileScreen = ({ navigation, route }) => {
       await reverseGeocode(latitude, longitude);
     } catch (error) {
       console.error('Error getting location:', error);
-      Alert.alert('Error', 'Failed to get current location.');
+      showModal('Error', 'Failed to get current location.', null, true);
     } finally {
       setIsLoadingLocation(false);
     }
@@ -170,53 +294,39 @@ const EditProfileScreen = ({ navigation, route }) => {
 
   const searchAddress = async () => {
     if (!searchLocation.trim()) return;
+
     setIsLoadingLocation(true);
     try {
-      // Get Google Maps API key from app config
       const googleMapsApiKey = Constants.expoConfig?.ios?.config?.googleMapsApiKey ||
                               Constants.expoConfig?.android?.config?.googleMaps?.apiKey;
 
       if (!googleMapsApiKey) {
-        Alert.alert('Error', 'Google Maps API key not configured');
+        showModal('Error', 'Google Maps API key not configured', null, true);
         return;
       }
 
-      console.log('🔍 Searching for address:', searchLocation);
-
-      // Step 1: Use Google Places API Text Search to find places
       const textSearchResponse = await fetch(
         `https://maps.googleapis.com/maps/api/place/textsearch/json?query=${encodeURIComponent(searchLocation)}&key=${googleMapsApiKey}`
       );
 
       const textSearchData = await textSearchResponse.json();
-      console.log('📡 Google Places Text Search Response:', textSearchData);
 
       if (textSearchData.status === 'OK' && textSearchData.results && textSearchData.results.length > 0) {
         const place = textSearchData.results[0];
         const placeId = place.place_id;
         const { lat, lng } = place.geometry.location;
 
-        console.log('📍 Selected place from text search:', place);
-        console.log('📍 Place ID:', placeId);
-
-        // Step 2: Get detailed place information including address_components
         const placeDetailsResponse = await fetch(
           `https://maps.googleapis.com/maps/api/place/details/json?place_id=${placeId}&fields=address_components,formatted_address,geometry,name&key=${googleMapsApiKey}`
         );
 
         const placeDetailsData = await placeDetailsResponse.json();
-        console.log('📋 Google Places Details Response:', placeDetailsData);
 
-        let detailedPlace = place; // fallback to text search result
+        let detailedPlace = place;
         if (placeDetailsData.status === 'OK' && placeDetailsData.result) {
           detailedPlace = placeDetailsData.result;
-          console.log('📍 Detailed place with address components:', detailedPlace);
         }
 
-        console.log('📍 Place geometry:', detailedPlace.geometry);
-        console.log('📍 Place address components:', detailedPlace.address_components);
-
-        // Update map region and marker
         setMapRegion({
           latitude: lat,
           longitude: lng,
@@ -225,10 +335,8 @@ const EditProfileScreen = ({ navigation, route }) => {
         });
         setMarkerCoordinate({ latitude: lat, longitude: lng });
 
-        // Update address fields - keep it simple, just use formatted address for street
         setStreetAddress(detailedPlace.formatted_address || detailedPlace.name || '');
 
-        // Extract only city and postal code - no building number extraction needed
         let cityComponent = null;
         let postalComponent = null;
 
@@ -240,43 +348,33 @@ const EditProfileScreen = ({ navigation, route }) => {
             component.types.includes('postal_code')
           );
 
-          console.log('🏙️ City component:', cityComponent);
-          console.log('📮 Postal component:', postalComponent);
-
           if (cityComponent) {
             setCity(cityComponent.long_name);
           }
           if (postalComponent) {
             setPostalCode(postalComponent.long_name);
           }
-        } else {
-          console.log('⚠️ No address components available from Place Details API');
         }
 
-        // Update the main address state - simple structure as requested
         const updatedAddress = {
           street: detailedPlace.formatted_address || detailedPlace.name || '',
           city: cityComponent?.long_name || 'Dhaka',
-          state: 'Badda', // Default state
-          country: 'Bangladesh', // Default country
+          state: 'Badda',
+          country: 'Bangladesh',
           postalCode: postalComponent?.long_name || '1212',
           latitude: lat,
           longitude: lng,
           geoAccuracy: 5,
         };
 
-        console.log('📝 Updated address object:', updatedAddress);
         setAddress(updatedAddress);
-
-        // Clear search input
         setSearchLocation('');
       } else {
-        console.log('❌ No results found for query:', searchLocation);
-        Alert.alert('No Results', 'No places found for the search query. Please try a different search term.');
+        showModal('No Results', 'No places found. Please try a different search.', null, true);
       }
     } catch (error) {
-      console.error('❌ Error searching address:', error);
-      Alert.alert('Error', 'Failed to search for the address. Please try again.');
+      console.error('Address search error:', error);
+      showModal('Error', 'Failed to search for the address. Please try again.', null, true);
     } finally {
       setIsLoadingLocation(false);
     }
@@ -287,22 +385,11 @@ const EditProfileScreen = ({ navigation, route }) => {
       let addresses = await Location.reverseGeocodeAsync({ latitude, longitude });
       if (addresses && addresses.length > 0) {
         const addr = addresses[0];
-        console.log('🔄 Reverse geocoded address:', addr);
 
         setStreetAddress(addr.street || '');
         setCity(addr.city || '');
         setPostalCode(addr.postalCode || '');
 
-        // Use streetNumber from Expo Location API if available
-        if (addr.streetNumber) {
-          setStreetNumber(addr.streetNumber);
-          console.log('🏠 Street number from GPS:', addr.streetNumber);
-        }
-
-        // Note: Expo Location API provides streetNumber but NOT building/suite numbers
-        // Building/suite numbers are only available from Google Places API (subpremise component)
-
-        // Update address state
         setAddress(prev => ({
           ...prev,
           street: addr.street || prev?.street || '',
@@ -312,7 +399,7 @@ const EditProfileScreen = ({ navigation, route }) => {
           country: addr.country || prev?.country || '',
           latitude,
           longitude,
-          geoAccuracy: 5, // Default accuracy value
+          geoAccuracy: 5,
         }));
       }
     } catch (error) {
@@ -320,10 +407,8 @@ const EditProfileScreen = ({ navigation, route }) => {
     }
   };
 
-  // Custom setters that also construct address object
   const setStreetAddressWithConstruct = (value) => {
     setStreetAddress(value);
-    // Delay to allow state update, then construct address
     setTimeout(constructAddressFromFields, 0);
   };
 
@@ -344,8 +429,7 @@ const EditProfileScreen = ({ navigation, route }) => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }] }>
+      <View style={[styles.header, { backgroundColor: colors.background, borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
@@ -356,9 +440,8 @@ const EditProfileScreen = ({ navigation, route }) => {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Avatar Section */}
         <View style={[styles.avatarSection, { backgroundColor: colors.background }]}>
-          <View style={[styles.avatarContainer, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }] }>
+          <View style={[styles.avatarContainer, { backgroundColor: colors.surface, borderWidth: 1, borderColor: colors.border }]}>
             {profilePhoto ? (
               <Image source={{ uri: profilePhoto }} style={styles.avatarImage} resizeMode="cover" />
             ) : (
@@ -375,7 +458,6 @@ const EditProfileScreen = ({ navigation, route }) => {
           )}
         </View>
 
-        {/* Form Fields */}
         <View style={[styles.formSection, { backgroundColor: colors.background }]}>
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.text.primary }]}>{t('fullName')}</Text>
@@ -424,11 +506,9 @@ const EditProfileScreen = ({ navigation, route }) => {
             </View>
           </View>
 
-          {/* Address Section */}
           <View style={styles.inputGroup}>
             <Text style={[styles.label, { color: colors.text.primary }]}>{t('address')}</Text>
             {address ? (
-              // show editable fields when editing, otherwise a read-only formatted view
               isEditing ? (
                 <LocationDetails
                   colors={colors}
@@ -455,7 +535,7 @@ const EditProfileScreen = ({ navigation, route }) => {
                   reverseGeocode={reverseGeocode}
                 />
               ) : (
-                <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border }] }>
+                <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                   <Ionicons name="location-outline" size={20} color={colors.text.secondary} />
                   <Text style={[styles.input, { color: colors.text.primary }]}>
                     {`${address.street || ''}${address.street ? ', ' : ''}${address.city || ''}${address.state ? ', ' : ''}${address.state || ''}${address.postalCode ? ' - ' : ''}${address.postalCode || ''}${address.country ? ', ' : ''}${address.country || ''}`}
@@ -463,22 +543,31 @@ const EditProfileScreen = ({ navigation, route }) => {
                 </View>
               )
             ) : (
-              <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border }] }>
+              <View style={[styles.inputContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
                 <Ionicons name="location-outline" size={20} color={colors.text.secondary} />
                 <Text style={[styles.input, { color: colors.text.light }]}>{t('noAddress')}</Text>
               </View>
             )}
           </View>
-
         </View>
 
-        {/* Save Button */}
         {isEditing && (
           <TouchableOpacity style={[styles.saveButton, { backgroundColor: colors.primary, shadowColor: colors.primary }]} onPress={handleSave}>
             <Text style={[styles.saveButtonText, { color: colors.text.white }]}>{t('saveChanges')}</Text>
           </TouchableOpacity>
         )}
       </ScrollView>
+      <CustomModal
+        visible={modalVisible}
+        title={modalConfig.title}
+        message={modalConfig.message}
+        onConfirm={() => {
+          if (modalConfig.onConfirm) modalConfig.onConfirm();
+          else setModalVisible(false);
+        }}
+        onlyConfirm={modalConfig.onlyConfirm}
+        confirmText="OK"
+      />
     </SafeAreaView>
   );
 };
@@ -512,7 +601,7 @@ const styles = StyleSheet.create({
     textAlign: 'center',
   },
   editButton: {
-    minWidth: 88, // allow longer localized labels like "Cancelar"
+    minWidth: 88,
     paddingHorizontal: 12,
     alignItems: 'flex-end',
     justifyContent: 'center',
@@ -554,7 +643,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 8,
     borderRadius: 20,
-    // backgroundColor set via theme in JSX
   },
   changePhotoText: {
     fontSize: 14,
@@ -578,12 +666,10 @@ const styles = StyleSheet.create({
   inputContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    // backgroundColor set via theme in JSX
     borderRadius: 12,
     paddingHorizontal: 16,
     paddingVertical: 12,
     borderWidth: 1,
-    // borderColor set via theme in JSX
   },
   input: {
     flex: 1,
