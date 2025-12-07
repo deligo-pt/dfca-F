@@ -436,7 +436,6 @@ const EditProfileScreen = ({ navigation, route }) => {
     }
     const result = await ImagePicker.launchCameraAsync({
       allowsEditing: true,
-      aspect: [1, 1],
       quality: 0.5,
     });
     if (!result.canceled) {
@@ -453,7 +452,6 @@ const EditProfileScreen = ({ navigation, route }) => {
     }
     const result = await ImagePicker.launchImageLibraryAsync({
       allowsEditing: true,
-      aspect: [1, 1],
       quality: 0.5,
     });
     if (!result.canceled) {
