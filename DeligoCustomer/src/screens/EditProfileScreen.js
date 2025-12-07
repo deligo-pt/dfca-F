@@ -8,6 +8,7 @@ import {
   TextInput,
   Alert,
   Image,
+  Button,
 } from "react-native";
 import { SafeAreaView } from "react-native-safe-area-context";
 import { Ionicons } from "@expo/vector-icons";
@@ -26,6 +27,7 @@ import {
   updateField,
 } from "../store/state-management/profileSlice";
 import Avatar from "../components/Profile/FormAvatar";
+import * as ImagePicker from "expo-image-picker";
 
 const EditProfileScreen = ({ navigation, route }) => {
   const { t } = useLanguage();
@@ -51,9 +53,12 @@ const EditProfileScreen = ({ navigation, route }) => {
 
   const [isEditing, setIsEditing] = useState(false);
 
+  // photo picker state
   const [edit, setEdited] = useState({
     profilePhoto: user?.profilePhoto,
   });
+  console.log("edit", edit.profilePhoto);
+
   const [isUpdateEnabled, setUpdateEnabled] = useState(false);
 
   // Load API data into Redux
@@ -92,7 +97,7 @@ const EditProfileScreen = ({ navigation, route }) => {
     if (!result.canceled) {
       const newUri = result.assets[0].uri;
       setEdited((prev) => ({ ...prev, profilePhoto: newUri }));
-      setUpdateEnabled(true);
+      setIsEditing(true);
       console.log("New image URI:", newUri);
     }
   };
@@ -174,6 +179,7 @@ const EditProfileScreen = ({ navigation, route }) => {
       edges={["top"]}
     >
       {(isLoading || isFetching) && <GlobalLoader visible={isLoading} />}
+
       {/* Header */}
       <View
         style={[
@@ -220,11 +226,10 @@ const EditProfileScreen = ({ navigation, route }) => {
       >
         {/* Avatar */}
         <Avatar
-          uri={edited.profilePhoto}
-          isEditing={true}
+          uri={edit?.profilePhoto}
+          isEditing={isEditing}
           colors={colors}
           onChangePhoto={() => {
-            console.log("Avatar button pressed");
             pickImage();
           }}
         />
