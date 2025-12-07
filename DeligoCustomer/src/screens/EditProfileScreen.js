@@ -20,6 +20,12 @@ import FormInput from "../components/Profile/FormInput";
 import { setContact } from "../store/state-management/map";
 import { useGetLoginUserQuery } from "../store/api-queries/profile";
 import GlobalLoader from "../components/GlobalLoader";
+import {
+  resetProfileChanges,
+  setOriginalProfile,
+  updateField,
+} from "../store/state-management/profileSlice";
+import Avatar from "../components/Profile/FormAvatar";
 
 const EditProfileScreen = ({ navigation, route }) => {
   const { t } = useLanguage();
@@ -29,7 +35,7 @@ const EditProfileScreen = ({ navigation, route }) => {
   const [mobile, setMobile] = useState("");
   // Address object state: show and optionally edit address details
   const [address, setAddress] = useState(null);
-  const [isEditing, setIsEditing] = useState(false);
+  // const [isEditing, setIsEditing] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState(null);
 
   // Redux
@@ -40,6 +46,56 @@ const EditProfileScreen = ({ navigation, route }) => {
 
   const user = data?.data;
   console.log("user: ", user);
+
+  const { edited, isProfileUpdated } = useAppSelector((state) => state.profile);
+
+  const [isEditing, setIsEditing] = useState(false);
+
+  const [edit, setEdited] = useState({
+    profilePhoto: user?.profilePhoto,
+  });
+  const [isUpdateEnabled, setUpdateEnabled] = useState(false);
+
+  // Load API data into Redux
+  useEffect(() => {
+    if (user) {
+      dispatch(setOriginalProfile(user));
+    }
+  }, [user]);
+
+  const handleSave = () => {
+    console.log("FINAL DATA TO UPDATE:", edited);
+    setIsEditing(false);
+    dispatch(resetProfileChanges());
+  };
+
+  if (!edited) return null;
+
+  const pickImage = async () => {
+    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+    console.log("Permission:", status);
+
+    if (status !== "granted") {
+      alert("Permission required!");
+      return;
+    }
+
+    const result = await ImagePicker.launchImageLibraryAsync({
+      mediaTypes: ImagePicker.MediaTypeOptions.Images,
+      allowsEditing: true,
+      aspect: [1, 1],
+      quality: 0.8,
+    });
+
+    console.log("Picker result:", result);
+
+    if (!result.canceled) {
+      const newUri = result.assets[0].uri;
+      setEdited((prev) => ({ ...prev, profilePhoto: newUri }));
+      setUpdateEnabled(true);
+      console.log("New image URI:", newUri);
+    }
+  };
 
   // sensible default address (from user's request)
   const defaultAddress = {
@@ -106,11 +162,11 @@ const EditProfileScreen = ({ navigation, route }) => {
     }
   };
 
-  const handleSave = () => {
+  /* const handleSave = () => {
     // TODO: Implement save functionality
     Alert.alert(t("success"), t("profileUpdated"));
     setIsEditing(false);
-  };
+  }; */
 
   return (
     <SafeAreaView
@@ -159,214 +215,165 @@ const EditProfileScreen = ({ navigation, route }) => {
       </View>
 
       <ScrollView
-        contentContainerStyle={styles.content}
         showsVerticalScrollIndicator={false}
+        contentContainerStyle={{ padding: 20 }}
       >
-        {/* Avatar Section */}
-        <View
-          style={[styles.avatarSection, { backgroundColor: colors.background }]}
-        >
-          <View
-            style={[
-              styles.avatarContainer,
-              {
-                backgroundColor: colors.surface,
-                borderWidth: 1,
-                borderColor: colors.border,
-              },
-            ]}
-          >
-            {profilePhoto ? (
-              <Image
-                source={{ uri: profilePhoto }}
-                style={styles.avatarImage}
-                resizeMode="cover"
-              />
-            ) : (
-              <Text style={[styles.avatarText, { color: colors.text.white }]}>
-                {name?.charAt(0)?.toUpperCase() || "U"}
-              </Text>
-            )}
-          </View>
-          {isEditing && (
-            <TouchableOpacity
-              style={[
-                styles.changePhotoButton,
-                {
-                  backgroundColor: colors.surface,
-                  borderColor: colors.border,
-                  borderWidth: 1,
-                },
-              ]}
-            >
-              <Ionicons name="camera" size={20} color={colors.primary} />
-              <Text style={[styles.changePhotoText, { color: colors.primary }]}>
-                {t("changePhoto")}
-              </Text>
-            </TouchableOpacity>
-          )}
-        </View>
+        {/* Avatar */}
+        <Avatar
+          uri={edited.profilePhoto}
+          isEditing={true}
+          colors={colors}
+          onChangePhoto={() => {
+            console.log("Avatar button pressed");
+            pickImage();
+          }}
+        />
 
-        {/* Form Fields */}
-        <View
-          style={[styles.formSection, { backgroundColor: colors.background }]}
-        >
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text.primary }]}>
-              {t("fullName")}
-            </Text>
-            <View
-              style={[
-                styles.inputContainer,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-                isEditing && {
-                  backgroundColor: colors.background,
-                  borderColor: colors.primary,
-                },
-              ]}
-            >
-              <Ionicons
-                name="person-outline"
-                size={20}
-                color={colors.text.secondary}
-              />
-              <TextInput
-                style={[styles.input, { color: colors.text.primary }]}
-                value={name}
-                onChangeText={setName}
-                placeholder={t("enterYourName")}
-                editable={isEditing}
-                placeholderTextColor={colors.text.light}
-              />
-            </View>
-          </View>
-          <View style={styles.inputGroup}>
-            <Text style={[styles.label, { color: colors.text.primary }]}>
-              {t("emailAddress")}
-            </Text>
-            <View
-              style={[
-                styles.inputContainer,
-                { backgroundColor: colors.surface, borderColor: colors.border },
-                isEditing && {
-                  backgroundColor: colors.background,
-                  borderColor: colors.primary,
-                },
-              ]}
-            >
-              <Ionicons
-                name="mail-outline"
-                size={20}
-                color={colors.text.secondary}
-              />
-              <TextInput
-                style={[styles.input, { color: colors.text.primary }]}
-                value={email}
-                onChangeText={setEmail}
-                placeholder={t("enterYourEmail")}
-                keyboardType="email-address"
-                editable={isEditing}
-                placeholderTextColor={colors.text.light}
-              />
-            </View>
-          </View>
+        {/* FIRST NAME */}
+        <FormInput
+          label="First Name"
+          value={edited.name?.firstName}
+          onChangeText={(text) =>
+            dispatch(
+              updateField({
+                key: "name",
+                value: { ...edited.name, firstName: text },
+              })
+            )
+          }
+          placeholder="Enter first name"
+          iconName="person-outline"
+          disabled={!isEditing}
+        />
 
-          {/* reusable user form */}
-          <FormInput
-            label="Mobile number"
-            value={user?.contactNumber}
-            onChangeText={(text) => dispatch(setContact(text))}
-            placeholder={t("enterYourMobileNumber")}
-            keyboardType="phone-pad"
-            iconName="call-outline"
-            disabled={isEditing ? false : true}
-          />
+        {/* LAST NAME */}
+        <FormInput
+          label="Last Name"
+          value={edited.name?.lastName}
+          onChangeText={(text) =>
+            dispatch(
+              updateField({
+                key: "name",
+                value: { ...edited.name, lastName: text },
+              })
+            )
+          }
+          placeholder="Enter last name"
+          iconName="person-circle-outline"
+          disabled={!isEditing}
+        />
 
-          {/* ---------- NAME FIELDS ---------- */}
-          <FormInput
-            label="First Name"
-            value={user?.name?.firstName}
-            onChangeText={() => {}}
-            placeholder="Enter first name"
-            iconName="person-outline"
-            disabled={isEditing ? false : true}
-          />
+        {/* EMAIL */}
+        <FormInput
+          label="Email"
+          value={edited.email}
+          onChangeText={(text) =>
+            dispatch(updateField({ key: "email", value: text }))
+          }
+          placeholder="Enter email"
+          iconName="mail-outline"
+          disabled={!isEditing}
+        />
 
-          <FormInput
-            label="Last Name"
-            value={user?.name?.lastName}
-            onChangeText={() => {}}
-            placeholder="Enter last name"
-            iconName="person-circle-outline"
-            disabled={isEditing ? false : true}
-          />
+        {/* PHONE */}
+        <FormInput
+          label="Phone Number"
+          value={edited.contactNumber}
+          onChangeText={(text) =>
+            dispatch(updateField({ key: "contactNumber", value: text }))
+          }
+          placeholder="Enter phone number"
+          keyboardType="phone-pad"
+          iconName="call-outline"
+          disabled={!isEditing}
+        />
 
-          {/* ---------- EMAIL ---------- */}
-          <FormInput
-            label="Email"
-            value={user?.email}
-            onChangeText={() => {}}
-            placeholder="Enter email"
-            keyboardType="email-address"
-            iconName="mail-outline"
-            disabled={isEditing ? false : true}
-          />
+        {/* STREET */}
+        <FormInput
+          label="Street"
+          value={edited.address?.street}
+          onChangeText={(text) =>
+            dispatch(
+              updateField({
+                key: "address",
+                value: { ...edited.address, street: text },
+              })
+            )
+          }
+          placeholder="Street"
+          iconName="home-outline"
+          disabled={!isEditing}
+        />
 
-          {/* ---------- PHONE ---------- */}
-          <FormInput
-            label="Mobile Number"
-            value={user?.contactNumber}
-            onChangeText={() => {}}
-            placeholder="Enter phone number"
-            keyboardType="phone-pad"
-            iconName="call-outline"
-            disabled={isEditing ? false : true}
-          />
+        {/* CITY */}
+        <FormInput
+          label="City"
+          value={edited.address?.city}
+          onChangeText={(text) =>
+            dispatch(
+              updateField({
+                key: "address",
+                value: { ...edited.address, city: text },
+              })
+            )
+          }
+          placeholder="City"
+          iconName="business-outline"
+          disabled={!isEditing}
+        />
 
-          {/* ---------- ADDRESS FIELDS ---------- */}
-          <FormInput
-            label="Street"
-            value={user?.address?.street}
-            onChangeText={() => {}}
-            placeholder="Street address"
-            iconName="home-outline"
-            disabled={isEditing ? false : true}
-          />
+        {/* STATE */}
+        <FormInput
+          label="State"
+          value={edited.address?.state}
+          onChangeText={(text) =>
+            dispatch(
+              updateField({
+                key: "address",
+                value: { ...edited.address, state: text },
+              })
+            )
+          }
+          placeholder="State"
+          iconName="location-outline"
+          disabled={!isEditing}
+        />
 
-          <FormInput
-            label="City"
-            value={user?.address?.city}
-            onChangeText={() => {}}
-            placeholder="City"
-            iconName="business-outline"
-            disabled={isEditing ? false : true}
-          />
+        {/* BUTTONS */}
+        <View style={{ height: 20 }} />
 
-          <FormInput
-            label="State"
-            value={user?.address?.state}
-            onChangeText={() => {}}
-            placeholder="State"
-            iconName="location-outline"
-            disabled={isEditing ? false : true}
-          />
-
-          {/* Location details component */}
-          {isEditing && <LocationDetails />}
-          {/* all values */}
-        </View>
-
-        {/* Save Button */}
-        {isEditing && (
+        {/* EDIT or SAVE */}
+        {!isEditing ? (
           <TouchableOpacity
-            style={[
-              styles.saveButton,
-              { backgroundColor: colors.primary, shadowColor: colors.primary },
-            ]}
+            style={{
+              padding: 15,
+              backgroundColor: colors.primary,
+              borderRadius: 10,
+            }}
+            onPress={() => setIsEditing(true)}
+          >
+            <Text
+              style={{
+                color: colors.text.white,
+                textAlign: "center",
+                fontSize: 16,
+              }}
+            >
+              Edit Profile
+            </Text>
+          </TouchableOpacity>
+        ) : (
+          <TouchableOpacity
+            disabled={!isProfileUpdated}
+            style={{
+              padding: 15,
+              borderRadius: 10,
+              backgroundColor: isProfileUpdated ? colors.primary : "#999",
+            }}
             onPress={handleSave}
           >
-            <Text style={[styles.saveButtonText, { color: colors.text.white }]}>
-              {t("saveChanges")}
+            <Text style={{ color: "#fff", textAlign: "center", fontSize: 16 }}>
+              Save Changes
             </Text>
           </TouchableOpacity>
         )}

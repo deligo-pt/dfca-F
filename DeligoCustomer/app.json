@@ -12,14 +12,8 @@
       "backgroundColor": "#DC3173",
       "resizeMode": "contain"
     },
-    "assetBundlePatterns": [
-      "**/*"
-    ],
-    "platforms": [
-      "ios",
-      "android",
-      "web"
-    ],
+    "assetBundlePatterns": ["**/*"],
+    "platforms": ["ios", "android", "web"],
     "extra": {
       "eas": {
         "projectId": "b53f15eb-427a-4d03-89b6-c99f067ef883"
@@ -53,10 +47,7 @@
         "backgroundColor": "#DC3173",
         "barStyle": "light-content"
       },
-      "permissions": [
-        "ACCESS_FINE_LOCATION",
-        "ACCESS_COARSE_LOCATION"
-      ],
+      "permissions": ["ACCESS_FINE_LOCATION", "ACCESS_COARSE_LOCATION"],
       "config": {
         "googleMaps": {
           "apiKey": "AIzaSyCZ1jixNYbSRM21Uq82a6KXNO_FSpLUwaQ"
@@ -81,12 +72,10 @@
           "locationAlwaysAndWhenInUsePermission": "Allow Deligo to use your location for order tracking and delivery."
         }
       ],
-      "expo-font",
       [
-        "@stripe/stripe-react-native",
+        "expo-image-picker",
         {
-          "merchantIdentifier": "merchant.com.deligo.customer",
-          "enableGooglePay": true
+          "photosPermission": "Allow the app to access your photos to update your profile picture."
         }
       ]
     ]

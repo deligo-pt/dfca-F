@@ -10,6 +10,7 @@ import {
 import { Ionicons } from "@expo/vector-icons";
 import PropTypes from "prop-types";
 import { useTheme } from "../../utils/ThemeContext";
+import { colors } from "../../theme";
 
 const FormInput = ({
   label,
@@ -25,44 +26,42 @@ const FormInput = ({
   disabled = false,
 }) => {
   const { colors } = useTheme();
+
+  const dynamicStyles = {
+    enabledContainer: {
+      borderColor: colors.primary,
+      backgroundColor: colors.background,
+    },
+    disabledContainer: {
+      borderColor: "#ddd",
+      backgroundColor: "#f3f3f3",
+      opacity: 0.6,
+    },
+  };
+
   return (
     <View style={[styles.inputGroup, style]}>
-      {label ? <Text style={styles.label}>{label}</Text> : null}
+      {label && <Text style={styles.label}>{label}</Text>}
 
       <View
         style={[
           styles.inputContainer,
-          disabled && styles.disabledContainer,
-          !disabled && {
-            backgroundColor: colors.background,
-            borderColor: colors.primary,
-          },
+          disabled
+            ? dynamicStyles.disabledContainer
+            : dynamicStyles.enabledContainer,
         ]}
       >
-        {iconName ? (
-          iconOnPress ? (
-            <TouchableOpacity
-              onPress={iconOnPress}
-              disabled={disabled}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              <Ionicons name={iconName} size={20} color="#666" />
-            </TouchableOpacity>
-          ) : (
-            <Ionicons name={iconName} size={20} color="#666" />
-          )
-        ) : null}
+        {iconName && <Ionicons name={iconName} size={20} color="#666" />}
 
         <TextInput
-          style={[styles.input, disabled && styles.disabledText]}
+          style={[styles.input]}
           value={value}
           onChangeText={onChangeText}
           placeholder={placeholder}
           keyboardType={keyboardType}
           secureTextEntry={secureTextEntry}
           placeholderTextColor={placeholderTextColor}
-          underlineColorAndroid="transparent"
-          editable={!disabled} // <-- FIXED
+          editable={!disabled}
         />
       </View>
     </View>
@@ -95,7 +94,7 @@ const styles = StyleSheet.create({
     marginBottom: 8,
   },
 
-  inputContainer: {
+  /* inputContainer: {
     flexDirection: "row",
     alignItems: "center",
     borderRadius: 12,
@@ -103,7 +102,7 @@ const styles = StyleSheet.create({
     paddingVertical: 12,
     borderWidth: 1,
     borderColor: "#ccc",
-  },
+  }, */
 
   input: {
     flex: 1,
@@ -111,5 +110,25 @@ const styles = StyleSheet.create({
     fontFamily: "Poppins-Regular",
     marginLeft: 12,
     color: "#000",
+  },
+
+  inputContainer: {
+    flexDirection: "row",
+    alignItems: "center",
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    borderWidth: 1,
+  },
+
+  enabledContainer: {
+    borderColor: colors.primary,
+    backgroundColor: colors.background,
+  },
+
+  disabledContainer: {
+    borderColor: "#ddd",
+    backgroundColor: "#f3f3f3",
+    opacity: 0.6,
   },
 });
