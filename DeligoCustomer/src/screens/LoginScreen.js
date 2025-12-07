@@ -11,6 +11,8 @@ import {
   Animated,
   Easing,
   Image,
+  Modal,
+  ActivityIndicator,
 } from 'react-native';
 import { sendOTP, verifyOTP, saveUserData } from '../utils/auth';
 import CountryPicker from 'react-native-country-picker-modal';
@@ -19,15 +21,17 @@ import OTPInput from '../components/OTPInput';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
 import { setAccessToken } from '../utils/storage';
+import { Ionicons } from '@expo/vector-icons';
 
 const LOGO = require('../assets/images/logo.png'); // Transparent logo icon
 
 const LoginScreen = ({ onLoginSuccess, navigation }) => {
-  const { t } = useLanguage();
-  const { colors } = useTheme();
+  const { t, language, changeLanguage } = useLanguage();
+  const { colors, isDarkMode } = useTheme();
   const BRAND_PINK = colors.primary;
   const GRAY = colors.text.secondary;
   const INFO_BG = colors.surface;
+  const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [loginMethod, setLoginMethod] = useState('mobile');
   const [identifier, setIdentifier] = useState('');
   const [otp, setOtp] = useState('');
@@ -299,6 +303,22 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
                 </TouchableOpacity>
               </View>
             )}
+
+            {/* Language Selection Button (inspired design) */}
+            <Animated.View style={{ opacity: cardAnim }}>
+              <TouchableOpacity
+                style={[styles.languageButton, { borderColor: colors.border }]}
+                onPress={() => setShowLanguageModal(true)}
+                disabled={isLoading}
+                activeOpacity={0.7}
+              >
+                <Ionicons name="globe-outline" size={20} color={colors.text.secondary} />
+                <Text style={[styles.languageButtonText, { color: colors.text.secondary }]}>
+                  {language === 'en' ? 'English' : 'Português'}
+                </Text>
+                <Ionicons name="chevron-down-outline" size={16} color={colors.text.secondary} />
+              </TouchableOpacity>
+            </Animated.View>
           </Animated.View>
 
           {/* Footer */}
@@ -331,207 +351,365 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
           onCancel={() => setModalVisible(false)}
           onlyConfirm={modalOnlyConfirm}
         />
-      </View>
-    </KeyboardAvoidingView>
-  );
-};
 
-const styles = StyleSheet.create({
-  gradientBg: {
-    flex: 1,
-    position: 'relative',
-  },
-  scrollContent: {
-    flexGrow: 1,
-    justifyContent: 'center',
-    padding: 24,
-    minHeight: '100%',
-  },
-  header: {
-    alignItems: 'center',
-    marginBottom: 32,
-    zIndex: 2,
-  },
-  logoImageModern: {
-    width: 80,
-    height: 80,
-    marginBottom: 10,
-    borderRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.10,
-    shadowRadius: 8,
-    elevation: 4,
-  },
-  logoText: {
-    fontSize: 32,
-    fontWeight: 'bold',
-    marginBottom: 2,
-    letterSpacing: 1.2,
-    fontFamily: 'Poppins-Bold',
-  },
-  tagline: {
-    fontSize: 15,
-    fontWeight: '500',
-    marginBottom: 2,
-    fontFamily: 'Poppins-Regular',
-  },
-  formCard: {
-    borderRadius: 24,
-    padding: 24,
-    marginHorizontal: 0,
-    marginBottom: 32,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.05,
-    shadowRadius: 20,
-    elevation: 8,
-    zIndex: 2,
-  },
-  title: {
-    fontSize: 22,
-    fontWeight: 'bold',
-    marginBottom: 6,
-    textAlign: 'center',
-    fontFamily: 'Poppins-Bold',
-  },
-  subtitle: {
-    fontSize: 15,
-    marginBottom: 18,
-    textAlign: 'center',
-    fontFamily: 'Poppins-Regular',
-  },
-  tabs: {
-    flexDirection: 'row',
-    borderRadius: 12,
-    marginBottom: 18,
-    overflow: 'hidden',
-  },
-  tab: {
-    flex: 1,
-    paddingVertical: 10,
-    alignItems: 'center',
-    borderRadius: 12,
-  },
-  tabText: {
-    fontSize: 15,
-    fontWeight: '600',
-    fontFamily: 'Poppins-Regular',
-  },
-  inputContainer: {
-    marginBottom: 8,
-  },
-  inputRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 12,
-  },
-  countryPicker: {
-    marginRight: 4,
-  },
-  countryCodeText: {
-    fontSize: 15,
-    fontWeight: '600',
-    marginRight: 8,
-  },
-  input: {
-    borderWidth: 1,
-    borderRadius: 12,
-    padding: 14,
-    fontSize: 16,
-    marginBottom: 12,
-    fontFamily: 'Poppins-Regular',
-  },
-  button: {
-    paddingVertical: 14,
-    borderRadius: 12,
-    alignItems: 'center',
-    marginTop: 2,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.18,
-    shadowRadius: 12,
-    elevation: 4,
-  },
-  buttonDisabled: {
-    opacity: 0.6,
-  },
-  buttonText: {
-    color: '#fff',
-    fontSize: 16,
-    fontWeight: '600',
-    letterSpacing: 0.5,
-    fontFamily: 'Poppins-Regular',
-  },
-  resendContainer: {
-    flexDirection: 'row',
-    justifyContent: 'center',
-    marginTop: 8,
-  },
-  resendText: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Regular',
-  },
-  resendLink: {
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: 'Poppins-Regular',
-  },
-  changeButton: {
-    marginTop: 8,
-    alignItems: 'center',
-  },
-  changeButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: 'Poppins-Regular',
-  },
-  infoBanner: {
-    borderColor: '#FFECB3',
-    borderWidth: 1,
-    borderRadius: 10,
-    padding: 12,
-    marginTop: 16,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  infoText: {
-    fontSize: 14,
-    flex: 1,
-    fontFamily: 'Poppins-Regular',
-  },
-  infoClose: {
-    marginLeft: 12,
-    padding: 2,
-  },
-  footerWrap: {
-    marginTop: 32,
-    alignItems: 'center',
-  },
-  divider: {
-    height: 1,
-    width: '100%',
-    marginBottom: 18,
-  },
-  footer: {
-    alignItems: 'center',
-    flexDirection: 'row',
-    flexWrap: 'wrap',
-    justifyContent: 'center',
-  },
-  footerText: {
-    fontSize: 13,
-    fontFamily: 'Poppins-Regular',
-  },
-  footerLinks: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  footerLink: {
-    fontSize: 13,
-    fontWeight: '600',
-    fontFamily: 'Poppins-Regular',
-  },
-});
+      {/* Language Selection Modal */}
+      <Modal
+        visible={showLanguageModal}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setShowLanguageModal(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setShowLanguageModal(false)}
+        >
+          <View style={[styles.languageModal, { backgroundColor: colors.surface }]}>
+            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+              <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
+                {t('selectLanguage') || 'Select Language'}
+              </Text>
+              <TouchableOpacity
+                onPress={() => setShowLanguageModal(false)}
+                style={styles.closeButton}
+              >
+                <Ionicons name="close" size={24} color={colors.text.primary} />
+              </TouchableOpacity>
+            </View>
 
-export default LoginScreen;
+            <View style={styles.languageList}>
+              {[
+                { code: 'en', name: 'English', flag: '🇬🇧' },
+                { code: 'pt', name: 'Português', flag: '🇵🇹' },
+              ].map((lang) => (
+                <TouchableOpacity
+                  key={lang.code}
+                  style={[
+                    styles.languageItem,
+                    { backgroundColor: isDarkMode ? colors.background : '#F8F9FA' },
+                    language === lang.code && [
+                      styles.languageItemSelected,
+                      {
+                        borderColor: colors.primary,
+                        backgroundColor: isDarkMode ? colors.card : '#E6F7FF',
+                      }
+                    ]
+                  ]}
+                  onPress={() => {
+                    changeLanguage(lang.code);
+                    setShowLanguageModal(false);
+                  }}
+                  activeOpacity={0.8}
+                >
+                  <Text style={[styles.languageFlag, { color: colors.text.primary }]}>
+                    {lang.flag}
+                  </Text>
+                  <Text style={[
+                    styles.languageName,
+                    { color: colors.text.primary },
+                    language === lang.code && styles.languageNameSelected
+                  ]}>
+                    {lang.name}
+                  </Text>
+                  {language === lang.code && (
+                    <Ionicons
+                      name="checkmark-outline"
+                      size={20}
+                      color={colors.primary}
+                      style={styles.checkmarkIcon}
+                    />
+                  )}
+                </TouchableOpacity>
+              ))}
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+       </View>
+     </KeyboardAvoidingView>
+   );
+ };
+
+ const styles = StyleSheet.create({
+   gradientBg: {
+     flex: 1,
+     position: 'relative',
+   },
+   scrollContent: {
+     flexGrow: 1,
+     justifyContent: 'center',
+     padding: 24,
+     minHeight: '100%',
+   },
+   header: {
+     alignItems: 'center',
+     marginBottom: 32,
+     zIndex: 2,
+   },
+   logoImageModern: {
+     width: 80,
+     height: 80,
+     marginBottom: 10,
+     borderRadius: 24,
+     shadowColor: '#000',
+     shadowOffset: { width: 0, height: 2 },
+     shadowOpacity: 0.10,
+     shadowRadius: 8,
+     elevation: 4,
+   },
+   logoText: {
+     fontSize: 32,
+     fontWeight: 'bold',
+     marginBottom: 2,
+     letterSpacing: 1.2,
+     fontFamily: 'Poppins-Bold',
+   },
+   tagline: {
+     fontSize: 15,
+     fontWeight: '500',
+     marginBottom: 2,
+     fontFamily: 'Poppins-Regular',
+   },
+   formCard: {
+     borderRadius: 24,
+     padding: 24,
+     marginHorizontal: 0,
+     marginBottom: 32,
+     shadowColor: '#000',
+     shadowOffset: { width: 0, height: 4 },
+     shadowOpacity: 0.05,
+     shadowRadius: 20,
+     elevation: 8,
+     zIndex: 2,
+   },
+   title: {
+     fontSize: 22,
+     fontWeight: 'bold',
+     marginBottom: 6,
+     textAlign: 'center',
+     fontFamily: 'Poppins-Bold',
+   },
+   subtitle: {
+     fontSize: 15,
+     marginBottom: 18,
+     textAlign: 'center',
+     fontFamily: 'Poppins-Regular',
+   },
+   tabs: {
+     flexDirection: 'row',
+     borderRadius: 12,
+     marginBottom: 18,
+     overflow: 'hidden',
+   },
+   tab: {
+     flex: 1,
+     paddingVertical: 10,
+     alignItems: 'center',
+     borderRadius: 12,
+   },
+   tabText: {
+     fontSize: 15,
+     fontWeight: '600',
+     fontFamily: 'Poppins-Regular',
+   },
+   inputContainer: {
+     marginBottom: 8,
+   },
+   inputRow: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     marginBottom: 12,
+   },
+   countryPicker: {
+     marginRight: 4,
+   },
+   countryCodeText: {
+     fontSize: 15,
+     fontWeight: '600',
+     marginRight: 8,
+   },
+   input: {
+     borderWidth: 1,
+     borderRadius: 12,
+     padding: 14,
+     fontSize: 16,
+     marginBottom: 12,
+     fontFamily: 'Poppins-Regular',
+   },
+   button: {
+     paddingVertical: 14,
+     borderRadius: 12,
+     alignItems: 'center',
+     marginTop: 2,
+     shadowOffset: { width: 0, height: 4 },
+     shadowOpacity: 0.18,
+     shadowRadius: 12,
+     elevation: 4,
+   },
+   buttonDisabled: {
+     opacity: 0.6,
+   },
+   buttonText: {
+     color: '#fff',
+     fontSize: 16,
+     fontWeight: '600',
+     letterSpacing: 0.5,
+     fontFamily: 'Poppins-Regular',
+   },
+   resendContainer: {
+     flexDirection: 'row',
+     justifyContent: 'center',
+     marginTop: 8,
+   },
+   resendText: {
+     fontSize: 14,
+     fontFamily: 'Poppins-Regular',
+   },
+   resendLink: {
+     fontSize: 14,
+     fontWeight: '600',
+     fontFamily: 'Poppins-Regular',
+   },
+   changeButton: {
+     marginTop: 8,
+     alignItems: 'center',
+   },
+   changeButtonText: {
+     fontSize: 14,
+     fontWeight: '600',
+     fontFamily: 'Poppins-Regular',
+   },
+   infoBanner: {
+     borderColor: '#FFECB3',
+     borderWidth: 1,
+     borderRadius: 10,
+     padding: 12,
+     marginTop: 16,
+     flexDirection: 'row',
+     alignItems: 'center',
+     justifyContent: 'space-between',
+   },
+   infoText: {
+     fontSize: 14,
+     flex: 1,
+     fontFamily: 'Poppins-Regular',
+   },
+   infoClose: {
+     marginLeft: 12,
+     padding: 2,
+   },
+   footerWrap: {
+     marginTop: 32,
+     alignItems: 'center',
+   },
+   divider: {
+     height: 1,
+     width: '100%',
+     marginBottom: 18,
+   },
+   footer: {
+     alignItems: 'center',
+     flexDirection: 'row',
+     flexWrap: 'wrap',
+     justifyContent: 'center',
+   },
+   footerText: {
+     fontSize: 13,
+     fontFamily: 'Poppins-Regular',
+   },
+   footerLinks: {
+     flexDirection: 'row',
+     alignItems: 'center',
+   },
+   footerLink: {
+     fontSize: 13,
+     fontWeight: '600',
+     fontFamily: 'Poppins-Regular',
+   },
+   // Language Button
+   languageButton: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     justifyContent: 'center',
+     paddingVertical: 14,
+     paddingHorizontal: 20,
+     borderRadius: 12,
+     borderWidth: 1,
+     alignSelf: 'center',
+     marginBottom: 24,
+     gap: 8,
+   },
+   languageButtonText: {
+     fontSize: 14,
+     fontFamily: 'Poppins-Regular',
+     marginLeft: 8,
+     marginRight: 4,
+   },
+
+   // Language Modal
+   modalOverlay: {
+     flex: 1,
+     backgroundColor: 'rgba(0, 0, 0, 0.5)',
+     justifyContent: 'center',
+     alignItems: 'center',
+     padding: 20,
+   },
+   languageModal: {
+     width: '100%',
+     maxWidth: 400,
+     borderRadius: 20,
+     overflow: 'hidden',
+   },
+   modalHeader: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     justifyContent: 'space-between',
+     paddingHorizontal: 20,
+     paddingVertical: 18,
+     borderBottomWidth: 1,
+   },
+   modalTitle: {
+     fontSize: 18,
+     fontWeight: '600',
+     fontFamily: 'Poppins-SemiBold',
+   },
+   closeButton: {
+     width: 36,
+     height: 36,
+     borderRadius: 18,
+     justifyContent: 'center',
+     alignItems: 'center',
+   },
+   languageList: {
+     paddingHorizontal: 20,
+     paddingVertical: 16,
+   },
+   languageItem: {
+     flexDirection: 'row',
+     alignItems: 'center',
+     paddingVertical: 16,
+     paddingHorizontal: 16,
+     borderRadius: 14,
+     marginBottom: 10,
+   },
+   languageItemSelected: {
+     borderWidth: 2,
+   },
+   languageFlag: {
+     fontSize: 28,
+     marginRight: 16,
+   },
+   languageName: {
+     fontSize: 16,
+     fontFamily: 'Poppins-Regular',
+     flex: 1,
+   },
+   languageNameSelected: {
+     fontWeight: '700',
+   },
+   checkmarkIcon: {
+     marginLeft: 8,
+   },
+ });
+
+ export default LoginScreen;
