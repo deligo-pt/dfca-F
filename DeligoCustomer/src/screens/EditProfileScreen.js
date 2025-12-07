@@ -59,71 +59,56 @@ const EditProfileScreen = ({ navigation, route }) => {
     if (!edited || !user) return;
 
     try {
-      const changes = {};
+      // Prepare a copy of edited to send
+      const profileData = { ...edited };
 
-      // Helper function to detect nested changes
-      const getChanges = (orig, edit) => {
-        const result = {};
-        Object.keys(edit).forEach((key) => {
-          const editValue = edit[key];
-          const origValue = orig[key];
-
-          if (
-            typeof editValue === "object" &&
-            editValue !== null &&
-            !Array.isArray(editValue)
-          ) {
-            const nested = getChanges(origValue || {}, editValue);
-            if (Object.keys(nested).length > 0) result[key] = nested;
-          } else if (editValue !== origValue) {
-            result[key] = editValue;
-          }
-        });
-        return result;
-      };
-
-      Object.assign(changes, getChanges(user, edited));
-
-      // Include profilePhoto if it changed
-      if (edited.profilePhoto && edited.profilePhoto !== user?.profilePhoto) {
-        changes.profilePhoto = edited.profilePhoto;
-      }
-
-      if (Object.keys(changes).length === 0) {
-        console.log("No changes detected");
-        Alert.alert("No changes detected");
-        return;
-      }
-
-      // Prepare image file for FormData if exists
+      // Prepare imageFile if profile photo changed
       let imageFile = null;
-      if (changes.profilePhoto) {
-        const uriParts = changes.profilePhoto.split("/");
+      if (edited.profilePhoto && edited.profilePhoto !== user?.profilePhoto) {
+        const uriParts = edited.profilePhoto.split("/");
         const fileName = uriParts[uriParts.length - 1];
         const fileType = `image/${fileName.split(".").pop()}`;
 
         imageFile = {
-          uri: changes.profilePhoto,
+          uri: edited.profilePhoto,
           name: fileName,
           type: fileType,
         };
 
         // Remove from profileData since it's sent as file
-        delete changes.profilePhoto;
+        delete profileData.profilePhoto;
+      }
+
+      // Merge nested objects (like address) with original to preserve unchanged fields
+      if (edited.address) {
+        profileData.address = {
+          ...user.address,
+          ...edited.address,
+        };
+      }
+
+      // Detect if anything actually changed
+      const changesExist =
+        JSON.stringify(user) !== JSON.stringify({ ...user, ...profileData });
+
+      if (!changesExist) {
+        console.log("No changes detected");
+        Alert.alert("No changes detected");
+        return;
       }
 
       // Call the API
       const result = await updateProfile({
         customerId: userId,
         imageFile,
-        profileData: changes,
+        profileData,
       }).unwrap();
 
       if (result.success || result.data?.success) {
         Alert.alert("Profile updated successfully!");
         dispatch(resetProfileChanges());
         setIsEditing(false);
-        refetch();
+        refetch(); // refresh user data
       }
     } catch (err) {
       console.error("Update failed:", err);
