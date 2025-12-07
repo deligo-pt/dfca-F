@@ -11,9 +11,16 @@ const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
   const [editedImageUri, setEditedImageUri] = useState(imageUri);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
   const [cropArea, setCropArea] = useState(null);
-  const [isDragging, setIsDragging] = useState(false);
-  const [isResizing, setIsResizing] = useState(false);
-  const [resizeHandle, setResizeHandle] = useState(null);
+
+  // Refs for storing initial values during gestures
+  const startDrag = useRef({ x: 0, y: 0 });
+  const startResize = useRef({ x: 0, y: 0, width: 0, height: 0 });
+  const cropAreaRef = useRef(null);
+
+  // Keep cropAreaRef in sync with cropArea state
+  useEffect(() => {
+    cropAreaRef.current = cropArea;
+  }, [cropArea]);
 
   useEffect(() => {
     if (imageUri) {
@@ -160,133 +167,128 @@ const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
-        setIsDragging(true);
+        if (!cropAreaRef.current) return;
+        startDrag.current = { x: cropAreaRef.current.x, y: cropAreaRef.current.y };
       },
       onPanResponderMove: (e, gestureState) => {
-        if (isDragging) {
-          setCropArea((prev) => ({
-            ...prev,
-            x: prev.x + gestureState.dx,
-            y: prev.y + gestureState.dy,
-          }));
-        }
+        if (!cropAreaRef.current) return;
+        const newX = startDrag.current.x + gestureState.dx;
+        const newY = startDrag.current.y + gestureState.dy;
+        setCropArea({
+          ...cropAreaRef.current,
+          x: newX,
+          y: newY,
+        });
       },
-      onPanResponderRelease: () => {
-        setIsDragging(false);
-      },
+      onPanResponderRelease: () => {},
     })
   ).current;
 
-  // PanResponders for resizing crop area corners
+  // PanResponder for top-left corner
   const topLeftPanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
-        setIsResizing(true);
-        setResizeHandle('topLeft');
+        if (!cropAreaRef.current) return;
+        startResize.current = { ...cropAreaRef.current };
       },
       onPanResponderMove: (e, gestureState) => {
-        if (isResizing && resizeHandle === 'topLeft') {
-          setCropArea((prev) => {
-            const { dx, dy } = gestureState;
-            return {
-              ...prev,
-              x: prev.x + dx,
-              y: prev.y + dy,
-              width: Math.max(50, prev.width - dx),
-              height: Math.max(50, prev.height - dy),
-            };
-          });
-        }
+        if (!cropAreaRef.current) return;
+        const { dx, dy } = gestureState;
+        const newX = startResize.current.x + dx;
+        const newY = startResize.current.y + dy;
+        const newWidth = Math.max(50, startResize.current.width - dx);
+        const newHeight = Math.max(50, startResize.current.height - dy);
+
+        setCropArea({
+          ...cropAreaRef.current,
+          x: newX,
+          y: newY,
+          width: newWidth,
+          height: newHeight,
+        });
       },
-      onPanResponderRelease: () => {
-        setIsResizing(false);
-        setResizeHandle(null);
-      },
+      onPanResponderRelease: () => {},
     })
   ).current;
 
+  // PanResponder for top-right corner
   const topRightPanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
-        setIsResizing(true);
-        setResizeHandle('topRight');
+        if (!cropAreaRef.current) return;
+        startResize.current = { ...cropAreaRef.current };
       },
       onPanResponderMove: (e, gestureState) => {
-        if (isResizing && resizeHandle === 'topRight') {
-          setCropArea((prev) => {
-            const { dx, dy } = gestureState;
-            return {
-              ...prev,
-              y: prev.y + dy,
-              width: Math.max(50, prev.width + dx),
-              height: Math.max(50, prev.height - dy),
-            };
-          });
-        }
+        if (!cropAreaRef.current) return;
+        const { dx, dy } = gestureState;
+        const newY = startResize.current.y + dy;
+        const newWidth = Math.max(50, startResize.current.width + dx);
+        const newHeight = Math.max(50, startResize.current.height - dy);
+
+        setCropArea({
+          ...cropAreaRef.current,
+          y: newY,
+          width: newWidth,
+          height: newHeight,
+        });
       },
-      onPanResponderRelease: () => {
-        setIsResizing(false);
-        setResizeHandle(null);
-      },
+      onPanResponderRelease: () => {},
     })
   ).current;
 
+  // PanResponder for bottom-left corner
   const bottomLeftPanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
-        setIsResizing(true);
-        setResizeHandle('bottomLeft');
+        if (!cropAreaRef.current) return;
+        startResize.current = { ...cropAreaRef.current };
       },
       onPanResponderMove: (e, gestureState) => {
-        if (isResizing && resizeHandle === 'bottomLeft') {
-          setCropArea((prev) => {
-            const { dx, dy } = gestureState;
-            return {
-              ...prev,
-              x: prev.x + dx,
-              width: Math.max(50, prev.width - dx),
-              height: Math.max(50, prev.height + dy),
-            };
-          });
-        }
+        if (!cropAreaRef.current) return;
+        const { dx, dy } = gestureState;
+        const newX = startResize.current.x + dx;
+        const newWidth = Math.max(50, startResize.current.width - dx);
+        const newHeight = Math.max(50, startResize.current.height + dy);
+
+        setCropArea({
+          ...cropAreaRef.current,
+          x: newX,
+          width: newWidth,
+          height: newHeight,
+        });
       },
-      onPanResponderRelease: () => {
-        setIsResizing(false);
-        setResizeHandle(null);
-      },
+      onPanResponderRelease: () => {},
     })
   ).current;
 
+  // PanResponder for bottom-right corner
   const bottomRightPanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
       onMoveShouldSetPanResponder: () => true,
       onPanResponderGrant: () => {
-        setIsResizing(true);
-        setResizeHandle('bottomRight');
+        if (!cropAreaRef.current) return;
+        startResize.current = { ...cropAreaRef.current };
       },
       onPanResponderMove: (e, gestureState) => {
-        if (isResizing && resizeHandle === 'bottomRight') {
-          setCropArea((prev) => {
-            const { dx, dy } = gestureState;
-            return {
-              ...prev,
-              width: Math.max(50, prev.width + dx),
-              height: Math.max(50, prev.height + dy),
-            };
-          });
-        }
+        if (!cropAreaRef.current) return;
+        const { dx, dy } = gestureState;
+        const newWidth = Math.max(50, startResize.current.width + dx);
+        const newHeight = Math.max(50, startResize.current.height + dy);
+
+        setCropArea({
+          ...cropAreaRef.current,
+          width: newWidth,
+          height: newHeight,
+        });
       },
-      onPanResponderRelease: () => {
-        setIsResizing(false);
-        setResizeHandle(null);
-      },
+      onPanResponderRelease: () => {},
     })
   ).current;
 
@@ -357,7 +359,7 @@ const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
                 }]} />
               </View>
 
-              {/* Crop rectangle with handles */}
+              {/* Crop rectangle border */}
               <View
                 style={[
                   styles.cropContainer,
@@ -368,14 +370,28 @@ const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
                     height: cropArea.height,
                   }
                 ]}
+                pointerEvents="box-none"
+              />
+
+              {/* Draggable area (inner transparent box) */}
+              <View
+                style={[
+                  styles.dragArea,
+                  {
+                    left: cropArea.x + 40,
+                    top: cropArea.y + 40,
+                    width: cropArea.width - 80,
+                    height: cropArea.height - 80,
+                  }
+                ]}
                 {...dragPanResponder.panHandlers}
-              >
-                {/* Corner handles */}
-                <View style={[styles.handle, styles.topLeftHandle]} {...topLeftPanResponder.panHandlers} />
-                <View style={[styles.handle, styles.topRightHandle]} {...topRightPanResponder.panHandlers} />
-                <View style={[styles.handle, styles.bottomLeftHandle]} {...bottomLeftPanResponder.panHandlers} />
-                <View style={[styles.handle, styles.bottomRightHandle]} {...bottomRightPanResponder.panHandlers} />
-              </View>
+              />
+
+              {/* Corner handles - positioned absolutely */}
+              <View style={[styles.handle, styles.topLeftHandle, { left: cropArea.x - 20, top: cropArea.y - 20 }]} {...topLeftPanResponder.panHandlers} />
+              <View style={[styles.handle, styles.topRightHandle, { left: cropArea.x + cropArea.width - 20, top: cropArea.y - 20 }]} {...topRightPanResponder.panHandlers} />
+              <View style={[styles.handle, styles.bottomLeftHandle, { left: cropArea.x - 20, top: cropArea.y + cropArea.height - 20 }]} {...bottomLeftPanResponder.panHandlers} />
+              <View style={[styles.handle, styles.bottomRightHandle, { left: cropArea.x + cropArea.width - 20, top: cropArea.y + cropArea.height - 20 }]} {...bottomRightPanResponder.panHandlers} />
             </>
           )}
         </View>
@@ -503,36 +519,39 @@ const styles = StyleSheet.create({
   },
   cropContainer: {
     position: 'absolute',
-    borderWidth: 2,
-    borderColor: 'transparent',
-    borderRadius: 12,
-    opacity: 0.7,
+    borderWidth: 3,
+    borderColor: '#fff',
+    borderStyle: 'solid',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.8,
+    shadowRadius: 3,
+    elevation: 5,
+  },
+  dragArea: {
+    position: 'absolute',
+    backgroundColor: 'transparent',
   },
   handle: {
     position: 'absolute',
-    width: 20,
-    height: 20,
-    backgroundColor: 'white',
-    borderRadius: 10,
-    borderWidth: 2,
-    borderColor: 'transparent',
+    width: 40,
+    height: 40,
+    backgroundColor: '#fff',
+    borderRadius: 20,
+    borderWidth: 3,
+    borderColor: '#007AFF',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.3,
+    shadowRadius: 3,
+    elevation: 5,
+    justifyContent: 'center',
+    alignItems: 'center',
   },
-  topLeftHandle: {
-    left: -10,
-    top: -10,
-  },
-  topRightHandle: {
-    right: -10,
-    top: -10,
-  },
-  bottomLeftHandle: {
-    left: -10,
-    bottom: -10,
-  },
-  bottomRightHandle: {
-    right: -10,
-    bottom: -10,
-  },
+  topLeftHandle: {},
+  topRightHandle: {},
+  bottomLeftHandle: {},
+  bottomRightHandle: {},
   toolsContainer: {
     paddingVertical: 16,
     paddingHorizontal: 20,
