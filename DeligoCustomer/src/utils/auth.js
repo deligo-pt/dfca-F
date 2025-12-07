@@ -135,13 +135,6 @@ export const verifyOTP = async (identifier, otp, method = "mobile") => {
       : { contactNumber: identifier, otp };
   const response = await customerApi.post("/auth/verify-otp", payload);
 
-  /* if (method === "mobile") {
-    console.log("Mobile OTP verification");
-  }
-  console.log("response: ", response);
-  console.log("identifier: ", identifier);
-  console.log("otp: ", otp); */
-
   // Normalize different backend response shapes
   // Example backend returns: { message: 'CUSTOMER Email verified successfully', data: { accessToken, refreshToken } }
   const accessToken =

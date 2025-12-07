@@ -164,7 +164,6 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
 
     try {
       const response = await verifyOTP(mobileNumber, otp, loginMethod);
-      console.log("responsessssss: ", response);
 
       const accessToken = response?.accessToken;
       const userData = response?.user || null;
