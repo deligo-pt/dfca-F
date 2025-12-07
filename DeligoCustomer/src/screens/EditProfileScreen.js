@@ -11,6 +11,7 @@ import Constants from 'expo-constants';
 import { customerApi } from '../utils/api';
 import CustomModal from '../components/CustomModal';
 import * as ImagePicker from 'expo-image-picker';
+import ImageEditor from '../components/ImageEditor';
 
 const EditProfileScreen = ({ navigation, route }) => {
   const { t } = useLanguage();
@@ -25,6 +26,8 @@ const EditProfileScreen = ({ navigation, route }) => {
   const [modalVisible, setModalVisible] = useState(false);
   const [modalConfig, setModalConfig] = useState({ title: '', message: '', onConfirm: null, onlyConfirm: false });
   const [imagePickerVisible, setImagePickerVisible] = useState(false);
+  const [selectedImageUri, setSelectedImageUri] = useState(null);
+  const [imageEditorVisible, setImageEditorVisible] = useState(false);
 
   const defaultAddress = {
     city: 'Dhaka',
@@ -429,35 +432,70 @@ const EditProfileScreen = ({ navigation, route }) => {
   };
 
   const pickFromCamera = async () => {
-    const { status } = await ImagePicker.requestCameraPermissionsAsync();
-    if (status !== 'granted') {
-      showModal('Permission Denied', 'Camera permission is required to take photos.', null, true);
-      return;
+    try {
+      const { status } = await ImagePicker.requestCameraPermissionsAsync();
+      if (status !== 'granted') {
+        showModal('Permission Denied', 'Camera permission is required to take photos.', null, true);
+        return;
+      }
+      const result = await ImagePicker.launchCameraAsync({
+        allowsEditing: false,
+        quality: 0.8,
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        exif: false,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const imageUri = result.assets[0].uri;
+        console.log('Camera image URI:', imageUri);
+        setSelectedImageUri(imageUri);
+        setImagePickerVisible(false);
+        setImageEditorVisible(true);
+      } else {
+        console.log('Camera cancelled or no image');
+      }
+    } catch (error) {
+      console.error('Camera error:', error);
+      showModal('Error', 'Failed to take photo. Please try again.', null, true);
     }
-    const result = await ImagePicker.launchCameraAsync({
-      allowsEditing: true,
-      quality: 0.5,
-    });
-    if (!result.canceled) {
-      setProfilePhoto(result.assets[0].uri);
-    }
-    setImagePickerVisible(false);
   };
 
   const pickFromGallery = async () => {
-    const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
-    if (status !== 'granted') {
-      showModal('Permission Denied', 'Media library permission is required to select photos.', null, true);
-      return;
+    try {
+      const { status } = await ImagePicker.requestMediaLibraryPermissionsAsync();
+      if (status !== 'granted') {
+        showModal('Permission Denied', 'Media library permission is required to select photos.', null, true);
+        return;
+      }
+      const result = await ImagePicker.launchImageLibraryAsync({
+        allowsEditing: false,
+        quality: 0.8,
+        mediaTypes: ImagePicker.MediaTypeOptions.Images,
+        exif: false,
+      });
+      if (!result.canceled && result.assets && result.assets.length > 0) {
+        const imageUri = result.assets[0].uri;
+        console.log('Gallery image URI:', imageUri);
+        setSelectedImageUri(imageUri);
+        setImagePickerVisible(false);
+        setImageEditorVisible(true);
+      } else {
+        console.log('Gallery cancelled or no image');
+      }
+    } catch (error) {
+      console.error('Gallery error:', error);
+      showModal('Error', 'Failed to select photo. Please try again.', null, true);
     }
-    const result = await ImagePicker.launchImageLibraryAsync({
-      allowsEditing: true,
-      quality: 0.5,
-    });
-    if (!result.canceled) {
-      setProfilePhoto(result.assets[0].uri);
-    }
-    setImagePickerVisible(false);
+  };
+
+  const handleImageEditConfirm = (editedUri) => {
+    setProfilePhoto(editedUri);
+    setSelectedImageUri(null);
+    setImageEditorVisible(false);
+  };
+
+  const handleImageEditCancel = () => {
+    setSelectedImageUri(null);
+    setImageEditorVisible(false);
   };
 
   return (
@@ -607,22 +645,52 @@ const EditProfileScreen = ({ navigation, route }) => {
         animationType="slide"
         onRequestClose={() => setImagePickerVisible(false)}
       >
-        <TouchableOpacity style={styles.modalOverlay} onPress={() => setImagePickerVisible(false)}>
-          <View style={[styles.imagePickerContainer, { backgroundColor: colors.background }]}>
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setImagePickerVisible(false)}
+        >
+          <View
+            style={[styles.imagePickerContainer, { backgroundColor: colors.background }]}
+            onStartShouldSetResponder={() => true}
+          >
+            <View style={styles.imagePickerHeader}>
+              <Text style={[styles.imagePickerTitle, { color: colors.text.primary }]}>
+                Select Photo
+              </Text>
+            </View>
             <TouchableOpacity style={styles.imagePickerOption} onPress={pickFromCamera}>
               <Ionicons name="camera" size={24} color={colors.primary} />
-              <Text style={[styles.imagePickerText, { color: colors.text.primary }]}>Camera</Text>
+              <Text style={[styles.imagePickerText, { color: colors.text.primary }]}>Take Photo</Text>
             </TouchableOpacity>
+            <View style={[styles.separator, { backgroundColor: colors.border }]} />
             <TouchableOpacity style={styles.imagePickerOption} onPress={pickFromGallery}>
               <Ionicons name="images" size={24} color={colors.primary} />
-              <Text style={[styles.imagePickerText, { color: colors.text.primary }]}>Gallery</Text>
+              <Text style={[styles.imagePickerText, { color: colors.text.primary }]}>Choose from Gallery</Text>
             </TouchableOpacity>
+            {profilePhoto && (
+              <>
+                <View style={[styles.separator, { backgroundColor: colors.border }]} />
+                <TouchableOpacity style={styles.imagePickerOption} onPress={() => { setProfilePhoto(null); setImagePickerVisible(false); }}>
+                  <Ionicons name="trash" size={24} color={colors.error || '#ff4444'} />
+                  <Text style={[styles.imagePickerText, { color: colors.text.primary }]}>Remove Current Photo</Text>
+                </TouchableOpacity>
+              </>
+            )}
+            <View style={[styles.separator, { backgroundColor: colors.border }]} />
             <TouchableOpacity style={styles.imagePickerOption} onPress={() => setImagePickerVisible(false)}>
               <Text style={[styles.imagePickerText, { color: colors.text.secondary }]}>Cancel</Text>
             </TouchableOpacity>
           </View>
         </TouchableOpacity>
       </Modal>
+      <ImageEditor
+        visible={imageEditorVisible}
+        imageUri={selectedImageUri}
+        onConfirm={handleImageEditConfirm}
+        onCancel={handleImageEditCancel}
+        colors={colors}
+      />
     </SafeAreaView>
   );
 };
@@ -769,6 +837,17 @@ const styles = StyleSheet.create({
       },
     }),
   },
+  imagePickerHeader: {
+    paddingBottom: 12,
+    borderBottomWidth: 1,
+    borderColor: 'rgba(0, 0, 0, 0.1)',
+    marginBottom: 12,
+  },
+  imagePickerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    fontFamily: 'Poppins-SemiBold',
+  },
   imagePickerOption: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -778,6 +857,11 @@ const styles = StyleSheet.create({
     fontSize: 16,
     fontFamily: 'Poppins-Medium',
     marginLeft: 12,
+  },
+  separator: {
+    height: 1,
+    width: '100%',
+    marginVertical: 8,
   },
 });
 
