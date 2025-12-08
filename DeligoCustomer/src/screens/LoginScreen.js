@@ -11,6 +11,7 @@ import {
   Animated,
   Easing,
   Image,
+  Alert,
 } from "react-native";
 import { sendOTP, verifyOTP, saveUserData } from "../utils/auth";
 import CountryPicker from "react-native-country-picker-modal";
@@ -30,6 +31,7 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
   const INFO_BG = colors.surface;
   const [loginMethod, setLoginMethod] = useState("mobile");
   const [identifier, setIdentifier] = useState("");
+
   const [otp, setOtp] = useState("");
   const [isOtpSent, setIsOtpSent] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -62,8 +64,10 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
     setModalVisible(true);
   };
 
-  const handleSendOtp = async () => {
-    if (!identifier.trim()) {
+  const handleSendOtp = async (method) => {
+    const value = identifier.trim();
+
+    if (!value) {
       showModal(
         t("error"),
         `${t("pleaseEnter")} ${
@@ -72,24 +76,28 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
       );
       return;
     }
+
     if (loginMethod === "mobile") {
-      if (identifier.length < 10) {
+      const mobileRegex = /^\d{10,}$/;
+      if (!mobileRegex.test(value)) {
         showModal(t("error"), t("validMobileNumber"));
         return;
       }
     } else {
-      if (!identifier.includes("@")) {
+      const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/;
+      if (!emailRegex.test(value)) {
         showModal(t("error"), t("validEmailAddress"));
         return;
       }
     }
     setIsLoading(true);
-
-    const mobileNumber = `+${country.callingCode[0] + identifier}`;
+    const code = country?.callingCode?.[0] || "";
+    let emailPhone = method === "email" ? identifier : `+${code}${identifier}`;
 
     try {
       // Call sendOTP and log the server response for debugging
-      const sendRes = await sendOTP(mobileNumber, loginMethod);
+      // console.log("object", emailPhone, loginMethod);
+      const sendRes = await sendOTP(emailPhone, loginMethod);
 
       // If API responded with success flag, proceed to OTP screen/modal
       if (sendRes && (sendRes.success === true || sendRes.success === "true")) {
@@ -150,7 +158,7 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
     }
   };
 
-  const handleVerifyOtp = async () => {
+  const handleVerifyOtp = async (method) => {
     if (!otp.trim()) {
       showModal(t("error"), t("enterOTP"));
       return;
@@ -160,10 +168,12 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
       return;
     }
     setIsLoading(true);
-    const mobileNumber = `+${country.callingCode[0] + identifier}`;
+    const code = country?.callingCode?.[0] || "";
+    const emailPhone =
+      method?.toLowerCase() === "email" ? identifier : `+${code}${identifier}`;
 
     try {
-      const response = await verifyOTP(mobileNumber, otp, loginMethod);
+      const response = await verifyOTP(emailPhone, otp, loginMethod);
 
       const accessToken = response?.accessToken;
       const userData = response?.user || null;
@@ -381,7 +391,7 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
                     { backgroundColor: colors.primary },
                     isLoading && styles.buttonDisabled,
                   ]}
-                  onPress={handleSendOtp}
+                  onPress={() => handleSendOtp(loginMethod)}
                   disabled={isLoading}
                   activeOpacity={0.9}
                 >
@@ -404,7 +414,7 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
                     { backgroundColor: colors.primary },
                     isLoading && styles.buttonDisabled,
                   ]}
-                  onPress={handleVerifyOtp}
+                  onPress={() => handleVerifyOtp(loginMethod)}
                   disabled={isLoading}
                   activeOpacity={0.9}
                 >
@@ -421,7 +431,9 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
                   >
                     {t("didntReceiveOTP")}{" "}
                   </Text>
-                  <TouchableOpacity onPress={handleResendOtp}>
+                  <TouchableOpacity
+                    onPress={() => handleSendOtp(handleResendOtp)}
+                  >
                     <Text
                       style={[styles.resendLink, { color: colors.primary }]}
                     >

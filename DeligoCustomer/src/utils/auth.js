@@ -112,12 +112,12 @@ export default AuthService;
  * @param {'mobile'|'email'} method
  */
 export const sendOTP = async (identifier, method = "mobile") => {
+  console.log("identifier: ", identifier);
   if (method === "email") {
     return await customerApi.post("/auth/login-customer", {
       email: identifier,
     });
-  }
-  if (method === "mobile") {
+  } else {
     return await customerApi.post("/auth/login-customer", {
       contactNumber: identifier,
     });
