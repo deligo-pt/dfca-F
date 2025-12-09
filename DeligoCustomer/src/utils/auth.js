@@ -109,11 +109,8 @@ export default AuthService;
  * @param {'mobile'|'email'} method
  */
 export const sendOTP = async (identifier, method = 'mobile') => {
-  if (method === 'email') {
-    return await customerApi.post('/auth/login-customer', {email: identifier});
-  }
-  // mobile flow
-  return await customerApi.post('/auth/send-otp', {mobile: identifier});
+  const payload = method === 'email' ? {email: identifier} : {contactNumber: identifier};
+  return await customerApi.post('/auth/login-customer', payload);
 };
 
 /**
@@ -124,7 +121,7 @@ export const verifyOTP = async (identifier, otp, method = 'mobile') => {
   const payload =
     method === 'email'
       ? {email: identifier, otp}
-      : {mobile: identifier, otp};
+      : {contactNumber: identifier, otp};
   const response = await customerApi.post('/auth/verify-otp', payload);
 
   // Normalize different backend response shapes
@@ -314,6 +311,16 @@ export const logoutUser = async (tokenInput = null) => {
       console.warn('[auth] error clearing storage on logout:', e);
     }
   }
+};
+
+/**
+ * resendOTP: wrapper for resending OTP for mobile or email.
+ * @param {string} identifier mobile number or email
+ * @param {'mobile'|'email'} method
+ */
+export const resendOTP = async (identifier, method = 'mobile') => {
+  const payload = method === 'email' ? {email: identifier} : {contactNumber: identifier};
+  return await customerApi.post('/auth/resend-otp', payload);
 };
 
 // End of file

@@ -14,7 +14,7 @@ import {
   Modal,
   ActivityIndicator,
 } from 'react-native';
-import { sendOTP, verifyOTP, saveUserData } from '../utils/auth';
+import { sendOTP, verifyOTP, saveUserData, resendOTP } from '../utils/auth';
 import CountryPicker from 'react-native-country-picker-modal';
 import CustomModal from '../components/CustomModal';
 import OTPInput from '../components/OTPInput';
@@ -82,8 +82,9 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
     }
     setIsLoading(true);
     try {
+      const fullIdentifier = loginMethod === 'mobile' ? `+${country ? country.callingCode[0] : '351'}${identifier}` : identifier;
       // Call sendOTP and log the server response for debugging
-      const sendRes = await sendOTP(identifier, loginMethod);
+      const sendRes = await sendOTP(fullIdentifier, loginMethod);
       console.log('[LoginScreen] sendOTP response:', sendRes);
 
       // If API responded with success flag, proceed to OTP screen/modal
@@ -127,13 +128,14 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
       showModal(t('error'), t('enterOTP'));
       return;
     }
-    if (otp.length !== 4) {
+    if (otp.length !== (loginMethod === 'mobile' ? 6 : 4)) {
       showModal(t('error'), t('invalidOTP'));
       return;
     }
     setIsLoading(true);
     try {
-      const response = await verifyOTP(identifier, otp, loginMethod);
+      const fullIdentifier = loginMethod === 'mobile' ? `+${country ? country.callingCode[0] : '351'}${identifier}` : identifier;
+      const response = await verifyOTP(fullIdentifier, otp, loginMethod);
       console.log('[LoginScreen] verifyOTP response:', response);
 
       const accessToken = response?.accessToken;
@@ -165,9 +167,21 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
     }
   };
 
-  const handleResendOtp = () => {
-    setOtp('');
-    showModal(t('otpResent'), t('newOtpSent'));
+  const handleResendOtp = async () => {
+    try {
+      const fullIdentifier = loginMethod === 'mobile' ? `+${country ? country.callingCode[0] : '351'}${identifier}` : identifier;
+      const resendRes = await resendOTP(fullIdentifier, loginMethod);
+      console.log('[LoginScreen] resendOTP response:', resendRes);
+      if (resendRes && resendRes.success) {
+        setOtp('');
+        showModal(t('otpResent'), resendRes.message || t('newOtpSent'));
+      } else {
+        showModal('Error', resendRes?.message || 'Failed to resend OTP');
+      }
+    } catch (error) {
+      console.error('[LoginScreen] resendOTP error:', error);
+      showModal('Error', 'Failed to resend OTP. Please try again.');
+    }
   };
 
   const handleChangeMethod = () => {
@@ -269,7 +283,7 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
             ) : (
               <View style={styles.inputContainer}>
                 <OTPInput
-                  length={4}
+                  length={loginMethod === 'mobile' ? 6 : 4}
                   value={otp}
                   onChangeText={setOtp}
                   disabled={isLoading}

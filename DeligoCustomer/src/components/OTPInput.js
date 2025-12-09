@@ -62,7 +62,7 @@ const OTPInput = ({ length = 4, value, onChangeText, disabled = false }) => {
           ref={(ref) => (inputRefs.current[index] = ref)}
           style={[
             styles.input,
-            index < length - 1 ? { marginRight: 12 } : null,
+            index < length - 1 ? { marginRight: 8 } : null,
             focusedIndex === index && styles.inputFocused,
             value[index] && styles.inputFilled,
           ]}
@@ -91,12 +91,12 @@ const styles = StyleSheet.create({
     marginBottom: 20,
   },
   input: {
-    width: 56,
-    height: 56,
+    width: 40,
+    height: 40,
     borderWidth: 2,
     borderColor: '#E0E0E0',
     borderRadius: 12,
-    fontSize: 24,
+    fontSize: 18,
     fontFamily: 'Poppins-Bold',
     color: '#222',
     backgroundColor: '#FAFAFA',
