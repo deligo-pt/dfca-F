@@ -178,6 +178,7 @@ const EditProfileScreen = ({ navigation, route }) => {
       console.log('Profile data:', updatedProfileData);
 
       const response = await customerApi.patch(
+        // `/customers/${customerId}`,
         `/customers/${customerId}`,
         formData,
         {
