@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image, Dimensions, Modal, PanResponder } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImageManipulator from 'expo-image-manipulator';
@@ -359,7 +359,7 @@ const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
                 }]} />
               </View>
 
-              {/* Crop rectangle border */}
+              {/* Crop rectangle with handles */}
               <View
                 style={[
                   styles.cropContainer,
@@ -370,28 +370,14 @@ const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
                     height: cropArea.height,
                   }
                 ]}
-                pointerEvents="box-none"
-              />
-
-              {/* Draggable area (inner transparent box) */}
-              <View
-                style={[
-                  styles.dragArea,
-                  {
-                    left: cropArea.x + 40,
-                    top: cropArea.y + 40,
-                    width: cropArea.width - 80,
-                    height: cropArea.height - 80,
-                  }
-                ]}
                 {...dragPanResponder.panHandlers}
-              />
-
-              {/* Corner handles - positioned absolutely */}
-              <View style={[styles.handle, styles.topLeftHandle, { left: cropArea.x - 20, top: cropArea.y - 20 }]} {...topLeftPanResponder.panHandlers} />
-              <View style={[styles.handle, styles.topRightHandle, { left: cropArea.x + cropArea.width - 20, top: cropArea.y - 20 }]} {...topRightPanResponder.panHandlers} />
-              <View style={[styles.handle, styles.bottomLeftHandle, { left: cropArea.x - 20, top: cropArea.y + cropArea.height - 20 }]} {...bottomLeftPanResponder.panHandlers} />
-              <View style={[styles.handle, styles.bottomRightHandle, { left: cropArea.x + cropArea.width - 20, top: cropArea.y + cropArea.height - 20 }]} {...bottomRightPanResponder.panHandlers} />
+              >
+                {/* Corner handles */}
+                <View style={[styles.handle, styles.topLeftHandle]} {...topLeftPanResponder.panHandlers} />
+                <View style={[styles.handle, styles.topRightHandle]} {...topRightPanResponder.panHandlers} />
+                <View style={[styles.handle, styles.bottomLeftHandle]} {...bottomLeftPanResponder.panHandlers} />
+                <View style={[styles.handle, styles.bottomRightHandle]} {...bottomRightPanResponder.panHandlers} />
+              </View>
             </>
           )}
         </View>
@@ -528,10 +514,6 @@ const styles = StyleSheet.create({
     shadowRadius: 3,
     elevation: 5,
   },
-  dragArea: {
-    position: 'absolute',
-    backgroundColor: 'transparent',
-  },
   handle: {
     position: 'absolute',
     width: 40,
@@ -548,10 +530,22 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  topLeftHandle: {},
-  topRightHandle: {},
-  bottomLeftHandle: {},
-  bottomRightHandle: {},
+  topLeftHandle: {
+    left: -20,
+    top: -20,
+  },
+  topRightHandle: {
+    right: -20,
+    top: -20,
+  },
+  bottomLeftHandle: {
+    left: -20,
+    bottom: -20,
+  },
+  bottomRightHandle: {
+    right: -20,
+    bottom: -20,
+  },
   toolsContainer: {
     paddingVertical: 16,
     paddingHorizontal: 20,

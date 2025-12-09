@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image,
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
-import { getUserData, saveUserData } from '../utils/auth';
+import { getUserData, saveUserData, getUserId } from '../utils/auth';
 import { useLanguage } from '../utils/LanguageContext';
 import LocationDetails from '../components/Profile/LocationDetails';
 import * as Location from 'expo-location';
@@ -144,11 +144,10 @@ const EditProfileScreen = ({ navigation, route }) => {
 
   const updateProfile = async (profileData, imageFile = null, userInfo = null) => {
     try {
-      const currentUser = userInfo || await getUserData();
-      const customerId = currentUser?.userId || currentUser?.id || currentUser?._id;
+      const customerId = await getUserId();
 
       if (!customerId) {
-        console.error('No customer ID found:', currentUser);
+        console.error('No customer ID found from token');
         throw new Error('Customer ID not found. Please log in again.');
       }
 
@@ -161,6 +160,7 @@ const EditProfileScreen = ({ navigation, route }) => {
       const updatedProfileData = {
         name: { firstName, lastName },
         contactNumber: mobile,
+        email: email,
         ...profileData,
       };
 
@@ -245,6 +245,7 @@ const EditProfileScreen = ({ navigation, route }) => {
               lastName: nameParts.slice(1).join(' ') || ''
           },
           contactNumber: mobile,
+          email: email,
           address: address,
           profilePhoto: profilePhoto || currentLocalUser.profilePhoto,
       };
