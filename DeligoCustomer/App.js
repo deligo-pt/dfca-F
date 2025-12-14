@@ -3,21 +3,19 @@ import React, { useState, useEffect } from 'react';
 import { Text as RNText, TextInput as RNTextInput } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
-import { OnboardingScreen, LoginScreen, TermsOfServiceScreen, PrivacyPolicyScreen, LocationAddressScreen, RestaurantDetailsScreen, TrackOrderScreen, CheckoutScreen, EditProfileScreen, VouchersScreen, SavedAddressesScreen, PaymentMethodsScreen, ReferralsScreen, NotificationsScreen, SettingsScreen, HelpCenterScreen, CartDetailScreen } from './src/screens';
-import { BottomTabNavigator } from './src/navigation';
-import { checkOnboardingStatus } from './src/utils/storage';
-import { isUserAuthenticated, getUserData } from './src/utils/auth';
 import { colors } from './src/theme';
 import * as Font from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
-import { createStackNavigator } from '@react-navigation/stack';
 import { LanguageProvider } from './src/utils/LanguageContext';
 import { ThemeProvider } from './src/utils/ThemeContext';
 import { ProductsProvider } from './src/contexts/ProductsContext';
 import { CartProvider } from './src/contexts/CartContext';
 import { OrdersProvider } from './src/contexts/OrdersContext';
+import { LocationProvider } from './src/contexts/LocationContext';
+import { ProfileProvider } from './src/contexts/ProfileContext';
 import * as SystemUI from 'expo-system-ui';
 import { StripeProvider } from '@stripe/stripe-react-native';
+import RootNavigator from './src/navigation/RootNavigator';
 
 // Minimal publishable key fallback (use env in production)
 const STRIPE_PUBLISHABLE_KEY = process.env.STRIPE_PUBLISHABLE_KEY || 'pk_test_51PT3CjP0xY0uRyP02HGOUxxzweu1yv7l8GMyECLggN1LJrLsbLfGb1lgMuqQHoADgb1LFYC9tDgRcmkaCLGvNFJR00CgHAWWNK';
@@ -31,13 +29,8 @@ RNText.defaultProps.style = [{ fontFamily: 'Poppins-Regular' }];
 RNTextInput.defaultProps = RNTextInput.defaultProps || {};
 RNTextInput.defaultProps.style = [{ fontFamily: 'Poppins-Regular' }];
 
-const Stack = createStackNavigator();
-
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
-  const [showOnboarding, setShowOnboarding] = useState(true);
-  const [isAuthenticated, setIsAuthenticated] = useState(false);
-  const [_user, setUser] = useState(null);
 
   // Load Poppins fonts
   const loadFonts = async () => {
@@ -73,7 +66,7 @@ export default function App() {
         const startTime = Date.now();
 
         await loadFonts();
-        await initializeApp();
+        // initializeApp is no longer needed here as ProfileContext handles it via Provider
 
         // Ensure splash screen shows for at least 2 seconds
         const elapsedTime = Date.now() - startTime;
@@ -92,39 +85,7 @@ export default function App() {
     prepare();
   }, []);
 
-  const initializeApp = async () => {
-    try {
-      const onboardingCompleted = await checkOnboardingStatus();
-      setShowOnboarding(!onboardingCompleted);
-
-      // Check if user is already logged in
-      const authenticated = await isUserAuthenticated();
-      if (authenticated) {
-        const userData = await getUserData();
-        setUser(userData);
-        setIsAuthenticated(true);
-      }
-    } catch (error) {
-      console.error('Error initializing app:', error);
-    }
-  };
-
-  const handleOnboardingDone = () => {
-    setShowOnboarding(false);
-  };
-
-  const handleLoginSuccess = (userData) => {
-    setUser(userData);
-    setIsAuthenticated(true);
-  };
-
-  const handleLogout = () => {
-    setIsAuthenticated(false);
-    setUser(null);
-  };
-
-  // Don't render anything while loading - the native splash screen will show
-  // It has the pink background configured in app.json
+  // Don't render anything while loading fonts (splash screen is visible)
   if (isLoading) {
     return null;
   }
@@ -137,47 +98,20 @@ export default function App() {
       <SafeAreaProvider>
         <ThemeProvider>
           <LanguageProvider>
-            <ProductsProvider>
-              <CartProvider>
-                <OrdersProvider>
-                  <NavigationContainer>
-                    <Stack.Navigator screenOptions={{ headerShown: false }}>
-                      {showOnboarding ? (
-                        <Stack.Screen name="Onboarding">
-                          {(props) => <OnboardingScreen {...props} onDone={handleOnboardingDone} />}
-                        </Stack.Screen>
-                      ) : !isAuthenticated ? (
-                        <Stack.Screen name="Login">
-                          {(props) => <LoginScreen {...props} onLoginSuccess={handleLoginSuccess} />}
-                        </Stack.Screen>
-                      ) : (
-                        <Stack.Screen name="Main">
-                          {(props) => <BottomTabNavigator {...props} onLogout={handleLogout} />}
-                        </Stack.Screen>
-                      )}
-                      <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
-                      <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
-                      <Stack.Screen name="LocationAddress" component={LocationAddressScreen} />
-                      <Stack.Screen name="RestaurantDetails" component={RestaurantDetailsScreen} />
-                      <Stack.Screen name="CartDetail" component={CartDetailScreen} />
-                      <Stack.Screen name="TrackOrder" component={TrackOrderScreen} />
-                      <Stack.Screen name="Checkout" component={CheckoutScreen} />
-
-                      {/* Account Related Screens */}
-                      <Stack.Screen name="EditProfile" component={EditProfileScreen} />
-                      <Stack.Screen name="Vouchers" component={VouchersScreen} />
-                      <Stack.Screen name="SavedAddresses" component={SavedAddressesScreen} />
-                      <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
-                      <Stack.Screen name="Referrals" component={ReferralsScreen} />
-                      <Stack.Screen name="Notifications" component={NotificationsScreen} />
-                      <Stack.Screen name="Settings" component={SettingsScreen} />
-                      <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
-                    </Stack.Navigator>
-                    <StatusBar style="light" backgroundColor={colors.primary} />
-                  </NavigationContainer>
-                </OrdersProvider>
-              </CartProvider>
-            </ProductsProvider>
+            <ProfileProvider>
+              <LocationProvider>
+                <ProductsProvider>
+                  <CartProvider>
+                    <OrdersProvider>
+                      <NavigationContainer>
+                        <RootNavigator />
+                        <StatusBar style="light" backgroundColor={colors.primary} />
+                      </NavigationContainer>
+                    </OrdersProvider>
+                  </CartProvider>
+                </ProductsProvider>
+              </LocationProvider>
+            </ProfileProvider>
           </LanguageProvider>
         </ThemeProvider>
       </SafeAreaProvider>

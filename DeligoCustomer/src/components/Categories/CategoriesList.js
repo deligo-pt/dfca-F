@@ -3,7 +3,7 @@ import { ScrollView, TouchableOpacity, View, Text, StyleSheet } from 'react-nati
 import { spacing, fontSize, borderRadius } from '../../theme';
 import { useTheme } from '../../utils/ThemeContext';
 
-export default function VendorType({ categories = [], onPress = () => {}, selectedId = null }) {
+export default function VendorType({ categories = [], onPress = () => { }, selectedId = null }) {
   const { colors } = useTheme();
 
   return (

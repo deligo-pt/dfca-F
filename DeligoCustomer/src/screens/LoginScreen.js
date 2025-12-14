@@ -13,8 +13,11 @@ import {
   Image,
   Modal,
   ActivityIndicator,
+  SafeAreaView,
+  StatusBar,
 } from 'react-native';
 import { sendOTP, verifyOTP, saveUserData, resendOTP } from '../utils/auth';
+import { useProfile } from '../contexts/ProfileContext';
 import CountryPicker from 'react-native-country-picker-modal';
 import CustomModal from '../components/CustomModal';
 import OTPInput from '../components/OTPInput';
@@ -23,9 +26,10 @@ import { useTheme } from '../utils/ThemeContext';
 import { setAccessToken } from '../utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 
-const LOGO = require('../assets/images/logo.png'); // Transparent logo icon
+const LOGO = require('../assets/images/logo.png'); // Updated Logo
 
-const LoginScreen = ({ onLoginSuccess, navigation }) => {
+const LoginScreen = ({ navigation }) => {
+  const { login } = useProfile();
   const { t, language, changeLanguage } = useLanguage();
   const { colors, isDarkMode } = useTheme();
   const BRAND_PINK = colors.primary;
@@ -148,18 +152,17 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
       }
 
       // Save the access token to storage
-      await setAccessToken(accessToken);
+      // Use ProfileContext login
+      const success = await login(userData, accessToken);
 
-      // Save user only if present
-      if (userData) {
-        await saveUserData(userData);
-      }
-
-      // Close modal and notify parent (pass userData or null)
+      // Close modal
       setModalVisible(false);
-      if (onLoginSuccess) {
-        onLoginSuccess(userData);
+
+      // If login failed (e.g. context error), show error (but login returns true/false)
+      if (!success) {
+        showModal(t('error'), t('somethingWentWrong'));
       }
+      // If success, RootNavigator will auto-redirect 
     } catch (error) {
       showModal(t('error'), t('invalidOTP'));
     } finally {
@@ -192,538 +195,454 @@ const LoginScreen = ({ onLoginSuccess, navigation }) => {
   };
 
   return (
-    <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-      {/* Soft gradient background */}
-      <View style={[styles.gradientBg, { backgroundColor: colors.background }]}>
-        <ScrollView contentContainerStyle={styles.scrollContent} keyboardShouldPersistTaps="handled" showsVerticalScrollIndicator={false}>
-          {/* Header Section */}
-          <View style={styles.header}>
-            {/* Modern logo image, no border or card */}
-            <Image source={LOGO} style={styles.logoImageModern} resizeMode="contain" />
-            <Text style={[styles.logoText, { color: colors.text.primary }]}>{t('deligo')}</Text>
-            <Text style={[styles.tagline, { color: colors.text.secondary }]}>{t('tagline')}</Text>
+    <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+      <View style={styles.container}>
+        {/* Top Decorative Background */}
+        <View style={[styles.topShape, { backgroundColor: colors.primary }]} />
+        <View style={[styles.topShapeSmall, { backgroundColor: colors.primary }]} />
+
+        <ScrollView
+          contentContainerStyle={styles.scrollContent}
+          keyboardShouldPersistTaps="handled"
+          showsVerticalScrollIndicator={false}
+        >
+          {/* Header & Logo */}
+          <View style={styles.headerContainer}>
+            <View style={styles.logoWrapper}>
+              <Image source={LOGO} style={styles.logoImage} resizeMode="contain" />
+            </View>
+            <Text style={[styles.welcomeText, { color: colors.text.primary }]}>
+              {isOtpSent ? t('verifyOTP') : t('deligo')}
+            </Text>
+            <Text style={[styles.subText, { color: colors.text.secondary }]}>
+              {isOtpSent ? t('enterCodeSent') : t('loginOrSignup')}
+            </Text>
           </View>
 
-          {/* Main Card with animation */}
-          <Animated.View style={[styles.formCard, { backgroundColor: colors.surface, opacity: cardAnim, transform: [{ translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [40, 0] }) }] }]}>
-            <Text style={[styles.title, { color: colors.text.primary }]}>{isOtpSent ? t('verifyOTP') : t('loginOrSignup')}</Text>
-            <Text style={[styles.subtitle, { color: colors.text.secondary }]}>{isOtpSent ? t('enterCodeSent') : t('enterToContinue')}</Text>
+          {/* Form Section - Clean, No Card */}
+          <Animated.View style={[styles.formContainer, { opacity: cardAnim, transform: [{ translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [50, 0] }) }] }]}>
 
             {/* Tabs */}
             {!isOtpSent && (
-              <View style={styles.tabs}>
+              <View style={styles.tabContainer}>
                 <TouchableOpacity
-                  style={[styles.tab, { backgroundColor: colors.background }, loginMethod === 'mobile' && { backgroundColor: colors.primary }]}
                   onPress={() => loginMethod !== 'mobile' && handleChangeMethod()}
-                  activeOpacity={0.8}
+                  style={[styles.tabItem, loginMethod === 'mobile' && styles.tabItemActive, { borderBottomColor: loginMethod === 'mobile' ? colors.primary : 'transparent' }]}
                 >
-                  <Text style={[styles.tabText, { color: colors.text.secondary }, loginMethod === 'mobile' && { color: '#FFFFFF' }]}>{t('mobile')}</Text>
+                  <Text style={[styles.tabLabel, { color: loginMethod === 'mobile' ? colors.primary : colors.text.secondary }]}>{t('mobile')}</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.tab, { backgroundColor: colors.background }, loginMethod === 'email' && { backgroundColor: colors.primary }]}
                   onPress={() => loginMethod !== 'email' && handleChangeMethod()}
-                  activeOpacity={0.8}
+                  style={[styles.tabItem, loginMethod === 'email' && styles.tabItemActive, { borderBottomColor: loginMethod === 'email' ? colors.primary : 'transparent' }]}
                 >
-                  <Text style={[styles.tabText, { color: colors.text.secondary }, loginMethod === 'email' && { color: '#FFFFFF' }]}>{t('email')}</Text>
+                  <Text style={[styles.tabLabel, { color: loginMethod === 'email' ? colors.primary : colors.text.secondary }]}>{t('email')}</Text>
                 </TouchableOpacity>
               </View>
             )}
 
-            {/* Input Fields */}
+            {/* Inputs */}
             {!isOtpSent ? (
-              <View style={styles.inputContainer}>
-                {loginMethod === 'mobile' && (
-                  <View style={styles.inputRow}>
-                    <CountryPicker
-                      countryCode={countryCode}
-                      withFilter
-                      withFlag
-                      withCallingCode
-                      onSelect={country => {
-                        setCountryCode(country.cca2);
-                        setCountry(country);
-                      }}
-                      containerButtonStyle={styles.countryPicker}
-                    />
-                    <Text style={[styles.countryCodeText, { color: colors.text.primary }]}>+{country ? country.callingCode[0] : '351'}</Text>
+              <View style={styles.inputsSection}>
+                {loginMethod === 'mobile' ? (
+                  <View style={[styles.inputGroup, { backgroundColor: isDarkMode ? '#1A1A1A' : '#F7F7F7', borderColor: colors.border }]}>
+                    <View style={styles.countryBtn}>
+                      <CountryPicker
+                        countryCode={countryCode}
+                        withFilter
+                        withFlag
+                        withCallingCode
+                        onSelect={country => {
+                          setCountryCode(country.cca2);
+                          setCountry(country);
+                        }}
+                      />
+                      <Text style={[styles.callingCode, { color: colors.text.primary }]}>+{country ? country.callingCode[0] : '351'}</Text>
+                      <Ionicons name="chevron-down" size={12} color={colors.text.secondary} style={{ marginLeft: 4 }} />
+                    </View>
+                    <View style={[styles.dividerVertical, { backgroundColor: colors.border }]} />
                     <TextInput
-                      style={[styles.input, { backgroundColor: colors.background, color: colors.text.primary, borderColor: colors.border, flex: 1 }]}
+                      style={[styles.inputField, { color: colors.text.primary }]}
                       placeholder={t('mobileNumber')}
-                      placeholderTextColor={GRAY}
+                      placeholderTextColor={colors.text.secondary}
                       value={identifier}
                       onChangeText={setIdentifier}
                       keyboardType="phone-pad"
+                      selectionColor={colors.primary}
                       autoCapitalize="none"
-                      maxLength={15}
-                      selectionColor={BRAND_PINK}
+                    />
+                  </View>
+                ) : (
+                  <View style={[styles.inputGroup, { backgroundColor: isDarkMode ? '#1A1A1A' : '#F7F7F7', borderColor: colors.border }]}>
+                    <Ionicons name="mail-outline" size={20} color={colors.text.secondary} style={styles.inputIcon} />
+                    <TextInput
+                      style={[styles.inputField, { color: colors.text.primary }]}
+                      placeholder={t('emailAddress')}
+                      placeholderTextColor={colors.text.secondary}
+                      value={identifier}
+                      onChangeText={setIdentifier}
+                      keyboardType="email-address"
+                      selectionColor={colors.primary}
+                      autoCapitalize="none"
                     />
                   </View>
                 )}
-                {loginMethod === 'email' && (
-                  <TextInput
-                    style={[styles.input, { backgroundColor: colors.background, color: colors.text.primary, borderColor: colors.border }]}
-                    placeholder={t('emailAddress')}
-                    placeholderTextColor={GRAY}
-                    value={identifier}
-                    onChangeText={setIdentifier}
-                    keyboardType="email-address"
-                    autoCapitalize="none"
-                    selectionColor={BRAND_PINK}
-                  />
-                )}
+
                 <TouchableOpacity
-                  style={[styles.button, { backgroundColor: colors.primary }, isLoading && styles.buttonDisabled]}
+                  style={[styles.primaryButton, { backgroundColor: colors.primary }, isLoading && { opacity: 0.7 }]}
                   onPress={handleSendOtp}
                   disabled={isLoading}
-                  activeOpacity={0.9}
+                  activeOpacity={0.8}
                 >
-                  <Text style={styles.buttonText}>{isLoading ? t('sending') : t('sendOTP')}</Text>
+                  {isLoading ? (
+                    <ActivityIndicator color="#FFF" />
+                  ) : (
+                    <Text style={styles.primaryButtonText}>{t('sendOTP')}</Text>
+                  )}
                 </TouchableOpacity>
               </View>
             ) : (
-              <View style={styles.inputContainer}>
-                <OTPInput
-                  length={loginMethod === 'mobile' ? 6 : 4}
-                  value={otp}
-                  onChangeText={setOtp}
-                  disabled={isLoading}
-                />
+              <View style={styles.inputsSection}>
+                <Text style={[styles.otpReviewText, { color: colors.text.secondary }]}>
+                  {t('sentCodeTo')} <Text style={{ color: colors.text.primary, fontWeight: '700' }}>{loginMethod === 'mobile' ? `+${country ? country.callingCode[0] : '351'} ${identifier}` : identifier}</Text>
+                </Text>
+
+                <View style={{ marginBottom: 24 }}>
+                  <OTPInput
+                    length={loginMethod === 'mobile' ? 6 : 4}
+                    value={otp}
+                    onChangeText={setOtp}
+                    disabled={isLoading}
+                  />
+                </View>
+
                 <TouchableOpacity
-                  style={[styles.button, { backgroundColor: colors.primary }, isLoading && styles.buttonDisabled]}
+                  style={[styles.primaryButton, { backgroundColor: colors.primary }, isLoading && { opacity: 0.7 }]}
                   onPress={handleVerifyOtp}
                   disabled={isLoading}
-                  activeOpacity={0.9}
+                  activeOpacity={0.8}
                 >
-                  <Text style={styles.buttonText}>{isLoading ? t('verifying') : t('verifyOTPButton')}</Text>
+                  {isLoading ? (
+                    <ActivityIndicator color="#FFF" />
+                  ) : (
+                    <Text style={styles.primaryButtonText}>{t('verifyOTPButton')}</Text>
+                  )}
                 </TouchableOpacity>
-                <View style={styles.resendContainer}>
-                  <Text style={[styles.resendText, { color: colors.text.secondary }]}>{t('didntReceiveOTP')} </Text>
-                  <TouchableOpacity onPress={handleResendOtp}>
-                    <Text style={[styles.resendLink, { color: colors.primary }]}>{t('resend')}</Text>
+
+                <View style={styles.otpActions}>
+                  <TouchableOpacity onPress={handleResendOtp} disabled={isLoading}>
+                    <Text style={[styles.actionLink, { color: colors.primary }]}>{t('resend')}</Text>
+                  </TouchableOpacity>
+
+                  <TouchableOpacity onPress={() => setIsOtpSent(false)} disabled={isLoading}>
+                    <Text style={[styles.actionLink, { color: colors.text.secondary }]}>{t('change')}</Text>
                   </TouchableOpacity>
                 </View>
-                <TouchableOpacity style={styles.changeButton} onPress={() => setIsOtpSent(false)}>
-                  <Text style={[styles.changeButtonText, { color: colors.text.secondary }]}>{t('change')} {loginMethod === 'mobile' ? t('number') : t('email')}</Text>
-                </TouchableOpacity>
               </View>
             )}
 
-            {/* Collapsible Info Banner (optional) */}
-            {showInfo && (
-              <View style={[styles.infoBanner, { backgroundColor: INFO_BG }]}>
-                <Text style={[styles.infoText, { color: colors.text.secondary }]}>Demo: Use any valid mobile or email and OTP 1234 for testing.</Text>
-                <TouchableOpacity style={styles.infoClose} onPress={() => setShowInfo(false)}>
-                  <Text style={{ color: BRAND_PINK, fontWeight: 'bold' }}>×</Text>
-                </TouchableOpacity>
-              </View>
-            )}
+            {/* Language Selection - Minimal */}
+            <TouchableOpacity
+              style={styles.langCapsule}
+              onPress={() => setShowLanguageModal(true)}
+            >
+              <Ionicons name="globe-outline" size={16} color={colors.text.secondary} />
+              <Text style={[styles.langText, { color: colors.text.secondary }]}>{language === 'en' ? 'English' : 'Português'}</Text>
+              <Ionicons name="chevron-down" size={14} color={colors.text.secondary} />
+            </TouchableOpacity>
 
-            {/* Language Selection Button (inspired design) */}
-            <Animated.View style={{ opacity: cardAnim }}>
-              <TouchableOpacity
-                style={[styles.languageButton, { borderColor: colors.border }]}
-                onPress={() => setShowLanguageModal(true)}
-                disabled={isLoading}
-                activeOpacity={0.7}
-              >
-                <Ionicons name="globe-outline" size={20} color={colors.text.secondary} />
-                <Text style={[styles.languageButtonText, { color: colors.text.secondary }]}>
-                  {language === 'en' ? 'English' : 'Português'}
-                </Text>
-                <Ionicons name="chevron-down-outline" size={16} color={colors.text.secondary} />
-              </TouchableOpacity>
-            </Animated.View>
-          </Animated.View>
-
-          {/* Footer */}
-          <View style={styles.footerWrap}>
-            <View style={[styles.divider, { backgroundColor: colors.border }]} />
-            <View style={styles.footer}>
-              <Text style={[styles.footerText, { color: colors.text.secondary }]}>{t('byContinuing')} </Text>
-              <View style={styles.footerLinks}>
+            {/* Footer Links */}
+            <View style={styles.footerRow}>
+              <Text style={[styles.footerNote, { color: colors.text.secondary }]}>{t('byContinuing')}</Text>
+              <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' }}>
                 <TouchableOpacity onPress={() => navigation.navigate('TermsOfService')}>
                   <Text style={[styles.footerLink, { color: colors.primary }]}>{t('termsOfService')}</Text>
                 </TouchableOpacity>
-                <Text style={[styles.footerText, { color: colors.text.secondary }]}> {t('and')} </Text>
+                <Text style={[styles.footerNote, { color: colors.text.secondary }]}> & </Text>
                 <TouchableOpacity onPress={() => navigation.navigate('PrivacyPolicy')}>
                   <Text style={[styles.footerLink, { color: colors.primary }]}>{t('privacyPolicy')}</Text>
                 </TouchableOpacity>
               </View>
             </View>
-          </View>
+          </Animated.View>
+
         </ScrollView>
+
+        {/* Modals */}
         <CustomModal
           visible={modalVisible}
           title={modalTitle}
           message={modalMessage}
           onConfirm={() => {
             setModalVisible(false);
-            if (modalOnConfirmRef.current) {
-              modalOnConfirmRef.current();
-            }
+            if (modalOnConfirmRef.current) modalOnConfirmRef.current();
           }}
           onCancel={() => setModalVisible(false)}
           onlyConfirm={modalOnlyConfirm}
         />
 
-      {/* Language Selection Modal */}
-      <Modal
-        visible={showLanguageModal}
-        transparent={true}
-        animationType="fade"
-        onRequestClose={() => setShowLanguageModal(false)}
-      >
-        <TouchableOpacity
-          style={styles.modalOverlay}
-          activeOpacity={1}
-          onPress={() => setShowLanguageModal(false)}
+        <Modal
+          visible={showLanguageModal}
+          transparent={true}
+          animationType="fade"
+          onRequestClose={() => setShowLanguageModal(false)}
         >
-          <View style={[styles.languageModal, { backgroundColor: colors.surface }]}>
-            <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
-              <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
-                {t('selectLanguage') || 'Select Language'}
-              </Text>
-              <TouchableOpacity
-                onPress={() => setShowLanguageModal(false)}
-                style={styles.closeButton}
-              >
-                <Ionicons name="close" size={24} color={colors.text.primary} />
-              </TouchableOpacity>
-            </View>
-
-            <View style={styles.languageList}>
-              {[
-                { code: 'en', name: 'English', flag: '🇬🇧' },
-                { code: 'pt', name: 'Português', flag: '🇵🇹' },
-              ].map((lang) => (
-                <TouchableOpacity
-                  key={lang.code}
-                  style={[
-                    styles.languageItem,
-                    { backgroundColor: isDarkMode ? colors.background : '#F8F9FA' },
-                    language === lang.code && [
-                      styles.languageItemSelected,
-                      {
-                        borderColor: colors.primary,
-                        backgroundColor: isDarkMode ? colors.card : '#E6F7FF',
-                      }
-                    ]
-                  ]}
-                  onPress={() => {
-                    changeLanguage(lang.code);
-                    setShowLanguageModal(false);
-                  }}
-                  activeOpacity={0.8}
-                >
-                  <Text style={[styles.languageFlag, { color: colors.text.primary }]}>
-                    {lang.flag}
-                  </Text>
-                  <Text style={[
-                    styles.languageName,
-                    { color: colors.text.primary },
-                    language === lang.code && styles.languageNameSelected
-                  ]}>
-                    {lang.name}
-                  </Text>
-                  {language === lang.code && (
-                    <Ionicons
-                      name="checkmark-outline"
-                      size={20}
-                      color={colors.primary}
-                      style={styles.checkmarkIcon}
-                    />
-                  )}
+          <TouchableOpacity
+            style={styles.modalOverlay}
+            activeOpacity={1}
+            onPress={() => setShowLanguageModal(false)}
+          >
+            <View style={[styles.languageModal, { backgroundColor: colors.surface }]}>
+              <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
+                <Text style={[styles.modalTitle, { color: colors.text.primary }]}>{t('selectLanguage')}</Text>
+                <TouchableOpacity onPress={() => setShowLanguageModal(false)} style={styles.closeButton}>
+                  <Ionicons name="close" size={24} color={colors.text.primary} />
                 </TouchableOpacity>
-              ))}
+              </View>
+              <View style={styles.languageList}>
+                {[
+                  { code: 'en', name: 'English', flag: '🇬🇧' },
+                  { code: 'pt', name: 'Português', flag: '🇵🇹' },
+                ].map((lang) => (
+                  <TouchableOpacity
+                    key={lang.code}
+                    style={[
+                      styles.languageItem,
+                      { backgroundColor: isDarkMode ? colors.background : '#F8F9FA' },
+                      language === lang.code && { borderColor: colors.primary, borderWidth: 1, backgroundColor: isDarkMode ? colors.card : '#FFF0F5' }
+                    ]}
+                    onPress={() => {
+                      changeLanguage(lang.code);
+                      setShowLanguageModal(false);
+                    }}
+                  >
+                    <Text style={{ fontSize: 24, marginRight: 12 }}>{lang.flag}</Text>
+                    <Text style={[styles.languageName, { color: colors.text.primary, fontWeight: language === lang.code ? '700' : '400' }]}>{lang.name}</Text>
+                    {language === lang.code && <Ionicons name="checkmark" size={20} color={colors.primary} />}
+                  </TouchableOpacity>
+                ))}
+              </View>
             </View>
-          </View>
-        </TouchableOpacity>
-      </Modal>
-       </View>
-     </KeyboardAvoidingView>
-   );
- };
+          </TouchableOpacity>
+        </Modal>
 
- const styles = StyleSheet.create({
-   gradientBg: {
-     flex: 1,
-     position: 'relative',
-   },
-   scrollContent: {
-     flexGrow: 1,
-     justifyContent: 'center',
-     padding: 24,
-     minHeight: '100%',
-   },
-   header: {
-     alignItems: 'center',
-     marginBottom: 32,
-     zIndex: 2,
-   },
-   logoImageModern: {
-     width: 80,
-     height: 80,
-     marginBottom: 10,
-     borderRadius: 24,
-     shadowColor: '#000',
-     shadowOffset: { width: 0, height: 2 },
-     shadowOpacity: 0.10,
-     shadowRadius: 8,
-     elevation: 4,
-   },
-   logoText: {
-     fontSize: 32,
-     fontWeight: 'bold',
-     marginBottom: 2,
-     letterSpacing: 1.2,
-     fontFamily: 'Poppins-Bold',
-   },
-   tagline: {
-     fontSize: 15,
-     fontWeight: '500',
-     marginBottom: 2,
-     fontFamily: 'Poppins-Regular',
-   },
-   formCard: {
-     borderRadius: 24,
-     padding: 24,
-     marginHorizontal: 0,
-     marginBottom: 32,
-     shadowColor: '#000',
-     shadowOffset: { width: 0, height: 4 },
-     shadowOpacity: 0.05,
-     shadowRadius: 20,
-     elevation: 8,
-     zIndex: 2,
-   },
-   title: {
-     fontSize: 22,
-     fontWeight: 'bold',
-     marginBottom: 6,
-     textAlign: 'center',
-     fontFamily: 'Poppins-Bold',
-   },
-   subtitle: {
-     fontSize: 15,
-     marginBottom: 18,
-     textAlign: 'center',
-     fontFamily: 'Poppins-Regular',
-   },
-   tabs: {
-     flexDirection: 'row',
-     borderRadius: 12,
-     marginBottom: 18,
-     overflow: 'hidden',
-   },
-   tab: {
-     flex: 1,
-     paddingVertical: 10,
-     alignItems: 'center',
-     borderRadius: 12,
-   },
-   tabText: {
-     fontSize: 15,
-     fontWeight: '600',
-     fontFamily: 'Poppins-Regular',
-   },
-   inputContainer: {
-     marginBottom: 8,
-   },
-   inputRow: {
-     flexDirection: 'row',
-     alignItems: 'center',
-     marginBottom: 12,
-   },
-   countryPicker: {
-     marginRight: 4,
-   },
-   countryCodeText: {
-     fontSize: 15,
-     fontWeight: '600',
-     marginRight: 8,
-   },
-   input: {
-     borderWidth: 1,
-     borderRadius: 12,
-     padding: 14,
-     fontSize: 16,
-     marginBottom: 12,
-     fontFamily: 'Poppins-Regular',
-   },
-   button: {
-     paddingVertical: 14,
-     borderRadius: 12,
-     alignItems: 'center',
-     marginTop: 2,
-     shadowOffset: { width: 0, height: 4 },
-     shadowOpacity: 0.18,
-     shadowRadius: 12,
-     elevation: 4,
-   },
-   buttonDisabled: {
-     opacity: 0.6,
-   },
-   buttonText: {
-     color: '#fff',
-     fontSize: 16,
-     fontWeight: '600',
-     letterSpacing: 0.5,
-     fontFamily: 'Poppins-Regular',
-   },
-   resendContainer: {
-     flexDirection: 'row',
-     justifyContent: 'center',
-     marginTop: 8,
-   },
-   resendText: {
-     fontSize: 14,
-     fontFamily: 'Poppins-Regular',
-   },
-   resendLink: {
-     fontSize: 14,
-     fontWeight: '600',
-     fontFamily: 'Poppins-Regular',
-   },
-   changeButton: {
-     marginTop: 8,
-     alignItems: 'center',
-   },
-   changeButtonText: {
-     fontSize: 14,
-     fontWeight: '600',
-     fontFamily: 'Poppins-Regular',
-   },
-   infoBanner: {
-     borderColor: '#FFECB3',
-     borderWidth: 1,
-     borderRadius: 10,
-     padding: 12,
-     marginTop: 16,
-     flexDirection: 'row',
-     alignItems: 'center',
-     justifyContent: 'space-between',
-   },
-   infoText: {
-     fontSize: 14,
-     flex: 1,
-     fontFamily: 'Poppins-Regular',
-   },
-   infoClose: {
-     marginLeft: 12,
-     padding: 2,
-   },
-   footerWrap: {
-     marginTop: 32,
-     alignItems: 'center',
-   },
-   divider: {
-     height: 1,
-     width: '100%',
-     marginBottom: 18,
-   },
-   footer: {
-     alignItems: 'center',
-     flexDirection: 'row',
-     flexWrap: 'wrap',
-     justifyContent: 'center',
-   },
-   footerText: {
-     fontSize: 13,
-     fontFamily: 'Poppins-Regular',
-   },
-   footerLinks: {
-     flexDirection: 'row',
-     alignItems: 'center',
-   },
-   footerLink: {
-     fontSize: 13,
-     fontWeight: '600',
-     fontFamily: 'Poppins-Regular',
-   },
-   // Language Button
-   languageButton: {
-     flexDirection: 'row',
-     alignItems: 'center',
-     justifyContent: 'center',
-     paddingVertical: 14,
-     paddingHorizontal: 20,
-     borderRadius: 12,
-     borderWidth: 1,
-     alignSelf: 'center',
-     marginBottom: 24,
-     gap: 8,
-   },
-   languageButtonText: {
-     fontSize: 14,
-     fontFamily: 'Poppins-Regular',
-     marginLeft: 8,
-     marginRight: 4,
-   },
+      </View>
+    </KeyboardAvoidingView>
+  );
+};
 
-   // Language Modal
-   modalOverlay: {
-     flex: 1,
-     backgroundColor: 'rgba(0, 0, 0, 0.5)',
-     justifyContent: 'center',
-     alignItems: 'center',
-     padding: 20,
-   },
-   languageModal: {
-     width: '100%',
-     maxWidth: 400,
-     borderRadius: 20,
-     overflow: 'hidden',
-   },
-   modalHeader: {
-     flexDirection: 'row',
-     alignItems: 'center',
-     justifyContent: 'space-between',
-     paddingHorizontal: 20,
-     paddingVertical: 18,
-     borderBottomWidth: 1,
-   },
-   modalTitle: {
-     fontSize: 18,
-     fontWeight: '600',
-     fontFamily: 'Poppins-SemiBold',
-   },
-   closeButton: {
-     width: 36,
-     height: 36,
-     borderRadius: 18,
-     justifyContent: 'center',
-     alignItems: 'center',
-   },
-   languageList: {
-     paddingHorizontal: 20,
-     paddingVertical: 16,
-   },
-   languageItem: {
-     flexDirection: 'row',
-     alignItems: 'center',
-     paddingVertical: 16,
-     paddingHorizontal: 16,
-     borderRadius: 14,
-     marginBottom: 10,
-   },
-   languageItemSelected: {
-     borderWidth: 2,
-   },
-   languageFlag: {
-     fontSize: 28,
-     marginRight: 16,
-   },
-   languageName: {
-     fontSize: 16,
-     fontFamily: 'Poppins-Regular',
-     flex: 1,
-   },
-   languageNameSelected: {
-     fontWeight: '700',
-   },
-   checkmarkIcon: {
-     marginLeft: 8,
-   },
- });
+const styles = StyleSheet.create({
+  container: {
+    flex: 1,
+  },
+  topShape: {
+    position: 'absolute',
+    top: -150,
+    right: -100,
+    width: 400,
+    height: 400,
+    borderRadius: 200,
+    opacity: 0.1,
+  },
+  topShapeSmall: {
+    position: 'absolute',
+    top: 50,
+    left: -60,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    opacity: 0.05,
+  },
+  scrollContent: {
+    flexGrow: 1,
+    paddingHorizontal: 24,
+    paddingTop: 80,
+    paddingBottom: 40,
+  },
+  headerContainer: {
+    alignItems: 'center',
+    marginBottom: 40,
+  },
+  logoWrapper: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 8,
+    marginBottom: 20,
+  },
+  logoImage: {
+    width: 140,
+    height: 140,
+  },
+  welcomeText: {
+    fontSize: 28,
+    fontFamily: 'Poppins-Bold',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  subText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    textAlign: 'center',
+    opacity: 0.8,
+  },
+  formContainer: {
+    width: '100%',
+  },
+  tabContainer: {
+    flexDirection: 'row',
+    marginBottom: 30,
+    borderBottomWidth: 1,
+    borderBottomColor: '#EEE',
+  },
+  tabItem: {
+    flex: 1,
+    alignItems: 'center',
+    paddingVertical: 12,
+    borderBottomWidth: 2,
+  },
+  tabItemActive: {
+    // Active style handled by dynamic border color
+  },
+  tabLabel: {
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
+  },
+  inputsSection: {
+    marginBottom: 30,
+  },
+  inputGroup: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    borderWidth: 1,
+    paddingHorizontal: 16,
+    height: 60,
+    marginBottom: 20,
+  },
+  countryBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginRight: 12,
+  },
+  callingCode: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Medium',
+    marginLeft: 4,
+  },
+  dividerVertical: {
+    width: 1,
+    height: 24,
+    marginRight: 12,
+  },
+  inputField: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    height: '100%',
+  },
+  inputIcon: {
+    marginRight: 12,
+  },
+  primaryButton: {
+    height: 56,
+    borderRadius: 28, // Pill shape
+    justifyContent: 'center',
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.2,
+    shadowRadius: 16,
+    elevation: 6,
+    marginTop: 10,
+  },
+  primaryButtonText: {
+    color: '#FFF',
+    fontSize: 18,
+    fontFamily: 'Poppins-SemiBold',
+  },
+  otpReviewText: {
+    textAlign: 'center',
+    marginBottom: 24,
+    fontSize: 15,
+    fontFamily: 'Poppins-Regular',
+  },
+  otpActions: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    marginTop: 24,
+  },
+  actionLink: {
+    fontSize: 14,
+    fontFamily: 'Poppins-SemiBold',
+  },
+  langCapsule: {
+    flexDirection: 'row',
+    alignSelf: 'center',
+    alignItems: 'center',
+    paddingVertical: 8,
+    paddingHorizontal: 16,
+    borderRadius: 20,
+    backgroundColor: 'rgba(0,0,0,0.03)',
+    marginBottom: 40,
+    gap: 6,
+  },
+  langText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Medium',
+  },
+  footerRow: {
+    alignItems: 'center',
+  },
+  footerNote: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    marginBottom: 4,
+  },
+  footerLink: {
+    fontSize: 12,
+    fontFamily: 'Poppins-SemiBold',
+  },
+  // Modal Styles (Keeping some existing structures)
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  languageModal: {
+    width: '100%',
+    borderRadius: 24,
+    padding: 24,
+  },
+  modalHeader: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingBottom: 16,
+    borderBottomWidth: 1,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontFamily: 'Poppins-Bold',
+  },
+  languageList: {
+    marginTop: 16,
+  },
+  languageItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
+    borderRadius: 16,
+    marginBottom: 12,
+  },
+  languageName: {
+    fontSize: 16,
+    flex: 1,
+    fontFamily: 'Poppins-Regular',
+  },
+});
 
- export default LoginScreen;
+export default LoginScreen;

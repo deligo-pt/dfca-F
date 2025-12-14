@@ -25,16 +25,26 @@ const LocationDetails = ({
   clearFieldError,
   getCurrentLocation,
   searchAddress,
+
   reverseGeocode,
+  label,
+  setLabel,
+  savedAddresses,
+  onSelectAddress,
 }) => {
+  const labels = [
+    { id: 'Home', icon: 'home', label: 'Home' },
+    { id: 'Work', icon: 'briefcase', label: 'Work' },
+    { id: 'Other', icon: 'location', label: 'Other' },
+  ];
   return (
     <View style={styles.professionalLocationWrapper}>
       <View style={styles.professionalHeader}>
         <Text style={[styles.professionalTitle, { color: colors.text.primary }]}>
-          Business Location
+          {streetAddress ? 'Confirm Location' : 'Add New Address'}
         </Text>
         <Text style={[styles.professionalSubtitle, { color: colors.text.secondary }]}>
-          Set your precise location for accurate service delivery
+          Select a label and save your location for future orders
         </Text>
       </View>
 
@@ -87,7 +97,11 @@ const LocationDetails = ({
             <View style={styles.fullScreenRightControls}>
               <TouchableOpacity
                 style={[styles.fullScreenIconButton, { backgroundColor: '#fff' }]}
-                onPress={getCurrentLocation}
+                onPress={() => {
+                  if (!isLoadingLocation) {
+                    getCurrentLocation();
+                  }
+                }}
                 disabled={isLoadingLocation}
               >
                 {isLoadingLocation ? (
@@ -101,11 +115,11 @@ const LocationDetails = ({
                 <TouchableOpacity
                   style={[styles.fullScreenIconButton, { backgroundColor: '#fff', marginBottom: 8 }]}
                   onPress={() => {
-                    setMapRegion({
-                      ...mapRegion,
-                      latitudeDelta: mapRegion.latitudeDelta / 2,
-                      longitudeDelta: mapRegion.longitudeDelta / 2,
-                    });
+                    setMapRegion(prev => ({
+                      ...prev,
+                      latitudeDelta: Math.max(0.001, prev.latitudeDelta / 2),
+                      longitudeDelta: Math.max(0.001, prev.longitudeDelta / 2),
+                    }));
                   }}
                 >
                   <Ionicons name="add" size={22} color={colors.primary} />
@@ -113,11 +127,11 @@ const LocationDetails = ({
                 <TouchableOpacity
                   style={[styles.fullScreenIconButton, { backgroundColor: '#fff' }]}
                   onPress={() => {
-                    setMapRegion({
-                      ...mapRegion,
-                      latitudeDelta: mapRegion.latitudeDelta * 2,
-                      longitudeDelta: mapRegion.longitudeDelta * 2,
-                    });
+                    setMapRegion(prev => ({
+                      ...prev,
+                      latitudeDelta: Math.min(90, prev.latitudeDelta * 2),
+                      longitudeDelta: Math.min(180, prev.longitudeDelta * 2),
+                    }));
                   }}
                 >
                   <Ionicons name="remove" size={22} color={colors.primary} />
@@ -212,7 +226,11 @@ const LocationDetails = ({
                 backgroundColor: '#fff',
                 borderColor: colors.primary,
               }]}
-              onPress={getCurrentLocation}
+              onPress={() => {
+                if (!isLoadingLocation) {
+                  getCurrentLocation();
+                }
+              }}
               disabled={isLoadingLocation}
             >
               {isLoadingLocation ? (
@@ -324,9 +342,37 @@ const LocationDetails = ({
             <Text style={[styles.formSectionTitle, { color: colors.text.primary }]}>
               Address Details
             </Text>
-            <Text style={[styles.formSectionSubtitle, { color: colors.text.secondary }]}>
-              Please verify and complete your business address
-            </Text>
+
+            {/* Label Selection */}
+            <View style={{ marginBottom: 20 }}>
+              <Text style={[styles.internationalFieldLabel, { color: colors.text.primary }]}>
+                Label as <Text style={styles.requiredMark}>*</Text>
+              </Text>
+              <View style={{ flexDirection: 'row', gap: 10 }}>
+                {labels.map((l) => (
+                  <TouchableOpacity
+                    key={l.id}
+                    style={[
+                      styles.labelButton,
+                      label === l.id && { backgroundColor: colors.primary, borderColor: colors.primary }
+                    ]}
+                    onPress={() => setLabel && setLabel(l.id)}
+                  >
+                    <Ionicons
+                      name={l.icon}
+                      size={18}
+                      color={label === l.id ? '#fff' : '#6B7280'}
+                    />
+                    <Text style={[
+                      styles.labelButtonText,
+                      label === l.id && { color: '#fff', fontWeight: '600' }
+                    ]}>
+                      {l.label}
+                    </Text>
+                  </TouchableOpacity>
+                ))}
+              </View>
+            </View>
 
             <View style={styles.internationalFieldGroup}>
               <Text style={[styles.internationalFieldLabel, { color: colors.text.primary }]}>
@@ -430,23 +476,44 @@ const LocationDetails = ({
             )}
           </View>
 
-          <View style={[styles.professionalHelpCard, {
-            backgroundColor: `${colors.primary}08`,
-            borderLeftColor: colors.primary,
-          }]}>
-            <Ionicons name="information-circle" size={20} color={colors.primary} />
-            <View style={styles.professionalHelpContent}>
-              <Text style={[styles.professionalHelpTitle, { color: colors.text.primary }]}>
-                Location Accuracy
+
+
+          {/* Saved Addresses List */}
+          {savedAddresses && savedAddresses.length > 0 && (
+            <View style={styles.savedAddressesSection}>
+              <Text style={[styles.formSectionTitle, { color: colors.text.primary, paddingHorizontal: 16, marginBottom: 12 }]}>
+                Saved Addresses
               </Text>
-              <Text style={[styles.professionalHelpText, { color: colors.text.secondary }]}>
-                Ensure your business address is accurate for seamless delivery operations and better customer reach.
-              </Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}>
+                {savedAddresses.map((addr) => (
+                  <TouchableOpacity
+                    key={addr.id}
+                    style={styles.savedAddressCard}
+                    onPress={() => onSelectAddress && onSelectAddress(addr)}
+                  >
+                    <View style={[styles.savedAddressIcon, { backgroundColor: colors.primary + '15' }]}>
+                      <Ionicons
+                        name={addr.label === 'Work' ? 'briefcase' : addr.label === 'Other' ? 'location' : 'home'}
+                        size={20}
+                        color={colors.primary}
+                      />
+                    </View>
+                    <View>
+                      <Text style={[styles.savedAddressLabel, { color: colors.text.primary }]}>{addr.label}</Text>
+                      <Text style={styles.savedAddressText} numberOfLines={1}>{addr.address}</Text>
+                      <Text style={styles.savedAddressSubText} numberOfLines={1}>{addr.city}</Text>
+                    </View>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
             </View>
-          </View>
+          )}
+
+          <View style={{ height: 20 }} />
         </ScrollView>
-      )}
-    </View>
+      )
+      }
+    </View >
   );
 };
 
@@ -908,6 +975,62 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Bold',
     color: '#fff',
     marginLeft: 10,
+  },
+  labelButton: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingVertical: 10,
+    backgroundColor: '#fff',
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    borderRadius: 8,
+    gap: 6,
+  },
+  labelButtonText: {
+    fontSize: 14,
+    color: '#374151',
+    fontFamily: 'Poppins-Medium',
+  },
+  savedAddressesSection: {
+    marginTop: 20,
+    marginBottom: 20,
+  },
+  savedAddressCard: {
+    backgroundColor: '#fff',
+    padding: 12,
+    borderRadius: 12,
+    width: 160,
+    borderWidth: 1,
+    borderColor: '#E5E7EB',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.05,
+    shadowRadius: 2,
+    elevation: 2,
+  },
+  savedAddressIcon: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  savedAddressLabel: {
+    fontSize: 14,
+    fontFamily: 'Poppins-SemiBold',
+    marginBottom: 2,
+  },
+  savedAddressText: {
+    fontSize: 12,
+    color: '#6B7280',
+    marginBottom: 1,
+  },
+  savedAddressSubText: {
+    fontSize: 11,
+    color: '#9CA3AF',
   },
 });
 

@@ -7,8 +7,8 @@ import {
 import AppIntroSlider from 'react-native-app-intro-slider';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { DealsIllustration, DeliveryIllustration, DiscoverIllustration } from '../components/OnboardingIllustrations';
-import { setOnboardingCompleted } from '../utils/storage';
 import { colors } from '../theme';
+import { useProfile } from '../contexts/ProfileContext';
 
 const slides = [
   {
@@ -34,7 +34,9 @@ const slides = [
   },
 ];
 
-const OnboardingScreen = ({ onDone }) => {
+const OnboardingScreen = () => {
+  const { completeOnboarding } = useProfile();
+
   const renderItem = ({ item }) => {
     const IllustrationComponent = item.illustration;
     return (
@@ -51,17 +53,11 @@ const OnboardingScreen = ({ onDone }) => {
   };
 
   const onDonePress = async () => {
-    const success = await setOnboardingCompleted();
-    if (success && onDone) {
-      onDone();
-    }
+    await completeOnboarding();
   };
 
   const onSkipPress = async () => {
-    const success = await setOnboardingCompleted();
-    if (success && onDone) {
-      onDone();
-    }
+    await completeOnboarding();
   };
 
   const renderNextButton = () => {

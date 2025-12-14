@@ -16,10 +16,43 @@ import { useTheme } from '../utils/ThemeContext';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLanguage } from '../utils/LanguageContext';
 import { useCart } from '../contexts/CartContext';
+import { useLocation } from '../contexts/LocationContext';
 import formatCurrency from '../utils/currency';
 import { setupPaymentSheet, openPaymentSheet } from '../utils/stripeService';
 import CheckoutAPI from '../utils/checkoutApi';
 import OrderAPI from '../utils/orderApi';
+
+// Helper component to display location from context
+const ConsumerLocationDisplay = ({ colors, t }) => {
+  const { address, detailedAddress, city, postalCode, label } = useLocation();
+  const displayAddress = address || t('selectAddress');
+
+  // Construct the full address line
+  const details = [
+    detailedAddress,
+    city,
+    postalCode
+  ].filter(part => part && part.trim()).join(', ');
+
+  return (
+    <View style={styles(colors).addressContainer}>
+      <View style={styles(colors).addressIconWrapper}>
+        <MaterialCommunityIcons name={label === 'Work' ? 'briefcase' : label === 'Other' ? 'map-marker' : 'home-variant'} size={24} color={colors.primary} />
+      </View>
+      <View style={styles(colors).addressDetails}>
+        <Text style={styles(colors).addressType}>{label || t('home')}</Text>
+        <Text style={styles(colors).addressFull}>
+          {displayAddress}
+        </Text>
+        {details ? (
+          <Text style={[styles(colors).addressFull, { fontSize: 13, color: colors.text.secondary, marginTop: 2 }]}>
+            {details}
+          </Text>
+        ) : null}
+      </View>
+    </View>
+  );
+};
 
 const CheckoutScreen = ({ route, navigation }) => {
   const { colors } = useTheme();
@@ -387,21 +420,14 @@ const CheckoutScreen = ({ route, navigation }) => {
         <View style={styles(colors).section}>
           <View style={styles(colors).sectionHeader}>
             <Text style={styles(colors).sectionTitle}>{t('deliveryTo')}</Text>
-            <TouchableOpacity activeOpacity={0.7}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              onPress={() => navigation.navigate('LocationAddress')}
+            >
               <Text style={styles(colors).changeButton}>{t('change')}</Text>
             </TouchableOpacity>
           </View>
-          <View style={styles(colors).addressContainer}>
-            <View style={styles(colors).addressIconWrapper}>
-              <MaterialCommunityIcons name="home-variant" size={24} color={colors.primary} />
-            </View>
-            <View style={styles(colors).addressDetails}>
-              <Text style={styles(colors).addressType}>{t('home')}</Text>
-              <Text style={styles(colors).addressFull}>
-                456 Park Avenue, Apartment 5B, 2nd Floor
-              </Text>
-            </View>
-          </View>
+          <ConsumerLocationDisplay colors={colors} t={t} />
         </View>
 
         {/* Delivery Instructions */}

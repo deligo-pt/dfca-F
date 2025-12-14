@@ -13,9 +13,14 @@ import CustomModal from '../components/CustomModal';
 import * as ImagePicker from 'expo-image-picker';
 import ImageEditor from '../components/ImageEditor';
 
+import { useProfile } from '../contexts/ProfileContext';
+
 const EditProfileScreen = ({ navigation, route }) => {
   const { t } = useLanguage();
   const { colors } = useTheme();
+  // Use updateProfile from context to ensure global state stays in sync
+  const { updateProfile: updateProfileContext } = useProfile();
+
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
@@ -240,19 +245,21 @@ const EditProfileScreen = ({ navigation, route }) => {
       const currentLocalUser = await getUserData();
       const nameParts = name.trim().split(' ');
       const updatedUser = {
-          ...currentLocalUser,
-          name: {
-              firstName: nameParts[0] || '',
-              lastName: nameParts.slice(1).join(' ') || ''
-          },
-          contactNumber: mobile,
-          email: email,
-          address: address,
-          profilePhoto: profilePhoto || currentLocalUser.profilePhoto,
+        ...currentLocalUser,
+        name: {
+          firstName: nameParts[0] || '',
+          lastName: nameParts.slice(1).join(' ') || ''
+        },
+        contactNumber: mobile,
+        email: email,
+        address: address,
+        profilePhoto: profilePhoto || currentLocalUser.profilePhoto,
       };
 
-      // Save the merged user object back to storage.
-      await saveUserData(updatedUser);
+      // Save the merged user object back to storage AND update context
+      await updateProfileContext(updatedUser);
+      // set local state to match
+      setUserDataState(updatedUser);
 
       showModal(t('success'), t('profileUpdated'), () => {
         setModalVisible(false);
@@ -304,7 +311,7 @@ const EditProfileScreen = ({ navigation, route }) => {
     setIsLoadingLocation(true);
     try {
       const googleMapsApiKey = Constants.expoConfig?.ios?.config?.googleMapsApiKey ||
-                              Constants.expoConfig?.android?.config?.googleMaps?.apiKey;
+        Constants.expoConfig?.android?.config?.googleMaps?.apiKey;
 
       if (!googleMapsApiKey) {
         showModal('Error', 'Google Maps API key not configured', null, true);

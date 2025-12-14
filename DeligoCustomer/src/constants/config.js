@@ -61,9 +61,9 @@ export const API_ENDPOINTS = {
     FAVORITES: '/profile/favorites',
   },
 
-    PRODUCTS:{
-        GET_ALL:'/products'
-    },
+  PRODUCTS: {
+    GET_ALL: '/products'
+  },
   // Restaurants & Menus
   RESTAURANTS: {
     LIST: '/restaurants',
