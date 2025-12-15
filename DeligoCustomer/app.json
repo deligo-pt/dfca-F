@@ -22,7 +22,7 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "b53f15eb-427a-4d03-89b6-c99f067ef883"
+        "projectId": "5e4bd552-628d-4712-83c0-958e4f9ab36b"
       }
     },
     "ios": {
@@ -60,7 +60,9 @@
         "ACCESS_COARSE_LOCATION",
         "CAMERA",
         "READ_EXTERNAL_STORAGE",
-        "WRITE_EXTERNAL_STORAGE"
+        "WRITE_EXTERNAL_STORAGE",
+        "android.permission.ACCESS_COARSE_LOCATION",
+        "android.permission.ACCESS_FINE_LOCATION"
       ],
       "config": {
         "googleMaps": {
