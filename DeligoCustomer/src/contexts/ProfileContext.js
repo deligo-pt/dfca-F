@@ -91,6 +91,28 @@ export const ProfileProvider = ({ children }) => {
         }
     };
 
+    const fetchUserProfile = async () => {
+        try {
+            const { customerApi } = await import('../utils/api');
+            const { API_ENDPOINTS } = await import('../constants/config').then(m => m.default || m);
+
+            // Call API
+            const response = await customerApi.get(API_ENDPOINTS.PROFILE.GET);
+            const userData = response?.data || response;
+
+            if (userData) {
+                console.log('[ProfileContext] Fetched fresh user profile:', userData?.name || userData?.firstName);
+                setUser(userData);
+                // Update local storage
+                await import('../utils/auth').then(mod => mod.saveUserData(userData));
+                return userData;
+            }
+        } catch (error) {
+            console.error('[ProfileContext] Failed to fetch user profile:', error);
+        }
+        return null;
+    };
+
     return (
         <ProfileContext.Provider value={{
             user,
@@ -101,7 +123,8 @@ export const ProfileProvider = ({ children }) => {
             logout,
             updateProfile,
             checkAuthStatus,
-            completeOnboarding
+            completeOnboarding,
+            fetchUserProfile
         }}>
             {children}
         </ProfileContext.Provider>

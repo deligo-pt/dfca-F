@@ -18,7 +18,7 @@ import * as Location from 'expo-location';
 import { spacing, fontSize, borderRadius } from '../theme';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useLanguage } from '../utils/LanguageContext';
-import { useTheme } from '../utils/ThemeContext';
+import { useTheme, darkMapStyle } from '../utils/ThemeContext';
 
 const { height } = Dimensions.get('window');
 
@@ -43,7 +43,7 @@ const formatAddress = (addr) => {
 
 const TrackOrderScreen = ({ route, navigation }) => {
   const { t, language } = useLanguage();
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
   const { order } = route.params || {};
   const [currentStatus, setCurrentStatus] = useState('on_the_way'); // preparing, ready, picked_up, on_the_way, nearby, delivered
@@ -534,149 +534,150 @@ const TrackOrderScreen = ({ route, navigation }) => {
             latitudeDelta: 0.02,
             longitudeDelta: 0.02,
           }}
+          customMapStyle={isDarkMode ? darkMapStyle : []}
           showsUserLocation={true}
           showsMyLocationButton={false}
           showsCompass={true}
           loadingEnabled={true}
         >
-        {/* Restaurant Marker */}
-        {restaurantLocation && (
-          <Marker
-            coordinate={restaurantLocation}
-            title={orderData.restaurantName}
-            description="Restaurant"
-          >
-            <View style={styles.customMarker}>
-              <View style={styles.restaurantMarker}>
-                <MaterialIcons name="restaurant" size={20} color={colors.text.white} />
+          {/* Restaurant Marker */}
+          {restaurantLocation && (
+            <Marker
+              coordinate={restaurantLocation}
+              title={orderData.restaurantName}
+              description="Restaurant"
+            >
+              <View style={styles.customMarker}>
+                <View style={styles.restaurantMarker}>
+                  <MaterialIcons name="restaurant" size={20} color={colors.text.white} />
+                </View>
               </View>
-            </View>
-          </Marker>
-        )}
+            </Marker>
+          )}
 
-        {/* Driver Marker */}
-        {driverLocation && (currentStatus === 'picked_up' || currentStatus === 'on_the_way' || currentStatus === 'nearby') && (
-          <Marker
-            coordinate={driverLocation}
-            title={orderData.driverName}
-            description="Delivery Rider"
-            anchor={{ x: 0.5, y: 0.5 }}
-          >
-            <View style={styles.customMarker}>
-              <View style={styles.driverMarker}>
-                <Ionicons name="bicycle" size={20} color={colors.text.white} />
+          {/* Driver Marker */}
+          {driverLocation && (currentStatus === 'picked_up' || currentStatus === 'on_the_way' || currentStatus === 'nearby') && (
+            <Marker
+              coordinate={driverLocation}
+              title={orderData.driverName}
+              description="Delivery Rider"
+              anchor={{ x: 0.5, y: 0.5 }}
+            >
+              <View style={styles.customMarker}>
+                <View style={styles.driverMarker}>
+                  <Ionicons name="bicycle" size={20} color={colors.text.white} />
+                </View>
+                <View style={styles.driverMarkerPulse} />
               </View>
-              <View style={styles.driverMarkerPulse} />
-            </View>
-          </Marker>
-        )}
+            </Marker>
+          )}
 
-        {/* User Location Marker */}
-        {userLocation && (
-          <Marker
-            coordinate={userLocation}
-            title="Your Location"
-            description={orderData.deliveryAddress}
-          >
-            <View style={styles.customMarker}>
-              <View style={styles.userMarker}>
-                <Ionicons name="location" size={24} color={colors.primary} />
+          {/* User Location Marker */}
+          {userLocation && (
+            <Marker
+              coordinate={userLocation}
+              title="Your Location"
+              description={orderData.deliveryAddress}
+            >
+              <View style={styles.customMarker}>
+                <View style={styles.userMarker}>
+                  <Ionicons name="location" size={24} color={colors.primary} />
+                </View>
               </View>
-            </View>
-          </Marker>
-        )}
+            </Marker>
+          )}
 
-        {/* Route Polyline */}
-        {routeCoordinates.length > 0 && (
-          <Polyline
-            coordinates={routeCoordinates}
-            strokeColor={colors.primary}
-            strokeWidth={4}
-            lineDashPattern={[1]}
-          />
-        )}
-      </MapView>
+          {/* Route Polyline */}
+          {routeCoordinates.length > 0 && (
+            <Polyline
+              coordinates={routeCoordinates}
+              strokeColor={colors.primary}
+              strokeWidth={4}
+              lineDashPattern={[1]}
+            />
+          )}
+        </MapView>
 
-      {/* Delivery ETA Badge */}
-      <View style={styles.etaBadge}>
-        <Ionicons name="time-outline" size={18} color={colors.text.white} />
-        <Text style={styles.etaText}>{orderData.estimatedTime}</Text>
-      </View>
+        {/* Delivery ETA Badge */}
+        <View style={styles.etaBadge}>
+          <Ionicons name="time-outline" size={18} color={colors.text.white} />
+          <Text style={styles.etaText}>{orderData.estimatedTime}</Text>
+        </View>
 
 
-      {/* Fullscreen Toggle Button */}
-      <TouchableOpacity
-        style={styles.fullscreenButton}
-        onPress={() => setIsMapFullscreen(true)}
-        activeOpacity={0.7}
-      >
-        <Ionicons name="expand" size={24} color={colors.text.primary} />
-      </TouchableOpacity>
-
-      {/* Zoom Controls */}
-      <View style={styles.zoomControls}>
+        {/* Fullscreen Toggle Button */}
         <TouchableOpacity
-          style={styles.zoomButton}
+          style={styles.fullscreenButton}
+          onPress={() => setIsMapFullscreen(true)}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="expand" size={24} color={colors.text.primary} />
+        </TouchableOpacity>
+
+        {/* Zoom Controls */}
+        <View style={styles.zoomControls}>
+          <TouchableOpacity
+            style={styles.zoomButton}
+            onPress={() => {
+              if (mapRef.current) {
+                try {
+                  mapRef.current.getCamera().then((cam) => {
+                    if (mapRef.current) {
+                      cam.zoom += 1;
+                      mapRef.current.animateCamera(cam);
+                    }
+                  }).catch(err => console.log('Zoom in error:', err));
+                } catch (error) {
+                  console.log('Camera zoom error:', error);
+                }
+              }
+            }}
+          >
+            <Ionicons name="add" size={24} color={colors.text.primary} />
+          </TouchableOpacity>
+          <View style={styles.zoomDivider} />
+          <TouchableOpacity
+            style={styles.zoomButton}
+            onPress={() => {
+              if (mapRef.current) {
+                try {
+                  mapRef.current.getCamera().then((cam) => {
+                    if (mapRef.current) {
+                      cam.zoom -= 1;
+                      mapRef.current.animateCamera(cam);
+                    }
+                  }).catch(err => console.log('Zoom out error:', err));
+                } catch (error) {
+                  console.log('Camera zoom error:', error);
+                }
+              }
+            }}
+          >
+            <Ionicons name="remove" size={24} color={colors.text.primary} />
+          </TouchableOpacity>
+        </View>
+
+        {/* My Location Button */}
+        <TouchableOpacity
+          style={styles.myLocationButton}
           onPress={() => {
-            if (mapRef.current) {
+            if (userLocation && mapRef.current) {
               try {
-                mapRef.current.getCamera().then((cam) => {
-                  if (mapRef.current) {
-                    cam.zoom += 1;
-                    mapRef.current.animateCamera(cam);
-                  }
-                }).catch(err => console.log('Zoom in error:', err));
+                mapRef.current.animateToRegion({
+                  latitude: userLocation.latitude,
+                  longitude: userLocation.longitude,
+                  latitudeDelta: 0.01,
+                  longitudeDelta: 0.01,
+                });
               } catch (error) {
-                console.log('Camera zoom error:', error);
+                console.log('Animate to region error:', error);
               }
             }
           }}
         >
-          <Ionicons name="add" size={24} color={colors.text.primary} />
-        </TouchableOpacity>
-        <View style={styles.zoomDivider} />
-        <TouchableOpacity
-          style={styles.zoomButton}
-          onPress={() => {
-            if (mapRef.current) {
-              try {
-                mapRef.current.getCamera().then((cam) => {
-                  if (mapRef.current) {
-                    cam.zoom -= 1;
-                    mapRef.current.animateCamera(cam);
-                  }
-                }).catch(err => console.log('Zoom out error:', err));
-              } catch (error) {
-                console.log('Camera zoom error:', error);
-              }
-            }
-          }}
-        >
-          <Ionicons name="remove" size={24} color={colors.text.primary} />
+          <MaterialIcons name="my-location" size={24} color={colors.primary} />
         </TouchableOpacity>
       </View>
-
-      {/* My Location Button */}
-      <TouchableOpacity
-        style={styles.myLocationButton}
-        onPress={() => {
-          if (userLocation && mapRef.current) {
-            try {
-              mapRef.current.animateToRegion({
-                latitude: userLocation.latitude,
-                longitude: userLocation.longitude,
-                latitudeDelta: 0.01,
-                longitudeDelta: 0.01,
-              });
-            } catch (error) {
-              console.log('Animate to region error:', error);
-            }
-          }
-        }}
-      >
-        <MaterialIcons name="my-location" size={24} color={colors.primary} />
-      </TouchableOpacity>
-    </View>
     );
   };
 
@@ -1006,6 +1007,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
                   latitudeDelta: 0.02,
                   longitudeDelta: 0.02,
                 }}
+                customMapStyle={isDarkMode ? darkMapStyle : []}
                 showsUserLocation={true}
                 showsMyLocationButton={false}
                 showsCompass={true}
@@ -1222,749 +1224,749 @@ const TrackOrderScreen = ({ route, navigation }) => {
       alignItems: 'center',
       justifyContent: 'center',
     },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingBottom: spacing.xl,
-  },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingBottom: spacing.xl,
+    },
 
-  // Map Styles
-  mapContainer: {
-    width: '100%',
-    height: height * 0.35,
-    backgroundColor: colors.surface,
-    position: 'relative',
-  },
-  map: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-  },
-  mapLoading: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.background,
-  },
-  mapLoadingText: {
-    marginTop: spacing.sm,
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Regular',
-    color: colors.text.light,
-  },
-  customMarker: {
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  restaurantMarker: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: colors.surface,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  driverMarker: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.success,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 3,
-    borderColor: colors.surface,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-    zIndex: 10,
-  },
-  driverMarkerPulse: {
-    position: 'absolute',
-    width: 60,
-    height: 60,
-    borderRadius: 30,
-    backgroundColor: colors.success,
-    opacity: 0.3,
-  },
-  userMarker: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 2,
-    borderColor: colors.primary,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  etaBadge: {
-    position: 'absolute',
-    top: spacing.md,
-    left: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderRadius: borderRadius.lg,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  etaText: {
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-Bold',
-    color: colors.text.white,
-    marginLeft: spacing.xs,
-  },
-  fullscreenButton: {
-    position: 'absolute',
-    bottom: spacing.md + 50,
-    right: spacing.md,
-    width: 48,
-    height: 48,
-    backgroundColor: colors.surface,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  zoomControls: {
-    position: 'absolute',
-    top: spacing.md,
-    right: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    overflow: 'hidden',
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  zoomButton: {
-    width: 44,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  zoomDivider: {
-    height: 1,
-    backgroundColor: colors.border,
-  },
-  myLocationButton: {
-    position: 'absolute',
-    bottom: spacing.md,
-    right: spacing.md,
-    width: 48,
-    height: 48,
-    backgroundColor: colors.surface,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
+    // Map Styles
+    mapContainer: {
+      width: '100%',
+      height: height * 0.35,
+      backgroundColor: colors.surface,
+      position: 'relative',
+    },
+    map: {
+      flex: 1,
+      width: '100%',
+      height: '100%',
+    },
+    mapLoading: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: colors.background,
+    },
+    mapLoadingText: {
+      marginTop: spacing.sm,
+      fontSize: fontSize.sm,
+      fontFamily: 'Poppins-Regular',
+      color: colors.text.light,
+    },
+    customMarker: {
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    restaurantMarker: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 3,
+      borderColor: colors.surface,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 4,
+      elevation: 5,
+    },
+    driverMarker: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor: colors.success,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 3,
+      borderColor: colors.surface,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 4,
+      elevation: 5,
+      zIndex: 10,
+    },
+    driverMarkerPulse: {
+      position: 'absolute',
+      width: 60,
+      height: 60,
+      borderRadius: 30,
+      backgroundColor: colors.success,
+      opacity: 0.3,
+    },
+    userMarker: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: colors.primary,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 4,
+      elevation: 5,
+    },
+    etaBadge: {
+      position: 'absolute',
+      top: spacing.md,
+      left: spacing.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.primary,
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      borderRadius: borderRadius.lg,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+      elevation: 5,
+    },
+    etaText: {
+      fontSize: fontSize.md,
+      fontFamily: 'Poppins-Bold',
+      color: colors.text.white,
+      marginLeft: spacing.xs,
+    },
+    fullscreenButton: {
+      position: 'absolute',
+      bottom: spacing.md + 50,
+      right: spacing.md,
+      width: 48,
+      height: 48,
+      backgroundColor: colors.surface,
+      borderRadius: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    zoomControls: {
+      position: 'absolute',
+      top: spacing.md,
+      right: spacing.md,
+      backgroundColor: colors.surface,
+      borderRadius: borderRadius.lg,
+      overflow: 'hidden',
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    zoomButton: {
+      width: 44,
+      height: 44,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    zoomDivider: {
+      height: 1,
+      backgroundColor: colors.border,
+    },
+    myLocationButton: {
+      position: 'absolute',
+      bottom: spacing.md,
+      right: spacing.md,
+      width: 48,
+      height: 48,
+      backgroundColor: colors.surface,
+      borderRadius: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 4,
+      elevation: 3,
+    },
 
-  // Driver Info Styles
-  driverContainer: {
-    backgroundColor: colors.surface,
-    padding: spacing.md,
-    marginTop: spacing.sm,
-  },
-  driverHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  driverStats: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  driverStatsText: {
-    fontSize: fontSize.xs,
-    fontFamily: 'Poppins-Medium',
-    color: colors.text.secondary,
-  },
-  sectionTitle: {
-    fontSize: fontSize.lg,
-    fontFamily: 'Poppins-Bold',
-    color: colors.text.primary,
-  },
-  driverCard: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    backgroundColor: colors.background,
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  driverLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  driverAvatar: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: colors.primary + '15',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
-    position: 'relative',
-  },
-  onlineBadge: {
-    position: 'absolute',
-    bottom: 2,
-    right: 2,
-    width: 16,
-    height: 16,
-    borderRadius: 8,
-    backgroundColor: colors.surface,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  onlineDot: {
-    width: 10,
-    height: 10,
-    borderRadius: 5,
-    backgroundColor: colors.success,
-  },
-  driverInfo: {
-    flex: 1,
-  },
-  driverName: {
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-SemiBold',
-    color: colors.text.primary,
-    marginBottom: 4,
-  },
-  driverRating: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 4,
-  },
-  driverRatingText: {
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Medium',
-    color: colors.text.primary,
-    marginLeft: 4,
-  },
-  driverVehicle: {
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Regular',
-    color: colors.text.secondary,
-    marginLeft: 4,
-  },
-  vehicleInfo: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 4,
-  },
-  vehicleNumber: {
-    fontSize: fontSize.xs,
-    fontFamily: 'Poppins-Medium',
-    color: colors.text.light,
-  },
-  vehicleDot: {
-    fontSize: fontSize.xs,
-    color: colors.text.light,
-  },
-  vehicleColor: {
-    fontSize: fontSize.xs,
-    fontFamily: 'Poppins-Regular',
-    color: colors.text.light,
-  },
-  driverActions: {
-    flexDirection: 'column',
-    gap: spacing.sm,
-  },
-  driverActionButton: {
-    minWidth: 56,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: spacing.xs,
-    borderRadius: borderRadius.md,
-    backgroundColor: colors.primary + '15',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  actionButtonLabel: {
-    fontSize: fontSize.xs,
-    fontFamily: 'Poppins-SemiBold',
-    color: colors.primary,
-    marginTop: 2,
-  },
-  driverStatusBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.md,
-    padding: spacing.sm,
-    backgroundColor: colors.primary + '15',
-    borderRadius: borderRadius.md,
-  },
-  statusItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-    flex: 1,
-  },
-  statusText: {
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Medium',
-    color: colors.text.primary,
-  },
-  statusDivider: {
-    width: 1,
-    height: 20,
-    backgroundColor: colors.border,
-    marginHorizontal: spacing.sm,
-  },
+    // Driver Info Styles
+    driverContainer: {
+      backgroundColor: colors.surface,
+      padding: spacing.md,
+      marginTop: spacing.sm,
+    },
+    driverHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: spacing.md,
+    },
+    driverStats: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    driverStatsText: {
+      fontSize: fontSize.xs,
+      fontFamily: 'Poppins-Medium',
+      color: colors.text.secondary,
+    },
+    sectionTitle: {
+      fontSize: fontSize.lg,
+      fontFamily: 'Poppins-Bold',
+      color: colors.text.primary,
+    },
+    driverCard: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      backgroundColor: colors.background,
+      padding: spacing.md,
+      borderRadius: borderRadius.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    driverLeft: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      flex: 1,
+    },
+    driverAvatar: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: colors.primary + '15',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: spacing.md,
+      position: 'relative',
+    },
+    onlineBadge: {
+      position: 'absolute',
+      bottom: 2,
+      right: 2,
+      width: 16,
+      height: 16,
+      borderRadius: 8,
+      backgroundColor: colors.surface,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    onlineDot: {
+      width: 10,
+      height: 10,
+      borderRadius: 5,
+      backgroundColor: colors.success,
+    },
+    driverInfo: {
+      flex: 1,
+    },
+    driverName: {
+      fontSize: fontSize.md,
+      fontFamily: 'Poppins-SemiBold',
+      color: colors.text.primary,
+      marginBottom: 4,
+    },
+    driverRating: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 4,
+    },
+    driverRatingText: {
+      fontSize: fontSize.sm,
+      fontFamily: 'Poppins-Medium',
+      color: colors.text.primary,
+      marginLeft: 4,
+    },
+    driverVehicle: {
+      fontSize: fontSize.sm,
+      fontFamily: 'Poppins-Regular',
+      color: colors.text.secondary,
+      marginLeft: 4,
+    },
+    vehicleInfo: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 4,
+    },
+    vehicleNumber: {
+      fontSize: fontSize.xs,
+      fontFamily: 'Poppins-Medium',
+      color: colors.text.light,
+    },
+    vehicleDot: {
+      fontSize: fontSize.xs,
+      color: colors.text.light,
+    },
+    vehicleColor: {
+      fontSize: fontSize.xs,
+      fontFamily: 'Poppins-Regular',
+      color: colors.text.light,
+    },
+    driverActions: {
+      flexDirection: 'column',
+      gap: spacing.sm,
+    },
+    driverActionButton: {
+      minWidth: 56,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: spacing.xs,
+      borderRadius: borderRadius.md,
+      backgroundColor: colors.primary + '15',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    actionButtonLabel: {
+      fontSize: fontSize.xs,
+      fontFamily: 'Poppins-SemiBold',
+      color: colors.primary,
+      marginTop: 2,
+    },
+    driverStatusBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: spacing.md,
+      padding: spacing.sm,
+      backgroundColor: colors.primary + '15',
+      borderRadius: borderRadius.md,
+    },
+    statusItem: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      flex: 1,
+    },
+    statusText: {
+      fontSize: fontSize.sm,
+      fontFamily: 'Poppins-Medium',
+      color: colors.text.primary,
+    },
+    statusDivider: {
+      width: 1,
+      height: 20,
+      backgroundColor: colors.border,
+      marginHorizontal: spacing.sm,
+    },
 
-  // Progress Styles
-  progressContainer: {
-    backgroundColor: colors.surface,
-    padding: spacing.md,
-    marginTop: spacing.sm,
-  },
-  progressHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginBottom: spacing.md,
-  },
-  progressTitle: {
-    fontSize: fontSize.lg,
-    fontFamily: 'Poppins-Bold',
-    color: colors.text.primary,
-  },
-  viewDetailsText: {
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Medium',
-    color: colors.primary,
-  },
-  progressBarContainer: {
-    height: 6,
-    backgroundColor: colors.border,
-    borderRadius: 3,
-    marginBottom: spacing.lg,
-    overflow: 'hidden',
-  },
-  progressBarBackground: {
-    ...StyleSheet.absoluteFillObject,
-    backgroundColor: colors.border,
-  },
-  progressBarFill: {
-    height: '100%',
-    backgroundColor: colors.primary,
-    borderRadius: 3,
-  },
-  stagesContainer: {
-    marginTop: spacing.sm,
-  },
-  stageItem: {
-    flexDirection: 'row',
-    marginBottom: spacing.md,
-  },
-  stageIconContainer: {
-    alignItems: 'center',
-    marginRight: spacing.md,
-  },
-  stageIconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  stageIconCompleted: {
-    backgroundColor: colors.success,
-  },
-  stageIconCurrent: {
-    backgroundColor: colors.primary,
-  },
-  stageConnector: {
-    width: 2,
-    flex: 1,
-    backgroundColor: colors.border,
-    marginVertical: 4,
-  },
-  stageConnectorCompleted: {
-    backgroundColor: colors.success,
-  },
-  stageContent: {
-    flex: 1,
-    paddingTop: 2,
-  },
-  stageTitle: {
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-SemiBold',
-    color: colors.text.light,
-    marginBottom: 2,
-  },
-  stageTitleActive: {
-    color: colors.text.primary,
-  },
-  stageSubtitle: {
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Regular',
-    color: colors.text.secondary,
-  },
-  currentBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: spacing.xs,
-  },
-  pulseDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.primary,
-    marginRight: spacing.xs,
-  },
-  currentBadgeText: {
-    fontSize: fontSize.xs,
-    fontFamily: 'Poppins-Medium',
-    color: colors.primary,
-  },
+    // Progress Styles
+    progressContainer: {
+      backgroundColor: colors.surface,
+      padding: spacing.md,
+      marginTop: spacing.sm,
+    },
+    progressHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      marginBottom: spacing.md,
+    },
+    progressTitle: {
+      fontSize: fontSize.lg,
+      fontFamily: 'Poppins-Bold',
+      color: colors.text.primary,
+    },
+    viewDetailsText: {
+      fontSize: fontSize.sm,
+      fontFamily: 'Poppins-Medium',
+      color: colors.primary,
+    },
+    progressBarContainer: {
+      height: 6,
+      backgroundColor: colors.border,
+      borderRadius: 3,
+      marginBottom: spacing.lg,
+      overflow: 'hidden',
+    },
+    progressBarBackground: {
+      ...StyleSheet.absoluteFillObject,
+      backgroundColor: colors.border,
+    },
+    progressBarFill: {
+      height: '100%',
+      backgroundColor: colors.primary,
+      borderRadius: 3,
+    },
+    stagesContainer: {
+      marginTop: spacing.sm,
+    },
+    stageItem: {
+      flexDirection: 'row',
+      marginBottom: spacing.md,
+    },
+    stageIconContainer: {
+      alignItems: 'center',
+      marginRight: spacing.md,
+    },
+    stageIconWrapper: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    stageIconCompleted: {
+      backgroundColor: colors.success,
+    },
+    stageIconCurrent: {
+      backgroundColor: colors.primary,
+    },
+    stageConnector: {
+      width: 2,
+      flex: 1,
+      backgroundColor: colors.border,
+      marginVertical: 4,
+    },
+    stageConnectorCompleted: {
+      backgroundColor: colors.success,
+    },
+    stageContent: {
+      flex: 1,
+      paddingTop: 2,
+    },
+    stageTitle: {
+      fontSize: fontSize.md,
+      fontFamily: 'Poppins-SemiBold',
+      color: colors.text.light,
+      marginBottom: 2,
+    },
+    stageTitleActive: {
+      color: colors.text.primary,
+    },
+    stageSubtitle: {
+      fontSize: fontSize.sm,
+      fontFamily: 'Poppins-Regular',
+      color: colors.text.secondary,
+    },
+    currentBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: spacing.xs,
+    },
+    pulseDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.primary,
+      marginRight: spacing.xs,
+    },
+    currentBadgeText: {
+      fontSize: fontSize.xs,
+      fontFamily: 'Poppins-Medium',
+      color: colors.primary,
+    },
 
-  // Summary Styles
-  summaryContainer: {
-    backgroundColor: colors.surface,
-    padding: spacing.md,
-    marginTop: spacing.sm,
-  },
-  summaryHeader: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    marginBottom: spacing.md,
-  },
-  orderDateContainer: {
-    alignItems: 'flex-end',
-  },
-  orderDate: {
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Medium',
-    color: colors.text.primary,
-  },
-  orderTime: {
-    fontSize: fontSize.xs,
-    fontFamily: 'Poppins-Regular',
-    color: colors.text.secondary,
-  },
-  orderNumber: {
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Medium',
-    color: colors.text.secondary,
-    marginTop: 2,
-  },
-  summaryCard: {
-    backgroundColor: colors.background,
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  summarySection: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  summaryIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primary + '15',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
-  },
-  summaryContent: {
-    flex: 1,
-  },
-  summaryLabel: {
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Regular',
-    color: colors.text.secondary,
-    marginBottom: 4,
-  },
-  summaryValue: {
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-SemiBold',
-    color: colors.text.primary,
-    marginBottom: 2,
-  },
-  summarySubtext: {
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Regular',
-    color: colors.text.light,
-    marginTop: 2,
-  },
-  instructionsBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.info + '15',
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: borderRadius.sm,
-    marginTop: spacing.xs,
-    gap: 4,
-  },
-  instructionsText: {
-    fontSize: fontSize.xs,
-    fontFamily: 'Poppins-Medium',
-    color: colors.info,
-  },
-  itemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 6,
-    gap: spacing.sm,
-  },
-  itemQuantity: {
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Bold',
-    color: colors.text.secondary,
-    minWidth: 24,
-  },
-  itemName: {
-    flex: 1,
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Regular',
-    color: colors.text.primary,
-  },
-  itemPrice: {
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-SemiBold',
-    color: colors.text.primary,
-  },
-  billRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: 6,
-  },
-  billLabel: {
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Regular',
-    color: colors.text.secondary,
-  },
-  billValue: {
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-SemiBold',
-    color: colors.text.primary,
-  },
-  billLabelDiscount: {
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Medium',
-    color: colors.success,
-  },
-  billValueDiscount: {
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Bold',
-    color: colors.success,
-  },
-  billDivider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginVertical: spacing.sm,
-  },
-  totalLabel: {
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-Bold',
-    color: colors.text.primary,
-  },
-  totalAmount: {
-    fontSize: fontSize.xl,
-    fontFamily: 'Poppins-Bold',
-    color: colors.primary,
-  },
-  paidBadge: {
-    backgroundColor: colors.success,
-    paddingHorizontal: spacing.sm,
-    paddingVertical: 4,
-    borderRadius: borderRadius.sm,
-  },
-  paidText: {
-    fontSize: fontSize.xs,
-    fontFamily: 'Poppins-Bold',
-    color: colors.text.white,
-  },
-  summaryDivider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginVertical: spacing.md,
-  },
+    // Summary Styles
+    summaryContainer: {
+      backgroundColor: colors.surface,
+      padding: spacing.md,
+      marginTop: spacing.sm,
+    },
+    summaryHeader: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      marginBottom: spacing.md,
+    },
+    orderDateContainer: {
+      alignItems: 'flex-end',
+    },
+    orderDate: {
+      fontSize: fontSize.sm,
+      fontFamily: 'Poppins-Medium',
+      color: colors.text.primary,
+    },
+    orderTime: {
+      fontSize: fontSize.xs,
+      fontFamily: 'Poppins-Regular',
+      color: colors.text.secondary,
+    },
+    orderNumber: {
+      fontSize: fontSize.sm,
+      fontFamily: 'Poppins-Medium',
+      color: colors.text.secondary,
+      marginTop: 2,
+    },
+    summaryCard: {
+      backgroundColor: colors.background,
+      padding: spacing.md,
+      borderRadius: borderRadius.lg,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    summarySection: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+    },
+    summaryIconContainer: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: colors.primary + '15',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: spacing.md,
+    },
+    summaryContent: {
+      flex: 1,
+    },
+    summaryLabel: {
+      fontSize: fontSize.sm,
+      fontFamily: 'Poppins-Regular',
+      color: colors.text.secondary,
+      marginBottom: 4,
+    },
+    summaryValue: {
+      fontSize: fontSize.md,
+      fontFamily: 'Poppins-SemiBold',
+      color: colors.text.primary,
+      marginBottom: 2,
+    },
+    summarySubtext: {
+      fontSize: fontSize.sm,
+      fontFamily: 'Poppins-Regular',
+      color: colors.text.light,
+      marginTop: 2,
+    },
+    instructionsBadge: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.info + '15',
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 4,
+      borderRadius: borderRadius.sm,
+      marginTop: spacing.xs,
+      gap: 4,
+    },
+    instructionsText: {
+      fontSize: fontSize.xs,
+      fontFamily: 'Poppins-Medium',
+      color: colors.info,
+    },
+    itemRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 6,
+      gap: spacing.sm,
+    },
+    itemQuantity: {
+      fontSize: fontSize.sm,
+      fontFamily: 'Poppins-Bold',
+      color: colors.text.secondary,
+      minWidth: 24,
+    },
+    itemName: {
+      flex: 1,
+      fontSize: fontSize.sm,
+      fontFamily: 'Poppins-Regular',
+      color: colors.text.primary,
+    },
+    itemPrice: {
+      fontSize: fontSize.sm,
+      fontFamily: 'Poppins-SemiBold',
+      color: colors.text.primary,
+    },
+    billRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      paddingVertical: 6,
+    },
+    billLabel: {
+      fontSize: fontSize.sm,
+      fontFamily: 'Poppins-Regular',
+      color: colors.text.secondary,
+    },
+    billValue: {
+      fontSize: fontSize.sm,
+      fontFamily: 'Poppins-SemiBold',
+      color: colors.text.primary,
+    },
+    billLabelDiscount: {
+      fontSize: fontSize.sm,
+      fontFamily: 'Poppins-Medium',
+      color: colors.success,
+    },
+    billValueDiscount: {
+      fontSize: fontSize.sm,
+      fontFamily: 'Poppins-Bold',
+      color: colors.success,
+    },
+    billDivider: {
+      height: 1,
+      backgroundColor: colors.border,
+      marginVertical: spacing.sm,
+    },
+    totalLabel: {
+      fontSize: fontSize.md,
+      fontFamily: 'Poppins-Bold',
+      color: colors.text.primary,
+    },
+    totalAmount: {
+      fontSize: fontSize.xl,
+      fontFamily: 'Poppins-Bold',
+      color: colors.primary,
+    },
+    paidBadge: {
+      backgroundColor: colors.success,
+      paddingHorizontal: spacing.sm,
+      paddingVertical: 4,
+      borderRadius: borderRadius.sm,
+    },
+    paidText: {
+      fontSize: fontSize.xs,
+      fontFamily: 'Poppins-Bold',
+      color: colors.text.white,
+    },
+    summaryDivider: {
+      height: 1,
+      backgroundColor: colors.border,
+      marginVertical: spacing.md,
+    },
 
-  // Fullscreen Map Styles
-  fullscreenContainer: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  fullscreenHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    zIndex: 10,
-  },
-  fullscreenTitle: {
-    fontSize: fontSize.xl,
-    fontFamily: 'Poppins-Bold',
-    color: colors.text.primary,
-    flex: 1,
-    textAlign: 'center',
-  },
-  fullscreenMapContainer: {
-    flex: 1,
-    position: 'relative',
-  },
-  fullscreenMap: {
-    flex: 1,
-    width: '100%',
-    height: '100%',
-  },
-  fullscreenEtaBadge: {
-    position: 'absolute',
-    top: spacing.md,
-    right: spacing.md,
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.lg,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.25,
-    shadowRadius: 4,
-    elevation: 5,
-  },
-  fullscreenEtaText: {
-    fontSize: fontSize.lg,
-    fontFamily: 'Poppins-Bold',
-    color: colors.text.white,
-    marginLeft: spacing.xs,
-  },
-  fullscreenZoomControls: {
-    position: 'absolute',
-    bottom: 200,
-    right: spacing.md,
-    backgroundColor: colors.surface,
-    borderRadius: borderRadius.lg,
-    overflow: 'hidden',
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  fullscreenMyLocationButton: {
-    position: 'absolute',
-    bottom: 280,
-    right: spacing.md,
-    width: 48,
-    height: 48,
-    backgroundColor: colors.surface,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  fullscreenDriverCard: {
-    position: 'absolute',
-    bottom: 0,
-    left: 0,
-    right: 0,
-    backgroundColor: colors.surface,
-    borderTopLeftRadius: borderRadius.xl,
-    borderTopRightRadius: borderRadius.xl,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: -4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 8,
-    elevation: 8,
-  },
-  driverCardContent: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    padding: spacing.lg,
-  },
+    // Fullscreen Map Styles
+    fullscreenContainer: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    fullscreenHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.sm,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+      zIndex: 10,
+    },
+    fullscreenTitle: {
+      fontSize: fontSize.xl,
+      fontFamily: 'Poppins-Bold',
+      color: colors.text.primary,
+      flex: 1,
+      textAlign: 'center',
+    },
+    fullscreenMapContainer: {
+      flex: 1,
+      position: 'relative',
+    },
+    fullscreenMap: {
+      flex: 1,
+      width: '100%',
+      height: '100%',
+    },
+    fullscreenEtaBadge: {
+      position: 'absolute',
+      top: spacing.md,
+      right: spacing.md,
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.primary,
+      paddingHorizontal: spacing.lg,
+      paddingVertical: spacing.md,
+      borderRadius: borderRadius.lg,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.25,
+      shadowRadius: 4,
+      elevation: 5,
+    },
+    fullscreenEtaText: {
+      fontSize: fontSize.lg,
+      fontFamily: 'Poppins-Bold',
+      color: colors.text.white,
+      marginLeft: spacing.xs,
+    },
+    fullscreenZoomControls: {
+      position: 'absolute',
+      bottom: 200,
+      right: spacing.md,
+      backgroundColor: colors.surface,
+      borderRadius: borderRadius.lg,
+      overflow: 'hidden',
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    fullscreenMyLocationButton: {
+      position: 'absolute',
+      bottom: 280,
+      right: spacing.md,
+      width: 48,
+      height: 48,
+      backgroundColor: colors.surface,
+      borderRadius: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    fullscreenDriverCard: {
+      position: 'absolute',
+      bottom: 0,
+      left: 0,
+      right: 0,
+      backgroundColor: colors.surface,
+      borderTopLeftRadius: borderRadius.xl,
+      borderTopRightRadius: borderRadius.xl,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: -4 },
+      shadowOpacity: 0.15,
+      shadowRadius: 8,
+      elevation: 8,
+    },
+    driverCardContent: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'center',
+      padding: spacing.lg,
+    },
 
-  // Bottom Actions
-  bottomActionsInline: {
-    flexDirection: 'row',
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    gap: spacing.sm,
-  },
-  cancelButton: {
-    flex: 1,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.lg,
-    backgroundColor: colors.background,
-    borderWidth: 1.5,
-    borderColor: colors.error,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  cancelButtonText: {
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-SemiBold',
-    color: colors.error,
-  },
-  supportButton: {
-    flex: 1,
-    flexDirection: 'row',
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.lg,
-    backgroundColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    gap: spacing.xs,
-  },
-  supportButtonText: {
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-SemiBold',
-    color: colors.text.white,
-  },
-}), [colors]);
+    // Bottom Actions
+    bottomActionsInline: {
+      flexDirection: 'row',
+      paddingHorizontal: spacing.md,
+      paddingTop: spacing.md,
+      gap: spacing.sm,
+    },
+    cancelButton: {
+      flex: 1,
+      paddingVertical: spacing.md,
+      borderRadius: borderRadius.lg,
+      backgroundColor: colors.background,
+      borderWidth: 1.5,
+      borderColor: colors.error,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    cancelButtonText: {
+      fontSize: fontSize.md,
+      fontFamily: 'Poppins-SemiBold',
+      color: colors.error,
+    },
+    supportButton: {
+      flex: 1,
+      flexDirection: 'row',
+      paddingVertical: spacing.md,
+      borderRadius: borderRadius.lg,
+      backgroundColor: colors.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+      gap: spacing.xs,
+    },
+    supportButtonText: {
+      fontSize: fontSize.md,
+      fontFamily: 'Poppins-SemiBold',
+      color: colors.text.white,
+    },
+  }), [colors]);
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>

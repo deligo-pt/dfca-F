@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Animated, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, fontSize } from '../theme';
+import { spacing, fontSize } from '../theme';
+import { useTheme } from '../utils/ThemeContext';
 
 const StickySearchHeader = ({
   onCartPress,
@@ -14,6 +15,7 @@ const StickySearchHeader = ({
   suggestions = [],
   onSuggestionPress,
 }) => {
+  const { colors, isDarkMode } = useTheme();
   const [isSearchFocused, setIsSearchFocused] = useState(false);
 
   const headerOpacity = scrollY.interpolate({
@@ -37,34 +39,34 @@ const StickySearchHeader = ({
 
   return (
     <Animated.View
-      style={[styles.wrapper, { opacity: headerOpacity }]}
+      style={[styles(colors, isDarkMode).wrapper, { opacity: headerOpacity }]}
       pointerEvents="box-none"
     >
-      <View style={styles.container}>
+      <View style={styles(colors, isDarkMode).container}>
         {/* Row 1: Location & Cart (Clean, Minimal) - Hidden when searching */}
         {!isSearchFocused && (
-          <View style={styles.topRow}>
+          <View style={styles(colors, isDarkMode).topRow}>
             <TouchableOpacity
-              style={styles.locationButton}
+              style={styles(colors, isDarkMode).locationButton}
               onPress={onLocationPress}
               activeOpacity={0.7}
             >
-              <Ionicons name="location-sharp" size={14} color="#FFFFFF" />
-              <Text style={styles.locationText} numberOfLines={1}>
+              <Ionicons name="location-sharp" size={14} color={colors.text.white || '#FFFFFF'} />
+              <Text style={styles(colors, isDarkMode).locationText} numberOfLines={1}>
                 {area || 'Set location'}
               </Text>
-              <Ionicons name="chevron-down" size={12} color="#FFFFFF" />
+              <Ionicons name="chevron-down" size={12} color={colors.text.white || '#FFFFFF'} />
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.cartButtonTop}
+              style={styles(colors, isDarkMode).cartButtonTop}
               onPress={onCartPress}
               activeOpacity={0.7}
             >
-              <Ionicons name="cart-outline" size={20} color="#FFFFFF" />
+              <Ionicons name="cart-outline" size={20} color={colors.text.white || '#FFFFFF'} />
               {cartItemCount > 0 && (
-                <View style={styles.badge}>
-                  <Text style={styles.badgeText}>{cartItemCount > 99 ? '99+' : cartItemCount}</Text>
+                <View style={styles(colors, isDarkMode).badge}>
+                  <Text style={styles(colors, isDarkMode).badgeText}>{cartItemCount > 99 ? '99+' : cartItemCount}</Text>
                 </View>
               )}
             </TouchableOpacity>
@@ -72,36 +74,36 @@ const StickySearchHeader = ({
         )}
 
         {/* Row 2: Search Bar (PROMINENT, CLEAN) */}
-        <View style={styles.searchRow}>
+        <View style={styles(colors, isDarkMode).searchRow}>
           {/* Back button (only when searching) */}
           {isSearchFocused && (
             <TouchableOpacity
-              style={styles.backButton}
+              style={styles(colors, isDarkMode).backButton}
               onPress={() => {
                 setIsSearchFocused(false);
                 if (searchQuery) clearSearch();
               }}
               activeOpacity={0.7}
             >
-              <Ionicons name="arrow-back" size={22} color="#FFFFFF" />
+              <Ionicons name="arrow-back" size={22} color={colors.text.white || '#FFFFFF'} />
             </TouchableOpacity>
           )}
 
           {/* Search Input - FULL WIDTH, CLEAN */}
           <View style={[
-            styles.searchContainer,
-            isSearchFocused && styles.searchContainerFocused
+            styles(colors, isDarkMode).searchContainer,
+            isSearchFocused && styles(colors, isDarkMode).searchContainerFocused
           ]}>
             <Ionicons
               name="search"
               size={18}
-              color={isSearchFocused ? colors.primary : "#999999"}
-              style={styles.searchIcon}
+              color={isSearchFocused ? colors.primary : colors.text.secondary}
+              style={styles(colors, isDarkMode).searchIcon}
             />
             <TextInput
-              style={styles.input}
+              style={styles(colors, isDarkMode).input}
               placeholder="Search restaurants, cuisines..."
-              placeholderTextColor="#999999"
+              placeholderTextColor={colors.text.secondary}
               value={searchQuery}
               onChangeText={handleSearchChange}
               onFocus={() => setIsSearchFocused(true)}
@@ -112,8 +114,8 @@ const StickySearchHeader = ({
               spellCheck={false}
             />
             {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
-                <Ionicons name="close-circle" size={18} color="#999999" />
+              <TouchableOpacity onPress={clearSearch} style={styles(colors, isDarkMode).clearButton}>
+                <Ionicons name="close-circle" size={18} color={colors.text.secondary} />
               </TouchableOpacity>
             )}
           </View>
@@ -122,10 +124,10 @@ const StickySearchHeader = ({
 
       {/* Autocomplete Suggestions Dropdown - OUTSIDE container for proper positioning */}
       {isSearchFocused && searchQuery.length > 0 && suggestions.length > 0 && (
-        <View style={styles.suggestionsWrapper}>
-          <View style={styles.suggestionsContainer}>
+        <View style={styles(colors, isDarkMode).suggestionsWrapper}>
+          <View style={styles(colors, isDarkMode).suggestionsContainer}>
             <ScrollView
-              style={styles.suggestionsList}
+              style={styles(colors, isDarkMode).suggestionsList}
               keyboardShouldPersistTaps="handled"
               showsVerticalScrollIndicator={true}
             >
@@ -133,21 +135,21 @@ const StickySearchHeader = ({
                 <TouchableOpacity
                   key={suggestion.id || index}
                   style={[
-                    styles.suggestionItem,
-                    index === suggestions.length - 1 && styles.suggestionItemLast
+                    styles(colors, isDarkMode).suggestionItem,
+                    index === suggestions.length - 1 && styles(colors, isDarkMode).suggestionItemLast
                   ]}
                   onPress={() => handleSuggestionTap(suggestion)}
                   activeOpacity={0.7}
                 >
-                  <View style={styles.suggestionIconWrapper}>
+                  <View style={styles(colors, isDarkMode).suggestionIconWrapper}>
                     <Ionicons name="search" size={18} color={colors.primary} />
                   </View>
-                  <View style={styles.suggestionContent}>
-                    <Text style={styles.suggestionName} numberOfLines={1}>
+                  <View style={styles(colors, isDarkMode).suggestionContent}>
+                    <Text style={styles(colors, isDarkMode).suggestionName} numberOfLines={1}>
                       {suggestion.name}
                     </Text>
                     {suggestion.cuisine && (
-                      <Text style={styles.suggestionCuisine} numberOfLines={1}>
+                      <Text style={styles(colors, isDarkMode).suggestionCuisine} numberOfLines={1}>
                         {suggestion.cuisine}
                       </Text>
                     )}
@@ -163,7 +165,7 @@ const StickySearchHeader = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = (colors, isDarkMode) => StyleSheet.create({
   wrapper: {
     position: 'absolute',
     top: 0,
@@ -176,7 +178,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.lg,
     paddingBottom: spacing.sm,
     paddingHorizontal: spacing.md,
-    shadowColor: '#000',
+    shadowColor: colors.shadow || '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
@@ -198,7 +200,7 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   locationText: {
-    color: '#FFFFFF',
+    color: colors.text.white || '#FFFFFF',
     fontSize: 11,
     fontFamily: 'Poppins-Medium',
     marginLeft: 4,
@@ -230,11 +232,11 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 20,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs + 2,
-    shadowColor: '#000',
+    shadowColor: colors.shadow || '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
@@ -251,7 +253,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: fontSize.sm,
     fontFamily: 'Poppins-Regular',
-    color: '#333333',
+    color: colors.text.primary,
     padding: 0,
     height: 32,
   },
@@ -275,7 +277,7 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   badgeText: {
-    color: '#333333',
+    color: colors.text.primary,
     fontSize: 9,
     fontFamily: 'Poppins-Bold',
   },
@@ -288,11 +290,11 @@ const styles = StyleSheet.create({
     zIndex: 1001,
   },
   suggestionsContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 20,
     marginTop: spacing.xs,
     marginHorizontal: spacing.md,
-    shadowColor: '#000',
+    shadowColor: colors.shadow || '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.2,
     shadowRadius: 16,
@@ -309,7 +311,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: '#F5F5F5',
+    borderBottomColor: colors.border,
   },
   suggestionItemLast: {
     borderBottomWidth: 0,
@@ -318,7 +320,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#FFE5F1',
+    backgroundColor: colors.primaryLight || 'rgba(255, 105, 180, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.sm,
@@ -329,13 +331,13 @@ const styles = StyleSheet.create({
   suggestionName: {
     fontSize: fontSize.md,
     fontFamily: 'Poppins-SemiBold',
-    color: '#333333',
+    color: colors.text.primary,
     marginBottom: 2,
   },
   suggestionCuisine: {
     fontSize: fontSize.sm,
     fontFamily: 'Poppins-Regular',
-    color: '#666666',
+    color: colors.text.secondary,
   },
 });
 

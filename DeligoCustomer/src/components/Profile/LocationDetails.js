@@ -1,7 +1,8 @@
-import React from 'react';
+import React, { useMemo } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
+import { useTheme, darkMapStyle } from '../../utils/ThemeContext';
 
 const LocationDetails = ({
   colors,
@@ -32,6 +33,557 @@ const LocationDetails = ({
   savedAddresses,
   onSelectAddress,
 }) => {
+  const { isDarkMode } = useTheme();
+
+  const styles = useMemo(() => StyleSheet.create({
+    professionalLocationWrapper: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    professionalHeader: {
+      paddingVertical: 20,
+      paddingHorizontal: 20,
+      backgroundColor: colors.surface,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    professionalTitle: {
+      fontSize: 24,
+      fontWeight: '700',
+      fontFamily: 'Poppins-Bold',
+      marginBottom: 6,
+      color: colors.text.primary,
+    },
+    professionalSubtitle: {
+      fontSize: 14,
+      fontFamily: 'Poppins-Regular',
+      lineHeight: 20,
+      color: colors.text.secondary,
+    },
+    professionalScrollView: {
+      flex: 1,
+    },
+    professionalScrollContent: {
+      paddingBottom: 30,
+    },
+    internationalSearchContainer: {
+      paddingHorizontal: 16,
+      paddingTop: 16,
+      paddingBottom: 12,
+    },
+    internationalSearchBar: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      borderRadius: 12,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 3,
+      elevation: 2,
+    },
+    internationalSearchInput: {
+      flex: 1,
+      fontSize: 15,
+      fontFamily: 'Poppins-Regular',
+      marginLeft: 10,
+      marginRight: 10,
+      color: colors.text.primary,
+    },
+    searchBarActions: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+    },
+    searchClearButton: {
+      padding: 4,
+    },
+    searchGoButton: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: colors.primary,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 3,
+      elevation: 2,
+    },
+    searchLoadingIndicator: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 8,
+      gap: 8,
+    },
+    searchLoadingText: {
+      fontSize: 13,
+      fontFamily: 'Poppins-Medium',
+      color: colors.text.secondary,
+    },
+    quickActionsRow: {
+      flexDirection: 'row',
+      paddingHorizontal: 16,
+      gap: 12,
+      marginBottom: 16,
+    },
+    quickActionButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 10,
+      borderWidth: 1.5,
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+    },
+    quickActionText: {
+      fontSize: 14,
+      fontWeight: '600',
+      fontFamily: 'Poppins-SemiBold',
+      marginLeft: 8,
+      color: colors.text.secondary,
+    },
+    internationalMapPreview: {
+      paddingHorizontal: 16,
+      marginBottom: 16,
+    },
+    mapPreviewTouchable: {
+      borderRadius: 16,
+      overflow: 'hidden',
+      marginBottom: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    mapPreview: {
+      width: '100%',
+      height: 280,
+    },
+    mapPreviewPin: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      justifyContent: 'center',
+      alignItems: 'center',
+      pointerEvents: 'none',
+    },
+    mapPreviewPinCircle: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 8,
+      elevation: 8,
+      borderWidth: 3,
+      borderColor: colors.surface,
+      backgroundColor: colors.primary,
+    },
+    mapPreviewPinStem: {
+      width: 3,
+      height: 18,
+      marginTop: -1,
+      backgroundColor: colors.primary,
+    },
+    mapPreviewOverlay: {
+      position: 'absolute',
+      top: 12,
+      left: 12,
+      right: 12,
+      alignItems: 'center',
+    },
+    mapPreviewExpandButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      borderRadius: 20,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 4,
+      elevation: 4,
+      backgroundColor: colors.primary,
+    },
+    mapPreviewExpandText: {
+      fontSize: 13,
+      fontWeight: '600',
+      fontFamily: 'Poppins-SemiBold',
+      color: colors.text.white,
+      marginLeft: 6,
+    },
+    internationalConfirmButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 14,
+      paddingHorizontal: 20,
+      borderRadius: 12,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 4,
+      elevation: 3,
+      backgroundColor: colors.border,
+    },
+    internationalConfirmText: {
+      fontSize: 15,
+      fontWeight: '600',
+      fontFamily: 'Poppins-SemiBold',
+      marginLeft: 8,
+      color: colors.text.light,
+    },
+    addressConfirmedCard: {
+      marginHorizontal: 16,
+      marginBottom: 16,
+      padding: 14,
+      borderRadius: 12,
+      borderWidth: 1.5,
+      backgroundColor: isDarkMode ? colors.surfaceVariant : '#ECFDF5',
+      borderColor: colors.success,
+    },
+    addressConfirmedHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 6,
+    },
+    addressConfirmedTitle: {
+      fontSize: 13,
+      fontWeight: '700',
+      fontFamily: 'Poppins-Bold',
+      color: colors.success,
+      marginLeft: 6,
+      textTransform: 'uppercase',
+    },
+    addressConfirmedText: {
+      fontSize: 14,
+      fontFamily: 'Poppins-Medium',
+      color: colors.text.primary,
+      lineHeight: 20,
+    },
+    internationalFormSection: {
+      paddingHorizontal: 16,
+      paddingTop: 8,
+    },
+    formSectionTitle: {
+      fontSize: 18,
+      fontWeight: '700',
+      fontFamily: 'Poppins-Bold',
+      marginBottom: 4,
+      color: colors.text.primary,
+    },
+    formSectionSubtitle: {
+      fontSize: 13,
+      fontFamily: 'Poppins-Regular',
+      marginBottom: 20,
+      color: colors.text.secondary,
+    },
+    internationalFieldGroup: {
+      marginBottom: 16,
+    },
+    internationalFieldLabel: {
+      fontSize: 14,
+      fontWeight: '600',
+      fontFamily: 'Poppins-SemiBold',
+      marginBottom: 8,
+      color: colors.text.primary,
+    },
+    requiredMark: {
+      color: colors.error,
+    },
+    internationalInput: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: colors.surface,
+      borderWidth: 1.5,
+      borderRadius: 10,
+      borderColor: colors.border,
+      paddingHorizontal: 12,
+      paddingVertical: 12,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.03,
+      shadowRadius: 2,
+      elevation: 1,
+    },
+    internationalInputText: {
+      flex: 1,
+      fontSize: 15,
+      fontFamily: 'Poppins-Regular',
+      marginLeft: 10,
+      color: colors.text.primary,
+    },
+    internationalErrorRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginTop: 6,
+      marginLeft: 2,
+    },
+    internationalErrorText: {
+      fontSize: 12,
+      color: colors.error,
+      fontFamily: 'Poppins-Regular',
+      marginLeft: 4,
+    },
+    gpsCoordinatesCard: {
+      padding: 14,
+      borderRadius: 12,
+      borderWidth: 1.5,
+      marginTop: 8,
+      backgroundColor: isDarkMode ? colors.surfaceVariant : '#F0F9FF',
+      borderColor: colors.primary,
+    },
+    gpsCoordinatesHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      marginBottom: 8,
+    },
+    gpsCoordinatesLabel: {
+      fontSize: 12,
+      fontWeight: '700',
+      fontFamily: 'Poppins-Bold',
+      color: colors.primary,
+      marginLeft: 6,
+      textTransform: 'uppercase',
+      letterSpacing: 0.5,
+    },
+    gpsCoordinatesValue: {
+      fontSize: 13,
+      fontFamily: 'Poppins-Medium',
+      color: colors.text.secondary,
+      marginBottom: 8,
+    },
+    gpsCoordinatesStatus: {
+      flexDirection: 'row',
+      alignItems: 'center',
+    },
+    gpsCoordinatesStatusText: {
+      fontSize: 12,
+      fontWeight: '600',
+      fontFamily: 'Poppins-SemiBold',
+      color: colors.success,
+      marginLeft: 4,
+    },
+    professionalHelpCard: {
+      flexDirection: 'row',
+      alignItems: 'flex-start',
+      paddingVertical: 14,
+      paddingHorizontal: 14,
+      borderRadius: 10,
+      marginTop: 20,
+      marginBottom: 10,
+      borderLeftWidth: 3,
+    },
+    professionalHelpContent: {
+      flex: 1,
+      marginLeft: 10,
+    },
+    professionalHelpTitle: {
+      fontSize: 14,
+      fontWeight: '600',
+      fontFamily: 'Poppins-SemiBold',
+      marginBottom: 4,
+    },
+    professionalHelpText: {
+      fontSize: 13,
+      fontFamily: 'Poppins-Regular',
+      lineHeight: 20,
+    },
+    fullScreenMapContainer: {
+      flex: 1,
+      backgroundColor: '#000',
+    },
+    fullScreenMap: {
+      ...StyleSheet.absoluteFillObject,
+    },
+    fullScreenPin: {
+      position: 'absolute',
+      top: 0,
+      left: 0,
+      right: 0,
+      bottom: 0,
+      justifyContent: 'center',
+      alignItems: 'center',
+      pointerEvents: 'none',
+    },
+    fullScreenPinCircle: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.35,
+      shadowRadius: 12,
+      elevation: 12,
+      borderWidth: 4,
+      borderColor: colors.surface,
+      backgroundColor: colors.primary,
+    },
+    fullScreenPinStem: {
+      width: 4,
+      height: 24,
+      marginTop: -1,
+      backgroundColor: colors.primary,
+    },
+    fullScreenPinShadow: {
+      width: 28,
+      height: 12,
+      borderRadius: 14,
+      backgroundColor: 'rgba(0, 0, 0, 0.3)',
+      marginTop: 8,
+    },
+    fullScreenControls: {
+      position: 'absolute',
+      top: 16,
+      left: 16,
+      right: 16,
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      alignItems: 'flex-start',
+      zIndex: 10,
+    },
+    fullScreenButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      paddingVertical: 12,
+      paddingHorizontal: 16,
+      borderRadius: 12,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 6,
+      elevation: 6,
+      backgroundColor: colors.surface,
+    },
+    fullScreenButtonText: {
+      fontSize: 14,
+      fontWeight: '600',
+      fontFamily: 'Poppins-SemiBold',
+      marginLeft: 8,
+      color: colors.primary,
+    },
+    fullScreenRightControls: {
+      alignItems: 'flex-end',
+    },
+    fullScreenIconButton: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      justifyContent: 'center',
+      alignItems: 'center',
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.15,
+      shadowRadius: 6,
+      elevation: 6,
+      backgroundColor: colors.surface,
+    },
+    fullScreenZoomButtons: {
+      marginTop: 12,
+    },
+    fullScreenConfirmContainer: {
+      position: 'absolute',
+      bottom: 24,
+      left: 16,
+      right: 16,
+      zIndex: 10,
+    },
+    fullScreenConfirmButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 16,
+      paddingHorizontal: 24,
+      borderRadius: 14,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.25,
+      shadowRadius: 10,
+      elevation: 10,
+      backgroundColor: colors.primary,
+    },
+    fullScreenConfirmText: {
+      fontSize: 16,
+      fontWeight: '700',
+      fontFamily: 'Poppins-Bold',
+      color: colors.text.white,
+      marginLeft: 10,
+    },
+    labelButton: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingVertical: 10,
+      backgroundColor: colors.surface,
+      borderWidth: 1,
+      borderColor: colors.border,
+      borderRadius: 8,
+      gap: 6,
+    },
+    labelButtonText: {
+      fontSize: 14,
+      fontFamily: 'Poppins-Medium',
+      color: colors.text.secondary,
+    },
+    savedAddressesSection: {
+      marginTop: 20,
+      marginBottom: 20,
+    },
+    savedAddressCard: {
+      backgroundColor: colors.surface,
+      padding: 12,
+      borderRadius: 12,
+      width: 160,
+      borderWidth: 1,
+      borderColor: colors.border,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 1 },
+      shadowOpacity: 0.05,
+      shadowRadius: 2,
+      elevation: 2,
+    },
+    savedAddressIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 18,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 8,
+      backgroundColor: colors.primary + '15',
+    },
+    savedAddressLabel: {
+      fontSize: 14,
+      fontFamily: 'Poppins-SemiBold',
+      marginBottom: 2,
+      color: colors.text.primary,
+    },
+    savedAddressText: {
+      fontSize: 12,
+      color: colors.text.secondary,
+      marginBottom: 1,
+    },
+    savedAddressSubText: {
+      fontSize: 11,
+      color: colors.text.light,
+    },
+  }), [colors, isDarkMode]);
+
   const labels = [
     { id: 'Home', icon: 'home', label: 'Home' },
     { id: 'Work', icon: 'briefcase', label: 'Work' },
@@ -75,11 +627,12 @@ const LocationDetails = ({
             scrollEnabled={true}
             pitchEnabled={false}
             rotateEnabled={false}
+            customMapStyle={isDarkMode ? darkMapStyle : []}
           />
 
           <View style={styles.fullScreenPin} pointerEvents="none">
             <View style={[styles.fullScreenPinCircle, { backgroundColor: colors.primary }]}>
-              <Ionicons name="business" size={22} color="#fff" />
+              <Ionicons name="business" size={22} color={colors.text.white} />
             </View>
             <View style={[styles.fullScreenPinStem, { backgroundColor: colors.primary }]} />
             <View style={styles.fullScreenPinShadow} />
@@ -87,7 +640,7 @@ const LocationDetails = ({
 
           <View style={styles.fullScreenControls}>
             <TouchableOpacity
-              style={[styles.fullScreenButton, { backgroundColor: '#fff' }]}
+              style={[styles.fullScreenButton, { backgroundColor: colors.surface }]}
               onPress={() => setIsMapFullScreen(false)}
             >
               <Ionicons name="contract" size={20} color={colors.primary} />
@@ -96,7 +649,7 @@ const LocationDetails = ({
 
             <View style={styles.fullScreenRightControls}>
               <TouchableOpacity
-                style={[styles.fullScreenIconButton, { backgroundColor: '#fff' }]}
+                style={[styles.fullScreenIconButton, { backgroundColor: colors.surface }]}
                 onPress={() => {
                   if (!isLoadingLocation) {
                     getCurrentLocation();
@@ -113,7 +666,7 @@ const LocationDetails = ({
 
               <View style={styles.fullScreenZoomButtons}>
                 <TouchableOpacity
-                  style={[styles.fullScreenIconButton, { backgroundColor: '#fff', marginBottom: 8 }]}
+                  style={[styles.fullScreenIconButton, { backgroundColor: colors.surface, marginBottom: 8 }]}
                   onPress={() => {
                     setMapRegion(prev => ({
                       ...prev,
@@ -125,7 +678,7 @@ const LocationDetails = ({
                   <Ionicons name="add" size={22} color={colors.primary} />
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.fullScreenIconButton, { backgroundColor: '#fff' }]}
+                  style={[styles.fullScreenIconButton, { backgroundColor: colors.surface }]}
                   onPress={() => {
                     setMapRegion(prev => ({
                       ...prev,
@@ -143,7 +696,7 @@ const LocationDetails = ({
           <View style={styles.fullScreenConfirmContainer}>
             <TouchableOpacity
               style={[styles.fullScreenConfirmButton, {
-                backgroundColor: markerCoordinate ? colors.primary : '#CCCCCC',
+                backgroundColor: markerCoordinate ? colors.primary : colors.border,
               }]}
               onPress={async () => {
                 if (markerCoordinate) {
@@ -155,12 +708,12 @@ const LocationDetails = ({
             >
               {isLoadingLocation ? (
                 <>
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color={colors.text.white} />
                   <Text style={styles.fullScreenConfirmText}>Getting Address...</Text>
                 </>
               ) : (
                 <>
-                  <Ionicons name="checkmark-circle" size={24} color="#fff" />
+                  <Ionicons name="checkmark-circle" size={24} color={colors.text.white} />
                   <Text style={styles.fullScreenConfirmText}>Confirm Location</Text>
                 </>
               )}
@@ -176,12 +729,12 @@ const LocationDetails = ({
           contentContainerStyle={styles.professionalScrollContent}
         >
           <View style={styles.internationalSearchContainer}>
-            <View style={[styles.internationalSearchBar, { backgroundColor: '#fff', borderColor: '#E5E7EB' }]}>
-              <Ionicons name="search" size={20} color="#9CA3AF" />
+            <View style={[styles.internationalSearchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+              <Ionicons name="search" size={20} color={colors.text.light} />
               <TextInput
                 style={[styles.internationalSearchInput, { color: colors.text.primary }]}
                 placeholder="Search for your business address..."
-                placeholderTextColor="#9CA3AF"
+                placeholderTextColor={colors.text.light}
                 value={searchLocation}
                 onChangeText={setSearchLocation}
                 onSubmitEditing={searchAddress}
@@ -194,7 +747,7 @@ const LocationDetails = ({
                     onPress={() => setSearchLocation('')}
                     style={styles.searchClearButton}
                   >
-                    <Ionicons name="close-circle" size={20} color="#9CA3AF" />
+                    <Ionicons name="close-circle" size={20} color={colors.text.light} />
                   </TouchableOpacity>
                   <TouchableOpacity
                     onPress={searchAddress}
@@ -202,9 +755,9 @@ const LocationDetails = ({
                     disabled={isLoadingLocation}
                   >
                     {isLoadingLocation ? (
-                      <ActivityIndicator size="small" color="#fff" />
+                      <ActivityIndicator size="small" color={colors.text.white} />
                     ) : (
-                      <Ionicons name="arrow-forward" size={18} color="#fff" />
+                      <Ionicons name="arrow-forward" size={18} color={colors.text.white} />
                     )}
                   </TouchableOpacity>
                 </View>
@@ -223,7 +776,7 @@ const LocationDetails = ({
           <View style={styles.quickActionsRow}>
             <TouchableOpacity
               style={[styles.quickActionButton, {
-                backgroundColor: '#fff',
+                backgroundColor: colors.surface,
                 borderColor: colors.primary,
               }]}
               onPress={() => {
@@ -245,13 +798,13 @@ const LocationDetails = ({
 
             <TouchableOpacity
               style={[styles.quickActionButton, {
-                backgroundColor: '#fff',
-                borderColor: '#E5E7EB',
+                backgroundColor: colors.surface,
+                borderColor: colors.border,
               }]}
               onPress={() => setIsMapFullScreen(true)}
             >
-              <Ionicons name="expand" size={20} color="#6B7280" />
-              <Text style={[styles.quickActionText, { color: '#6B7280' }]}>
+              <Ionicons name="expand" size={20} color={colors.text.secondary} />
+              <Text style={[styles.quickActionText, { color: colors.text.secondary }]}>
                 Full Map
               </Text>
             </TouchableOpacity>
@@ -273,18 +826,19 @@ const LocationDetails = ({
                 rotateEnabled={false}
                 showsUserLocation={locationPermission}
                 showsMyLocationButton={false}
+                customMapStyle={isDarkMode ? darkMapStyle : []}
               />
 
               <View style={styles.mapPreviewPin} pointerEvents="none">
                 <View style={[styles.mapPreviewPinCircle, { backgroundColor: colors.primary }]}>
-                  <Ionicons name="business" size={18} color="#fff" />
+                  <Ionicons name="business" size={18} color={colors.text.white} />
                 </View>
                 <View style={[styles.mapPreviewPinStem, { backgroundColor: colors.primary }]} />
               </View>
 
               <View style={styles.mapPreviewOverlay}>
                 <View style={[styles.mapPreviewExpandButton, { backgroundColor: colors.primary }]}>
-                  <Ionicons name="expand" size={18} color="#fff" />
+                  <Ionicons name="expand" size={18} color={colors.text.white} />
                   <Text style={styles.mapPreviewExpandText}>Tap to expand map</Text>
                 </View>
               </View>
@@ -292,7 +846,7 @@ const LocationDetails = ({
 
             <TouchableOpacity
               style={[styles.internationalConfirmButton, {
-                backgroundColor: markerCoordinate ? colors.primary : '#E5E7EB',
+                backgroundColor: markerCoordinate ? colors.primary : colors.border,
               }]}
               onPress={async () => {
                 if (markerCoordinate) {
@@ -303,18 +857,18 @@ const LocationDetails = ({
             >
               {isLoadingLocation ? (
                 <>
-                  <ActivityIndicator size="small" color="#fff" />
+                  <ActivityIndicator size="small" color={colors.text.white} />
                   <Text style={[styles.internationalConfirmText, {
-                    color: markerCoordinate ? '#fff' : '#9CA3AF'
+                    color: markerCoordinate ? colors.text.white : colors.text.light
                   }]}>
                     Getting Address...
                   </Text>
                 </>
               ) : (
                 <>
-                  <Ionicons name="checkmark-circle" size={20} color={markerCoordinate ? '#fff' : '#9CA3AF'} />
+                  <Ionicons name="checkmark-circle" size={20} color={markerCoordinate ? colors.text.white : colors.text.light} />
                   <Text style={[styles.internationalConfirmText, {
-                    color: markerCoordinate ? '#fff' : '#9CA3AF'
+                    color: markerCoordinate ? colors.text.white : colors.text.light
                   }]}>
                     {streetAddress ? 'Update Location' : 'Confirm & Get Address'}
                   </Text>
@@ -325,11 +879,11 @@ const LocationDetails = ({
 
           {streetAddress && (
             <View style={[styles.addressConfirmedCard, {
-              backgroundColor: '#ECFDF5',
-              borderColor: '#10B981',
+              backgroundColor: isDarkMode ? colors.surfaceVariant : '#ECFDF5',
+              borderColor: colors.success,
             }]}>
               <View style={styles.addressConfirmedHeader}>
-                <Ionicons name="checkmark-circle" size={20} color="#10B981" />
+                <Ionicons name="checkmark-circle" size={20} color={colors.success} />
                 <Text style={styles.addressConfirmedTitle}>Location Confirmed</Text>
               </View>
               <Text style={styles.addressConfirmedText}>
@@ -361,11 +915,11 @@ const LocationDetails = ({
                     <Ionicons
                       name={l.icon}
                       size={18}
-                      color={label === l.id ? '#fff' : '#6B7280'}
+                      color={label === l.id ? colors.text.white : colors.text.secondary}
                     />
                     <Text style={[
                       styles.labelButtonText,
-                      label === l.id && { color: '#fff', fontWeight: '600' }
+                      label === l.id && { color: colors.text.white, fontWeight: '600' }
                     ]}>
                       {l.label}
                     </Text>
@@ -379,13 +933,13 @@ const LocationDetails = ({
                 Street Address <Text style={styles.requiredMark}>*</Text>
               </Text>
               <View style={[styles.internationalInput, {
-                borderColor: fieldErrors.streetAddress ? '#EF4444' : '#E5E7EB',
+                borderColor: fieldErrors.streetAddress ? colors.error : colors.border,
               }]}>
-                <Ionicons name="home-outline" size={20} color="#6B7280" />
+                <Ionicons name="home-outline" size={20} color={colors.text.secondary} />
                 <TextInput
                   style={[styles.internationalInputText, { color: colors.text.primary }]}
                   placeholder="House 32, Road 14"
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={colors.text.light}
                   value={streetAddress}
                   onChangeText={(text) => {
                     setStreetAddress(text);
@@ -395,7 +949,7 @@ const LocationDetails = ({
               </View>
               {fieldErrors.streetAddress && (
                 <View style={styles.internationalErrorRow}>
-                  <Ionicons name="alert-circle" size={14} color="#EF4444" />
+                  <Ionicons name="alert-circle" size={14} color={colors.error} />
                   <Text style={styles.internationalErrorText}>{fieldErrors.streetAddress}</Text>
                 </View>
               )}
@@ -406,13 +960,13 @@ const LocationDetails = ({
                 City <Text style={styles.requiredMark}>*</Text>
               </Text>
               <View style={[styles.internationalInput, {
-                borderColor: fieldErrors.city ? '#EF4444' : '#E5E7EB',
+                borderColor: fieldErrors.city ? colors.error : colors.border,
               }]}>
-                <Ionicons name="location-outline" size={20} color="#6B7280" />
+                <Ionicons name="location-outline" size={20} color={colors.text.secondary} />
                 <TextInput
                   style={[styles.internationalInputText, { color: colors.text.primary }]}
                   placeholder="Dhaka"
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={colors.text.light}
                   value={city}
                   onChangeText={(text) => {
                     setCity(text);
@@ -422,7 +976,7 @@ const LocationDetails = ({
               </View>
               {fieldErrors.city && (
                 <View style={styles.internationalErrorRow}>
-                  <Ionicons name="alert-circle" size={14} color="#EF4444" />
+                  <Ionicons name="alert-circle" size={14} color={colors.error} />
                   <Text style={styles.internationalErrorText}>{fieldErrors.city}</Text>
                 </View>
               )}
@@ -433,13 +987,13 @@ const LocationDetails = ({
                 Postal Code / ZIP Code <Text style={styles.requiredMark}>*</Text>
               </Text>
               <View style={[styles.internationalInput, {
-                borderColor: fieldErrors.postalCode ? '#EF4444' : '#E5E7EB',
+                borderColor: fieldErrors.postalCode ? colors.error : colors.border,
               }]}>
-                <Ionicons name="mail-outline" size={20} color="#6B7280" />
+                <Ionicons name="mail-outline" size={20} color={colors.text.secondary} />
                 <TextInput
                   style={[styles.internationalInputText, { color: colors.text.primary }]}
                   placeholder="10001"
-                  placeholderTextColor="#9CA3AF"
+                  placeholderTextColor={colors.text.light}
                   value={postalCode}
                   onChangeText={(text) => {
                     setPostalCode(text);
@@ -450,7 +1004,7 @@ const LocationDetails = ({
               </View>
               {fieldErrors.postalCode && (
                 <View style={styles.internationalErrorRow}>
-                  <Ionicons name="alert-circle" size={14} color="#EF4444" />
+                  <Ionicons name="alert-circle" size={14} color={colors.error} />
                   <Text style={styles.internationalErrorText}>{fieldErrors.postalCode}</Text>
                 </View>
               )}
@@ -458,18 +1012,18 @@ const LocationDetails = ({
 
             {markerCoordinate && (
               <View style={[styles.gpsCoordinatesCard, {
-                backgroundColor: '#F0F9FF',
-                borderColor: '#3B82F6',
+                backgroundColor: isDarkMode ? colors.surfaceVariant : '#F0F9FF',
+                borderColor: colors.primary,
               }]}>
                 <View style={styles.gpsCoordinatesHeader}>
-                  <Ionicons name="navigate-circle" size={20} color="#3B82F6" />
+                  <Ionicons name="navigate-circle" size={20} color={colors.primary} />
                   <Text style={styles.gpsCoordinatesLabel}>GPS Coordinates</Text>
                 </View>
                 <Text style={styles.gpsCoordinatesValue}>
                   Lat: {markerCoordinate.latitude.toFixed(7)}, Lng: {markerCoordinate.longitude.toFixed(7)}
                 </Text>
                 <View style={styles.gpsCoordinatesStatus}>
-                  <Ionicons name="checkmark-circle" size={16} color="#10B981" />
+                  <Ionicons name="checkmark-circle" size={16} color={colors.success} />
                   <Text style={styles.gpsCoordinatesStatusText}>Verified</Text>
                 </View>
               </View>
@@ -517,521 +1071,6 @@ const LocationDetails = ({
   );
 };
 
-const styles = StyleSheet.create({
-  professionalLocationWrapper: {
-    flex: 1,
-    backgroundColor: '#F9FAFB',
-  },
-  professionalHeader: {
-    paddingVertical: 20,
-    paddingHorizontal: 20,
-    backgroundColor: '#FFFFFF',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
-  },
-  professionalTitle: {
-    fontSize: 24,
-    fontWeight: '700',
-    fontFamily: 'Poppins-Bold',
-    marginBottom: 6,
-  },
-  professionalSubtitle: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Regular',
-    lineHeight: 20,
-  },
-  professionalScrollView: {
-    flex: 1,
-  },
-  professionalScrollContent: {
-    paddingBottom: 30,
-  },
-  internationalSearchContainer: {
-    paddingHorizontal: 16,
-    paddingTop: 16,
-    paddingBottom: 12,
-  },
-  internationalSearchBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: 14,
-    paddingVertical: 12,
-    borderRadius: 12,
-    borderWidth: 1,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  internationalSearchInput: {
-    flex: 1,
-    fontSize: 15,
-    fontFamily: 'Poppins-Regular',
-    marginLeft: 10,
-    marginRight: 10,
-  },
-  searchBarActions: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 8,
-  },
-  searchClearButton: {
-    padding: 4,
-  },
-  searchGoButton: {
-    width: 32,
-    height: 32,
-    borderRadius: 16,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 3,
-    elevation: 2,
-  },
-  searchLoadingIndicator: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 8,
-    gap: 8,
-  },
-  searchLoadingText: {
-    fontSize: 13,
-    fontFamily: 'Poppins-Medium',
-  },
-  quickActionsRow: {
-    flexDirection: 'row',
-    paddingHorizontal: 16,
-    gap: 12,
-    marginBottom: 16,
-  },
-  quickActionButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 10,
-    borderWidth: 1.5,
-  },
-  quickActionText: {
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: 'Poppins-SemiBold',
-    marginLeft: 8,
-  },
-  internationalMapPreview: {
-    paddingHorizontal: 16,
-    marginBottom: 16,
-  },
-  mapPreviewTouchable: {
-    borderRadius: 16,
-    overflow: 'hidden',
-    marginBottom: 12,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-  },
-  mapPreview: {
-    width: '100%',
-    height: 280,
-  },
-  mapPreviewPin: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    pointerEvents: 'none',
-  },
-  mapPreviewPinCircle: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 8,
-    elevation: 8,
-    borderWidth: 3,
-    borderColor: '#fff',
-  },
-  mapPreviewPinStem: {
-    width: 3,
-    height: 18,
-    marginTop: -1,
-  },
-  mapPreviewOverlay: {
-    position: 'absolute',
-    top: 12,
-    left: 12,
-    right: 12,
-    alignItems: 'center',
-  },
-  mapPreviewExpandButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 8,
-    paddingHorizontal: 14,
-    borderRadius: 20,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 4,
-  },
-  mapPreviewExpandText: {
-    fontSize: 13,
-    fontWeight: '600',
-    fontFamily: 'Poppins-SemiBold',
-    color: '#fff',
-    marginLeft: 6,
-  },
-  internationalConfirmButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 14,
-    paddingHorizontal: 20,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  internationalConfirmText: {
-    fontSize: 15,
-    fontWeight: '600',
-    fontFamily: 'Poppins-SemiBold',
-    marginLeft: 8,
-  },
-  addressConfirmedCard: {
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
-  },
-  addressConfirmedHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 6,
-  },
-  addressConfirmedTitle: {
-    fontSize: 13,
-    fontWeight: '700',
-    fontFamily: 'Poppins-Bold',
-    color: '#10B981',
-    marginLeft: 6,
-    textTransform: 'uppercase',
-  },
-  addressConfirmedText: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Medium',
-    color: '#065F46',
-    lineHeight: 20,
-  },
-  internationalFormSection: {
-    paddingHorizontal: 16,
-    paddingTop: 8,
-  },
-  formSectionTitle: {
-    fontSize: 18,
-    fontWeight: '700',
-    fontFamily: 'Poppins-Bold',
-    marginBottom: 4,
-  },
-  formSectionSubtitle: {
-    fontSize: 13,
-    fontFamily: 'Poppins-Regular',
-    marginBottom: 20,
-  },
-  internationalFieldGroup: {
-    marginBottom: 16,
-  },
-  internationalFieldLabel: {
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: 'Poppins-SemiBold',
-    marginBottom: 8,
-  },
-  requiredMark: {
-    color: '#EF4444',
-  },
-  internationalInput: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: '#fff',
-    borderWidth: 1.5,
-    borderRadius: 10,
-    paddingHorizontal: 12,
-    paddingVertical: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.03,
-    shadowRadius: 2,
-    elevation: 1,
-  },
-  internationalInputText: {
-    flex: 1,
-    fontSize: 15,
-    fontFamily: 'Poppins-Regular',
-    marginLeft: 10,
-  },
-  internationalErrorRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 6,
-    marginLeft: 2,
-  },
-  internationalErrorText: {
-    fontSize: 12,
-    color: '#EF4444',
-    fontFamily: 'Poppins-Regular',
-    marginLeft: 4,
-  },
-  gpsCoordinatesCard: {
-    padding: 14,
-    borderRadius: 12,
-    borderWidth: 1.5,
-    marginTop: 8,
-  },
-  gpsCoordinatesHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginBottom: 8,
-  },
-  gpsCoordinatesLabel: {
-    fontSize: 12,
-    fontWeight: '700',
-    fontFamily: 'Poppins-Bold',
-    color: '#3B82F6',
-    marginLeft: 6,
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-  },
-  gpsCoordinatesValue: {
-    fontSize: 13,
-    fontFamily: 'Poppins-Medium',
-    color: '#1E40AF',
-    marginBottom: 8,
-  },
-  gpsCoordinatesStatus: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  gpsCoordinatesStatusText: {
-    fontSize: 12,
-    fontWeight: '600',
-    fontFamily: 'Poppins-SemiBold',
-    color: '#10B981',
-    marginLeft: 4,
-  },
-  professionalHelpCard: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderRadius: 10,
-    marginTop: 20,
-    marginBottom: 10,
-    borderLeftWidth: 3,
-  },
-  professionalHelpContent: {
-    flex: 1,
-    marginLeft: 10,
-  },
-  professionalHelpTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: 'Poppins-SemiBold',
-    marginBottom: 4,
-  },
-  professionalHelpText: {
-    fontSize: 13,
-    fontFamily: 'Poppins-Regular',
-    lineHeight: 20,
-  },
-  fullScreenMapContainer: {
-    flex: 1,
-    backgroundColor: '#000',
-  },
-  fullScreenMap: {
-    ...StyleSheet.absoluteFillObject,
-  },
-  fullScreenPin: {
-    position: 'absolute',
-    top: 0,
-    left: 0,
-    right: 0,
-    bottom: 0,
-    justifyContent: 'center',
-    alignItems: 'center',
-    pointerEvents: 'none',
-  },
-  fullScreenPinCircle: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.35,
-    shadowRadius: 12,
-    elevation: 12,
-    borderWidth: 4,
-    borderColor: '#fff',
-  },
-  fullScreenPinStem: {
-    width: 4,
-    height: 24,
-    marginTop: -1,
-  },
-  fullScreenPinShadow: {
-    width: 28,
-    height: 12,
-    borderRadius: 14,
-    backgroundColor: 'rgba(0, 0, 0, 0.3)',
-    marginTop: 8,
-  },
-  fullScreenControls: {
-    position: 'absolute',
-    top: 16,
-    left: 16,
-    right: 16,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'flex-start',
-    zIndex: 10,
-  },
-  fullScreenButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-    borderRadius: 12,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 6,
-  },
-  fullScreenButtonText: {
-    fontSize: 14,
-    fontWeight: '600',
-    fontFamily: 'Poppins-SemiBold',
-    marginLeft: 8,
-  },
-  fullScreenRightControls: {
-    alignItems: 'flex-end',
-  },
-  fullScreenIconButton: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    justifyContent: 'center',
-    alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 6,
-  },
-  fullScreenZoomButtons: {
-    marginTop: 12,
-  },
-  fullScreenConfirmContainer: {
-    position: 'absolute',
-    bottom: 24,
-    left: 16,
-    right: 16,
-    zIndex: 10,
-  },
-  fullScreenConfirmButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 14,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.25,
-    shadowRadius: 10,
-    elevation: 10,
-  },
-  fullScreenConfirmText: {
-    fontSize: 16,
-    fontWeight: '700',
-    fontFamily: 'Poppins-Bold',
-    color: '#fff',
-    marginLeft: 10,
-  },
-  labelButton: {
-    flex: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingVertical: 10,
-    backgroundColor: '#fff',
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    borderRadius: 8,
-    gap: 6,
-  },
-  labelButtonText: {
-    fontSize: 14,
-    color: '#374151',
-    fontFamily: 'Poppins-Medium',
-  },
-  savedAddressesSection: {
-    marginTop: 20,
-    marginBottom: 20,
-  },
-  savedAddressCard: {
-    backgroundColor: '#fff',
-    padding: 12,
-    borderRadius: 12,
-    width: 160,
-    borderWidth: 1,
-    borderColor: '#E5E7EB',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
-    elevation: 2,
-  },
-  savedAddressIcon: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 8,
-  },
-  savedAddressLabel: {
-    fontSize: 14,
-    fontFamily: 'Poppins-SemiBold',
-    marginBottom: 2,
-  },
-  savedAddressText: {
-    fontSize: 12,
-    color: '#6B7280',
-    marginBottom: 1,
-  },
-  savedAddressSubText: {
-    fontSize: 11,
-    color: '#9CA3AF',
-  },
-});
+
 
 export default LocationDetails;

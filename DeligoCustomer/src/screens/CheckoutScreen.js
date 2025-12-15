@@ -55,7 +55,7 @@ const ConsumerLocationDisplay = ({ colors, t }) => {
 };
 
 const CheckoutScreen = ({ route, navigation }) => {
-  const { colors } = useTheme();
+  const { colors, isDark } = useTheme();
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const { cartData } = route.params || {};
@@ -83,6 +83,7 @@ const CheckoutScreen = ({ route, navigation }) => {
     const createCheckoutOnEnter = async () => {
       try {
         setInitializingCheckout(true);
+        setStripeError(null);
         console.debug('[CheckoutScreen] Creating checkout via API with useCart=true');
 
         const res = await CheckoutAPI.createCheckout(true);
@@ -91,7 +92,8 @@ const CheckoutScreen = ({ route, navigation }) => {
         if (canceled) return;
 
         if (!res.success) {
-          setStripeError(res.error || 'Failed to initialize checkout');
+          const msg = typeof res.error === 'string' ? res.error : (res.error?.message || 'Failed to initialize checkout');
+          setStripeError(msg);
           setInitializingCheckout(false);
           return;
         }
@@ -176,6 +178,14 @@ const CheckoutScreen = ({ route, navigation }) => {
     return sum + unitTax * (it.quantity || 0);
   }, 0);
   const total = subtotalAfterDiscount + taxAmount;
+
+  // Debug: Log checkoutResponse to verify it's being populated
+  console.debug('[CheckoutScreen] Render - checkoutResponse:', checkoutResponse, 'local total:', total);
+
+  // Use server's finalAmount when available, fallback to local calculation
+  // Note: checkoutResponse stores {success, message, data: {finalAmount}}
+  const serverFinalAmount = checkoutResponse?.data?.finalAmount;
+  const displayTotal = (typeof serverFinalAmount === 'number') ? serverFinalAmount : total;
 
   // Set initial notes from cart delivery instructions
   useEffect(() => {
@@ -377,7 +387,7 @@ const CheckoutScreen = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={styles(colors).container} edges={['top']}>
-      <StatusBar barStyle="dark-content" backgroundColor={colors.surface} />
+      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.surface} />
 
       {/* Header */}
       <View style={styles(colors).header}>
@@ -580,7 +590,16 @@ const CheckoutScreen = ({ route, navigation }) => {
           <View style={styles(colors).summaryRows}>
             <View style={styles(colors).summaryRow}>
               <Text style={styles(colors).summaryLabel}>{t('subtotal')}</Text>
-              <Text style={styles(colors).summaryValue}>{formatCurrency(currency, baseSubtotal)}</Text>
+              <Text style={styles(colors).summaryValue}>
+                {formatCurrency(currency, checkoutResponse?.subTotal || baseSubtotal)}
+              </Text>
+            </View>
+
+            <View style={styles(colors).summaryRow}>
+              <Text style={styles(colors).summaryLabel}>Delivery Fee</Text>
+              <Text style={styles(colors).summaryValue}>
+                {formatCurrency(currency, checkoutResponse?.deliveryCharge || 0)}
+              </Text>
             </View>
 
             {discountTotal > 0 && (
@@ -595,22 +614,29 @@ const CheckoutScreen = ({ route, navigation }) => {
 
             <View style={styles(colors).summaryRow}>
               <Text style={styles(colors).summaryLabel}>{t('tax')}</Text>
-              <Text style={styles(colors).summaryValue}>{formatCurrency(currency, taxAmount)}</Text>
+              <Text style={styles(colors).summaryValue}>
+                {formatCurrency(currency, checkoutResponse?.tax || taxAmount)}
+              </Text>
             </View>
 
-            <View style={styles(colors).summaryDivider} />
+            <View style={styles(colors).divider} />
 
-            <View style={styles(colors).totalSummaryRow}>
-              <Text style={styles(colors).totalSummaryLabel}>{t('total')}</Text>
-              <Text style={styles(colors).totalSummaryValue}>{formatCurrency(currency, total)}</Text>
+            <View style={styles(colors).summaryRow}>
+              <Text style={styles(colors).totalLabel}>{t('total')}</Text>
+              <Text style={styles(colors).totalValue}>
+                {formatCurrency(currency, displayTotal)}
+              </Text>
             </View>
           </View>
         </View>
 
         {/* Payment Error Banner */}
-        {stripeError && (
+        {!!stripeError && (
           <View style={{ backgroundColor: '#FFEBEE', padding: 12, borderRadius: 12, marginHorizontal: spacing.lg, marginBottom: 12, borderWidth: 1, borderColor: '#F44336' }}>
-            <Text style={{ color: '#D32F2F', fontFamily: 'Poppins-Medium', fontSize: 13 }}>{stripeError}</Text>
+            <Text style={{ color: '#D32F2F', fontFamily: 'Poppins-Medium', fontSize: 13 }}>{typeof stripeError === 'string' ? stripeError : t('error')}</Text>
+            <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 8 }}>
+              <Text style={{ color: '#D32F2F', fontFamily: 'Poppins-Bold', textDecorationLine: 'underline' }}>{t('goBack')}</Text>
+            </TouchableOpacity>
           </View>
         )}
 
@@ -618,7 +644,7 @@ const CheckoutScreen = ({ route, navigation }) => {
         {initializingCheckout && (
           <View style={{ backgroundColor: '#E3F2FD', padding: 12, borderRadius: 12, marginHorizontal: spacing.lg, marginBottom: 12, borderWidth: 1, borderColor: '#2196F3', flexDirection: 'row', alignItems: 'center' }}>
             <ActivityIndicator size="small" color="#1976D2" style={{ marginRight: 8 }} />
-            <Text style={{ color: '#1565C0', fontFamily: 'Poppins-Medium', fontSize: 13 }}>Preparing checkout...</Text>
+            <Text style={{ color: '#1565C0', fontFamily: 'Poppins-Medium', fontSize: 13 }}>{t('preparingCheckout')}</Text>
           </View>
         )}
 
@@ -626,7 +652,7 @@ const CheckoutScreen = ({ route, navigation }) => {
         <View style={styles(colors).checkoutButtonContainer}>
           <View style={styles(colors).totalBarInline}>
             <Text style={styles(colors).totalBarLabel}>{t('total')}</Text>
-            <Text style={styles(colors).totalBarAmount}>{formatCurrency(currency, total)}</Text>
+            <Text style={styles(colors).totalBarAmount}>{formatCurrency(currency, displayTotal)}</Text>
           </View>
           <TouchableOpacity
             style={[
@@ -641,9 +667,9 @@ const CheckoutScreen = ({ route, navigation }) => {
               {isProcessing
                 ? t('processing')
                 : initializingCheckout
-                  ? 'Preparing...'
+                  ? t('preparingCheckout')
                   : !stripeReady
-                    ? 'Initializing Payment...'
+                    ? t('initializingPayment')
                     : t('placeOrder')}
             </Text>
             <View style={styles(colors).placeOrderArrow}>
@@ -662,7 +688,7 @@ const CheckoutScreen = ({ route, navigation }) => {
 
       {renderProcessingModal()}
       {renderSuccessModal()}
-    </SafeAreaView>
+    </SafeAreaView >
   );
 };
 

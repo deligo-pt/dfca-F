@@ -1,7 +1,8 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, TextInput, ScrollView, Image, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, fontSize } from '../theme';
+import { spacing, fontSize } from '../theme';
+import { useTheme } from '../utils/ThemeContext';
 
 const LocationHeader = ({
   location,
@@ -23,6 +24,7 @@ const LocationHeader = ({
   onShopPress,
   userName = null, // for personalized greeting
 }) => {
+  const { colors, isDarkMode } = useTheme();
   const [isSearchFocused, setIsSearchFocused] = useState(false);
 
   const handleSearchChange = (text) => {
@@ -39,70 +41,70 @@ const LocationHeader = ({
   };
 
   return (
-    <View style={styles.wrapper}>
+    <View style={styles(colors, isDarkMode).wrapper}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-      <View style={styles.container}>
+      <View style={styles(colors, isDarkMode).container}>
         {/* Header Row: Greeting + Location + Icons */}
-        <View style={styles.headerRow}>
+        <View style={styles(colors, isDarkMode).headerRow}>
           {/* Left side: Greeting and Location */}
-          <View style={styles.leftSection}>
-            <Text style={styles.greetingText}>Good Afternoon</Text>
+          <View style={styles(colors, isDarkMode).leftSection}>
+            <Text style={styles(colors, isDarkMode).greetingText}>Good Afternoon</Text>
             <TouchableOpacity
-              style={styles.locationButton}
+              style={styles(colors, isDarkMode).locationButton}
               onPress={onLocationPress}
               activeOpacity={0.7}
             >
               {loading ? (
-                <ActivityIndicator size="small" color={colors.text.white} />
+                <ActivityIndicator size="small" color={colors.text.white || '#FFFFFF'} />
               ) : errorMsg ? (
-                <Text style={styles.errorText}>{errorMsg}</Text>
+                <Text style={styles(colors, isDarkMode).errorText}>{errorMsg}</Text>
               ) : (
-                <View style={styles.locationContent}>
-                  <Ionicons name="location-sharp" size={16} color="#FFFFFF" />
-                  <Text style={styles.locationText} numberOfLines={1}>
+                <View style={styles(colors, isDarkMode).locationContent}>
+                  <Ionicons name="location-sharp" size={16} color={colors.text.white || '#FFFFFF'} />
+                  <Text style={styles(colors, isDarkMode).locationText} numberOfLines={1}>
                     {area || 'Set location'}
                   </Text>
-                  <Ionicons name="chevron-down" size={14} color="#FFFFFF" />
+                  <Ionicons name="chevron-down" size={14} color={colors.text.white || '#FFFFFF'} />
                 </View>
               )}
             </TouchableOpacity>
           </View>
 
           {/* Right side: Notification and Profile Icons */}
-          <View style={styles.rightSection}>
+          <View style={styles(colors, isDarkMode).rightSection}>
             <TouchableOpacity
-              style={styles.iconButton}
+              style={styles(colors, isDarkMode).iconButton}
               activeOpacity={0.7}
             >
-              <Ionicons name="notifications-outline" size={24} color="#FFFFFF" />
+              <Ionicons name="notifications-outline" size={24} color={colors.text.white || '#FFFFFF'} />
             </TouchableOpacity>
 
             <TouchableOpacity
-              style={styles.iconButton}
+              style={styles(colors, isDarkMode).iconButton}
               activeOpacity={0.7}
             >
-              <Ionicons name="person-outline" size={24} color="#FFFFFF" />
+              <Ionicons name="person-outline" size={24} color={colors.text.white || '#FFFFFF'} />
             </TouchableOpacity>
           </View>
         </View>
 
         {/* Row 2: Search Bar - NO BACK BUTTON (always visible header) */}
-        <View style={styles.searchRow}>
+        <View style={styles(colors, isDarkMode).searchRow}>
           <View style={[
-            styles.searchContainer,
-            isSearchFocused && styles.searchContainerFocused
+            styles(colors, isDarkMode).searchContainer,
+            isSearchFocused && styles(colors, isDarkMode).searchContainerFocused
           ]}>
             <Ionicons
               name="search"
               size={18}
-              color={isSearchFocused ? colors.primary : "#999999"}
-              style={styles.searchIcon}
+              color={isSearchFocused ? colors.primary : colors.text.secondary}
+              style={styles(colors, isDarkMode).searchIcon}
             />
             <TextInput
-              style={styles.input}
+              style={styles(colors, isDarkMode).input}
               placeholder="Search restaurants, cuisines..."
-              placeholderTextColor="#999999"
+              placeholderTextColor={colors.text.secondary}
               value={searchQuery}
               onChangeText={handleSearchChange}
               onFocus={() => setIsSearchFocused(true)}
@@ -114,8 +116,8 @@ const LocationHeader = ({
               spellCheck={false}
             />
             {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={clearSearch} style={styles.clearButton}>
-                <Ionicons name="close-circle" size={18} color="#999999" />
+              <TouchableOpacity onPress={clearSearch} style={styles(colors, isDarkMode).clearButton}>
+                <Ionicons name="close-circle" size={18} color={colors.text.secondary} />
               </TouchableOpacity>
             )}
           </View>
@@ -125,56 +127,56 @@ const LocationHeader = ({
         {activeOffer ? (
           // Marketing-Centric Offer Banner
           <TouchableOpacity
-            style={styles.promoBanner}
+            style={styles(colors, isDarkMode).promoBanner}
             activeOpacity={0.85}
             onPress={() => onOfferPress && onOfferPress(activeOffer)}
           >
-            <View style={styles.promoLeft}>
-              <View style={styles.promoLogoContainer}>
+            <View style={styles(colors, isDarkMode).promoLeft}>
+              <View style={styles(colors, isDarkMode).promoLogoContainer}>
                 <Image
                   source={require('../assets/images/logo.png')}
-                  style={styles.promoLogo}
+                  style={styles(colors, isDarkMode).promoLogo}
                   resizeMode="contain"
                 />
-                <View style={styles.sparkleEffect}>
-                  <Text style={styles.sparkle}>✨</Text>
+                <View style={styles(colors, isDarkMode).sparkleEffect}>
+                  <Text style={styles(colors, isDarkMode).sparkle}>✨</Text>
                 </View>
               </View>
-              <View style={styles.promoTextContainer}>
-                <Text style={styles.promoTitle} numberOfLines={1}>
+              <View style={styles(colors, isDarkMode).promoTextContainer}>
+                <Text style={styles(colors, isDarkMode).promoTitle} numberOfLines={1}>
                   {activeOffer.title || 'Special Offer!'}
                 </Text>
-                <Text style={styles.promoSubtitle} numberOfLines={1}>
+                <Text style={styles(colors, isDarkMode).promoSubtitle} numberOfLines={1}>
                   {activeOffer.subtitle || 'Limited time offer'}
                 </Text>
                 {activeOffer.code && (
-                  <View style={styles.promoCodeBadge}>
-                    <Text style={styles.promoCodeText}>{activeOffer.code}</Text>
+                  <View style={styles(colors, isDarkMode).promoCodeBadge}>
+                    <Text style={styles(colors, isDarkMode).promoCodeText}>{activeOffer.code}</Text>
                   </View>
                 )}
               </View>
             </View>
-            <View style={styles.promoRight}>
-              <Text style={styles.promoDiscount}>
+            <View style={styles(colors, isDarkMode).promoRight}>
+              <Text style={styles(colors, isDarkMode).promoDiscount}>
                 {activeOffer.discount || '50%'}
               </Text>
-              <Text style={styles.promoOffText}>OFF</Text>
-              <Ionicons name="chevron-forward" size={16} color="#FFFFFF" style={{ marginTop: 2 }} />
+              <Text style={styles(colors, isDarkMode).promoOffText}>OFF</Text>
+              <Ionicons name="chevron-forward" size={16} color={colors.text.white || '#FFFFFF'} style={{ marginTop: 2 }} />
             </View>
           </TouchableOpacity>
         ) : (
           // Welcome Greeting (No Active Offer)
-          <View style={styles.welcomeBanner}>
+          <View style={styles(colors, isDarkMode).welcomeBanner}>
             <Image
               source={require('../assets/images/logo.png')}
-              style={styles.welcomeLogo}
+              style={styles(colors, isDarkMode).welcomeLogo}
               resizeMode="contain"
             />
-            <View style={styles.welcomeTextContainer}>
-              <Text style={styles.welcomeTitle}>
+            <View style={styles(colors, isDarkMode).welcomeTextContainer}>
+              <Text style={styles(colors, isDarkMode).welcomeTitle}>
                 {userName ? `Welcome back, ${userName}! 👋` : 'Welcome to Deligo! 👋'}
               </Text>
-              <Text style={styles.welcomeSubtitle}>
+              <Text style={styles(colors, isDarkMode).welcomeSubtitle}>
                 Discover amazing food near you
               </Text>
             </View>
@@ -183,45 +185,45 @@ const LocationHeader = ({
 
         {/* Featured Shops - Real Shop Logos */}
         {featuredShops && featuredShops.length > 0 && (
-          <View style={styles.shopsSection}>
-            <View style={styles.shopsSectionHeader}>
-              <Text style={styles.shopsSectionTitle}>Featured Restaurants</Text>
+          <View style={styles(colors, isDarkMode).shopsSection}>
+            <View style={styles(colors, isDarkMode).shopsSectionHeader}>
+              <Text style={styles(colors, isDarkMode).shopsSectionTitle}>Featured Restaurants</Text>
               <TouchableOpacity onPress={() => onShopPress && onShopPress('all')}>
-                <Text style={styles.viewAllShops}>View All →</Text>
+                <Text style={styles(colors, isDarkMode).viewAllShops}>View All →</Text>
               </TouchableOpacity>
             </View>
             <ScrollView
               horizontal
               showsHorizontalScrollIndicator={false}
-              contentContainerStyle={styles.shopsContainer}
+              contentContainerStyle={styles(colors, isDarkMode).shopsContainer}
             >
               {featuredShops.map((shop, index) => (
                 <TouchableOpacity
                   key={shop.id || index}
-                  style={styles.shopCard}
+                  style={styles(colors, isDarkMode).shopCard}
                   activeOpacity={0.8}
                   onPress={() => onShopPress && onShopPress(shop)}
                 >
-                  <View style={styles.shopLogoWrapper}>
+                  <View style={styles(colors, isDarkMode).shopLogoWrapper}>
                     {shop.logo ? (
                       <Image
                         source={{ uri: shop.logo }}
-                        style={styles.shopLogo}
+                        style={styles(colors, isDarkMode).shopLogo}
                         resizeMode="cover"
                       />
                     ) : (
-                      <View style={styles.shopLogoPlaceholder}>
-                        <Text style={styles.shopLogoText}>
+                      <View style={styles(colors, isDarkMode).shopLogoPlaceholder}>
+                        <Text style={styles(colors, isDarkMode).shopLogoText}>
                           {shop.name ? shop.name.charAt(0).toUpperCase() : '🍽️'}
                         </Text>
                       </View>
                     )}
                   </View>
-                  <Text style={styles.shopName} numberOfLines={1}>
+                  <Text style={styles(colors, isDarkMode).shopName} numberOfLines={1}>
                     {shop.name}
                   </Text>
                   {shop.cuisine && (
-                    <Text style={styles.shopCuisine} numberOfLines={1}>
+                    <Text style={styles(colors, isDarkMode).shopCuisine} numberOfLines={1}>
                       {shop.cuisine}
                     </Text>
                   )}
@@ -234,9 +236,9 @@ const LocationHeader = ({
 
       {/* Autocomplete Suggestions Dropdown */}
       {isSearchFocused && searchQuery.length > 0 && suggestions.length > 0 && (
-        <View style={styles.suggestionsContainer}>
+        <View style={styles(colors, isDarkMode).suggestionsContainer}>
           <ScrollView
-            style={styles.suggestionsList}
+            style={styles(colors, isDarkMode).suggestionsList}
             keyboardShouldPersistTaps="handled"
             showsVerticalScrollIndicator={true}
           >
@@ -244,21 +246,21 @@ const LocationHeader = ({
               <TouchableOpacity
                 key={suggestion.id || index}
                 style={[
-                  styles.suggestionItem,
-                  index === suggestions.length - 1 && styles.suggestionItemLast
+                  styles(colors, isDarkMode).suggestionItem,
+                  index === suggestions.length - 1 && styles(colors, isDarkMode).suggestionItemLast
                 ]}
                 onPress={() => handleSuggestionTap(suggestion)}
                 activeOpacity={0.7}
               >
-                <View style={styles.suggestionIconWrapper}>
+                <View style={styles(colors, isDarkMode).suggestionIconWrapper}>
                   <Ionicons name="search" size={18} color={colors.primary} />
                 </View>
-                <View style={styles.suggestionContent}>
-                  <Text style={styles.suggestionName} numberOfLines={1}>
+                <View style={styles(colors, isDarkMode).suggestionContent}>
+                  <Text style={styles(colors, isDarkMode).suggestionName} numberOfLines={1}>
                     {suggestion.name}
                   </Text>
                   {suggestion.cuisine && (
-                    <Text style={styles.suggestionCuisine} numberOfLines={1}>
+                    <Text style={styles(colors, isDarkMode).suggestionCuisine} numberOfLines={1}>
                       {suggestion.cuisine}
                     </Text>
                   )}
@@ -273,7 +275,7 @@ const LocationHeader = ({
   );
 };
 
-const styles = StyleSheet.create({
+const styles = (colors, isDarkMode) => StyleSheet.create({
   wrapper: {
     position: 'relative',
     paddingTop: 0,
@@ -284,7 +286,7 @@ const styles = StyleSheet.create({
     paddingTop: spacing.xs,
     paddingBottom: spacing.sm,
     paddingHorizontal: spacing.md,
-    shadowColor: colors.shadow,
+    shadowColor: colors.shadow || '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
@@ -335,7 +337,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   locationText: {
-    color: '#FFFFFF',
+    color: colors.text.white || '#FFFFFF',
     fontSize: fontSize.md,
     fontFamily: 'Poppins-SemiBold',
     marginLeft: spacing.xs,
@@ -359,11 +361,11 @@ const styles = StyleSheet.create({
     flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 20,
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs + 2,
-    shadowColor: '#000',
+    shadowColor: colors.shadow || '#000',
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.08,
     shadowRadius: 8,
@@ -380,7 +382,7 @@ const styles = StyleSheet.create({
     flex: 1,
     fontSize: fontSize.sm,
     fontFamily: 'Poppins-Regular',
-    color: '#333333',
+    color: colors.text.primary,
     padding: 0,
     height: 32,
   },
@@ -404,17 +406,17 @@ const styles = StyleSheet.create({
     borderColor: colors.primary,
   },
   badgeText: {
-    color: '#333333',
+    color: colors.text.primary,
     fontSize: 9,
     fontFamily: 'Poppins-Bold',
   },
   // Suggestions Dropdown
   suggestionsContainer: {
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderRadius: 20,
     marginTop: spacing.xs,
     marginHorizontal: spacing.md,
-    shadowColor: '#000',
+    shadowColor: colors.shadow || '#000',
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.2,
     shadowRadius: 16,
@@ -431,7 +433,7 @@ const styles = StyleSheet.create({
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
-    borderBottomColor: '#F5F5F5',
+    borderBottomColor: colors.border,
   },
   suggestionItemLast: {
     borderBottomWidth: 0,
@@ -440,7 +442,7 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    backgroundColor: '#FFE5F1',
+    backgroundColor: colors.primaryLight || 'rgba(255, 105, 180, 0.15)',
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.sm,
@@ -451,17 +453,17 @@ const styles = StyleSheet.create({
   suggestionName: {
     fontSize: fontSize.md,
     fontFamily: 'Poppins-SemiBold',
-    color: '#333333',
+    color: colors.text.primary,
     marginBottom: 2,
   },
   suggestionCuisine: {
     fontSize: fontSize.sm,
     fontFamily: 'Poppins-Regular',
-    color: '#666666',
+    color: colors.text.secondary,
   },
   // Marketing-Centric Promo Banner Styles
   promoBanner: {
-    backgroundColor: 'rgba(255, 255, 255, 0.98)',
+    backgroundColor: colors.surface,
     borderRadius: 20,
     padding: spacing.md + 2,
     marginTop: spacing.sm,
@@ -469,7 +471,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    shadowColor: '#000',
+    shadowColor: colors.shadow || '#000',
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.15,
     shadowRadius: 12,
@@ -514,13 +516,13 @@ const styles = StyleSheet.create({
   promoTitle: {
     fontSize: fontSize.md + 1,
     fontFamily: 'Poppins-Bold',
-    color: '#1A1A1A',
+    color: colors.text.primary,
     marginBottom: 2,
   },
   promoSubtitle: {
     fontSize: fontSize.sm,
     fontFamily: 'Poppins-Medium',
-    color: '#666666',
+    color: colors.text.secondary,
     marginBottom: spacing.xs,
   },
   promoCodeBadge: {
@@ -538,7 +540,7 @@ const styles = StyleSheet.create({
   promoCodeText: {
     fontSize: fontSize.xs + 1,
     fontFamily: 'Poppins-Black',
-    color: '#FFFFFF',
+    color: colors.text.white || '#FFFFFF',
     letterSpacing: 1.2,
   },
   promoRight: {
@@ -557,13 +559,13 @@ const styles = StyleSheet.create({
   promoDiscount: {
     fontSize: 28,
     fontFamily: 'Poppins-Black',
-    color: '#FFFFFF',
+    color: colors.text.white || '#FFFFFF',
     lineHeight: 30,
   },
   promoOffText: {
     fontSize: fontSize.sm,
     fontFamily: 'Poppins-Bold',
-    color: '#FFFFFF',
+    color: colors.text.white || '#FFFFFF',
     marginTop: -2,
   },
   // Welcome Greeting Styles (No Active Offer)
@@ -590,7 +592,7 @@ const styles = StyleSheet.create({
   welcomeTitle: {
     fontSize: fontSize.md + 1,
     fontFamily: 'Poppins-Bold',
-    color: '#FFFFFF',
+    color: colors.text.white || '#FFFFFF',
     marginBottom: 2,
   },
   welcomeSubtitle: {
@@ -611,12 +613,12 @@ const styles = StyleSheet.create({
   shopsSectionTitle: {
     fontSize: fontSize.md,
     fontFamily: 'Poppins-Bold',
-    color: '#FFFFFF',
+    color: colors.text.white || '#FFFFFF',
   },
   viewAllShops: {
     fontSize: fontSize.sm,
     fontFamily: 'Poppins-SemiBold',
-    color: '#FFFFFF',
+    color: colors.text.white || '#FFFFFF',
   },
   shopsContainer: {
     paddingRight: spacing.md,
@@ -631,7 +633,7 @@ const styles = StyleSheet.create({
     height: 64,
     borderRadius: 32,
     marginBottom: spacing.xs - 2,
-    shadowColor: '#000',
+    shadowColor: colors.shadow || '#000',
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
     shadowRadius: 6,
@@ -641,19 +643,19 @@ const styles = StyleSheet.create({
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     borderWidth: 2,
-    borderColor: '#FFFFFF',
+    borderColor: colors.surface,
   },
   shopLogoPlaceholder: {
     width: 64,
     height: 64,
     borderRadius: 32,
-    backgroundColor: '#FFFFFF',
+    backgroundColor: colors.surface,
     alignItems: 'center',
     justifyContent: 'center',
     borderWidth: 2,
-    borderColor: '#FFFFFF',
+    borderColor: colors.surface,
   },
   shopLogoText: {
     fontSize: 24,
@@ -663,7 +665,7 @@ const styles = StyleSheet.create({
   shopName: {
     fontSize: fontSize.xs + 1,
     fontFamily: 'Poppins-SemiBold',
-    color: '#FFFFFF',
+    color: colors.text.white || '#FFFFFF',
     textAlign: 'center',
     marginBottom: 2,
   },

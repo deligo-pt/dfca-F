@@ -21,7 +21,8 @@ import {
     NotificationsScreen,
     SettingsScreen,
     HelpCenterScreen,
-    CartDetailScreen
+    CartDetailScreen,
+    SeeAllScreen
 } from '../screens';
 import { BottomTabNavigator } from './index'; // assuming index.js exports BottomTabNavigator or directly from './BottomTabNavigator'
 
@@ -53,6 +54,7 @@ export default function RootNavigator() {
             <Stack.Screen name="LocationAddress" component={LocationAddressScreen} />
             <Stack.Screen name="RestaurantDetails" component={RestaurantDetailsScreen} />
             <Stack.Screen name="CartDetail" component={CartDetailScreen} />
+            <Stack.Screen name="SeeAll" component={SeeAllScreen} />
             <Stack.Screen name="TrackOrder" component={TrackOrderScreen} />
             <Stack.Screen name="Checkout" component={CheckoutScreen} />
 

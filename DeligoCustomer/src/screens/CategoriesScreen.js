@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef } from 'react';
-import { View, StyleSheet, Animated, ActivityIndicator, Text, TouchableOpacity, RefreshControl } from 'react-native';
+import { View, StyleSheet, Animated, ActivityIndicator, Text, TouchableOpacity, RefreshControl, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { spacing } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
@@ -23,7 +23,7 @@ import { useProfile } from '../contexts/ProfileContext';
 import formatCurrency from '../utils/currency';
 
 const CategoriesScreen = ({ navigation }) => {
-    const { colors } = useTheme();
+    const { colors, isDark } = useTheme();
     const { t } = useLanguage();
 
     // Use global LocationContext instead of local hook
@@ -44,6 +44,40 @@ const CategoriesScreen = ({ navigation }) => {
     const [staticVendorTypes, setStaticVendorTypes] = useState([]);
     const [staticCuisines, setStaticCuisines] = useState([]);
     const [sessionLoaded, setSessionLoaded] = useState(false);
+
+    // Glovo-style static subcategories for each vendor type
+    const RESTAURANT_CATEGORIES = [
+        { id: 'pizza', name: 'Pizza', icon: '🍕' },
+        { id: 'burger', name: 'Burgers', icon: '🍔' },
+        { id: 'chinese', name: 'Chinese', icon: '🥡' },
+        { id: 'indian', name: 'Indian', icon: '🍛' },
+        { id: 'healthy', name: 'Healthy', icon: '🥗' },
+        { id: 'desserts', name: 'Desserts', icon: '🍰' },
+        { id: 'coffee', name: 'Coffee', icon: '☕' },
+    ];
+
+    const STORE_CATEGORIES = [
+        { id: 'dairy', name: 'Dairy & Eggs', icon: '🥛' },
+        { id: 'fruits', name: 'Fruits & Veg', icon: '🍎' },
+        { id: 'snacks', name: 'Snacks', icon: '🍪' },
+        { id: 'beverages', name: 'Beverages', icon: '🥤' },
+        { id: 'frozen', name: 'Frozen', icon: '🧊' },
+        { id: 'household', name: 'Household', icon: '🧹' },
+        { id: 'pharmacy', name: 'Pharmacy', icon: '💊' },
+    ];
+
+    // Dynamic categories based on selected vendor type
+    const dynamicCategories = React.useMemo(() => {
+        const vendorName = (selectedVendorType || '').toLowerCase();
+        if (vendorName.includes('resturent') || vendorName.includes('restaurant') || vendorName.includes('food')) {
+            return RESTAURANT_CATEGORIES;
+        }
+        if (vendorName.includes('store') || vendorName.includes('grocery') || vendorName.includes('shop')) {
+            return STORE_CATEGORIES;
+        }
+        // If no vendor selected, show combined or empty
+        return [...RESTAURANT_CATEGORIES.slice(0, 3), ...STORE_CATEGORIES.slice(0, 3)];
+    }, [selectedVendorType]);
 
     // Modal state for offer details
     const [offerModalVisible, setOfferModalVisible] = useState(false);
@@ -128,23 +162,28 @@ const CategoriesScreen = ({ navigation }) => {
     }, [products]);
 
     // User name for personalized greeting (from auth context)
-    const { user } = useProfile();
+    const { user, fetchUserProfile } = useProfile();
+
+    useEffect(() => {
+        // Fetch fresh profile data when home screen loads to ensure name is available
+        if (fetchUserProfile) fetchUserProfile();
+    }, []);
 
     // Robust name extraction
     let userName = null;
     if (user) {
+        // console.log('[CategoriesScreen] User object:', JSON.stringify(user, null, 2)); // Debug log
         if (typeof user.name === 'object' && user.name !== null) {
-            userName = user.name.firstName || '';
+            userName = user.name.firstName || user.name.first || '';
+            if (!userName && user.name.fullName) userName = user.name.fullName.split(' ')[0];
         } else if (typeof user.name === 'string') {
             userName = user.name;
         }
 
         if (!userName) userName = user.firstName;
-        if (!userName) userName = user.fullName;
+        if (!userName) userName = user.fullName ? user.fullName.split(' ')[0] : '';
         if (!userName) userName = user.displayName;
-
-        // Fallback to email/phone if really needed, or just let it be null to show default welcome
-        // if (!userName) userName = user.email ? user.email.split('@')[0] : '';
+        if (!userName && user.email) userName = user.email.split('@')[0];
     }
 
     // Use products from context as the source - do not include displayedProducts to avoid circular dependency
@@ -326,19 +365,24 @@ const CategoriesScreen = ({ navigation }) => {
         } catch (e) { console.debug('Failed to persist selection', key, e); }
     };
 
-    // Debounced search -> trigger context fetch
+    // Debounced search -> trigger context fetch (ONLY on search query change)
+    // Category/Cuisine filtering is done client-side for instant response
     useEffect(() => {
         const t = setTimeout(() => {
-            // include selected filters when searching
-            fetchProducts({ search: searchQuery, page: 1, vendorType: selectedVendorType || undefined, category: selectedCuisine || undefined });
+            // Only fetch on search - filtering is done locally
+            if (searchQuery) {
+                fetchProducts({ search: searchQuery, page: 1 });
+            }
         }, 300);
         return () => clearTimeout(t);
-    }, [searchQuery, selectedVendorType, selectedCuisine, fetchProducts]);
+    }, [searchQuery, fetchProducts]); // REMOVED: selectedVendorType, selectedCuisine
 
     // Keep displayedProducts in sync with sourceProducts and current filters (normalized comparisons)
     useEffect(() => {
         const arr = Array.isArray(sourceProducts) ? sourceProducts : [];
-        if (arr.length === 0) return;
+        // REMOVED early return: if (arr.length === 0) return; 
+        // We MUST update displayedProducts even if arr is empty (to clear the list)
+
         // If no filters selected, show all
         if (!selectedVendorType && !selectedCuisine) {
             setDisplayedProducts(arr);
@@ -379,23 +423,25 @@ const CategoriesScreen = ({ navigation }) => {
         }
     }, [displayedProducts]);
 
-    const handleVendorTypePress = (vendor) => {
+    const handleVendorTypePress = React.useCallback((vendor) => {
         const vendorId = vendor.id || vendor.name;
         const newSel = selectedVendorType === vendorId ? null : vendorId;
         setSelectedVendorType(newSel);
+        // If unselecting vendor, also unselect cuisine
         if (newSel === null) setSelectedCuisine(null);
+
         persistSelection('selectedVendorType', newSel);
         if (newSel === null) persistSelection('selectedCuisine', null);
-        fetchProducts({ vendorType: newSel || undefined, category: undefined, page: 1 });
-    };
+        // Removed manual fetchProducts - useEffect will handle it based on state change
+    }, [selectedVendorType]);
 
-    const handleCuisinePress = (cuisine) => {
+    const handleCuisinePress = React.useCallback((cuisine) => {
         const cuisineId = cuisine.id || cuisine.name;
         const newSel = selectedCuisine === cuisineId ? null : cuisineId;
         setSelectedCuisine(newSel);
         persistSelection('selectedCuisine', newSel);
-        fetchProducts({ vendorType: selectedVendorType || undefined, category: newSel || undefined, page: 1 });
-    };
+        // Removed manual fetchProducts - useEffect will handle it
+    }, [selectedCuisine]);
 
     const handleRestaurantPress = (restaurant) => {
         console.log('Restaurant pressed:', restaurant.name);
@@ -470,6 +516,10 @@ const CategoriesScreen = ({ navigation }) => {
 
     return (
         <SafeAreaView style={styles(colors).safeArea} edges={['top']}>
+            <StatusBar
+                barStyle={isDark ? 'light-content' : 'dark-content'}
+                backgroundColor={colors.primary}
+            />
             {/* Sticky Search Header - appears on scroll */}
             <StickySearchHeader
                 scrollY={scrollY}
@@ -555,33 +605,30 @@ const CategoriesScreen = ({ navigation }) => {
 
                 {/* Categories Section */}
                 <SectionHeader title={t('whatDoYouNeed')} showSeeAll={false} />
-                {productsLoading && (!displayedProducts || displayedProducts.length === 0) ? (
-                    <View style={{ paddingVertical: 16 }}>
-                        <ActivityIndicator size="small" color={colors.primary} />
-                    </View>
-                ) : (
-                    <VendorType categories={Array.isArray(vendorTypes) ? vendorTypes : []} onPress={handleVendorTypePress} selectedId={selectedVendorType} />
-                )}
+                <VendorType categories={Array.isArray(vendorTypes) ? vendorTypes : []} onPress={handleVendorTypePress} selectedId={selectedVendorType} />
 
-                {/* Cuisines Section */}
+                {/* Categories Section - Dynamic from API based on vendor type */}
                 <SectionHeader
-                    title={t('cuisines')}
-                    onSeeAll={() => console.log('See all cuisines')}
+                    title={selectedVendorType ? t('categories') : t('browseByCategory')}
+                    showSeeAll={false}
+                />
+                <Category cuisines={Array.isArray(cuisines) ? cuisines : []} selectedCuisine={selectedCuisine} onPress={handleCuisinePress} />
+
+                {/* Results Section */}
+                <SectionHeader
+                    title={searchQuery ? `Search Results (${filteredRestaurants.length})` : t('nearYou')}
+                    onSeeAll={!searchQuery ? () => navigation.navigate('SeeAll', {
+                        allItems: sourceProducts,  // ALL products (unfiltered)
+                        vendorTypes: vendorTypes,  // For filter chips
+                        availableCuisines: cuisinesFromProducts,  // All cuisines
+                        title: t('nearYou')
+                    }) : undefined}
                 />
                 {productsLoading && (!displayedProducts || displayedProducts.length === 0) ? (
-                    <View style={{ paddingVertical: 12 }}>
-                        <ActivityIndicator size="small" color={colors.primary} />
+                    <View style={{ paddingVertical: 40, alignItems: 'center' }}>
+                        <ActivityIndicator size="large" color={colors.primary} />
                     </View>
-                ) : (
-                    <Category cuisines={Array.isArray(cuisines) ? cuisines : []} selectedCuisine={selectedCuisine} onPress={handleCuisinePress} />
-                )}
-
-                {/* Restaurants Section */}
-                <SectionHeader
-                    title={searchQuery ? `Search Results (${filteredRestaurants.length})` : t('popularRestaurants')}
-                    onSeeAll={!searchQuery ? () => console.log('See all restaurants') : undefined}
-                />
-                {(displayedByVendor.length > 0) ? (
+                ) : (displayedByVendor.length > 0) ? (
                     <RestaurantsList restaurants={displayedByVendor} onPress={handleRestaurantPress} searchQuery={searchQuery} disableScroll={true} />
                 ) : (prevNonEmptyRef.current.length > 0 && (selectedVendorType || selectedCuisine)) ? (
                     <RestaurantsList restaurants={prevNonEmptyRef.current} onPress={handleRestaurantPress} searchQuery={searchQuery} disableScroll={true} />

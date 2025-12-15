@@ -1,27 +1,53 @@
 import React, { useState } from 'react';
 import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, Image, Platform, ActivityIndicator } from 'react-native';
 import { useCart } from '../contexts/CartContext';
+import { useProducts } from '../contexts/ProductsContext';
 import { useTheme } from '../utils/ThemeContext';
 import { spacing, fontSize, borderRadius } from '../theme';
 import formatCurrency from '../utils/currency';
-import { Ionicons } from '@expo/vector-icons';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import CheckoutAPI from '../utils/checkoutApi';
 
 export default function CartDetail({ vendorId, navigation }) {
-  const { getVendorCart, getVendorSubtotal, updateQuantity, removeItem, setDeliveryInstructionsForVendor } = useCart();
+  const { getVendorCart, updateQuantity, removeItem, setDeliveryInstructionsForVendor } = useCart();
+  const { products } = useProducts();
   const cart = getVendorCart(vendorId);
-  const { colors } = useTheme();
-  const [promoInput, setPromoInput] = useState('');
-  const [showPromoInput, setShowPromoInput] = useState(false);
-  const [updatingItemId, setUpdatingItemId] = useState(null);
+  const { colors, isDarkMode } = useTheme();
+  const [updatingItem, setUpdatingItem] = useState(null); // { id, action: 'add' | 'remove' }
   const [checkingOut, setCheckingOut] = useState(false);
 
   if (!cart) return <Text style={{ color: colors.text.secondary, padding: spacing.md }}>No cart found.</Text>;
 
   const rawItems = Object.keys(cart.items || {}).map(id => ({ id, ...cart.items[id] }));
-  // Build detailed pricing per item from product.pricing
+
+  // Build detailed pricing per item from product.pricing AND enrich with ProductsContext
   const items = rawItems.map(it => {
-    const p = it.product || {};
+    // 1. Existing cart product data
+    let p = it.product || {};
+
+    // 2. Lookup in ProductsContext for better data (images, names)
+    let contextProduct = null;
+    if (products && products.length > 0) {
+      const rawId = p.id || p._id || p.productId || it.productId || it.id; // it.id might be cart item key, checking all
+      if (rawId) {
+        contextProduct = products.find(prod =>
+          prod.id === rawId ||
+          prod._id === rawId ||
+          (prod._raw && (prod._raw.productId === rawId || prod._raw.id === rawId))
+        );
+      }
+    }
+
+    // Merge: Prefer Context data for static fields (image, name), keep Cart data for pricing?
+    if (contextProduct) {
+      p = {
+        ...p,
+        image: contextProduct.image || p.image,
+        name: contextProduct.name || p.name,
+        _raw: { ...p._raw, ...contextProduct._raw }
+      };
+    }
+
     const pricing = p?._raw?.pricing || p?.pricing || {};
     const basePrice = Number(pricing.price ?? p.price ?? 0) || 0;
     const discountRaw = pricing.discount;
@@ -55,25 +81,49 @@ export default function CartDetail({ vendorId, navigation }) {
   const taxTotal = items.reduce((s, it) => s + it.taxUnit * it.qty, 0);
   const total = items.reduce((s, it) => s + it.finalUnit * it.qty, 0);
 
-  const vendorImage = items.length ? (items[0].product._raw?.vendor?.storePhoto || items[0].product.image) : null;
-  const vendorRating = items.length ? (items[0].product._raw?.vendor?.rating || '4.5') : '4.5';
-  const vendorDeliveryTime = items.length ? (items[0].product._raw?.vendor?.deliveryTime || '30-40 min') : '30-40 min';
+  // Resolve Vendor Details (Context > Cart > Item)
+  // Try to find vendor info from the first item since they belong to the same vendor
+  const firstItem = items.length > 0 ? items[0] : null;
+
+  // Look up vendor in ProductsContext (via first item)
+  let pcVendor = null;
+  if (products && products.length > 0 && firstItem) {
+    const pId = firstItem.product.id || firstItem.product._id;
+    const match = products.find(p => p.id === pId || p._id === pId);
+    if (match) {
+      pcVendor = match.vendor || match._raw?.vendor;
+    }
+  }
+
+  const finalVendorName = cart.vendorName && !['Store', 'Vendor'].includes(cart.vendorName) ? cart.vendorName : (pcVendor?.vendorName || pcVendor?.name || firstItem?.product?._raw?.vendor?.vendorName || 'Vendor');
+  const finalVendorImage = cart.vendorImage || pcVendor?.storePhoto || pcVendor?.logo || pcVendor?.image || firstItem?.product?.image || null; // Fallback to product image if logo missing
+  const finalVendorRating = cart.vendorRating || pcVendor?.rating || firstItem?.product?._raw?.vendor?.rating || '4.5';
+  const finalDeliveryTime = cart.vendorDeliveryTime || pcVendor?.deliveryTime || firstItem?.product?._raw?.vendor?.deliveryTime || '30-40 min';
+
+
+  const vendorImage = finalVendorImage;
+  const vendorRating = finalVendorRating;
+  const vendorDeliveryTime = finalDeliveryTime;
 
   const handleUpdateQuantity = async (itemId, delta) => {
-    setUpdatingItemId(itemId);
-    await updateQuantity(itemId, delta, vendorId);
-    setTimeout(() => setUpdatingItemId(null), 300);
+    const action = delta > 0 ? 'add' : 'remove';
+    setUpdatingItem({ id: itemId, action });
+    try {
+      await updateQuantity(itemId, delta, vendorId);
+    } catch (err) {
+      console.error("Failed to update quantity", err);
+    } finally {
+      setUpdatingItem(null);
+    }
   };
 
   const onCheckout = async () => {
+    if (checkingOut) return;
     setCheckingOut(true);
+
     try {
-      const response = await CheckoutAPI.createCheckout(true);
-      if (!response.success) {
-        console.error('[CartDetail] Checkout failed:', response.error);
-        setCheckingOut(false);
-        return;
-      }
+      // Optimistic navigation: pass data directly
+      // CheckoutScreen will handle the session creation
       const cartData = {
         vendorId,
         vendorName: cart.vendorName,
@@ -90,13 +140,14 @@ export default function CartDetail({ vendorId, navigation }) {
         subtotal: subtotalAfterDiscount,
         tax: taxTotal,
         total,
-        checkoutResponse: response.data,
+        useCart: true,
       };
+
       navigation.navigate('Checkout', { cartData });
     } catch (e) {
-      console.error('[CartDetail] Checkout error:', e);
+      console.error('[CartDetail] Navigation error', e);
     } finally {
-      setCheckingOut(false);
+      setTimeout(() => setCheckingOut(false), 1000);
     }
   };
 
@@ -117,7 +168,7 @@ export default function CartDetail({ vendorId, navigation }) {
             </View>
           )}
           <View style={{ flex: 1, marginLeft: spacing.md }}>
-            <Text style={[styles.vendorName, { color: colors.text.primary }]} numberOfLines={1}>{cart.vendorName || 'Vendor'}</Text>
+            <Text style={[styles.vendorName, { color: colors.text.primary }]} numberOfLines={1}>{finalVendorName || 'Vendor'}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
               <Ionicons name="star" size={14} color="#FFA000" />
               <Text style={{ color: colors.text.secondary, fontSize: 13, marginLeft: 4 }}>{vendorRating}</Text>
@@ -155,57 +206,55 @@ export default function CartDetail({ vendorId, navigation }) {
                   <Text style={{ color: colors.text.secondary, fontSize: 12, marginTop: 6, fontFamily: 'Poppins-Regular' }}>
                     {formatCurrency(it.currency, it.basePrice)}
                     {it.discountPercent > 0 ? ` • -${Math.round(it.discountPercent)}%` : ''}
-                    {it.taxPercent > 0 ? ` • +${Math.round(it.taxPercent)}%` : ''}
                     {` • = ${formatCurrency(it.currency, it.finalUnit)}`}
                   </Text>
                 </View>
               </View>
 
               <View style={styles.itemActions}>
-                <View style={[styles.qtyPill, { backgroundColor: colors.background, borderColor: colors.border }]}>
+                {/* Quantity Control Pill */}
+                <View style={[styles.qtyPill, { backgroundColor: isDarkMode ? colors.surfaceVariant || colors.border : '#F0F0F0' }]}>
+                  {/* Decrement Button */}
                   <TouchableOpacity
                     onPress={() => handleUpdateQuantity(it.id, -1)}
-                    style={[styles.qtyBtn, { backgroundColor: colors.background }]}
-                    disabled={updatingItemId === it.id || it.qty <= 1}
+                    style={styles.qtyBtn}
+                    disabled={updatingItem?.id === it.id || it.qty <= 0}
                   >
-                    {updatingItemId === it.id && it.qty > 1 ? (
+                    {updatingItem?.id === it.id && updatingItem?.action === 'remove' ? (
                       <ActivityIndicator size="small" color={colors.primary} />
                     ) : (
-                      <Ionicons name="remove" size={18} color={it.qty <= 1 ? colors.text.light : colors.primary} />
+                      <Ionicons
+                        name={it.qty <= 1 ? "trash-outline" : "remove"} // Show trash if qty is 1, else remove
+                        size={20}
+                        color={colors.primary}
+                      />
                     )}
                   </TouchableOpacity>
-                  <Text style={{
-                    marginHorizontal: spacing.md,
-                    minWidth: 28,
-                    textAlign: 'center',
-                    color: colors.text.primary,
-                    fontFamily: 'Poppins-SemiBold',
-                    fontSize: fontSize.md
-                  }}>
+
+                  {/* Count */}
+                  <Text style={[styles.qtyText, { color: colors.text.primary }]}>
                     {it.qty}
                   </Text>
+
+                  {/* Increment Button */}
                   <TouchableOpacity
                     onPress={() => handleUpdateQuantity(it.id, 1)}
-                    style={[styles.qtyBtn, { backgroundColor: colors.primary }]}
-                    disabled={updatingItemId === it.id}
+                    style={styles.qtyBtn}
+                    disabled={updatingItem?.id === it.id}
                   >
-                    {updatingItemId === it.id ? (
-                      <ActivityIndicator size="small" color="#fff" />
+                    {updatingItem?.id === it.id && updatingItem?.action === 'add' ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
                     ) : (
-                      <Ionicons name="add" size={18} color="#fff" />
+                      <Ionicons name="add" size={20} color={colors.primary} />
                     )}
                   </TouchableOpacity>
                 </View>
-                <View>
-                  <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-Bold' }}>
+
+                {/* Total Price & Remove Link */}
+                <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
+                  <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-Bold', fontSize: 16 }}>
                     {formatCurrency(it.currency, it.finalUnit * it.qty)}
                   </Text>
-                  <TouchableOpacity onPress={() => removeItem(it.id, vendorId)} style={{ marginTop: spacing.xs }}>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                      <Ionicons name="trash-outline" size={16} color="#D32F2F" />
-                      <Text style={{ color: '#D32F2F', marginLeft: 4, fontSize: 13, fontFamily: 'Poppins-Medium' }}>Remove</Text>
-                    </View>
-                  </TouchableOpacity>
                 </View>
               </View>
             </View>
@@ -275,8 +324,8 @@ export default function CartDetail({ vendorId, navigation }) {
             <ActivityIndicator size="small" color="#fff" />
           ) : (
             <>
-              <Text style={{ color: '#fff', fontFamily: 'Poppins-Bold', fontSize: 16 }}>Checkout</Text>
-              <Ionicons name="arrow-forward" size={20} color="#fff" style={{ marginLeft: spacing.xs }} />
+              <Text style={{ color: colors.text.white || '#fff', fontFamily: 'Poppins-Bold', fontSize: 16 }}>Checkout</Text>
+              <Ionicons name="arrow-forward" size={20} color={colors.text.white || '#fff'} style={{ marginLeft: spacing.xs }} />
             </>
           )}
         </TouchableOpacity>
@@ -336,14 +385,11 @@ const styles = StyleSheet.create({
     width: 88,
     height: 64,
     borderRadius: borderRadius.md,
+    backgroundColor: '#f0f0f0',
   },
   itemName: {
     fontSize: fontSize.md,
     fontFamily: 'Poppins-SemiBold',
-  },
-  itemPrice: {
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-Bold',
   },
   itemActions: {
     flexDirection: 'row',
@@ -353,48 +399,23 @@ const styles = StyleSheet.create({
   },
   qtyPill: {
     borderRadius: borderRadius.full,
-    borderWidth: 1,
-    padding: 4,
+    padding: 2,
     flexDirection: 'row',
     alignItems: 'center',
+    // Glovo-style grey pill
   },
   qtyBtn: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  promoToggle: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-  },
-  promoInput: {
-    flex: 1,
-    borderRadius: borderRadius.md,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-Regular',
-    borderWidth: 1,
-  },
-  applyBtn: {
-    marginLeft: spacing.sm,
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.sm + 2,
-    borderRadius: borderRadius.md,
-  },
-  appliedPromo: {
-    marginTop: spacing.sm,
-    padding: spacing.md,
-    borderRadius: borderRadius.lg,
-    borderWidth: 1,
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+  qtyText: {
+    marginHorizontal: 12,
+    minWidth: 20,
+    textAlign: 'center',
+    fontSize: 16,
+    fontFamily: 'Poppins-SemiBold',
   },
   instructionsInput: {
     borderRadius: borderRadius.lg,

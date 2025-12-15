@@ -5,7 +5,7 @@ import { useTheme } from '../utils/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 
 const RestaurantCard = ({ restaurant, onPress }) => {
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
 
   // Accept either a mapped restaurant shape or raw product in restaurant._raw
   const p = restaurant && restaurant._raw ? restaurant._raw : restaurant || {};
@@ -28,36 +28,41 @@ const RestaurantCard = ({ restaurant, onPress }) => {
 
   return (
     <TouchableOpacity
-      style={[styles.card, { backgroundColor: colors.surface, borderColor: colors.border }]}
-      activeOpacity={0.86}
+      style={[styles(colors).card]}
+      activeOpacity={0.92}
       onPress={() => onPress && onPress(restaurant)}
     >
-      <Image source={imageSource} style={styles.heroImage} />
+      <View style={{ position: 'relative' }}>
+        <Image source={imageSource} style={[styles(colors).heroImage]} resizeMode="cover" />
 
-      <View style={styles.infoContainer}>
-        <View style={styles.body}>
-          <View style={styles.rowTop}>
-            <View style={styles.nameContainer}>
-              <Text style={[styles.name, { color: colors.text.primary }]} numberOfLines={1}>{vendorName}</Text>
-              {isVerified && (
-                <View style={styles.verifiedBadge}>
-                  <Ionicons name="checkmark-circle" size={16} color="#28a745" />
-                </View>
-              )}
-            </View>
+        {/* Floating Rating Badge (Bottom Left) */}
+        {ratingValue !== null && (
+          <View style={styles(colors).ratingPill}>
+            <Ionicons name="star" size={12} color="#FFC107" />
+            <Text style={styles(colors).ratingPillText}>{` ${ratingValue}`}</Text>
+          </View>
+        )}
 
-            <View style={[styles.ratingPill, { backgroundColor: colors.primary }]}>
-              <Ionicons name="star" size={12} color="#fff" />
-              <Text style={[styles.ratingPillText]}>{ratingValue !== null ? ` ${ratingValue}` : ' N/A'}</Text>
+        {/* Floating Delivery Time Badge (Bottom Right) */}
+        <View style={[styles(colors).deliveryPill]}>
+          <Text style={styles(colors).deliveryPillText}>20-30 min</Text>
+        </View>
+      </View>
+
+      <View style={styles(colors).infoContainer}>
+        <View style={styles(colors).body}>
+          <View style={styles(colors).rowTop}>
+            <View style={styles(colors).nameContainer}>
+              <Text style={styles(colors).name} numberOfLines={1}>{vendorName}</Text>
+              {isVerified && <Ionicons name="checkmark-circle" size={16} color={colors.primary} />}
             </View>
           </View>
 
-          <View style={styles.tagsRow}>
-            {tags.slice(0, 5).map((tag, i) => (
-              <View key={`${tag}-${i}`} style={[styles.tag, { backgroundColor: colors.background === '#FFFFFF' ? '#F2F2F2' : 'rgba(255,255,255,0.03)' }]}>
-                <Text style={[styles.tagText, { color: colors.text.secondary }]} numberOfLines={1}>{tag}</Text>
-              </View>
-            ))}
+          {/* Subtitle Row: Delivery Fee • Tag */}
+          <View style={styles(colors).tagsRow}>
+            <Text style={styles(colors).tagText}>
+              Delivery {vendor.deliveryFee ? vendor.deliveryFee : '$1.99'} • {tags[0] || 'Food'}
+            </Text>
           </View>
         </View>
       </View>
@@ -65,23 +70,27 @@ const RestaurantCard = ({ restaurant, onPress }) => {
   );
 };
 
-const styles = StyleSheet.create({
+const styles = (colors) => StyleSheet.create({
   card: {
-    marginBottom: spacing.md,
-    borderRadius: 12,
-    borderWidth: 1,
+    marginBottom: spacing.lg,
+    borderRadius: 16,
+    borderWidth: 0,
+    backgroundColor: colors.surface,
+    shadowColor: colors.shadow || '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 5,
     overflow: 'hidden',
   },
   heroImage: {
     width: '100%',
-    height: 140,
-    backgroundColor: '#eee',
+    height: 180,
+    backgroundColor: colors.border || colors.surfaceVariant || '#f0f0f0',
   },
   infoContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
     paddingVertical: 12,
-    paddingHorizontal: 14,
+    paddingHorizontal: 16,
   },
   body: {
     flex: 1,
@@ -91,7 +100,7 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: 8,
+    marginBottom: 4,
   },
   nameContainer: {
     flexDirection: 'row',
@@ -100,40 +109,64 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   name: {
-    fontSize: 16,
-    fontFamily: 'Poppins-SemiBold',
+    fontSize: 18,
+    fontFamily: 'Poppins-Bold',
     marginRight: 6,
+    color: colors.text.primary,
   },
-  verifiedBadge: {
-    // Optional: for additional styling
-  },
+  verifiedBadge: {},
   ratingPill: {
+    position: 'absolute',
+    bottom: 12,
+    left: 12,
     flexDirection: 'row',
     alignItems: 'center',
     paddingVertical: 4,
     paddingHorizontal: 8,
-    borderRadius: 12,
+    borderRadius: 20,
+    backgroundColor: colors.surface,
+    shadowColor: colors.shadow || '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.15,
+    shadowRadius: 4,
+    elevation: 3,
   },
   ratingPillText: {
-    color: '#fff',
+    color: colors.text.primary,
     fontSize: 12,
-    fontFamily: 'Poppins-Medium',
+    fontFamily: 'Poppins-Bold',
+  },
+  deliveryPill: {
+    position: 'absolute',
+    bottom: 12,
+    right: 12,
+    backgroundColor: colors.surface,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 20,
+    shadowColor: colors.shadow || '#000',
+    shadowOpacity: 0.15,
+    elevation: 3,
+  },
+  deliveryPillText: {
+    fontFamily: 'Poppins-Bold',
+    fontSize: 11,
+    color: colors.text.primary,
   },
   tagsRow: {
     flexDirection: 'row',
-    flexWrap: 'wrap',
+    alignItems: 'center',
+    marginTop: 4,
   },
   tag: {
-    paddingVertical: 4,
-    paddingHorizontal: 8,
-    borderRadius: 12,
-    marginRight: 8,
-    marginBottom: 6,
+    marginRight: 6,
   },
   tagText: {
-    fontSize: 12,
+    fontSize: 13,
     fontFamily: 'Poppins-Regular',
+    color: colors.text.secondary,
   },
 });
 
 export default RestaurantCard;
+

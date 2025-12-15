@@ -11,6 +11,7 @@ export { default as RestaurantDetailsScreen } from './RestaurantDetailsScreen';
 export { default as TrackOrderScreen } from './TrackOrderScreen';
 export { default as CheckoutScreen } from './CheckoutScreen';
 export { default as CartDetailScreen } from './CartDetailScreen';
+export { default as SeeAllScreen } from './SeeAllScreen';
 
 // Account Related Screens
 export { default as EditProfileScreen } from './EditProfileScreen';

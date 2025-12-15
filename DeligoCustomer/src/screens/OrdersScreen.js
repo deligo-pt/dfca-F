@@ -7,7 +7,8 @@ import {
   TouchableOpacity,
   Image,
   ActivityIndicator,
-  RefreshControl
+  RefreshControl,
+  StatusBar
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -15,10 +16,11 @@ import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
 import { BASE_API_URL, API_ENDPOINTS } from '../constants/config';
 import StorageService from '../utils/storage';
+import { useCart } from '../contexts/CartContext';
 
 const OrdersScreen = ({ navigation }) => {
   const { t } = useLanguage();
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const [activeTab, setActiveTab] = useState('ongoing');
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -50,25 +52,44 @@ const OrdersScreen = ({ navigation }) => {
       console.debug('[OrdersScreen] Fetching orders from API');
       const url = `${BASE_API_URL}${API_ENDPOINTS.ORDERS.LIST}`;
 
-      const response = await fetch(url, {
-        method: 'GET',
-        headers,
-      });
+      // Add timeout to prevent infinite loading
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 10000);
 
-      const responseData = await response.json();
-      console.debug('[OrdersScreen] Orders response:', responseData);
+      try {
+        const response = await fetch(url, {
+          method: 'GET',
+          headers,
+          signal: controller.signal,
+        });
+        clearTimeout(timeoutId);
 
-      if (!response.ok) {
-        throw new Error(responseData?.message || 'Failed to fetch orders');
+        const responseData = await response.json();
+        console.debug('[OrdersScreen] Orders response:', responseData);
+
+        if (!response.ok) {
+          throw new Error(responseData?.message || 'Failed to fetch orders');
+        }
+
+        // Extract orders from response
+        const ordersData = responseData?.data || [];
+        setOrders(ordersData);
+      } catch (fetchError) {
+        clearTimeout(timeoutId);
+        // If aborted due to timeout or network error, still set loading to false
+        if (fetchError.name === 'AbortError') {
+          console.debug('[OrdersScreen] Request timed out');
+          setOrders([]); // Show empty state on timeout
+        } else {
+          throw fetchError;
+        }
       }
-
-      // Extract orders from response
-      const ordersData = responseData?.data || [];
-      setOrders(ordersData);
 
     } catch (err) {
       console.error('[OrdersScreen] Error fetching orders:', err);
-      setError(err.message || 'Failed to load orders');
+      // Don't show error for network issues, just show empty state
+      setOrders([]);
+      // setError(err.message || 'Failed to load orders');
     } finally {
       setLoading(false);
       setRefreshing(false);
@@ -127,25 +148,104 @@ const OrdersScreen = ({ navigation }) => {
     const statusUpper = status?.toUpperCase();
     switch (statusUpper) {
       case 'PENDING':
-        return 'Pending';
+        return t('pending') || 'Pending';
       case 'ACCEPTED':
-        return 'Accepted';
+        return t('accepted') || 'Accepted';
       case 'ASSIGNED':
-        return 'Assigned';
+        return t('assigned') || 'Assigned';
       case 'PICKED_UP':
-        return 'Picked Up';
+        return t('pickedUp') || 'Picked Up';
       case 'ON_THE_WAY':
-        return t('onTheWay');
+        return t('onTheWay') || 'On the way';
       case 'DELIVERED':
-        return t('delivered');
+        return t('delivered') || 'Delivered';
       case 'CANCELED':
-        return 'Canceled';
+        return t('canceled') || 'Canceled';
       case 'REJECTED':
-        return 'Rejected';
+        return t('rejected') || 'Rejected';
       default:
-        return 'Processing';
+        return t('processing') || 'Processing';
     }
   };
+
+  // Reorder functionality
+  const { addItem, clearVendorCartAndSync } = useCart();
+
+  const handleReorder = async (order) => {
+    if (!order || !order.items || order.items.length === 0) return;
+
+    try {
+      setLoading(true);
+      const vendorId = order.vendorId;
+
+      // Fetch fresh vendor details to ensure we have name/image for the cart
+      // (Order history often lacks full vendor metadata)
+      let vendorDetails = { vendorName: order.vendorName, vendorImage: order.vendorImage };
+      try {
+        const token = await StorageService.getAccessToken();
+        const rawToken = (token && typeof token === 'object') ? (token.accessToken || token.token) : token;
+        const authHeader = rawToken ? (rawToken.startsWith('Bearer ') ? rawToken.substring(7) : rawToken) : null;
+
+        if (authHeader && vendorId) {
+          const vendorUrl = `${BASE_API_URL}${API_ENDPOINTS.RESTAURANTS.GET_DETAILS.replace(':id', vendorId)}`;
+          const vRes = await fetch(vendorUrl, {
+            method: 'GET',
+            headers: {
+              'Content-Type': 'application/json',
+              'Authorization': authHeader
+            }
+          });
+          if (vRes.ok) {
+            const vData = await vRes.json();
+            const v = vData.data || vData;
+            if (v) {
+              vendorDetails.vendorName = v.vendorName || v.name || v.restaurantName;
+              vendorDetails.vendorImage = v.storePhoto || v.logo || v.image;
+              console.log('[OrdersScreen] Fetched vendor details for reorder:', vendorDetails);
+            }
+          }
+        }
+      } catch (err) {
+        console.warn('[OrdersScreen] Failed to fetch vendor details for reorder', err);
+      }
+
+      // Add each item to cart
+      let successCount = 0;
+      for (const item of order.items) {
+        // Construct product object from order item details
+        const product = {
+          _id: item.productId || item._id, // Ensure ID is passed
+          name: item.name,
+          price: item.price,
+          pricing: { price: item.price }, // normalized structure
+          image: item.image,
+          vendor: {
+            vendorId: vendorId,
+            vendorName: vendorDetails.vendorName || 'Vendor',
+            storePhoto: vendorDetails.vendorImage
+          }
+        };
+
+        const result = await addItem(product, item.quantity || 1);
+        if (result.success) successCount++;
+      }
+
+      setLoading(false);
+
+      if (successCount > 0) {
+        // Navigate to Cart Detail for this vendor
+        navigation.navigate('CartDetail', { vendorId: vendorId });
+      } else {
+        // Show error?
+        console.warn('Failed to add items for reorder');
+      }
+
+    } catch (e) {
+      console.error('Reorder failed', e);
+      setLoading(false);
+    }
+  };
+
 
   const renderOrderCard = (order, isOngoing = false) => {
     const statusIcon = getStatusIcon(order.orderStatus);
@@ -154,7 +254,7 @@ const OrdersScreen = ({ navigation }) => {
     const formatDate = (dateString) => {
       try {
         const date = new Date(dateString);
-        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        return date.toLocaleDateString('en-US', { month: 'short', day: 'numeric' });
       } catch {
         return 'N/A';
       }
@@ -170,102 +270,73 @@ const OrdersScreen = ({ navigation }) => {
     };
 
     // Get items list as string
-    const itemsList = order.items?.map(item => `${item.quantity}x ${item.name}`).join(', ') || 'No items';
+    const itemsList = order.items?.map(item => `${item.quantity}x ${item.name}`).join(', ') || t('items') || 'items';
 
-    // Placeholder image (you can update with vendor logo later)
+    // Placeholder image
     const restaurantImage = require('../assets/images/logo.png');
 
     return (
       <TouchableOpacity
         key={order._id || order.orderId}
-        style={[styles.orderCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowColor: colors.shadow }]}
-        activeOpacity={0.7}
+        style={[styles.orderCard, { backgroundColor: colors.surface, shadowColor: colors.shadow }]}
+        activeOpacity={0.9}
         onPress={() => isOngoing ? navigation.navigate('TrackOrder', { order }) : null}
       >
-        {/* Order Header */}
-        <View style={styles.orderHeader}>
+        {/* Top Section: Vendor Info & Status */}
+        <View style={styles.cardHeader}>
           <Image
             source={restaurantImage}
-            style={[styles.restaurantImage, { backgroundColor: colors.background }]}
+            style={[styles.restaurantImage, { backgroundColor: colors.border }]}
             resizeMode="cover"
           />
-          <View style={styles.orderHeaderInfo}>
-            <Text style={[styles.restaurantName, { color: colors.text.primary }]}>
-              {order.vendorId || 'Restaurant'}
-            </Text>
-            <Text style={[styles.orderNumber, { color: colors.text.secondary }]}>
-              {order.orderId}
-            </Text>
-            <Text style={[styles.orderDateTime, { color: colors.text.light }]}>
-              {formatDate(order.createdAt)} • {formatTime(order.createdAt)}
-            </Text>
+          <View style={styles.headerContent}>
+            <View style={styles.headerRow}>
+              <Text style={[styles.restaurantName, { color: colors.text.primary }]} numberOfLines={1}>
+                {order.vendorId || t('groceriesAndFood') || 'Groceries & Food'}
+              </Text>
+              <Text style={[styles.orderPrice, { color: colors.text.primary }]}>
+                €{order.finalAmount?.toFixed(2) || order.totalPrice?.toFixed(2) || '0.00'}
+              </Text>
+            </View>
+            <View style={styles.subHeaderRow}>
+              <Text style={[styles.dateText, { color: colors.text.light }]}>
+                {formatDate(order.createdAt)} • {formatTime(order.createdAt)}
+              </Text>
+              <View style={[styles.statusBadge, { backgroundColor: statusIcon.color + '15' }]}>
+                <Text style={[styles.statusText, { color: statusIcon.color }]}>
+                  {getStatusText(order.orderStatus)}
+                </Text>
+              </View>
+            </View>
           </View>
         </View>
 
-        {/* Order Items */}
-        <View style={[styles.orderItems, { borderTopColor: colors.border, borderBottomColor: colors.border }]}>
+        {/* Divider */}
+        <View style={[styles.divider, { backgroundColor: colors.border }]} />
+
+        {/* Middle Section: Items */}
+        <View style={styles.itemsContainer}>
           <Text style={[styles.itemsText, { color: colors.text.secondary }]} numberOfLines={2}>
             {itemsList}
           </Text>
-          <Text style={[styles.itemsCount, { color: colors.text.light }]}>
-            {order.totalItems} item{order.totalItems > 1 ? 's' : ''}
-          </Text>
         </View>
 
-        {/* Order Footer */}
-        <View style={styles.orderFooter}>
-          <View style={styles.statusContainer}>
-            {statusIcon.library === 'Ionicons' ? (
-              <Ionicons name={statusIcon.name} size={20} color={statusIcon.color} />
-            ) : (
-              <MaterialIcons name={statusIcon.name} size={20} color={statusIcon.color} />
-            )}
-            <Text style={[styles.statusText, { color: statusIcon.color }]}>
-              {getStatusText(order.orderStatus)}
-            </Text>
-          </View>
-          <Text style={[styles.totalAmount, { color: colors.text.primary }]}>
-            €{order.finalAmount?.toFixed(2) || order.totalPrice?.toFixed(2) || '0.00'}
-          </Text>
-        </View>
-
-        {/* Estimated Time for Ongoing Orders */}
-        {isOngoing && order.estimatedDeliveryTime && order.estimatedDeliveryTime !== 'N/A' && (
-          <View style={[styles.estimatedTimeContainer, { borderTopColor: colors.border }]}>
-            <Ionicons name="time-outline" size={16} color={colors.primary} />
-            <Text style={[styles.estimatedTimeText, { color: colors.primary }]}>
-              {t('estimated')} {t('deliveryTime')}: {order.estimatedDeliveryTime}
-            </Text>
-          </View>
-        )}
-
-        {/* Action Buttons */}
-        <View style={styles.actionButtons}>
+        {/* Bottom Section: Actions */}
+        <View style={styles.actionsContainer}>
           {isOngoing ? (
-            <>
-              <TouchableOpacity
-                style={[styles.trackButton, { backgroundColor: colors.primary }]}
-                onPress={() => navigation.navigate('TrackOrder', { order })}
-              >
-                <Ionicons name="location" size={18} color={colors.text.white} />
-                <Text style={[styles.trackButtonText, { color: colors.text.white }]}>{t('trackOrder')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.helpButton, { backgroundColor: colors.surface, borderColor: colors.primary }]}>
-                <Ionicons name="help-circle-outline" size={18} color={colors.primary} />
-                <Text style={[styles.helpButtonText, { color: colors.primary }]}>{t('helpCenter')}</Text>
-              </TouchableOpacity>
-            </>
+            <TouchableOpacity
+              style={[styles.primaryButton, { backgroundColor: colors.primary }]}
+              onPress={() => navigation.navigate('TrackOrder', { order })}
+            >
+              <Text style={[styles.primaryButtonText, { color: colors.text.white || '#fff' }]}>{t('trackOrder') || 'Track Order'}</Text>
+            </TouchableOpacity>
           ) : (
-            <>
-              <TouchableOpacity style={[styles.reorderButton, { backgroundColor: colors.surface, borderColor: colors.primary }]}>
-                <MaterialIcons name="replay" size={18} color={colors.primary} />
-                <Text style={[styles.reorderButtonText, { color: colors.primary }]}>{t('orderAgain')}</Text>
-              </TouchableOpacity>
-              <TouchableOpacity style={[styles.reviewButton, { backgroundColor: colors.surface, borderColor: colors.primary }]}>
-                <Ionicons name="star-outline" size={18} color={colors.primary} />
-                <Text style={[styles.reviewButtonText, { color: colors.primary }]}>{t('rating')}</Text>
-              </TouchableOpacity>
-            </>
+            <TouchableOpacity
+              style={[styles.reorderButton, { backgroundColor: colors.primary + '15' }]} // Tinted background
+              onPress={() => handleReorder(order)}
+            >
+              <Text style={[styles.reorderButtonText, { color: colors.primary }]}>{t('reorder') || 'Reorder'}</Text>
+            </TouchableOpacity>
           )}
         </View>
       </TouchableOpacity>
@@ -274,19 +345,25 @@ const OrdersScreen = ({ navigation }) => {
 
   const renderEmptyState = (type) => (
     <View style={styles.emptyState}>
-      <Ionicons
-        name={type === 'ongoing' ? 'receipt-outline' : 'time-outline'}
-        size={80}
-        color={colors.text.light}
+      <Image
+        source={require('../assets/images/logo.png')}
+        style={[styles.emptyStateImage, { opacity: 0.5 }]}
+        resizeMode="contain"
       />
       <Text style={[styles.emptyStateTitle, { color: colors.text.primary }]}>
-        {type === 'ongoing' ? t('noOrders') : t('noOrders')}
+        {type === 'ongoing' ? (t('noActiveOrders') || 'No active orders') : (t('noPastOrders') || 'No past orders')}
       </Text>
       <Text style={[styles.emptyStateText, { color: colors.text.secondary }]}>
         {type === 'ongoing'
-          ? 'Your active orders will appear here'
-          : 'Your past orders will appear here'}
+          ? (t('noOrdersInProgress') || "You don't have any orders in progress.")
+          : (t('noOrdersYet') || "Looks like you haven't ordered anything yet.")}
       </Text>
+      <TouchableOpacity
+        style={[styles.browseButton, { backgroundColor: colors.primary }]}
+        onPress={() => navigation.navigate('Categories')}
+      >
+        <Text style={[styles.browseButtonText, { color: colors.text.white || '#fff' }]}>{t('browseAndOrder') || 'Start Shopping'}</Text>
+      </TouchableOpacity>
     </View>
   );
 
@@ -296,67 +373,58 @@ const OrdersScreen = ({ navigation }) => {
       edges={['top']}
     >
       <View style={[styles.container, { backgroundColor: colors.background }]}>
+        <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
         {/* Header */}
-        <View style={styles.header}>
-          <Text style={[styles.headerText, { color: colors.text.primary }]}>{t('orders')}</Text>
+        <View style={[styles.header, { backgroundColor: colors.background }]}>
+          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>{t('orders') || 'Orders'}</Text>
         </View>
 
-        {/* Tabs */}
+        {/* Tabs - Pill Style */}
         <View style={styles.tabContainer}>
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              { backgroundColor: colors.surface },
-              activeTab === 'ongoing' && { backgroundColor: colors.primary }
-            ]}
-            onPress={() => setActiveTab('ongoing')}
-          >
-            <Text style={[
-              styles.tabText,
-              { color: colors.text.secondary },
-              activeTab === 'ongoing' && { color: colors.text.white }
-            ]}>
-              {t('ongoingOrders')}
-            </Text>
-            {ongoingOrders.length > 0 && (
-              <View style={[styles.badge, { backgroundColor: activeTab === 'ongoing' ? colors.text.white : colors.primary }]}>
-                <Text style={[styles.badgeText, { color: activeTab === 'ongoing' ? colors.primary : colors.text.white }]}>{ongoingOrders.length}</Text>
-              </View>
-            )}
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[
-              styles.tab,
-              { backgroundColor: colors.surface },
-              activeTab === 'history' && { backgroundColor: colors.primary }
-            ]}
-            onPress={() => setActiveTab('history')}
-          >
-            <Text style={[
-              styles.tabText,
-              { color: colors.text.secondary },
-              activeTab === 'history' && { color: colors.text.white }
-            ]}>
-              {t('pastOrders')}
-            </Text>
-          </TouchableOpacity>
+          <View style={[styles.tabWrapper, { backgroundColor: isDarkMode ? colors.surface : '#E0E0E0' }]}>
+            <TouchableOpacity
+              style={[
+                styles.tab,
+                activeTab === 'ongoing' && [styles.activeTab, { backgroundColor: colors.surface, shadowColor: colors.shadow }]
+              ]}
+              onPress={() => setActiveTab('ongoing')}
+              activeOpacity={1}
+            >
+              <Text style={[
+                styles.tabText,
+                { color: activeTab === 'ongoing' ? colors.text.primary : colors.text.secondary }
+              ]}>
+                {t('ongoing') || 'Ongoing'}
+              </Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[
+                styles.tab,
+                activeTab === 'history' && [styles.activeTab, { backgroundColor: colors.surface, shadowColor: colors.shadow }]
+              ]}
+              onPress={() => setActiveTab('history')}
+              activeOpacity={1}
+            >
+              <Text style={[
+                styles.tabText,
+                { color: activeTab === 'history' ? colors.text.primary : colors.text.secondary }
+              ]}>
+                {t('history') || 'History'}
+              </Text>
+            </TouchableOpacity>
+          </View>
         </View>
 
         {/* Orders List */}
         {loading && !refreshing ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
-            <Text style={[styles.loadingText, { color: colors.text.secondary }]}>Loading orders...</Text>
           </View>
         ) : error ? (
           <View style={styles.errorContainer}>
-            <Ionicons name="alert-circle-outline" size={60} color={colors.error} />
-            <Text style={[styles.errorText, { color: colors.text.primary }]}>{error}</Text>
-            <TouchableOpacity
-              style={[styles.retryButton, { backgroundColor: colors.primary }]}
-              onPress={() => fetchOrders()}
-            >
-              <Text style={[styles.retryButtonText, { color: colors.text.white }]}>Retry</Text>
+            <Text style={[styles.errorText, { color: colors.text.secondary }]}>{t('somethingWentWrong') || 'Something went wrong'}</Text>
+            <TouchableOpacity onPress={() => fetchOrders()} style={{ marginTop: 10 }}>
+              <Text style={{ color: colors.primary, fontFamily: 'Poppins-SemiBold' }}>{t('tryAgain') || 'Try Again'}</Text>
             </TouchableOpacity>
           </View>
         ) : (
@@ -399,47 +467,44 @@ const styles = StyleSheet.create({
   },
   header: {
     paddingHorizontal: 20,
-    paddingTop: 20,
-    paddingBottom: 16,
+    paddingVertical: 15,
+    backgroundColor: '#FAFAFA',
   },
-  headerText: {
-    fontSize: 28,
-    fontWeight: 'bold',
+  headerTitle: {
+    fontSize: 26,
     fontFamily: 'Poppins-Bold',
   },
   tabContainer: {
-    flexDirection: 'row',
     paddingHorizontal: 20,
-    marginBottom: 16,
-    gap: 12,
+    marginBottom: 20,
+  },
+  tabWrapper: {
+    flexDirection: 'row',
+    borderRadius: 25,
+    padding: 4,
+    height: 44,
   },
   tab: {
     flex: 1,
-    paddingVertical: 12,
-    paddingHorizontal: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 12,
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    borderRadius: 22,
+  },
+  activeTab: {
+    elevation: 2,
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   tabText: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Medium',
-    textAlign: 'center',
-    flexShrink: 1,
-  },
-  badge: {
-    borderRadius: 10,
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    marginLeft: 6,
-    minWidth: 20,
-    alignItems: 'center',
-  },
-  badgeText: {
-    fontSize: 11,
+    fontSize: 13,
     fontFamily: 'Poppins-SemiBold',
+  },
+  loadingContainer: {
+    flex: 1,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginTop: 50,
   },
   scrollView: {
     flex: 1,
@@ -448,161 +513,143 @@ const styles = StyleSheet.create({
     paddingHorizontal: 20,
     paddingBottom: 100,
   },
+  // Card Styles
   orderCard: {
     borderRadius: 16,
     padding: 16,
     marginBottom: 16,
-    elevation: 3,
+    backgroundColor: '#fff',
+    elevation: 2,
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    borderWidth: 1,
+    shadowOpacity: 0.08,
+    shadowRadius: 6,
   },
-  orderHeader: {
+  cardHeader: {
     flexDirection: 'row',
-    marginBottom: 12,
   },
   restaurantImage: {
-    width: 60,
-    height: 60,
-    borderRadius: 12,
+    width: 48,
+    height: 48,
+    borderRadius: 10,
+    backgroundColor: '#eee',
   },
-  orderHeaderInfo: {
+  headerContent: {
     flex: 1,
     marginLeft: 12,
     justifyContent: 'center',
   },
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 4,
+  },
+  subHeaderRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+  },
   restaurantName: {
-    fontSize: 16,
-    fontFamily: 'Poppins-SemiBold',
-    marginBottom: 2,
+    fontSize: 15,
+    fontFamily: 'Poppins-Bold',
+    flex: 1,
+    marginRight: 8,
   },
-  orderNumber: {
-    fontSize: 13,
-    fontFamily: 'Poppins-Regular',
-    marginBottom: 2,
+  orderPrice: {
+    fontSize: 15,
+    fontFamily: 'Poppins-Bold',
   },
-  orderDateTime: {
+  dateText: {
     fontSize: 12,
-    fontFamily: 'Poppins-Regular',
+    fontFamily: 'Poppins-Medium',
   },
-  orderItems: {
-    paddingVertical: 12,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
+  statusBadge: {
+    paddingHorizontal: 8,
+    paddingVertical: 2,
+    borderRadius: 6,
+  },
+  statusText: {
+    fontSize: 11,
+    fontFamily: 'Poppins-SemiBold',
+    textTransform: 'uppercase',
+  },
+  divider: {
+    height: 1,
+    marginVertical: 12,
+    opacity: 0.5,
+  },
+  itemsContainer: {
+    marginBottom: 16,
   },
   itemsText: {
     fontSize: 13,
     fontFamily: 'Poppins-Regular',
-    lineHeight: 20,
+    lineHeight: 18,
   },
-  orderFooter: {
+  actionsContainer: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    marginTop: 12,
   },
-  statusContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  statusText: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Medium',
-    marginLeft: 6,
-  },
-  totalAmount: {
-    fontSize: 18,
-    fontFamily: 'Poppins-Bold',
-  },
-  estimatedTimeContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    marginTop: 12,
-    paddingTop: 12,
-    borderTopWidth: 1,
-  },
-  estimatedTimeText: {
-    fontSize: 13,
-    fontFamily: 'Poppins-Medium',
-    marginLeft: 6,
-  },
-  actionButtons: {
-    flexDirection: 'row',
-    marginTop: 12,
-    gap: 12,
-  },
-  trackButton: {
+  primaryButton: {
     flex: 1,
-    flexDirection: 'row',
-    paddingVertical: 12,
-    borderRadius: 10,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
   },
-  trackButtonText: {
+  primaryButtonText: {
+    color: '#fff',
     fontSize: 14,
     fontFamily: 'Poppins-SemiBold',
-    marginLeft: 6,
-  },
-  helpButton: {
-    flex: 1,
-    flexDirection: 'row',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-  },
-  helpButtonText: {
-    fontSize: 14,
-    fontFamily: 'Poppins-SemiBold',
-    marginLeft: 6,
   },
   reorderButton: {
     flex: 1,
-    flexDirection: 'row',
-    paddingVertical: 12,
-    borderRadius: 10,
+    height: 42,
+    borderRadius: 21,
     alignItems: 'center',
     justifyContent: 'center',
-    borderWidth: 1.5,
   },
   reorderButtonText: {
     fontSize: 14,
     fontFamily: 'Poppins-SemiBold',
-    marginLeft: 6,
   },
-  reviewButton: {
-    flex: 1,
-    flexDirection: 'row',
-    paddingVertical: 12,
-    borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderWidth: 1.5,
-  },
-  reviewButtonText: {
-    fontSize: 14,
-    fontFamily: 'Poppins-SemiBold',
-    marginLeft: 6,
-  },
+  // Empty State Styles
   emptyState: {
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 80,
+    paddingVertical: 60,
+  },
+  emptyStateImage: {
+    width: 120,
+    height: 120,
+    marginBottom: 20,
   },
   emptyStateTitle: {
     fontSize: 18,
-    fontFamily: 'Poppins-SemiBold',
-    marginTop: 16,
+    fontFamily: 'Poppins-Bold',
     marginBottom: 8,
   },
   emptyStateText: {
     fontSize: 14,
     fontFamily: 'Poppins-Regular',
     textAlign: 'center',
+    marginBottom: 24,
+    maxWidth: '80%',
   },
+  browseButton: {
+    paddingHorizontal: 32,
+    paddingVertical: 14,
+    borderRadius: 25,
+  },
+  browseButtonText: {
+    color: '#fff',
+    fontSize: 15,
+    fontFamily: 'Poppins-Bold',
+  },
+  errorContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginTop: 50,
+  }
 });
 
 export default OrdersScreen;

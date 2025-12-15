@@ -46,16 +46,46 @@ function normalizeProductForCart(p) {
   const style = isValidObjectId(chosen) ? 'objectId' : (/^PROD-/i.test(chosen || '') ? 'sku' : (chosen ? 'other' : 'none'));
   console.debug('[cart:id-debug] normalizeProductForCart', { candidates, chosen, style });
 
+  // Extract vendor info more robustly
+  const vendor = raw.vendor || {};
+  const vendorId = vendor.vendorId || raw.vendorId || null;
+
+  // Pricing extraction
+  const pricing = raw.pricing || {};
+  const price = Number(pricing.price ?? raw.price ?? p.price ?? 0) || 0;
+  const discountRaw = pricing.discount ?? raw.discount ?? 0;
+  const taxRaw = pricing.tax ?? raw.tax ?? 0;
+  const finalPriceRaw = pricing.finalPrice ?? raw.finalPrice;
+
+  // Calculate final price if not explicitly provided, or use provided
+  // Note: Backend seems to provide finalPrice. Trust it if present.
+  let finalPrice = Number(finalPriceRaw);
+  if (!Number.isFinite(finalPrice)) {
+    // fallback calculation if needed, roughly: price - discount + tax
+    // But usually backend finalPrice is the source of truth
+    finalPrice = price;
+  }
+
+  // Ensure images array is handled
+  const images = Array.isArray(raw.images) ? raw.images : [];
+  const primaryImage = p.image || images[0] || null;
+
   return {
     id: chosen,
     idSource: source,
     idStyle: style,
     name: raw.product?.name || raw.name || raw.productName || p.name || 'Item',
-    price: Number(raw.pricing?.price ?? raw.price ?? p.price ?? 0) || 0,
-    currency: raw.pricing?.currency ?? raw.currency ?? '',
-    image: p.image || (Array.isArray(raw.images) && raw.images[0]) || null,
-    vendorId: raw.vendor?.vendorId || raw.vendorId || null,
-    vendorName: raw.vendor?.vendorName || raw.vendorName || null,
+    price: price,
+    finalPrice: finalPrice, // NEW: exposed for total calculation
+    discount: discountRaw,
+    tax: taxRaw,
+    currency: pricing.currency ?? raw.currency ?? raw.pricing?.currency ?? '',
+    image: primaryImage,
+    vendorId,
+    vendorName: vendor.vendorName || raw.vendorName || null,
+    vendorImage: vendor.storePhoto || vendor.logo || raw.vendorImage || null,
+    vendorRating: vendor.rating,
+    vendorDeliveryTime: vendor.deliveryTime,
     _raw: raw,
   };
 }
@@ -124,8 +154,8 @@ export const CartProvider = ({ children }) => {
     try {
       if (!t) return null;
       const s = t.toString();
-      if (s.length <= 12) return `${s.slice(0,4)}...`;
-      return `${s.slice(0,8)}...${s.slice(-4)}`;
+      if (s.length <= 12) return `${s.slice(0, 4)}...`;
+      return `${s.slice(0, 8)}...${s.slice(-4)}`;
     } catch (e) { return null; }
   };
 
@@ -505,14 +535,23 @@ export const CartProvider = ({ children }) => {
   const itemsMap = useMemo(() => buildItemsMap(), [state.carts]);
   const cartItems = useMemo(() => Object.keys(itemsMap).map(id => ({ id, ...itemsMap[id] })), [itemsMap]);
   const itemCount = useMemo(() => cartItems.reduce((s, it) => s + (it.quantity || 0), 0), [cartItems]);
-  const total = useMemo(() => cartItems.reduce((s, it) => s + (Number(it.product.price || 0) * (it.quantity || 0)), 0), [cartItems]);
+  const total = useMemo(() => cartItems.reduce((s, it) => {
+    const p = it.product;
+    const priceToUse = (p.finalPrice !== undefined && p.finalPrice !== null) ? Number(p.finalPrice) : Number(p.price || 0);
+    return s + (priceToUse * (it.quantity || 0));
+  }, 0), [cartItems]);
 
   // Helper: vendor subtotal
   const getVendorSubtotal = (vendorId) => {
     const v = String(vendorId);
     const cart = state.carts?.[v];
     if (!cart) return 0;
-    return Object.keys(cart.items || {}).reduce((s, id) => s + (Number(cart.items[id].product.price || 0) * (cart.items[id].quantity || 0)), 0);
+    return Object.keys(cart.items || {}).reduce((s, id) => {
+      const item = cart.items[id];
+      const p = item.product;
+      const priceToUse = (p.finalPrice !== undefined && p.finalPrice !== null) ? Number(p.finalPrice) : Number(p.price || 0);
+      return s + (priceToUse * (item.quantity || 0));
+    }, 0);
   };
 
   // Global ID resolution helper (maps any incoming product/item id to stored cart key, preferring SKU)
@@ -536,22 +575,40 @@ export const CartProvider = ({ children }) => {
   // Fetch cart from backend API (memoized to avoid changing identity)
   const fetchCart = useCallback(async (options = {}) => {
     const force = !!options.force;
+    const silent = !!options.silent;
     const now = Date.now();
     const minIntervalMs = 2000; // throttle window
 
-    if (fetchInFlightRef.current) {
-      console.debug('[CartContext] fetchCart skipped (in-flight)');
-      return { success: true, skipped: true, reason: 'in_flight' };
+    // Safety: If in-flight for more than 10 seconds, assume stuck and reset
+    if (fetchInFlightRef.current && (now - lastFetchAtRef.current > 10000)) {
+      console.warn('[CartContext] fetchCart stuck in-flight for >10s, resetting');
+      fetchInFlightRef.current = false;
     }
+
+    if (fetchInFlightRef.current) {
+      if (force) {
+        console.debug('[CartContext] fetchCart force requested while in-flight, allowing but potential race condition');
+        // We proceed, but we don't set inFlight to true again since it's already true.
+      } else {
+        console.debug('[CartContext] fetchCart skipped (in-flight)');
+        return { success: true, skipped: true, reason: 'in_flight' };
+      }
+    }
+
     if (!force && now - (lastFetchAtRef.current || 0) < minIntervalMs) {
       console.debug('[CartContext] fetchCart skipped (throttled)');
       return { success: true, skipped: true, reason: 'throttled' };
     }
+
     fetchInFlightRef.current = true;
     lastFetchAtRef.current = now;
+
     try {
-      setSyncing(true);
+      if (!silent) setSyncing(true);
       const res = await CartAPI.getCart();
+
+      // If we made a successful fetch, we should update state even if another fetch is starting?
+      // Yes, React state updates are queued.
 
       if (!res.success) {
         console.warn('[CartContext] fetchCart failed', res);
@@ -559,10 +616,7 @@ export const CartProvider = ({ children }) => {
       }
 
       const root = res.data;
-      try {
-        const keys = root && typeof root === 'object' ? Object.keys(root) : [];
-        console.debug('[CartContext] fetchCart data keys:', keys);
-      } catch {}
+      // ... (rest of parsing logic is fine)
 
       // Extract items from multiple possible shapes
       let items = [];
@@ -579,35 +633,50 @@ export const CartProvider = ({ children }) => {
       } else if (Array.isArray(root?.data?.cartItems)) {
         items = root.data.cartItems;
       } else if (Array.isArray(root?.data)) {
-        // Some APIs return items array in data directly
         items = root.data;
       }
 
       console.debug('[CartContext] fetchCart received', { itemCount: items.length });
+      if (items.length > 0) {
+        console.log('[CartContext] raw item sample:', JSON.stringify(items[0], null, 2));
+      }
 
       // Group items by vendor
       const newCarts = {};
       for (const item of items) {
         if (!item) continue;
-        const rawProd = item.product || item; // support both nested and flat shapes
+        const rawProd = item.product || item;
         const normalized = normalizeProductForCart(rawProd);
         const vid = normalized.vendorId || rawProd.vendorId || rawProd.vendor?.vendorId || 'unknown_vendor';
         const vendorKey = String(vid);
         const qty = Number(item.quantity ?? item.qty ?? item.count ?? 1) || 1;
 
-        if (!normalized.id) {
-          console.debug('[CartContext] skipping item without id', { rawKeys: Object.keys(rawProd || {}) });
-          continue;
-        }
+        if (!normalized.id) continue;
 
         if (!newCarts[vendorKey]) {
           newCarts[vendorKey] = {
             vendorId: vendorKey,
             vendorName: normalized.vendorName || rawProd.vendorName || rawProd.vendor?.vendorName || '',
+            vendorImage: normalized.vendorImage || 'https://via.placeholder.com/60',
+            vendorRating: normalized.vendorRating || '4.5',
+            vendorDeliveryTime: normalized.vendorDeliveryTime || '30-40 min',
             items: {},
             appliedPromo: null,
             deliveryInstructions: ''
           };
+        } else {
+          // Update vendor details if better info is found in subsequent items
+          const c = newCarts[vendorKey];
+          if (!c.vendorName && normalized.vendorName) c.vendorName = normalized.vendorName;
+          if ((!c.vendorImage || c.vendorImage === 'https://via.placeholder.com/60') && normalized.vendorImage) {
+            c.vendorImage = normalized.vendorImage;
+          }
+          if ((!c.vendorRating || c.vendorRating === '4.5') && normalized.vendorRating) {
+            c.vendorRating = normalized.vendorRating;
+          }
+          if ((!c.vendorDeliveryTime || c.vendorDeliveryTime === '30-40 min') && normalized.vendorDeliveryTime) {
+            c.vendorDeliveryTime = normalized.vendorDeliveryTime;
+          }
         }
 
         newCarts[vendorKey].items[normalized.id] = {
@@ -617,12 +686,9 @@ export const CartProvider = ({ children }) => {
       }
 
       setState(prev => {
-        // Avoid unnecessary state updates if equal (basic check)
         const prevCarts = prev?.carts || {};
-        const prevKeys = Object.keys(prevCarts);
-        const nextKeys = Object.keys(newCarts);
-        const shallowEqual = prevKeys.length === nextKeys.length && prevKeys.every(k => prevCarts[k] && newCarts[k] && Object.keys(prevCarts[k].items||{}).length === Object.keys(newCarts[k].items||{}).length);
-        if (shallowEqual) return prev; // skip update to reduce re-renders
+        // Simple shallow comparison optimization could be here, but let's trust React for now
+        // or keep existing logic if it was working well.
         return { carts: newCarts };
       });
       return { success: true, data: res.data };
@@ -630,8 +696,11 @@ export const CartProvider = ({ children }) => {
       console.error('[CartContext] fetchCart error', error);
       return { success: false, error: error?.message || 'Network error' };
     } finally {
-      fetchInFlightRef.current = false;
-      setSyncing(false);
+      // Small delay before allowing next fetch to debounce rapid retries
+      setTimeout(() => {
+        fetchInFlightRef.current = false;
+      }, 500);
+      if (!silent) setSyncing(false);
     }
   }, []);
 

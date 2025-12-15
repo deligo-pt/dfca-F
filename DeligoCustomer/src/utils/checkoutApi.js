@@ -11,8 +11,8 @@ const maskToken = (t) => {
   try {
     if (!t) return null;
     const s = t.toString();
-    if (s.length <= 12) return `${s.slice(0,4)}...`;
-    return `${s.slice(0,8)}...${s.slice(-4)}`;
+    if (s.length <= 12) return `${s.slice(0, 4)}...`;
+    return `${s.slice(0, 8)}...${s.slice(-4)}`;
   } catch (e) { return null; }
 };
 
@@ -58,11 +58,18 @@ class CheckoutAPI {
 
       console.debug('[CheckoutAPI] POST', url, { useCart });
 
+      console.debug('[CheckoutAPI] POST', url, { useCart });
+
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
       const response = await fetch(url, {
         method: 'POST',
         headers,
         body: JSON.stringify({ useCart }),
+        signal: controller.signal,
       });
+      clearTimeout(timeoutId);
 
       const responseData = await response.json();
 

@@ -32,12 +32,14 @@ export const translations = {
     searchRestaurants: 'Search for restaurants or food',
     categories: 'Categories',
     popularRestaurants: 'Popular Restaurants',
+    nearYou: 'Near You',
     nearbyRestaurants: 'Nearby Restaurants',
     viewAll: 'View All',
 
     // Categories Screen
     whatDoYouNeed: "What's on your mind?",
     cuisines: 'Cuisines',
+    browseByCategory: 'Browse by Category',
     locationDenied: 'Location denied',
     errorGettingLocation: 'Error getting location',
     setYourLocation: 'Set your location',
@@ -70,6 +72,7 @@ export const translations = {
     addDeliveryInstructions: 'Add delivery instructions (optional)',
     billSummary: 'Bill Summary',
     browseRestaurants: 'Browse Restaurants',
+    browseAndOrder: 'Browse & Order',
     addItemsToGetStarted: 'Add items from a restaurant to get started',
 
     // Checkout
@@ -102,13 +105,37 @@ export const translations = {
     // Orders Screen
     ongoingOrders: 'Ongoing Orders',
     pastOrders: 'Past Orders',
+    ongoing: 'Ongoing',
+    history: 'History',
     noOrders: 'No orders yet',
+    activeOrdersAppearHere: 'Your active orders will appear here',
+    pastOrdersAppearHere: 'Your past orders will appear here',
     orderAgain: 'Order Again',
+    reorder: 'Reorder',
     trackOrder: 'Track Order',
     liveTracking: 'Live Tracking',
+
+    // Status
+    pending: 'Pending',
+    accepted: 'Accepted',
+    assigned: 'Assigned',
+    pickedUp: 'Picked Up',
     delivered: 'Delivered',
     preparing: 'Preparing',
     onTheWay: 'On the way',
+    canceled: 'Canceled',
+    rejected: 'Rejected',
+    processing: 'Processing',
+
+    // Empty States & Errors
+    noActiveOrders: 'No active orders',
+    noPastOrders: 'No past orders',
+    noOrdersInProgress: "You don't have any orders in progress.",
+    noOrdersYet: "Looks like you haven't ordered anything yet.",
+    browseAndOrder: 'Start Shopping',
+    groceriesAndFood: 'Groceries & Food',
+    somethingWentWrong: 'Something went wrong',
+    tryAgain: 'Try Again',
 
     // Track Order Screen
     readyForPickup: 'Ready for Pickup',
@@ -242,6 +269,26 @@ export const translations = {
     changePhoto: 'Change Photo',
     saveChanges: 'Save Changes',
     profileUpdated: 'Profile updated successfully!',
+    selectPhoto: 'Select Photo',
+    takePhoto: 'Take Photo',
+    chooseFromGallery: 'Choose from Gallery',
+    removeCurrentPhoto: 'Remove Current Photo',
+    cameraPermissionDenied: 'Permission Denied',
+    cameraPermissionRequired: 'Camera permission is required to take photos.',
+    mediaPermissionDenied: 'Permission Denied',
+    mediaPermissionRequired: 'Media library permission is required to select photos.',
+    failedToTakePhoto: 'Failed to take photo. Please try again.',
+    failedToSelectPhoto: 'Failed to select photo. Please try again.',
+    locationPermissionDenied: 'Permission Denied',
+    locationPermissionRequired: 'Location permission is required to get current location.',
+    failedToGetLocation: 'Failed to get current location.',
+    googleMapsKeyMissing: 'Google Maps API key not configured',
+    noPlacesFound: 'No places found. Please try a different search.',
+    addressSearchFailed: 'Failed to search for the address. Please try again.',
+    enterFullName: 'Please enter your full name',
+    enterMobileNumberError: 'Please enter your mobile number',
+    provideAddress: 'Please provide your address',
+    saveFailed: 'Failed to save changes',
 
     // Help Center Screen
     howCanWeHelp: 'How can we help you?',
@@ -413,6 +460,10 @@ export const translations = {
     // Checkout Screen
     fast: 'Fast',
     vegan: 'Vegan',
+    estimatedDeliveryTime: 'Estimated delivery time',
+    preparingCheckout: 'Preparing checkout...',
+    initializingPayment: 'Initializing Payment...',
+    goBack: 'Go Back',
   },
 
   pt: {
@@ -447,12 +498,14 @@ export const translations = {
     searchRestaurants: 'Pesquisar restaurantes ou comida',
     categories: 'Categorias',
     popularRestaurants: 'Restaurantes Populares',
+    nearYou: 'Perto de Você',
     nearbyRestaurants: 'Restaurantes Próximos',
     viewAll: 'Ver Todos',
 
     // Categories Screen
     whatDoYouNeed: 'O que está em sua mente?',
     cuisines: 'Cozinhas',
+    browseByCategory: 'Explorar por Categoria',
     locationDenied: 'Localização negada',
     errorGettingLocation: 'Erro ao obter localização',
     setYourLocation: 'Defina sua localização',
@@ -486,6 +539,7 @@ export const translations = {
     addDeliveryInstructions: 'Adicionar instruções de entrega (opcional)',
     billSummary: 'Resumo da Conta',
     browseRestaurants: 'Navegar Restaurantes',
+    browseAndOrder: 'Explorar e Pedir',
     addItemsToGetStarted: 'Adicione itens de um restaurante para começar',
 
     // Checkout
@@ -518,7 +572,16 @@ export const translations = {
     // Orders Screen
     ongoingOrders: 'Pedidos em Andamento',
     pastOrders: 'Pedidos Anteriores',
+    ongoing: 'Em Andamento',
+    history: 'Histórico',
+    reorder: 'Pedir Novamente',
     noOrders: 'Nenhum pedido ainda',
+    noActiveOrders: 'Nenhum pedido ativo',
+    noPastOrders: 'Nenhum pedido anterior',
+    noOrdersInProgress: 'Você não tem nenhum pedido em andamento.',
+    noOrdersYet: 'Parece que você ainda não fez nenhum pedido.',
+    activeOrdersAppearHere: 'Seus pedidos ativos aparecerão aqui',
+    pastOrdersAppearHere: 'Seus pedidos anteriores aparecerão aqui',
     orderAgain: 'Pedir Novamente',
     trackOrder: 'Rastrear Pedido',
     liveTracking: 'Rastreamento ao Vivo',
@@ -574,7 +637,10 @@ export const translations = {
     estimatedDelivery: 'Entrega Estimada',
     contactRider: 'Contatar Entregador',
     from: 'De',
-
+    estimatedDeliveryTime: 'Tempo de entrega estimado',
+    preparingCheckout: 'Preparando finalização...',
+    initializingPayment: 'Inicializando pagamento...',
+    goBack: 'Voltar',
     // Profile/Account
     myProfile: 'Meu Perfil',
     editProfile: 'Editar Perfil',
@@ -658,6 +724,26 @@ export const translations = {
     changePhoto: 'Alterar Foto',
     saveChanges: 'Salvar Alterações',
     profileUpdated: 'Perfil atualizado com sucesso!',
+    selectPhoto: 'Selecionar Foto',
+    takePhoto: 'Tirar Foto',
+    chooseFromGallery: 'Escolher da Galeria',
+    removeCurrentPhoto: 'Remover Foto Atual',
+    cameraPermissionDenied: 'Permissão Negada',
+    cameraPermissionRequired: 'A permissão da câmera é necessária para tirar fotos.',
+    mediaPermissionDenied: 'Permissão Negada',
+    mediaPermissionRequired: 'A permissão da biblioteca de mídia é necessária para selecionar fotos.',
+    failedToTakePhoto: 'Falha ao tirar foto. Por favor, tente novamente.',
+    failedToSelectPhoto: 'Falha ao selecionar foto. Por favor, tente novamente.',
+    locationPermissionDenied: 'Permissão Negada',
+    locationPermissionRequired: 'A permissão de localização é necessária para obter a localização atual.',
+    failedToGetLocation: 'Falha ao obter localização atual.',
+    googleMapsKeyMissing: 'Chave API do Google Maps não configurada',
+    noPlacesFound: 'Nenhum lugar encontrado. Por favor, tente uma pesquisa diferente.',
+    addressSearchFailed: 'Falha ao pesquisar o endereço. Por favor, tente novamente.',
+    enterFullName: 'Por favor, digite seu nome completo',
+    enterMobileNumberError: 'Por favor, digite seu número de celular',
+    provideAddress: 'Por favor, forneça seu endereço',
+    saveFailed: 'Falha ao salvar as alterações',
 
     // Help Center Screen
     howCanWeHelp: 'Como podemos ajudar você?',

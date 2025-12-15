@@ -1,5 +1,5 @@
 import React, { useCallback, useState, useRef, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, ActivityIndicator, RefreshControl, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { Ionicons } from '@expo/vector-icons';
@@ -11,7 +11,7 @@ import CartList from '../components/CartList';
 
 const CartScreen = ({ navigation }) => {
   const { t } = useLanguage();
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
 
   // Use Cart context for real data (cartsArray provides multiple vendor carts)
@@ -28,7 +28,7 @@ const CartScreen = ({ navigation }) => {
       const loadCart = async () => {
         const fn = fetchCartRef.current;
         if (fn && active) {
-          const result = await fn();
+          const result = await fn({ silent: true });
           if (result?.skipped) {
             console.debug('[CartScreen] fetch skipped:', result.reason);
           } else if (!result?.success) {
@@ -55,24 +55,25 @@ const CartScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      {/* Modern Header with Badge */}
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <View style={styles.headerLeft}>
-          <Ionicons name="cart" size={28} color={colors.primary} />
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+      {/* Modern Header (Clean & Minimal) */}
+      <View style={[styles.header, { backgroundColor: colors.background }]}>
+        <View style={styles.headerContent}>
           <Text style={[styles.headerTitle, { color: colors.text.primary }]}>{t('cart')}</Text>
           {itemCount > 0 && (
-            <View style={[styles.badge, { backgroundColor: colors.primary }]}>
-              <Text style={styles.badgeText}>{itemCount}</Text>
+            <View style={[styles.badge, { backgroundColor: colors.primary + '20' }]}>
+              <Text style={[styles.badgeText, { color: colors.primary }]}>{itemCount}</Text>
             </View>
           )}
         </View>
+        {/* Optional: Add an action here if needed, like 'Edit' */}
       </View>
 
       {/* Syncing Indicator */}
       {syncing && (
-        <View style={[styles.syncingBanner, { backgroundColor: colors.primary + '15' }]}>
+        <View style={[styles.syncingBanner, { backgroundColor: colors.primary + '10' }]}>
           <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 8 }} />
-          <Text style={[styles.syncingText, { color: colors.primary }]}>Syncing cart...</Text>
+          <Text style={[styles.syncingText, { color: colors.primary }]}>Updating your cart...</Text>
         </View>
       )}
 
@@ -86,26 +87,28 @@ const CartScreen = ({ navigation }) => {
             tintColor={colors.primary}
           />
         }
+        contentContainerStyle={{ paddingBottom: 100 }}
       >
         {cartsArray.length === 0 ? (
           <View style={styles.emptyContainer}>
-            <View style={[styles.emptyIconContainer, { backgroundColor: colors.primary + '10' }]}>
-              <Ionicons name="cart-outline" size={64} color={colors.primary} />
+            <View style={[styles.emptyIconContainer, { backgroundColor: colors.surface, shadowColor: colors.shadow }]}>
+              <Ionicons name="basket-outline" size={60} color={colors.primary} />
             </View>
-            <Text style={[styles.emptyTitle, { color: colors.text.primary }]}>Your cart is empty</Text>
+            <Text style={[styles.emptyTitle, { color: colors.text.primary }]}>Your basket is empty</Text>
             <Text style={[styles.emptySubtitle, { color: colors.text.secondary }]}>
-              Add delicious items from restaurants to get started
+              Go ahead and order some yummy food!
             </Text>
             <TouchableOpacity
               style={[styles.browseButton, { backgroundColor: colors.primary }]}
-              onPress={() => navigation.navigate('Home')}
+              onPress={() => navigation.navigate('Categories')}
             >
-              <Ionicons name="restaurant" size={20} color="#fff" style={{ marginRight: 8 }} />
-              <Text style={styles.browseButtonText}>Browse Restaurants</Text>
+              <Text style={[styles.browseButtonText, { color: colors.text.white || '#fff' }]}>Browse Food</Text>
             </TouchableOpacity>
           </View>
         ) : (
-          <CartList navigation={navigation} />
+          <View style={{ paddingTop: 10 }}>
+            <CartList navigation={navigation} />
+          </View>
         )}
       </ScrollView>
     </SafeAreaView>
@@ -117,94 +120,85 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: '#F9F9F9',
+    // Removed border/shadow for glovo-like cleanliness
   },
-  headerLeft: {
+  headerContent: {
     flexDirection: 'row',
     alignItems: 'center',
   },
   headerTitle: {
-    fontSize: fontSize.xxl,
+    fontSize: 28,
     fontFamily: 'Poppins-Bold',
-    marginLeft: spacing.sm,
   },
   badge: {
-    minWidth: 22,
-    height: 22,
-    borderRadius: 11,
+    marginLeft: 12,
+    paddingHorizontal: 10,
+    paddingVertical: 4,
+    borderRadius: 12,
     alignItems: 'center',
     justifyContent: 'center',
-    marginLeft: spacing.sm,
-    paddingHorizontal: 6,
   },
   badgeText: {
-    color: '#fff',
-    fontSize: 12,
-    fontFamily: 'Poppins-Bold',
+    fontSize: 14,
+    fontFamily: 'Poppins-SemiBold',
   },
   syncingBanner: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.sm,
+    paddingVertical: 8,
   },
   syncingText: {
-    fontSize: fontSize.sm,
+    fontSize: 12,
     fontFamily: 'Poppins-Medium',
   },
   emptyContainer: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 100,
-    paddingHorizontal: spacing.xl,
+    paddingTop: 120,
+    paddingHorizontal: 30,
   },
   emptyIconContainer: {
-    width: 120,
-    height: 120,
-    borderRadius: 60,
+    width: 100,
+    height: 100,
+    borderRadius: 50,
     alignItems: 'center',
     justifyContent: 'center',
-    marginBottom: spacing.lg,
+    marginBottom: 24,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 10,
   },
   emptyTitle: {
-    fontSize: fontSize.xxl,
+    fontSize: 22,
     fontFamily: 'Poppins-Bold',
-    marginBottom: spacing.sm,
+    marginBottom: 8,
     textAlign: 'center',
   },
   emptySubtitle: {
-    fontSize: fontSize.md,
+    fontSize: 15,
     fontFamily: 'Poppins-Regular',
     textAlign: 'center',
-    marginBottom: spacing.xl,
+    marginBottom: 32,
     lineHeight: 22,
   },
   browseButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    paddingHorizontal: spacing.xl,
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.full,
-    elevation: 3,
+    paddingHorizontal: 40,
+    paddingVertical: 16,
+    borderRadius: 30,
+    elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.2,
-    shadowRadius: 4,
+    shadowRadius: 8,
   },
   browseButtonText: {
     color: '#fff',
-    fontSize: fontSize.md,
+    fontSize: 16,
     fontFamily: 'Poppins-Bold',
   },
 });
