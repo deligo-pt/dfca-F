@@ -2,7 +2,8 @@ import React, { useState, useRef, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, Animated, RefreshControl } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../utils/ThemeContext';
-import { getUserData, logoutUser } from '../utils/auth';
+import { getUserData } from '../utils/auth';
+import { useProfile } from '../contexts/ProfileContext';
 import StorageService from '../utils/storage';
 import CustomModal from '../components/CustomModal';
 import { useLanguage } from '../utils/LanguageContext';
@@ -20,6 +21,7 @@ import { useFocusEffect } from '@react-navigation/native';
 const ProfileScreen = ({ onLogout, navigation }) => {
   const { t } = useLanguage();
   const { colors } = useTheme();
+  const { logout } = useProfile();
   const insets = useSafeAreaInsets();
   const [user, setUser] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
@@ -73,46 +75,21 @@ const ProfileScreen = ({ onLogout, navigation }) => {
       t('logout'),
       'Are you sure you want to logout?',
       async () => {
-        // Keep modal open while logout happens and show a loader in the button
         setIsLoggingOut(true);
         try {
-          // Read token from storage and pass it into logoutUser to ensure server receives the exact stored token
-          const tokenFromStorage = await (StorageService.getAccessToken ? StorageService.getAccessToken() : StorageService.getItem('userToken'));
-          const result = await logoutUser(tokenFromStorage);
+          // Use context logout which handles state updates and navigation trigger
+          await logout();
 
-           // Stop loader and close the confirmation modal
-           setIsLoggingOut(false);
-           setModalVisible(false);
-
-           // Handle API result: success -> navigate; failure -> show informative modal
-           if (result && result.success) {
-             // Successful logout
-             if (onLogout) {
-               onLogout();
-             }
-             return;
-           }
-
-           // If unauthorized (token invalid/expired), still navigate to login but inform the user
-           if (result && result.status === 401) {
-             // Token invalid/expired: perform local logout/navigation immediately.
-             console.warn('[ProfileScreen] logout returned 401 - treating as session expired');
-             if (onLogout) onLogout();
-             return;
-           }
-
-           // Generic failure message
-           showModal(
-             t('error'),
-             result?.message || 'Logout failed. Please try again.',
-             () => setModalVisible(false),
-             true,
-           );
-         } catch (err) {
-           console.warn('[ProfileScreen] logout error:', err);
-           setIsLoggingOut(false);
-           setModalVisible(false);
-         }
+          if (onLogout) {
+            onLogout();
+          }
+        } catch (err) {
+          console.warn('[ProfileScreen] logout error:', err);
+          // Context logout forces cleanup even on error, so we should be good.
+        } finally {
+          setIsLoggingOut(false);
+          setModalVisible(false);
+        }
       },
       false
     );

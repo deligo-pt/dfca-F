@@ -21,7 +21,7 @@ const API_BASE_URLS = {
 };
 
 // Current environment - Should be managed by build scripts or CI/CD
-const ENVIRONMENT = 'development'; // 'development' | 'staging' | 'production'
+const ENVIRONMENT = 'staging'; // 'development' | 'staging' | 'production'
 
 // API Configuration
 export const API_CONFIG = {

@@ -3,8 +3,8 @@
  */
 
 import StorageService from './storage';
-import {STORAGE_KEYS} from '../constants/storageKeys';
-import {customerApi} from './api';
+import { STORAGE_KEYS } from '../constants/storageKeys';
+import { customerApi } from './api';
 
 /**
  * A service for handling user authentication.
@@ -109,7 +109,7 @@ export default AuthService;
  * @param {'mobile'|'email'} method
  */
 export const sendOTP = async (identifier, method = 'mobile') => {
-  const payload = method === 'email' ? {email: identifier} : {contactNumber: identifier};
+  const payload = method === 'email' ? { email: identifier } : { contactNumber: identifier };
   return await customerApi.post('/auth/login-customer', payload);
 };
 
@@ -120,8 +120,8 @@ export const sendOTP = async (identifier, method = 'mobile') => {
 export const verifyOTP = async (identifier, otp, method = 'mobile') => {
   const payload =
     method === 'email'
-      ? {email: identifier, otp}
-      : {contactNumber: identifier, otp};
+      ? { email: identifier, otp }
+      : { contactNumber: identifier, otp };
   const response = await customerApi.post('/auth/verify-otp', payload);
 
   // Normalize different backend response shapes
@@ -212,6 +212,13 @@ export const logoutUser = async (tokenInput = null) => {
 
     const refreshToken = StorageService.getRefreshToken ? await StorageService.getRefreshToken() : await StorageService.getItem(STORAGE_KEYS.REFRESH_TOKEN);
 
+    // If we don't have any tokens, there's no point calling the API (it will just 401).
+    // We'll let the finally block clean up local storage.
+    if (!storedToken && !refreshToken) {
+      console.log('[auth] No tokens found locally. Skipping API logout.');
+      return { success: true, message: 'Logged out locally (no tokens found)' };
+    }
+
     const raw = storedToken || '';
     const bearer = raw && raw.startsWith('Bearer ') ? raw : raw ? `Bearer ${raw}` : undefined;
 
@@ -220,8 +227,8 @@ export const logoutUser = async (tokenInput = null) => {
       try {
         if (!token) return null;
         const t = token.toString();
-        if (t.length <= 12) return `${t.slice(0,4)}...`;
-        return `${t.slice(0,8)}...${t.slice(-4)}`;
+        if (t.length <= 12) return `${t.slice(0, 4)}...`;
+        return `${t.slice(0, 8)}...${t.slice(-4)}`;
       } catch (e) {
         return null;
       }
@@ -233,7 +240,7 @@ export const logoutUser = async (tokenInput = null) => {
     const doAttempt = async (name, headersObj, bodyObj) => {
       try {
         console.warn('[auth] logout attempt START', { attempt: name, authHeader: headersObj?.Authorization ? (headersObj.Authorization.startsWith('Bearer ') ? 'Bearer [REDACTED]' : 'RAW [REDACTED]') : null, accessMask: mask(raw), refreshMask: mask(refreshToken), bodyKeys: bodyObj ? Object.keys(bodyObj) : null });
-      } catch (e) {}
+      } catch (e) { }
 
       try {
         const resp = await fetch(`${customerApi.defaults.baseURL}/auth/logout`, {
@@ -251,7 +258,7 @@ export const logoutUser = async (tokenInput = null) => {
         let json;
         try { json = text ? JSON.parse(text) : null; } catch (_e) { json = { message: text }; }
 
-        try { console.warn('[auth] logout attempt RESULT', { attempt: name, status, message: json?.message || null }); } catch (e) {}
+        try { console.warn('[auth] logout attempt RESULT', { attempt: name, status, message: json?.message || null }); } catch (e) { }
 
         if (!resp.ok) {
           return { success: false, status, message: json?.message || resp.statusText, data: json, attempt: name };
@@ -319,7 +326,7 @@ export const logoutUser = async (tokenInput = null) => {
  * @param {'mobile'|'email'} method
  */
 export const resendOTP = async (identifier, method = 'mobile') => {
-  const payload = method === 'email' ? {email: identifier} : {contactNumber: identifier};
+  const payload = method === 'email' ? { email: identifier } : { contactNumber: identifier };
   return await customerApi.post('/auth/resend-otp', payload);
 };
 
