@@ -14,6 +14,7 @@ import * as ImagePicker from 'expo-image-picker';
 import ImageEditor from '../components/ImageEditor';
 
 import { useProfile } from '../contexts/ProfileContext';
+import { useLocation } from '../contexts/LocationContext';
 
 const EditProfileScreen = ({ navigation, route }) => {
   const { t } = useLanguage();
@@ -216,6 +217,7 @@ const EditProfileScreen = ({ navigation, route }) => {
   }), [colors]);
   // Use updateProfile from context to ensure global state stays in sync
   const { updateProfile: updateProfileContext } = useProfile();
+  const { saveAddress } = useLocation();
 
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -462,6 +464,23 @@ const EditProfileScreen = ({ navigation, route }) => {
 
       // Save the merged user object back to storage AND update context
       await updateProfileContext(updatedUser);
+
+      // Sync address to LocationContext (local storage) for checkout consistency
+      if (address) {
+        // Ensure lat/lng are present in correct structure
+        const lat = markerCoordinate?.latitude || address.latitude;
+        const lng = markerCoordinate?.longitude || address.longitude;
+
+        await saveAddress({
+          address: streetAddress,
+          detailedAddress: city,
+          city: city,
+          postalCode: postalCode,
+          label: label,
+          coordinates: { latitude: lat, longitude: lng }
+        });
+      }
+
       // set local state to match
       setUserDataState(updatedUser);
 
@@ -795,7 +814,7 @@ const EditProfileScreen = ({ navigation, route }) => {
           </View>
 
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t('address')}</Text>
+            <Text style={styles.label}>{t('deliveryAddress') || t('address')}</Text>
             {address ? (
               isEditing ? (
                 <LocationDetails

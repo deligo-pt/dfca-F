@@ -1,4 +1,5 @@
 import React, { useMemo } from 'react';
+import { useLanguage } from '../../utils/LanguageContext';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
@@ -34,6 +35,7 @@ const LocationDetails = ({
   onSelectAddress,
 }) => {
   const { isDarkMode } = useTheme();
+  const { t } = useLanguage();
 
   const styles = useMemo(() => StyleSheet.create({
     professionalLocationWrapper: {
@@ -585,18 +587,18 @@ const LocationDetails = ({
   }), [colors, isDarkMode]);
 
   const labels = [
-    { id: 'Home', icon: 'home', label: 'Home' },
-    { id: 'Work', icon: 'briefcase', label: 'Work' },
-    { id: 'Other', icon: 'location', label: 'Other' },
+    { id: 'Home', icon: 'home', label: t('home') },
+    { id: 'Work', icon: 'briefcase', label: t('work') },
+    { id: 'Other', icon: 'location', label: t('other') },
   ];
   return (
     <View style={styles.professionalLocationWrapper}>
       <View style={styles.professionalHeader}>
         <Text style={[styles.professionalTitle, { color: colors.text.primary }]}>
-          {streetAddress ? 'Confirm Location' : 'Add New Address'}
+          {streetAddress ? t('confirmLocation') : t('addNewAddress')}
         </Text>
         <Text style={[styles.professionalSubtitle, { color: colors.text.secondary }]}>
-          Select a label and save your location for future orders
+          {t('selectLabelAndSave')}
         </Text>
       </View>
 
@@ -644,7 +646,7 @@ const LocationDetails = ({
               onPress={() => setIsMapFullScreen(false)}
             >
               <Ionicons name="contract" size={20} color={colors.primary} />
-              <Text style={[styles.fullScreenButtonText, { color: colors.primary }]}>Exit Full Screen</Text>
+              <Text style={[styles.fullScreenButtonText, { color: colors.primary }]}>{t('exitFullScreen')}</Text>
             </TouchableOpacity>
 
             <View style={styles.fullScreenRightControls}>
@@ -709,12 +711,12 @@ const LocationDetails = ({
               {isLoadingLocation ? (
                 <>
                   <ActivityIndicator size="small" color={colors.text.white} />
-                  <Text style={styles.fullScreenConfirmText}>Getting Address...</Text>
+                  <Text style={styles.fullScreenConfirmText}>{t('gettingAddress')}</Text>
                 </>
               ) : (
                 <>
                   <Ionicons name="checkmark-circle" size={24} color={colors.text.white} />
-                  <Text style={styles.fullScreenConfirmText}>Confirm Location</Text>
+                  <Text style={styles.fullScreenConfirmText}>{t('confirmLocation')}</Text>
                 </>
               )}
             </TouchableOpacity>
@@ -733,7 +735,7 @@ const LocationDetails = ({
               <Ionicons name="search" size={20} color={colors.text.light} />
               <TextInput
                 style={[styles.internationalSearchInput, { color: colors.text.primary }]}
-                placeholder="Search for your business address..."
+                placeholder={t('searchBusinessAddress')}
                 placeholderTextColor={colors.text.light}
                 value={searchLocation}
                 onChangeText={setSearchLocation}
@@ -764,10 +766,10 @@ const LocationDetails = ({
               ) : null}
             </View>
             {isLoadingLocation && (
-              <View style={styles.searchLoadingIndicator}>
-                <ActivityIndicator size="small" color={colors.primary} />
-                <Text style={[styles.searchLoadingText, { color: colors.text.secondary }]}>
-                  Searching location...
+              <View style={styles.professionalHelpContent}>
+                <Text style={[styles.professionalHelpTitle, { color: colors.text.primary }]}>{t('needHelp')}</Text>
+                <Text style={[styles.professionalHelpText, { color: colors.text.secondary }]}>
+                  {t('contactSupportText')}
                 </Text>
               </View>
             )}
@@ -792,20 +794,20 @@ const LocationDetails = ({
                 <Ionicons name="navigate-circle" size={20} color={colors.primary} />
               )}
               <Text style={[styles.quickActionText, { color: colors.primary }]}>
-                {isLoadingLocation ? 'Locating...' : 'Use GPS'}
+                {isLoadingLocation ? t('locating') : t('useGPS')}
               </Text>
             </TouchableOpacity>
 
             <TouchableOpacity
               style={[styles.quickActionButton, {
                 backgroundColor: colors.surface,
-                borderColor: colors.border,
+                borderColor: colors.primary,
               }]}
               onPress={() => setIsMapFullScreen(true)}
             >
-              <Ionicons name="expand" size={20} color={colors.text.secondary} />
-              <Text style={[styles.quickActionText, { color: colors.text.secondary }]}>
-                Full Map
+              <Ionicons name="map" size={20} color={colors.primary} />
+              <Text style={[styles.quickActionText, { color: colors.primary }]}>
+                {t('fullMap') || 'Full Map'}
               </Text>
             </TouchableOpacity>
           </View>
@@ -861,7 +863,7 @@ const LocationDetails = ({
                   <Text style={[styles.internationalConfirmText, {
                     color: markerCoordinate ? colors.text.white : colors.text.light
                   }]}>
-                    Getting Address...
+                    {t('gettingAddress')}
                   </Text>
                 </>
               ) : (
@@ -870,7 +872,7 @@ const LocationDetails = ({
                   <Text style={[styles.internationalConfirmText, {
                     color: markerCoordinate ? colors.text.white : colors.text.light
                   }]}>
-                    {streetAddress ? 'Update Location' : 'Confirm & Get Address'}
+                    {streetAddress ? t('updateLocation') : t('confirmAndGetAddress')}
                   </Text>
                 </>
               )}
@@ -884,9 +886,9 @@ const LocationDetails = ({
             }]}>
               <View style={styles.addressConfirmedHeader}>
                 <Ionicons name="checkmark-circle" size={20} color={colors.success} />
-                <Text style={styles.addressConfirmedTitle}>Location Confirmed</Text>
+                <Text style={styles.addressConfirmedTitle}>{t('locationConfirmed')}</Text>
               </View>
-              <Text style={styles.addressConfirmedText}>
+              <Text style={[styles.addressConfirmedText, { color: colors.text.primary }]}>
                 {[streetAddress, city, postalCode].filter(Boolean).join(', ')}
               </Text>
             </View>
@@ -1017,14 +1019,14 @@ const LocationDetails = ({
               }]}>
                 <View style={styles.gpsCoordinatesHeader}>
                   <Ionicons name="navigate-circle" size={20} color={colors.primary} />
-                  <Text style={styles.gpsCoordinatesLabel}>GPS Coordinates</Text>
+                  <Text style={styles.gpsCoordinatesLabel}>{t('gpsCoordinates') || 'GPS Coordinates'}</Text>
                 </View>
                 <Text style={styles.gpsCoordinatesValue}>
                   Lat: {markerCoordinate.latitude.toFixed(7)}, Lng: {markerCoordinate.longitude.toFixed(7)}
                 </Text>
                 <View style={styles.gpsCoordinatesStatus}>
                   <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-                  <Text style={styles.gpsCoordinatesStatusText}>Verified</Text>
+                  <Text style={styles.gpsCoordinatesStatusText}>{t('verified') || 'Verified'}</Text>
                 </View>
               </View>
             )}
@@ -1036,7 +1038,7 @@ const LocationDetails = ({
           {savedAddresses && savedAddresses.length > 0 && (
             <View style={styles.savedAddressesSection}>
               <Text style={[styles.formSectionTitle, { color: colors.text.primary, paddingHorizontal: 16, marginBottom: 12 }]}>
-                Saved Addresses
+                {t('savedAddressesText')}
               </Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}>
                 {savedAddresses.map((addr) => (
@@ -1047,7 +1049,7 @@ const LocationDetails = ({
                   >
                     <View style={[styles.savedAddressIcon, { backgroundColor: colors.primary + '15' }]}>
                       <Ionicons
-                        name={addr.label === 'Work' ? 'briefcase' : addr.label === 'Other' ? 'location' : 'home'}
+                        name={(addr.label === 'Work' || addr.label === t('work')) ? 'briefcase' : (addr.label === 'Other' || addr.label === t('other')) ? 'location' : 'home'}
                         size={20}
                         color={colors.primary}
                       />
