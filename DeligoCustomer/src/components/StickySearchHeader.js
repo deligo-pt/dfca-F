@@ -187,8 +187,8 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
   // Badge - COMPACT
   badge: {
     position: 'absolute',
-    top: -3,
-    right: -3,
+    top: 0,
+    right: -2,
     backgroundColor: '#FFD700',
     borderRadius: 9,
     minWidth: 18,
@@ -203,6 +203,8 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
     color: colors.text.primary,
     fontSize: 9,
     fontFamily: 'Poppins-Bold',
+    includeFontPadding: false,
+    textAlignVertical: 'center',
   },
   // Suggestions Dropdown Wrapper & Container
   suggestionsWrapper: {

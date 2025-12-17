@@ -289,6 +289,16 @@ export const translations = {
     dessert: 'Dessert',
     drinks: 'Drinks',
     healthy: 'Healthy',
+    chinese: 'Chinese',
+    indian: 'Indian',
+    coffee: 'Coffee',
+    dairy: 'Dairy & Eggs',
+    fruits: 'Fruits & Veg',
+    snacks: 'Snacks',
+    beverages: 'Beverages',
+    frozen: 'Frozen',
+    household: 'Household',
+    pharmacy: 'Pharmacy',
 
     // Edit Profile Screen
     fullName: 'Full Name',
@@ -800,6 +810,16 @@ export const translations = {
     dessert: 'Sobremesa',
     drinks: 'Bebidas',
     healthy: 'Saudável',
+    chinese: 'Chinesa',
+    indian: 'Indiana',
+    coffee: 'Café',
+    dairy: 'Laticínios e Ovos',
+    fruits: 'Frutas e Legumes',
+    snacks: 'Lanches',
+    beverages: 'Bebidas',
+    frozen: 'Congelados',
+    household: 'Casa',
+    pharmacy: 'Farmácia',
     vegan: 'Vegano',
 
     // Edit Profile Screen

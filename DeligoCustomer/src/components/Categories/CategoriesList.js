@@ -33,7 +33,7 @@ export default function VendorType({ categories = [], onPress = () => { }, selec
         return (
           <TouchableOpacity key={category.id} style={[styles(colors).card, isSelected && styles(colors).selected]} onPress={() => onPress(category)} activeOpacity={0.8}>
             <View style={[styles(colors).iconWrap, isSelected && styles(colors).iconWrapSelected]}>
-              <Text style={styles(colors).iconEmoji}>{getIcon(category.name)}</Text>
+              <Text style={styles(colors).iconEmoji}>{category.icon || getIcon(category.name)}</Text>
             </View>
             <Text style={[styles(colors).name, isSelected && styles(colors).nameSelected]} numberOfLines={1}>{category.name}</Text>
           </TouchableOpacity>

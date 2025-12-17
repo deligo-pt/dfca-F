@@ -53,23 +53,23 @@ const CategoriesScreen = ({ navigation }) => {
 
     // Glovo-style static subcategories for each vendor type
     const RESTAURANT_CATEGORIES = [
-        { id: 'pizza', name: 'Pizza', icon: '🍕' },
-        { id: 'burger', name: 'Burgers', icon: '🍔' },
-        { id: 'chinese', name: 'Chinese', icon: '🥡' },
-        { id: 'indian', name: 'Indian', icon: '🍛' },
-        { id: 'healthy', name: 'Healthy', icon: '🥗' },
-        { id: 'desserts', name: 'Desserts', icon: '🍰' },
-        { id: 'coffee', name: 'Coffee', icon: '☕' },
+        { id: 'pizza', name: t('pizza'), icon: '🍕' },
+        { id: 'burger', name: t('burger'), icon: '🍔' },
+        { id: 'chinese', name: t('chinese'), icon: '🥡' },
+        { id: 'indian', name: t('indian'), icon: '🍛' },
+        { id: 'healthy', name: t('healthy'), icon: '🥗' },
+        { id: 'desserts', name: t('dessert'), icon: '🍰' },
+        { id: 'coffee', name: t('coffee'), icon: '☕' },
     ];
 
     const STORE_CATEGORIES = [
-        { id: 'dairy', name: 'Dairy & Eggs', icon: '🥛' },
-        { id: 'fruits', name: 'Fruits & Veg', icon: '🍎' },
-        { id: 'snacks', name: 'Snacks', icon: '🍪' },
-        { id: 'beverages', name: 'Beverages', icon: '🥤' },
-        { id: 'frozen', name: 'Frozen', icon: '🧊' },
-        { id: 'household', name: 'Household', icon: '🧹' },
-        { id: 'pharmacy', name: 'Pharmacy', icon: '💊' },
+        { id: 'dairy', name: t('dairy'), icon: '🥛' },
+        { id: 'fruits', name: t('fruits'), icon: '🍎' },
+        { id: 'snacks', name: t('snacks'), icon: '🍪' },
+        { id: 'beverages', name: t('beverages'), icon: '🥤' },
+        { id: 'frozen', name: t('frozen'), icon: '🧊' },
+        { id: 'household', name: t('household'), icon: '🧹' },
+        { id: 'pharmacy', name: t('pharmacy'), icon: '💊' },
     ];
 
     // Dynamic categories based on selected vendor type
@@ -647,8 +647,8 @@ const CategoriesScreen = ({ navigation }) => {
                     <View style={styles(colors).noResultsContainer}>
                         <Text style={styles(colors).noResultsText}>
                             {selectedVendorType || selectedCuisine
-                                ? (t('noRestaurantsInFilter') || 'No restaurants match your selection')
-                                : (t('noRestaurantsFound') || 'No restaurants found')
+                                ? (t('noResultsFor') + ' ' + (selectedVendorType || selectedCuisine) || 'No restaurants match your selection')
+                                : (t('noResultsFor') + ' ' + (selectedVendorType || selectedCuisine) || 'No restaurants found')
                             }
                         </Text>
                         <Text style={styles(colors).noResultsSubtext}>

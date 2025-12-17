@@ -61,7 +61,7 @@ const RestaurantCard = ({ restaurant, onPress }) => {
           {/* Subtitle Row: Delivery Fee • Tag */}
           <View style={styles(colors).tagsRow}>
             <Text style={styles(colors).tagText}>
-              Delivery {vendor.deliveryFee ? vendor.deliveryFee : '$1.99'} • {tags[0] || 'Food'}
+              • {tags[0] || 'Food'}
             </Text>
           </View>
         </View>
