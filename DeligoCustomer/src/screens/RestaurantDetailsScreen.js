@@ -19,7 +19,7 @@ import {
   Platform,
   UIManager,
 } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { spacing, fontSize, borderRadius } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
@@ -32,6 +32,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const { colors, isDark } = useTheme();
   const { t } = useLanguage();
   const { restaurant } = route.params;
+  const insets = useSafeAreaInsets();
 
   // Normalize rating
   const _r = restaurant || {};
@@ -299,13 +300,13 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                 )}
 
                 <View style={[styles.modalPriceRow, { borderTopColor: colors.border, borderBottomColor: colors.border }]}>
-                  <Text style={[styles.modalPriceLabel, { color: colors.text.secondary }]}>Price</Text>
+                  <Text style={[styles.modalPriceLabel, { color: colors.text.secondary }]}>{t('price') || 'Price'}</Text>
                   <Text style={[styles.modalPrice, { color: colors.primary }]}>{formatCurrency(currency, price)}</Text>
                 </View>
 
                 {/* Quantity Controls */}
                 <View style={styles.modalQuantitySection}>
-                  <Text style={[styles.modalQuantityLabel, { color: colors.text.primary }]}>Quantity</Text>
+                  <Text style={[styles.modalQuantityLabel, { color: colors.text.primary }]}>{t('quantity') || 'Quantity'}</Text>
                   <View style={[styles.modalQuantityControl, { borderColor: colors.border }]}>
                     <TouchableOpacity
                       style={[styles.modalQuantityBtn, { backgroundColor: quantity > 0 ? colors.background : colors.border }]}
@@ -347,7 +348,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
               >
                 <Ionicons name="cart" size={20} color="#fff" style={{ marginRight: 8 }} />
                 <Text style={styles.modalAddToCartText}>
-                  {quantity > 0 ? `${quantity} in cart` : 'Add to cart'}
+                  {quantity > 0 ? `${quantity} ${t('inCart') || 'in cart'}` : (t('addToCart') || 'Add to cart')}
                 </Text>
               </TouchableOpacity>
             </View>
@@ -378,7 +379,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
           <Ionicons name="search" size={20} color={colors.text.secondary} style={{ marginRight: 8 }} />
           <TextInput
             style={[styles.searchInput, { color: colors.text.primary }]}
-            placeholder={t('search') || 'Search menu...'}
+            placeholder={t('searchMenu') || 'Search menu...'}
             placeholderTextColor={colors.text.secondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
@@ -469,7 +470,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                   selectedCategory === category && { color: '#fff' },
                 ]}
               >
-                {category}
+                {category === 'Popular' ? (t('popular') || 'Popular') : category}
               </Text>
             </TouchableOpacity>
           ))}
@@ -497,7 +498,11 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
       {/* Floating Cart Button */}
       {getTotalItems() > 0 && (
-        <View style={[styles.floatingCart, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+        <View style={[styles.floatingCart, {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+          paddingBottom: Math.max(16, insets.bottom + 16)
+        }]}>
           <View>
             <Text style={[styles.cartItemCount, { color: colors.text.secondary }]}>{getTotalItems()} {t('items') || 'items'}</Text>
             <Text style={[styles.cartTotal, { color: colors.primary }]}>{formatCurrency(vendorCurrency, getTotalPrice())}</Text>

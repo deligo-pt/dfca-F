@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { View, StyleSheet, TouchableOpacity, Text, Alert } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { Ionicons } from '@expo/vector-icons';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useTheme } from '../utils/ThemeContext';
 import { useLocation } from '../contexts/LocationContext';
@@ -188,11 +189,13 @@ const LocationAddressScreen = ({ navigation, route }) => {
     }
   };
 
+  const insets = useSafeAreaInsets();
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Text style={styles.backButtonText}>←</Text>
+          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
         <Text style={[styles.headerTitle, { color: colors.text.primary }]}>Add Address</Text>
         <View style={{ width: 40 }} />
@@ -230,7 +233,11 @@ const LocationAddressScreen = ({ navigation, route }) => {
       </View>
 
       {!isMapFullScreen && (
-        <View style={[styles.footer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+        <View style={[styles.footer, {
+          backgroundColor: colors.surface,
+          borderTopColor: colors.border,
+          paddingBottom: Math.max(16, insets.bottom + 16)
+        }]}>
           <TouchableOpacity
             style={[styles.saveButton, { backgroundColor: colors.primary }]}
             onPress={handleSave}
@@ -260,10 +267,8 @@ const styles = StyleSheet.create({
   },
   backButton: {
     padding: 8,
-  },
-  backButtonText: {
-    fontSize: 24,
-    color: '#374151',
+    borderRadius: 20,
+    backgroundColor: '#F3F4F6', // Light gray background for contrast or match theme if needed
   },
   headerTitle: {
     fontSize: 18,

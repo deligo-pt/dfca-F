@@ -21,6 +21,8 @@ import formatCurrency from '../utils/currency';
 import { setupPaymentSheet, openPaymentSheet } from '../utils/stripeService';
 import CheckoutAPI from '../utils/checkoutApi';
 import OrderAPI from '../utils/orderApi';
+import { customerApi } from '../utils/api';
+import { API_ENDPOINTS } from '../constants/config';
 
 // Helper component to display location from context
 const ConsumerLocationDisplay = ({ colors, t }) => {
@@ -77,16 +79,94 @@ const CheckoutScreen = ({ route, navigation }) => {
   const cart = getVendorCart(vendorId);
 
   // Create checkout on mount (payment integration happens here, not in CartDetail)
+  const { address, detailedAddress, city, postalCode, currentLocation } = useLocation();
+
   useEffect(() => {
     let canceled = false;
 
     const createCheckoutOnEnter = async () => {
-      try {
-        setInitializingCheckout(true);
-        setStripeError(null);
-        console.debug('[CheckoutScreen] Creating checkout via API with useCart=true');
+      // If no address is set, prompt user to add one instead of calling API
+      if (!address || !city) {
+        console.debug('[CheckoutScreen] No address available, skipping API call');
+        setStripeError(t('pleaseSelectAddress') || 'Please select a delivery address');
+        setInitializingCheckout(false);
+        return;
+      }
 
-        const res = await CheckoutAPI.createCheckout(true);
+      const addressData = {
+        address: address || '',
+        detailedAddress: detailedAddress || '',
+        city: city || '',
+        postalCode: postalCode || '',
+        coordinates: currentLocation ? {
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude
+        } : null
+      };
+
+      setInitializingCheckout(true);
+      setStripeError(null);
+
+      let backendAddressId = null;
+
+      try {
+        console.debug('[CheckoutScreen] Fetching existing backend addresses...');
+
+        // 1. Try to get existing addresses
+        let existingResponse = null;
+        try {
+          existingResponse = await customerApi.get(API_ENDPOINTS.PROFILE.GET);
+        } catch (fetchErr) {
+          console.debug('[CheckoutScreen] Failed to fetch profile addresses, will try adding.', fetchErr.message);
+        }
+
+        const profileData = existingResponse?.data || existingResponse;
+        const addresses = profileData?.addresses || [];
+        console.debug('[CheckoutScreen] Fetched profile addresses count:', addresses.length);
+
+        // 2. If we have addresses, pick one (prefer default or first)
+        if (Array.isArray(addresses) && addresses.length > 0) {
+          const defaultAddr = addresses.find(a => a.isDefault) || addresses[0];
+          backendAddressId = defaultAddr._id || defaultAddr.id || defaultAddr.addressId;
+          console.debug('[CheckoutScreen] Found existing backend address:', backendAddressId);
+        } else {
+          // 3. No addresses? Add the current one
+          console.debug('[CheckoutScreen] No backend addresses found. Syncing current...');
+          // Ensure label is present
+          const syncPayload = {
+            ...addressData,
+            label: addressData.label || 'Home',
+            isDefault: true
+          };
+
+          const syncRes = await customerApi.post(API_ENDPOINTS.PROFILE.ADD_ADDRESS, syncPayload);
+          console.debug('[CheckoutScreen] Address synced result:', syncRes);
+
+          const data = syncRes?.data || syncRes;
+          // If data is array (list of all addresses), take last. If object, take id.
+          if (Array.isArray(data) && data.length > 0) {
+            const last = data[data.length - 1];
+            backendAddressId = last._id || last.id;
+          } else {
+            backendAddressId = data?._id || data?.id || data?.addressId;
+          }
+        }
+      } catch (e) {
+        console.warn('[CheckoutScreen] Address sync/fetch process failed', e);
+      }
+
+      // Prepare Final Payload
+      const finalPayload = { ...addressData, label: addressData.label || 'Home' };
+      if (backendAddressId) {
+        finalPayload.deliveryAddressId = backendAddressId;
+        finalPayload.addressId = backendAddressId;
+      }
+
+      try {
+        console.debug('[CheckoutScreen] Creating checkout via API with payload:', JSON.stringify(finalPayload));
+
+        // Pass finalPayload to API
+        const res = await CheckoutAPI.createCheckout(true, finalPayload);
         console.debug('[CheckoutScreen] createCheckout result:', res);
 
         if (canceled) return;
@@ -117,7 +197,7 @@ const CheckoutScreen = ({ route, navigation }) => {
     return () => {
       canceled = true;
     };
-  }, []);
+  }, [address, city]); // Re-run if address changes significantly (debounced via standard react flow)
 
   // Calculate real cart values
   const cartItems = cart?.items ? Object.keys(cart.items).map(id => {

@@ -18,7 +18,7 @@ const ReferralBanner = ({ navigation }) => {
         </View>
         <View style={styles.referralMiddle}>
           <Text style={[styles.referralTitle, { color: colors.text.primary }]}>Invite Friends, Earn Rewards!</Text>
-          <Text style={[styles.referralSubtitle, { color: colors.primary }]}>Give $10, Get $10 for each friend</Text>
+          <Text style={[styles.referralSubtitle, { color: colors.primary }]}>Give €10, Get €10 for each friend</Text>
         </View>
         <View style={styles.referralRight}>
           <Ionicons name="chevron-forward" size={24} color={colors.primary} />

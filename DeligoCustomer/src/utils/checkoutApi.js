@@ -51,14 +51,19 @@ class CheckoutAPI {
    * @param {boolean} useCart - Whether to use cart items for checkout
    * @returns {Promise}
    */
-  static async createCheckout(useCart = true) {
+  static async createCheckout(useCart = true, addressData = null) {
     try {
       const url = `${BASE_API_URL}${API_ENDPOINTS.CHECKOUT.CREATE}`;
       const headers = await this.getHeaders();
 
-      console.debug('[CheckoutAPI] POST', url, { useCart });
+      const payload = { useCart, ...addressData };
 
-      console.debug('[CheckoutAPI] POST', url, { useCart });
+      // Also include as deliveryAddress for safety if backend supports both
+      if (addressData) {
+        payload.deliveryAddress = addressData;
+      }
+
+      console.debug('[CheckoutAPI] POST', url, payload);
 
       const controller = new AbortController();
       const timeoutId = setTimeout(() => controller.abort(), 15000);
@@ -66,7 +71,7 @@ class CheckoutAPI {
       const response = await fetch(url, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ useCart }),
+        body: JSON.stringify(payload),
         signal: controller.signal,
       });
       clearTimeout(timeoutId);

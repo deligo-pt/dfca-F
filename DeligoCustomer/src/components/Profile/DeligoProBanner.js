@@ -17,7 +17,7 @@ const DeligoProBanner = () => {
             </View>
           </View>
           <Text style={styles.proSubtitle}>Unlimited free delivery + exclusive deals</Text>
-          <Text style={styles.proOffer}>🎁 First month free • Save up to $50/month</Text>
+          <Text style={styles.proOffer}>🎁 First month free • Save up to €50/month</Text>
         </View>
         <Ionicons name="arrow-forward-circle" size={32} color="#FFB800" />
       </View>
