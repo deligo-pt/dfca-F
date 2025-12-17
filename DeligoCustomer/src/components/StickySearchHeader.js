@@ -1,8 +1,10 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Animated, ScrollView, ActivityIndicator } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Animated, ScrollView, ActivityIndicator, Platform, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, fontSize } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
+
+const STATUSBAR_HEIGHT = Platform.OS === 'android' ? StatusBar.currentHeight : 0;
 
 const StickySearchHeader = ({
   onCartPress,
@@ -11,6 +13,8 @@ const StickySearchHeader = ({
   area,
   cartItemCount = 0,
   onSearchPress,
+  paddingTop = 0,
+  pointerEvents = 'auto',
 }) => {
   const { colors, isDarkMode } = useTheme();
 
@@ -25,7 +29,10 @@ const StickySearchHeader = ({
       style={[styles(colors, isDarkMode).wrapper, { opacity: headerOpacity }]}
       pointerEvents="box-none"
     >
-      <View style={styles(colors, isDarkMode).container}>
+      <View
+        style={[styles(colors, isDarkMode).container, { paddingTop: paddingTop }]}
+        pointerEvents={pointerEvents}
+      >
         {/* Row 1: Location & Cart (Clean, Minimal) - Hidden when searching */}
         <View style={styles(colors, isDarkMode).topRow}>
           <TouchableOpacity
@@ -86,10 +93,12 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 1000,
+    // Fix for flicker: Solid background ensures no transparency during opacity transition
+    backgroundColor: colors.primary,
   },
   container: {
     backgroundColor: colors.primary,
-    paddingTop: spacing.lg,
+    // paddingTop handled via prop
     paddingBottom: spacing.sm,
     paddingHorizontal: spacing.md,
     shadowColor: colors.shadow || '#000',

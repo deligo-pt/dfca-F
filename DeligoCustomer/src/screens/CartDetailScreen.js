@@ -1,4 +1,5 @@
 import React from 'react';
+import { useLanguage } from '../utils/LanguageContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
 import CartDetail from '../components/CartDetail';
@@ -7,6 +8,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { useCart } from '../contexts/CartContext';
 
 export default function CartDetailScreen({ route, navigation }) {
+  const { t } = useLanguage();
   const { vendorId } = route.params || {};
   const { colors } = useTheme();
   const { getVendorCart } = useCart();
@@ -18,7 +20,7 @@ export default function CartDetailScreen({ route, navigation }) {
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={colors.text.primary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text.primary }]} numberOfLines={1}>{vendor.vendorName || 'Your cart'}</Text>
+        <Text style={[styles.headerTitle, { color: colors.text.primary }]} numberOfLines={1}>{vendor.vendorName || t('yourCart')}</Text>
         <View style={{ width: 40 }} />
       </View>
       <CartDetail vendorId={vendorId} navigation={navigation} />

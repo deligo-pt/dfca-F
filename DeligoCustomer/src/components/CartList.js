@@ -4,10 +4,12 @@ import { useCart } from '../contexts/CartContext';
 import { useProducts } from '../contexts/ProductsContext';
 import { useTheme } from '../utils/ThemeContext';
 import { spacing, fontSize, borderRadius } from '../theme';
+import { useLanguage } from '../utils/LanguageContext';
 import formatCurrency from '../utils/currency';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
 export default function CartList({ navigation }) {
+  const { t } = useLanguage();
   const { cartsArray, getVendorSubtotal, clearVendorCartAndSync, enforceSingleVendor } = useCart();
   const { products } = useProducts();
   const { colors, isDarkMode } = useTheme();
@@ -35,12 +37,22 @@ export default function CartList({ navigation }) {
             const authHeader = rawToken ? (rawToken.startsWith('Bearer ') ? rawToken.substring(7) : rawToken) : null;
 
             if (authHeader) {
-              const res = await fetch(`${BASE_API_URL}${API_ENDPOINTS.RESTAURANTS.GET_DETAILS.replace(':id', vid)}`, {
-                headers: { 'Authorization': authHeader }
+              const url = `${BASE_API_URL}${API_ENDPOINTS.RESTAURANTS.GET_DETAILS.replace(':id', vid)}`;
+              console.debug('[CartList] Fetching vendor details:', url);
+              const res = await fetch(url, {
+                method: 'GET',
+                headers: {
+                  'Content-Type': 'application/json',
+                  'Authorization': `Bearer ${rawToken}` // Use rawToken here for the Bearer prefix
+                }
               });
-              if (res.ok) {
-                const data = await res.json();
-                const v = data.data || data;
+              const json = await res.json();
+              console.debug('[CartList] Vendor details response:', json);
+
+              if (res.ok && json.success && json.data) {
+                // It might be nested under `restaurant` or `vendor`
+                const v = json.data.restaurant || json.data.vendor || json.data;
+                console.debug('[CartList] Extracted vendor data:', v);
                 if (v && (v.vendorName || v.name)) {
                   setVendorDetailsCache(prev => ({
                     ...prev,
@@ -52,6 +64,9 @@ export default function CartList({ navigation }) {
                     }
                   }));
                 }
+              } else {
+                console.warn('[CartList] API response not successful or data missing for vendor', vid, json);
+                setVendorDetailsCache(prev => ({ ...prev, [vid]: { failed: true } }));
               }
             }
           } catch (e) {
@@ -129,23 +144,45 @@ export default function CartList({ navigation }) {
           }
         }
 
+        // Fallback: If no product match, try to find ANY product from this vendor to get vendor details
+        if (!productContextMatch && products && products.length > 0 && cart.vendorId) {
+          // DEBUG: Inspect what we have in products
+          if (products.length > 0) console.debug('[CartList] fallback inspect', { cartVid: cart.vendorId, sampleVendor: products[0].vendor, sampleRawVendor: products[0]._raw?.vendor });
+
+          productContextMatch = products.find(p => {
+            const v = p.vendor || {};
+            const r = p._raw || {};
+            const rv = r.vendor || {};
+            const vid = String(cart.vendorId);
+            return String(v.vendorId) === vid ||
+              String(v.id) === vid ||
+              String(v._id) === vid ||
+              String(r.vendorId) === vid ||
+              String(rv.vendorId) === vid ||
+              String(rv._id) === vid;
+          });
+        }
+
+        if (products) console.debug(`[CartList] products available: ${products.length} for vendor ${cart.vendorId}`);
+
         const pcVendor = productContextMatch?.vendor || productContextMatch?._raw?.vendor;
-        const pcVendorName = pcVendor?.vendorName || pcVendor?.name;
+        // In ProductsContext, 'name' is often the vendor name
+        const pcVendorName = pcVendor?.vendorName || pcVendor?.name || productContextMatch?.name;
         // Vendor image from context
         const pcVendorImage = pcVendor?.storePhoto || pcVendor?.logo || pcVendor?.image;
         // Product image from context (strong fallback)
         const pcProductImage = productContextMatch?.image;
 
-        const finalVendorName = cached?.name ||
+        const finalVendorName = pcVendorName ||
+          cached?.name ||
           (cart.vendorName && !['Store', 'Vendor'].includes(cart.vendorName) ? cart.vendorName : null) ||
-          pcVendorName ||
           firstItem?._raw?.vendor?.vendorName ||
-          'Store';
+          t('store');
 
-        const finalVendorImage = cached?.image ||
+        const finalVendorImage = pcVendorImage ||
+          pcProductImage ||
+          cached?.image ||
           cart.vendorImage ||
-          pcVendorImage ||
-          pcProductImage || // Use product image if vendor logo missing
           firstItem?._raw?.vendor?.storePhoto ||
           firstItem?.image ||
           null;
@@ -230,7 +267,7 @@ export default function CartList({ navigation }) {
                   style={[styles.checkoutButton, { backgroundColor: colors.primary }]}
                   onPress={() => navigation.navigate('CartDetail', { vendorId: cart.vendorId })}
                 >
-                  <Text style={[styles.checkoutButtonText, { color: colors.text.white || '#fff' }]}>Go to Checkout</Text>
+                  <Text style={[styles.checkoutButtonText, { color: colors.text.white || '#fff' }]}>{t('goToCheckout')}</Text>
                   <View style={[styles.pricePill, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
                     <Text style={[styles.pricePillText, { color: colors.text.white || '#fff' }]}>{formatCurrency(firstItem?.currency || '', subtotal)}</Text>
                   </View>
@@ -252,7 +289,7 @@ export default function CartList({ navigation }) {
                     ) : (
                       <Ionicons name="checkmark-circle-outline" size={18} color={colors.primary} />
                     )}
-                    <Text style={[styles.menuText, { color: colors.text.primary }]}>Set as Active</Text>
+                    <Text style={[styles.menuText, { color: colors.text.primary }]}>{t('setAsActive')}</Text>
                   </TouchableOpacity>
 
                   <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
@@ -267,7 +304,7 @@ export default function CartList({ navigation }) {
                     ) : (
                       <Ionicons name="trash-outline" size={18} color={colors.error || '#D32F2F'} />
                     )}
-                    <Text style={[styles.menuText, { color: colors.error || '#D32F2F' }]}>Remove Cart</Text>
+                    <Text style={[styles.menuText, { color: colors.error || '#D32F2F' }]}>{t('removeCart')}</Text>
                   </TouchableOpacity>
                 </View>
               </View>

@@ -73,7 +73,7 @@ const CartScreen = ({ navigation }) => {
       {syncing && (
         <View style={[styles.syncingBanner, { backgroundColor: colors.primary + '10' }]}>
           <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 8 }} />
-          <Text style={[styles.syncingText, { color: colors.primary }]}>Updating your cart...</Text>
+          <Text style={[styles.syncingText, { color: colors.primary }]}>{t('updatingCart')}</Text>
         </View>
       )}
 
@@ -94,15 +94,15 @@ const CartScreen = ({ navigation }) => {
             <View style={[styles.emptyIconContainer, { backgroundColor: colors.surface, shadowColor: colors.shadow }]}>
               <Ionicons name="basket-outline" size={60} color={colors.primary} />
             </View>
-            <Text style={[styles.emptyTitle, { color: colors.text.primary }]}>Your basket is empty</Text>
+            <Text style={[styles.emptyTitle, { color: colors.text.primary }]}>{t('cartEmpty')}</Text>
             <Text style={[styles.emptySubtitle, { color: colors.text.secondary }]}>
-              Go ahead and order some yummy food!
+              {t('goAheadOrder')}
             </Text>
             <TouchableOpacity
               style={[styles.browseButton, { backgroundColor: colors.primary }]}
               onPress={() => navigation.navigate('Categories')}
             >
-              <Text style={[styles.browseButtonText, { color: colors.text.white || '#fff' }]}>Browse Food</Text>
+              <Text style={[styles.browseButtonText, { color: colors.text.white || '#fff' }]}>{t('browseFood')}</Text>
             </TouchableOpacity>
           </View>
         ) : (

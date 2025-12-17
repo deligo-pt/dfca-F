@@ -83,7 +83,7 @@ function normalizeProductForCart(p) {
     image: primaryImage,
     vendorId,
     vendorName: vendor.vendorName || raw.vendorName || null,
-    vendorImage: vendor.storePhoto || vendor.logo || raw.vendorImage || null,
+    vendorImage: vendor.storePhoto || vendor.logo || vendor.image || raw.vendorImage || raw.storePhoto || null,
     vendorRating: vendor.rating,
     vendorDeliveryTime: vendor.deliveryTime,
     _raw: raw,

@@ -4,11 +4,13 @@ import { useCart } from '../contexts/CartContext';
 import { useProducts } from '../contexts/ProductsContext';
 import { useTheme } from '../utils/ThemeContext';
 import { spacing, fontSize, borderRadius } from '../theme';
+import { useLanguage } from '../utils/LanguageContext';
 import formatCurrency from '../utils/currency';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import CheckoutAPI from '../utils/checkoutApi';
 
 export default function CartDetail({ vendorId, navigation }) {
+  const { t } = useLanguage();
   const { getVendorCart, updateQuantity, removeItem, setDeliveryInstructionsForVendor } = useCart();
   const { products } = useProducts();
   const cart = getVendorCart(vendorId);
@@ -16,7 +18,7 @@ export default function CartDetail({ vendorId, navigation }) {
   const [updatingItem, setUpdatingItem] = useState(null); // { id, action: 'add' | 'remove' }
   const [checkingOut, setCheckingOut] = useState(false);
 
-  if (!cart) return <Text style={{ color: colors.text.secondary, padding: spacing.md }}>No cart found.</Text>;
+  if (!cart) return <Text style={{ color: colors.text.secondary, padding: spacing.md }}>{t('noCartFound')}</Text>;
 
   const rawItems = Object.keys(cart.items || {}).map(id => ({ id, ...cart.items[id] }));
 
@@ -95,8 +97,27 @@ export default function CartDetail({ vendorId, navigation }) {
     }
   }
 
-  const finalVendorName = cart.vendorName && !['Store', 'Vendor'].includes(cart.vendorName) ? cart.vendorName : (pcVendor?.vendorName || pcVendor?.name || firstItem?.product?._raw?.vendor?.vendorName || 'Vendor');
-  const finalVendorImage = cart.vendorImage || pcVendor?.storePhoto || pcVendor?.logo || pcVendor?.image || firstItem?.product?.image || null; // Fallback to product image if logo missing
+  // Fallback: If no vendor found yet, try searching products by vendorId
+  if (!pcVendor && products && products.length > 0 && vendorId) {
+    const match = products.find(p => {
+      const v = p.vendor || {};
+      const r = p._raw || {};
+      const rv = r.vendor || {};
+      const vid = String(vendorId);
+      return String(v.vendorId) === vid ||
+        String(v.id) === vid ||
+        String(v._id) === vid ||
+        String(r.vendorId) === vid ||
+        String(rv.vendorId) === vid ||
+        String(rv._id) === vid;
+    });
+    if (match) {
+      pcVendor = match.vendor || match._raw?.vendor;
+    }
+  }
+
+  const finalVendorName = (pcVendor?.vendorName || pcVendor?.name) || (products && products.find(p => p.vendor?.vendorId === vendorId)?.name) || (cart.vendorName && !['Store', 'Vendor'].includes(cart.vendorName) ? cart.vendorName : null) || firstItem?.product?._raw?.vendor?.vendorName || t('vendor');
+  const finalVendorImage = pcVendor?.storePhoto || pcVendor?.logo || pcVendor?.image || cart.vendorImage || firstItem?.product?.image || null; // Fallback to product image if logo missing
   const finalVendorRating = cart.vendorRating || pcVendor?.rating || firstItem?.product?._raw?.vendor?.rating || '4.5';
   const finalDeliveryTime = cart.vendorDeliveryTime || pcVendor?.deliveryTime || firstItem?.product?._raw?.vendor?.deliveryTime || '30-40 min';
 
@@ -168,7 +189,7 @@ export default function CartDetail({ vendorId, navigation }) {
             </View>
           )}
           <View style={{ flex: 1, marginLeft: spacing.md }}>
-            <Text style={[styles.vendorName, { color: colors.text.primary }]} numberOfLines={1}>{finalVendorName || 'Vendor'}</Text>
+            <Text style={[styles.vendorName, { color: colors.text.primary }]} numberOfLines={1}>{finalVendorName || t('vendor')}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
               <Ionicons name="star" size={14} color="#FFA000" />
               <Text style={{ color: colors.text.secondary, fontSize: 13, marginLeft: 4 }}>{vendorRating}</Text>
@@ -182,7 +203,7 @@ export default function CartDetail({ vendorId, navigation }) {
         {/* Section Title */}
         <View style={[styles.sectionHeader, { borderBottomColor: colors.border }]}>
           <Ionicons name="fast-food" size={20} color={colors.primary} />
-          <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>Your Order</Text>
+          <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('yourOrder')}</Text>
         </View>
 
         {/* Items */}
@@ -265,12 +286,12 @@ export default function CartDetail({ vendorId, navigation }) {
         <View style={{ paddingHorizontal: spacing.md, paddingBottom: spacing.md }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.sm }}>
             <Ionicons name="clipboard-outline" size={20} color={colors.primary} />
-            <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', marginLeft: spacing.sm }}>Delivery instructions</Text>
+            <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', marginLeft: spacing.sm }}>{t('deliveryInstructions')}</Text>
           </View>
           <TextInput
             value={cart.deliveryInstructions || ''}
             onChangeText={(t) => setDeliveryInstructionsForVendor(vendorId, t)}
-            placeholder="e.g., Leave at door, Ring bell twice..."
+            placeholder={t('deliveryInstructionsPlaceholder')}
             placeholderTextColor={colors.text.light}
             style={[styles.instructionsInput, { borderColor: colors.border, color: colors.text.primary, backgroundColor: colors.surface }]}
             multiline
@@ -282,28 +303,28 @@ export default function CartDetail({ vendorId, navigation }) {
         <View style={[styles.summaryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: spacing.md }}>
             <Ionicons name="receipt-outline" size={20} color={colors.primary} />
-            <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.lg, marginLeft: spacing.sm }}>Order Summary</Text>
+            <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.lg, marginLeft: spacing.sm }}>{t('orderSummary')}</Text>
           </View>
 
           <View style={styles.rowBetween}>
-            <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>Subtotal</Text>
+            <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>{t('subtotal')}</Text>
             <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>{formatCurrency(currency, baseSubtotal)}</Text>
           </View>
           {discountTotal > 0 && (
             <View style={styles.rowBetween}>
-              <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>Discount</Text>
+              <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>{t('discount')}</Text>
               <Text style={{ color: '#4CAF50', fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>-{formatCurrency(currency, discountTotal)}</Text>
             </View>
           )}
           <View style={styles.rowBetween}>
-            <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>Tax</Text>
+            <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>{t('serviceFee')}</Text>
             <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>{formatCurrency(currency, taxTotal)}</Text>
           </View>
 
           <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
 
           <View style={styles.rowBetween}>
-            <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-Bold', fontSize: fontSize.lg }}>Total</Text>
+            <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-Bold', fontSize: fontSize.lg }}>{t('total')}</Text>
             <Text style={{ color: colors.primary, fontFamily: 'Poppins-Bold', fontSize: fontSize.xl }}>{formatCurrency(currency, total)}</Text>
           </View>
         </View>
@@ -312,7 +333,7 @@ export default function CartDetail({ vendorId, navigation }) {
       {/* Sticky footer */}
       <View style={[styles.footer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
         <View style={{ flex: 1 }}>
-          <Text style={{ color: colors.text.secondary, fontSize: 13 }}>{items.reduce((s, it) => s + it.qty, 0)} items</Text>
+          <Text style={{ color: colors.text.secondary, fontSize: 13 }}>{items.reduce((s, it) => s + it.qty, 0)} {t('items')}</Text>
           <Text style={{ color: colors.primary, fontFamily: 'Poppins-Bold', fontSize: 20 }}>{formatCurrency(currency, total)}</Text>
         </View>
         <TouchableOpacity
@@ -324,7 +345,7 @@ export default function CartDetail({ vendorId, navigation }) {
             <ActivityIndicator size="small" color="#fff" />
           ) : (
             <>
-              <Text style={{ color: colors.text.white || '#fff', fontFamily: 'Poppins-Bold', fontSize: 16 }}>Checkout</Text>
+              <Text style={{ color: colors.text.white || '#fff', fontFamily: 'Poppins-Bold', fontSize: 16 }}>{t('checkout')}</Text>
               <Ionicons name="arrow-forward" size={20} color={colors.text.white || '#fff'} style={{ marginLeft: spacing.xs }} />
             </>
           )}

@@ -7,6 +7,7 @@ const ThemeContext = createContext();
 // Light theme colors
 export const lightColors = {
   primary: '#DC3173',
+  primaryLight: '#E956A8', // Lighter shade for gradient
   secondary: '#FF6B9D',
   background: '#FFFFFF',
   surface: '#FFFFFF',
@@ -28,6 +29,7 @@ export const lightColors = {
 // Dark theme colors
 export const darkColors = {
   primary: '#DC3173',
+  primaryLight: '#E956A8', // Lighter shade for gradient
   secondary: '#FF6B9D',
   background: '#121212',
   surface: '#1E1E1E',

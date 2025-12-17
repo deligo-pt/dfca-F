@@ -1,113 +1,101 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, FlatList } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors } from '../theme';
+import { colors, spacing, fontSize } from '../theme';
 import { useLanguage } from '../utils/LanguageContext';
+import { useTheme } from '../utils/ThemeContext';
+
+const MOCK_NOTIFICATIONS = [
+  {
+    id: '1',
+    type: 'order',
+    title: 'Order Delivered',
+    message: 'Your order from Burger King has been delivered. Enjoy your meal! 🍔',
+    time: '2 mins ago',
+    read: false,
+    icon: 'cube-outline',
+    color: '#4CAF50'
+  },
+  {
+    id: '2',
+    type: 'promo',
+    title: '50% OFF Lunch Deal',
+    message: 'Get 50% off on all Asian cuisines today from 12 PM to 3 PM. 🍜',
+    time: '2 hours ago',
+    read: true,
+    icon: 'pricetag-outline',
+    color: '#FF9800'
+  },
+  {
+    id: '3',
+    type: 'system',
+    title: 'New Feature Available',
+    message: 'Check out our new "Glovo Bubbles" for faster category browsing! 🚀',
+    time: '1 day ago',
+    read: true,
+    icon: 'star-outline',
+    color: '#2196F3'
+  },
+  {
+    id: '4',
+    type: 'order',
+    title: 'Order Confirmed',
+    message: 'Restaurant "Pizza Hut" has confirmed your order. preparing now...',
+    time: '1 day ago',
+    read: true,
+    icon: 'restaurant-outline',
+    color: '#9C27B0'
+  }
+];
 
 const NotificationsScreen = ({ navigation }) => {
   const { t } = useLanguage();
-  const [settings, setSettings] = useState({
-    orderUpdates: true,
-    offers: true,
-    newRestaurants: false,
-    newsletter: false,
-    push: true,
-    email: false,
-    sms: true,
-  });
+  const { colors, isDarkMode } = useTheme();
 
-  const toggleSetting = (key) => {
-    setSettings(prev => ({ ...prev, [key]: !prev[key] }));
-  };
+  const NotificationsList = () => (
+    <View style={styles.listContainer}>
+      {MOCK_NOTIFICATIONS.map((item) => (
+        <TouchableOpacity key={item.id} style={[styles.notificationItem, !item.read && styles.unreadItem]}>
+          <View style={[styles.iconContainer, { backgroundColor: item.color + '20' }]}>
+            <Ionicons name={item.icon} size={24} color={item.color} />
+          </View>
+          <View style={styles.textContainer}>
+            <View style={styles.headerRow}>
+              <Text style={styles.title}>{item.title}</Text>
+              <Text style={styles.time}>{item.time}</Text>
+            </View>
+            <Text style={styles.message} numberOfLines={2}>{item.message}</Text>
+          </View>
+          {!item.read && <View style={styles.dot} />}
+        </TouchableOpacity>
+      ))}
+    </View>
+  );
 
-  const SettingItem = ({ icon, title, subtitle, settingKey }) => (
-    <View style={styles.settingItem}>
-      <View style={styles.settingIconContainer}>
-        <Ionicons name={icon} size={22} color={colors.primary} />
-      </View>
-      <View style={styles.settingContent}>
-        <Text style={styles.settingTitle}>{title}</Text>
-        {subtitle && <Text style={styles.settingSubtitle}>{subtitle}</Text>}
-      </View>
-      <Switch
-        value={settings[settingKey]}
-        onValueChange={() => toggleSetting(settingKey)}
-        trackColor={{ false: '#E0E0E0', true: colors.secondary }}
-        thumbColor={settings[settingKey] ? colors.primary : '#F5F5F5'}
-      />
+  const EmptyState = () => (
+    <View style={styles.emptyContainer}>
+      <Ionicons name="notifications-off-outline" size={64} color="#CCC" />
+      <Text style={styles.emptyTitle}>No Notifications</Text>
+      <Text style={styles.emptyText}>You're all caught up! Check back later for updates.</Text>
     </View>
   );
 
   return (
-    <SafeAreaView style={styles.container} edges={['top']}>
-      <View style={styles.header}>
+    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+      {/* Header */}
+      <View style={[styles.header, { borderBottomColor: colors.border }]}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerText}>{t('notifications')}</Text>
-        <View style={styles.placeholder} />
+        <Text style={[styles.headerText, { color: colors.text.primary }]}>Notifications</Text>
+        <TouchableOpacity>
+          <Text style={{ color: colors.primary, fontFamily: 'Poppins-Medium', fontSize: 12 }}>Mark all read</Text>
+        </TouchableOpacity>
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('notificationTypes')}</Text>
-          <View style={styles.card}>
-            <SettingItem
-              icon="receipt-outline"
-              title={t('orderUpdatesText')}
-              subtitle={t('getNotifiedOrderStatus')}
-              settingKey="orderUpdates"
-            />
-            <View style={styles.divider} />
-            <SettingItem
-              icon="pricetag-outline"
-              title={t('offersPromotions')}
-              subtitle={t('receiveDeals')}
-              settingKey="offers"
-            />
-            <View style={styles.divider} />
-            <SettingItem
-              icon="restaurant-outline"
-              title={t('newRestaurants')}
-              subtitle={t('updatesNewRestaurants')}
-              settingKey="newRestaurants"
-            />
-            <View style={styles.divider} />
-            <SettingItem
-              icon="mail-outline"
-              title={t('newsletter')}
-              subtitle={t('weeklyFoodTrends')}
-              settingKey="newsletter"
-            />
-          </View>
-        </View>
-
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('deliveryMethod')}</Text>
-          <View style={styles.card}>
-            <SettingItem
-              icon="notifications-outline"
-              title={t('pushNotifications')}
-              subtitle={t('instantAlerts')}
-              settingKey="push"
-            />
-            <View style={styles.divider} />
-            <SettingItem
-              icon="mail-outline"
-              title={t('emailText')}
-              subtitle={t('updatesViaEmail')}
-              settingKey="email"
-            />
-            <View style={styles.divider} />
-            <SettingItem
-              icon="chatbubble-outline"
-              title={t('smsText')}
-              subtitle={t('textMessages')}
-              settingKey="sms"
-            />
-          </View>
-        </View>
+        {MOCK_NOTIFICATIONS.length > 0 ? <NotificationsList /> : <EmptyState />}
       </ScrollView>
     </SafeAreaView>
   );
@@ -116,88 +104,105 @@ const NotificationsScreen = ({ navigation }) => {
 const styles = StyleSheet.create({
   container: {
     flex: 1,
-    backgroundColor: '#F5F5F5',
   },
   header: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: colors.background,
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.md,
     borderBottomWidth: 1,
-    borderBottomColor: colors.border,
   },
   backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
+    padding: 4,
   },
   headerText: {
-    fontSize: 18,
-    fontWeight: '600',
-    color: colors.text.primary,
+    fontSize: fontSize.lg,
     fontFamily: 'Poppins-SemiBold',
-    flex: 1,
-    textAlign: 'center',
-  },
-  placeholder: {
-    width: 40,
   },
   content: {
-    padding: 16,
-    paddingBottom: 24,
+    padding: spacing.md,
   },
-  section: {
-    marginBottom: 24,
+  listContainer: {
+    gap: spacing.md,
   },
-  sectionTitle: {
-    fontSize: 14,
-    fontWeight: '600',
-    color: colors.text.secondary,
-    fontFamily: 'Poppins-SemiBold',
-    textTransform: 'uppercase',
-    letterSpacing: 0.5,
-    marginBottom: 12,
-  },
-  card: {
-    backgroundColor: colors.background,
-    borderRadius: 16,
-    overflow: 'hidden',
-  },
-  settingItem: {
+  notificationItem: {
     flexDirection: 'row',
-    alignItems: 'center',
-    padding: 16,
+    alignItems: 'start',
+    padding: spacing.md,
+    backgroundColor: '#FFF',
+    borderRadius: 16,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
+    shadowOpacity: 0.05,
+    shadowRadius: 8,
+    elevation: 2,
+    marginBottom: spacing.sm,
   },
-  settingIconContainer: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: '#F8F8F8',
+  unreadItem: {
+    backgroundColor: '#F0F9FF',
+    borderLeftWidth: 3,
+    borderLeftColor: colors.primary,
+  },
+  iconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: 16,
+    marginRight: spacing.md,
   },
-  settingContent: {
+  textContainer: {
     flex: 1,
   },
-  settingTitle: {
-    fontSize: 16,
-    fontWeight: '500',
-    color: colors.text.primary,
-    fontFamily: 'Poppins-Medium',
-    marginBottom: 2,
+  headerRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    marginBottom: 4,
   },
-  settingSubtitle: {
-    fontSize: 13,
-    color: colors.text.secondary,
+  title: {
+    fontSize: fontSize.md,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#333',
+    flex: 1,
+  },
+  time: {
+    fontSize: 12,
+    color: '#999',
     fontFamily: 'Poppins-Regular',
+    marginLeft: 8,
   },
-  divider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginLeft: 72,
+  message: {
+    fontSize: fontSize.sm,
+    color: '#666',
+    fontFamily: 'Poppins-Regular',
+    lineHeight: 20,
+  },
+  dot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.primary,
+    marginTop: 6,
+    marginLeft: 6,
+  },
+  emptyContainer: {
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: 100,
+  },
+  emptyTitle: {
+    fontSize: 18,
+    fontFamily: 'Poppins-SemiBold',
+    color: '#555',
+    marginTop: 16,
+  },
+  emptyText: {
+    fontSize: 14,
+    color: '#999',
+    textAlign: 'center',
+    marginTop: 8,
+    width: '70%',
   },
 });
 

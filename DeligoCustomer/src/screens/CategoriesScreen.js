@@ -1,7 +1,10 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { View, StyleSheet, Animated, ActivityIndicator, Text, TouchableOpacity, RefreshControl, StatusBar } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useEffect, useState, useRef, useCallback } from 'react';
+import { View, StyleSheet, Animated, ActivityIndicator, Text, TouchableOpacity, RefreshControl, StatusBar, Platform } from 'react-native';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { useFocusEffect } from '@react-navigation/native';
 import { spacing } from '../theme';
+
+const STATUSBAR_HEIGHT = Platform.OS === 'android' ? StatusBar.currentHeight : 0;
 import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
 import {
@@ -10,6 +13,7 @@ import {
     StickySearchHeader,
     SkeletonCategory,
 } from '../components';
+import GlovoBubbles from '../components/GlovoBubbles';
 import VendorType from '../components/Categories/CategoriesList';
 import Category from '../components/Categories/CuisinesList';
 import { useProducts } from '../contexts/ProductsContext';
@@ -26,6 +30,7 @@ import formatCurrency from '../utils/currency';
 const CategoriesScreen = ({ navigation }) => {
     const { colors, isDark } = useTheme();
     const { t } = useLanguage();
+    const insets = useSafeAreaInsets();
 
     // Use global LocationContext instead of local hook
     const {
@@ -85,9 +90,9 @@ const CategoriesScreen = ({ navigation }) => {
     const [selectedOffer, setSelectedOffer] = useState(null);
 
     // Cart counts from context
-    const { cartsArray, cartItems } = useCart();
+    const { cartsArray, itemCount } = useCart();
     const cartVendorsCount = (cartsArray && cartsArray.length) ? cartsArray.length : 0; // number of vendor carts
-    const cartItemCount = cartItems ? cartItems.reduce((s, it) => s + (it.quantity || 0), 0) : 0; // total items across vendor carts
+    const cartItemCount = itemCount || 0; // Use context-provided total count
 
     // Sample offer from API - set to null to test welcome greeting
     // Sample offer from API - set to null to test welcome greeting
@@ -204,7 +209,17 @@ const CategoriesScreen = ({ navigation }) => {
             const vendorType = rawVendor.vendorType;
             if (vendorType && String(vendorType).trim()) {
                 const key = String(vendorType).trim();
-                if (!map.has(key)) map.set(key, { id: key, name: key });
+                if (!map.has(key)) {
+                    // Map vendor types to icons for header
+                    const icon = key.toLowerCase().includes('resturent') || key.toLowerCase().includes('restaurant')
+                        ? '🍕'
+                        : key.toLowerCase().includes('store') || key.toLowerCase().includes('grocery')
+                            ? '🛒'
+                            : key.toLowerCase().includes('pharmacy')
+                                ? '💊'
+                                : '🏪';
+                    map.set(key, { id: key, name: key, icon });
+                }
             }
         });
         return Array.from(map.values());
@@ -508,12 +523,49 @@ const CategoriesScreen = ({ navigation }) => {
         }
     }, [displayedProducts]);
 
+    // State to manage sticky header interactivity (pointerEvents)
+    const [isStickyVisible, setIsStickyVisible] = useState(false);
+
+    useEffect(() => {
+        const listener = scrollY.addListener(({ value }) => {
+            // Threshold matches the opacity animation start (approx 80-100)
+            const shouldBeVisible = value > 80;
+            if (shouldBeVisible !== isStickyVisible) {
+                setIsStickyVisible(shouldBeVisible);
+            }
+        });
+        return () => scrollY.removeListener(listener);
+    }, [isStickyVisible]);
+
+    // Force Status Bar style when screen comes into focus
+    useFocusEffect(
+        useCallback(() => {
+            StatusBar.setBarStyle('light-content');
+            if (Platform.OS === 'android') {
+                StatusBar.setBackgroundColor('transparent');
+                StatusBar.setTranslucent(true);
+            }
+        }, [])
+    );
+
     return (
-        <SafeAreaView style={styles(colors).safeArea} edges={['top']}>
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
             <StatusBar
-                barStyle={isDark ? 'light-content' : 'dark-content'}
-                backgroundColor={colors.primary}
+                barStyle="light-content"
+                backgroundColor="transparent"
+                translucent={true}
             />
+            {/* PERMANENT FIX: Static Status Bar Background */}
+            <View style={{
+                position: 'absolute',
+                top: 0,
+                left: 0,
+                right: 0,
+                height: insets.top,
+                backgroundColor: colors.primary,
+                zIndex: 9999,
+            }} />
+
             {/* Sticky Search Header - appears on scroll */}
             <StickySearchHeader
                 scrollY={scrollY}
@@ -523,37 +575,11 @@ const CategoriesScreen = ({ navigation }) => {
                 cartItemCount={cartItemCount}
                 cartVendorsCount={cartVendorsCount}
                 onSearchPress={handleSearchPress} // REPLACED: trigger nav only
+                paddingTop={insets.top}
+                pointerEvents={isStickyVisible ? 'auto' : 'none'}
             />
 
-            {/* DEBUG + controls: show products context state and cache controls */}
-            <View style={{ paddingHorizontal: spacing.md, paddingVertical: 8 }}>
-                <Text style={{ color: colors.text.secondary, fontSize: 12 }}>
-                    {(productsLoading && (!displayedProducts || displayedProducts.length === 0)) ? 'Loading products...' : `Products: ${displayedProducts ? displayedProducts.length : (products || []).length}`}{productsError ? ` • Error: ${String(productsError)}` : ''}
-                </Text>
-                <Text style={{ color: colors.text.secondary, fontSize: 11, marginTop: 4 }}>
-                    {`vendorTypes: ${debugVendorTypes || '<none>'}`}
-                </Text>
-                <Text style={{ color: colors.text.secondary, fontSize: 11 }}>
-                    {`cuisines: ${debugCuisines || '<none>'}`}
-                </Text>
-                <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', marginTop: 8 }}>
-                    <Text style={{ color: colors.text.secondary, fontSize: 11 }}>{`Last updated: ${formatAgo(lastUpdated)}`}</Text>
-                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                        <TouchableOpacity onPress={() => setTtl(60 * 1000)} style={{ marginRight: 10 }}>
-                            <Text style={{ color: cacheTtlMs === 60 * 1000 ? colors.primary : colors.text.secondary }}>1m</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setTtl(5 * 60 * 1000)} style={{ marginRight: 10 }}>
-                            <Text style={{ color: cacheTtlMs === 5 * 60 * 1000 ? colors.primary : colors.text.secondary }}>5m</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={() => setTtl(15 * 60 * 1000)} style={{ marginRight: 12 }}>
-                            <Text style={{ color: cacheTtlMs === 15 * 60 * 1000 ? colors.primary : colors.text.secondary }}>15m</Text>
-                        </TouchableOpacity>
-                        <TouchableOpacity onPress={clearProductCache}>
-                            <Text style={{ color: colors.primary, fontFamily: 'Poppins-SemiBold' }}>Clear cache</Text>
-                        </TouchableOpacity>
-                    </View>
-                </View>
-            </View>
+
 
             <Animated.ScrollView
                 style={styles(colors).scrollView}
@@ -566,6 +592,7 @@ const CategoriesScreen = ({ navigation }) => {
                         onRefresh={handleRefresh}
                         colors={[colors.primary]}
                         tintColor={colors.primary}
+                        progressViewOffset={insets.top + 20}
                     />
                 }
                 onScroll={Animated.event(
@@ -578,22 +605,20 @@ const CategoriesScreen = ({ navigation }) => {
                     location={currentLocation}
                     area={address}
                     loading={locationLoading}
-                    errorMsg={locationError}
-                    onCartPress={handleCartPress}
                     onLocationPress={handleLocationPress}
-                    cartItemCount={cartItemCount}
-                    cartVendorsCount={cartVendorsCount}
-                    onSearchPress={handleSearchPress} // REPLACED: trigger nav only
-                    activeOffer={activeOffer}
-                    featuredShops={featuredShops}
-                    onOfferPress={handleOfferPress}
-                    onShopPress={handleShopPress}
+                    onSearchPress={handleSearchPress}
                     userName={userName}
+                    onProfilePress={() => navigation.navigate('Profile')}
+                    onNotificationPress={() => navigation.navigate('Notifications')}
+                    paddingTop={insets.top}
                 />
 
-                {/* Categories Section */}
-                <SectionHeader title={t('whatDoYouNeed')} showSeeAll={false} />
-                <VendorType categories={Array.isArray(vendorTypes) ? vendorTypes : []} onPress={handleVendorTypePress} selectedId={selectedVendorType} />
+                {/* Glovo-Style "Super App" Bubbles */}
+                <GlovoBubbles
+                    categories={vendorTypesFromProducts}
+                    onPress={handleVendorTypePress}
+                    selectedId={selectedVendorType}
+                />
 
                 {/* Categories Section - Dynamic from API based on vendor type */}
                 <SectionHeader
@@ -652,7 +677,7 @@ const CategoriesScreen = ({ navigation }) => {
             </Animated.ScrollView>
 
             <OfferModal visible={offerModalVisible} onClose={() => setOfferModalVisible(false)} offer={selectedOffer} onApply={(o) => console.log('Apply offer:', o)} />
-        </SafeAreaView>
+        </View>
     );
 };
 

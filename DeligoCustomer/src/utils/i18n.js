@@ -60,6 +60,11 @@ export const translations = {
 
     // Restaurant Details
     menu: 'Menu',
+    searchMenu: 'Search menu...',
+    popular: 'Popular',
+    viewCart: 'View Cart',
+    quantity: 'Quantity',
+    inCart: 'in cart',
     reviews: 'Reviews',
     info: 'Info',
     addToCart: 'Add to Cart',
@@ -87,6 +92,19 @@ export const translations = {
     browseRestaurants: 'Browse Restaurants',
     browseAndOrder: 'Browse & Order',
     addItemsToGetStarted: 'Add items from a restaurant to get started',
+    yourCart: 'Your Cart',
+    goAheadOrder: 'Go ahead and order some yummy food',
+    browseFood: 'Browse Food',
+    updatingCart: 'Updating cart...',
+    goToCheckout: 'Go to Checkout',
+    setAsActive: 'Set as Active',
+    removeCart: 'Remove Cart',
+    noCartFound: 'No cart found.',
+    yourOrder: 'Your Order',
+    deliveryInstructionsPlaceholder: 'e.g., Leave at door, Ring bell twice...',
+    orderSummary: 'Order Summary',
+    store: 'Store',
+    vendor: 'Vendor',
 
     // Checkout
     checkout: 'Checkout',
@@ -553,6 +571,11 @@ export const translations = {
 
     // Restaurant Details
     menu: 'Menu',
+    searchMenu: 'Pesquisar cardápio...',
+    popular: 'Populares',
+    viewCart: 'Ver Carrinho',
+    quantity: 'Quantidade',
+    inCart: 'no carrinho',
     reviews: 'Avaliações',
     info: 'Informações',
     addToCart: 'Adicionar ao Carrinho',
@@ -580,6 +603,19 @@ export const translations = {
     browseRestaurants: 'Navegar Restaurantes',
     browseAndOrder: 'Explorar e Pedir',
     addItemsToGetStarted: 'Adicione itens de um restaurante para começar',
+    yourCart: 'Seu Carrinho',
+    goAheadOrder: 'Vá em frente e peça uma comida deliciosa',
+    browseFood: 'Navegar Comida',
+    updatingCart: 'Atualizando carrinho...',
+    goToCheckout: 'Ir para o Checkout',
+    setAsActive: 'Definir como Ativo',
+    removeCart: 'Remover Carrinho',
+    noCartFound: 'Nenhum carrinho encontrado.',
+    yourOrder: 'Seu Pedido',
+    deliveryInstructionsPlaceholder: 'ex: Deixe na porta, toque a campainha duas vezes...',
+    orderSummary: 'Resumo do Pedido',
+    store: 'Loja',
+    vendor: 'Vendedor',
 
     // Checkout
     checkout: 'Finalizar',
