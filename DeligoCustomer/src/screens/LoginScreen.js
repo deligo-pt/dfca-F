@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { sendOTP, verifyOTP, saveUserData, resendOTP } from '../utils/auth';
 import { useProfile } from '../contexts/ProfileContext';
+import { useProducts } from '../contexts/ProductsContext';
 import CountryPicker from 'react-native-country-picker-modal';
 import CustomModal from '../components/CustomModal';
 import OTPInput from '../components/OTPInput';
@@ -30,6 +31,7 @@ const LOGO = require('../assets/images/logo.png'); // Updated Logo
 
 const LoginScreen = ({ navigation }) => {
   const { login } = useProfile();
+  const { fetchProducts } = useProducts();
   const { t, language, changeLanguage } = useLanguage();
   const { colors, isDarkMode } = useTheme();
   const BRAND_PINK = colors.primary;
@@ -112,16 +114,9 @@ const LoginScreen = ({ navigation }) => {
       console.error('[LoginScreen] sendOTP error:', error);
 
       // Try to extract server-provided message
-      const serverMsg = error && (error.message || error.msg || error.error || error.message?.toString());
+      const serverMsg = error?.response?.data?.message || error?.response?.data?.error || error?.message || error?.msg || error?.error;
 
-      if (serverMsg) {
-        showModal(t('notRegistered'), serverMsg.toString(), () => navigation.navigate('HelpCenter'), false);
-      } else if (error && error.status === 404) {
-        showModal(t('notRegistered'), t('accountNotRegistered'), () => navigation.navigate('HelpCenter'), false);
-      } else {
-        // Generic fallback
-        showModal(t('error'), t('somethingWentWrong'));
-      }
+      showModal(t('error'), serverMsg || t('somethingWentWrong'));
     } finally {
       setIsLoading(false);
     }
@@ -154,6 +149,11 @@ const LoginScreen = ({ navigation }) => {
       // Save the access token to storage
       // Use ProfileContext login
       const success = await login(userData, accessToken);
+
+      // Immediate data pre-load
+      if (success) {
+        fetchProducts({ force: true });
+      }
 
       // Close modal
       setModalVisible(false);

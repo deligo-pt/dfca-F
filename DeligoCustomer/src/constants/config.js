@@ -33,7 +33,8 @@ export const API_CONFIG = {
 // Construct full base URL for the API
 // NOTE: backend routes are under /api/v1/... (no extra /customer segment)
 // Use base URL without the trailing '/customer' so endpoints like '/auth/login-customer' resolve to '/api/v1/auth/login-customer'
-export const BASE_API_URL = `${API_CONFIG.BASE_URL}/api/${API_CONFIG.API_VERSION}`;
+const cleanBaseUrl = API_CONFIG.BASE_URL.replace(/\/+$/, '');
+export const BASE_API_URL = `${cleanBaseUrl}/api/${API_CONFIG.API_VERSION}`;
 
 // API Endpoint Categories for Customer App
 export const API_ENDPOINTS = {

@@ -8,6 +8,7 @@ import {
     LocationHeader,
     SectionHeader,
     StickySearchHeader,
+    SkeletonCategory,
 } from '../components';
 import VendorType from '../components/Categories/CategoriesList';
 import Category from '../components/Categories/CuisinesList';
@@ -118,9 +119,10 @@ const CategoriesScreen = ({ navigation }) => {
         };
     };
 
-    // Initialize displayedProducts from bundled mock so UI is immediate and not empty
-    const initialMockItems = (Array.isArray(mockProductsRaw) ? mockProductsRaw : (mockProductsRaw.data || mockProductsRaw.items || [])).map(p => localNormalize(p));
-    const [displayedProducts, setDisplayedProducts] = useState(initialMockItems || []);
+    // Initialize empty to allow Skeleton to show instantly
+    // const initialMockItems = (Array.isArray(mockProductsRaw) ? mockProductsRaw : (mockProductsRaw.data || mockProductsRaw.items || [])).map(p => localNormalize(p));
+    // const [displayedProducts, setDisplayedProducts] = useState(initialMockItems || []);
+    const [displayedProducts, setDisplayedProducts] = useState([]);
     // Cache TTL ms state (user selectable) - ensure it's declared before any effect or UI references
     const [cacheTtlMs, setCacheTtlMs] = useState(5 * 60 * 1000);
 
@@ -139,7 +141,9 @@ const CategoriesScreen = ({ navigation }) => {
                     const norm = cached.items.map(localNormalize);
                     setDisplayedProducts(norm);
                 } else {
-                    // No cache found — fall back to bundled mock data so UI is instant
+                    // No cache found — do NOT fall back to bundled mock data.
+                    // We want to show Skeleton Loader instead.
+                    /*
                     try {
                         const items = Array.isArray(mockProductsRaw) ? mockProductsRaw : (mockProductsRaw.data || mockProductsRaw.items || []);
                         if (items && items.length) {
@@ -148,6 +152,7 @@ const CategoriesScreen = ({ navigation }) => {
                     } catch (e) {
                         // ignore
                     }
+                    */
                 }
             } catch (e) {
                 console.debug('No default cache found on mount', e);
@@ -367,15 +372,8 @@ const CategoriesScreen = ({ navigation }) => {
 
     // Debounced search -> trigger context fetch (ONLY on search query change)
     // Category/Cuisine filtering is done client-side for instant response
-    useEffect(() => {
-        const t = setTimeout(() => {
-            // Only fetch on search - filtering is done locally
-            if (searchQuery) {
-                fetchProducts({ search: searchQuery, page: 1 });
-            }
-        }, 300);
-        return () => clearTimeout(t);
-    }, [searchQuery, fetchProducts]); // REMOVED: selectedVendorType, selectedCuisine
+    // Old search effect removed in favor of handleSearch logic
+
 
     // Keep displayedProducts in sync with sourceProducts and current filters (normalized comparisons)
     useEffect(() => {
@@ -448,15 +446,11 @@ const CategoriesScreen = ({ navigation }) => {
         navigation.navigate('RestaurantDetails', { restaurant });
     };
 
-    // Suggestions based on current context products
-    const filteredRestaurants = products || [];
-    const searchSuggestions = searchQuery.trim() ? filteredRestaurants.slice(0, 5) : [];
-
-    const handleSuggestionPress = (restaurant) => {
-        console.log('Suggestion selected:', restaurant.name);
-        setSearchQuery(''); // Clear search
-        navigation.navigate('RestaurantDetails', { restaurant });
+    // Search Handler: Navigate to dedicated Search Screen
+    const handleSearchPress = () => {
+        navigation.navigate('Search');
     };
+
 
     useEffect(() => {
         // Fetch location on mount if not already set
@@ -507,7 +501,7 @@ const CategoriesScreen = ({ navigation }) => {
         }
     };
 
-    const prevNonEmptyRef = useRef(initialMockItems || []);
+    const prevNonEmptyRef = useRef([]);
     useEffect(() => {
         if (Array.isArray(displayedProducts) && displayedProducts.length > 0) {
             prevNonEmptyRef.current = displayedProducts;
@@ -528,10 +522,7 @@ const CategoriesScreen = ({ navigation }) => {
                 area={address}
                 cartItemCount={cartItemCount}
                 cartVendorsCount={cartVendorsCount}
-                onSearch={setSearchQuery}
-                searchQuery={searchQuery}
-                suggestions={searchSuggestions}
-                onSuggestionPress={handleSuggestionPress}
+                onSearchPress={handleSearchPress} // REPLACED: trigger nav only
             />
 
             {/* DEBUG + controls: show products context state and cache controls */}
@@ -592,10 +583,7 @@ const CategoriesScreen = ({ navigation }) => {
                     onLocationPress={handleLocationPress}
                     cartItemCount={cartItemCount}
                     cartVendorsCount={cartVendorsCount}
-                    onSearch={setSearchQuery}
-                    searchQuery={searchQuery}
-                    suggestions={searchSuggestions}
-                    onSuggestionPress={handleSuggestionPress}
+                    onSearchPress={handleSearchPress} // REPLACED: trigger nav only
                     activeOffer={activeOffer}
                     featuredShops={featuredShops}
                     onOfferPress={handleOfferPress}
@@ -616,7 +604,7 @@ const CategoriesScreen = ({ navigation }) => {
 
                 {/* Results Section */}
                 <SectionHeader
-                    title={searchQuery ? `Search Results (${filteredRestaurants.length})` : t('nearYou')}
+                    title={searchQuery ? `Search Results (${(products || []).length})` : t('nearYou')}
                     onSeeAll={!searchQuery ? () => navigation.navigate('SeeAll', {
                         allItems: sourceProducts,  // ALL products (unfiltered)
                         vendorTypes: vendorTypes,  // For filter chips
@@ -625,9 +613,7 @@ const CategoriesScreen = ({ navigation }) => {
                     }) : undefined}
                 />
                 {productsLoading && (!displayedProducts || displayedProducts.length === 0) ? (
-                    <View style={{ paddingVertical: 40, alignItems: 'center' }}>
-                        <ActivityIndicator size="large" color={colors.primary} />
-                    </View>
+                    <SkeletonCategory />
                 ) : (displayedByVendor.length > 0) ? (
                     <RestaurantsList restaurants={displayedByVendor} onPress={handleRestaurantPress} searchQuery={searchQuery} disableScroll={true} />
                 ) : (prevNonEmptyRef.current.length > 0 && (selectedVendorType || selectedCuisine)) ? (

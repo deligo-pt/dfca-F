@@ -8,37 +8,22 @@ const LocationHeader = ({
   location,
   area,
   loading,
+  searchLoading, // New loading prop for search spinner
   errorMsg,
   onRefresh,
   onCartPress,
   onLocationPress,
   cartItemCount = 0,
-  onSearch,
-  searchQuery = '',
-  suggestions = [],
-  onSuggestionPress,
+  onSearchPress, // New prop: triggers nav to SearchScreen
   // New props for offers and shops
-  activeOffer = null, // from API: { title, subtitle, code, discount, action: 'navigate_to_offers' }
-  featuredShops = [], // from API: [{ id, name, logo, cuisine }]
+  activeOffer = null,
+  featuredShops = [],
   onOfferPress,
   onShopPress,
-  userName = null, // for personalized greeting
+  userName = null,
 }) => {
   const { colors, isDarkMode } = useTheme();
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
-
-  const handleSearchChange = (text) => {
-    onSearch && onSearch(text);
-  };
-
-  const clearSearch = () => {
-    onSearch && onSearch('');
-  };
-
-  const handleSuggestionTap = (suggestion) => {
-    onSuggestionPress && onSuggestionPress(suggestion);
-    setIsSearchFocused(false);
-  };
+  // State removed - handled by navigation
 
   return (
     <View style={styles(colors, isDarkMode).wrapper}>
@@ -49,7 +34,7 @@ const LocationHeader = ({
         <View style={styles(colors, isDarkMode).headerRow}>
           {/* Left side: Greeting and Location */}
           <View style={styles(colors, isDarkMode).leftSection}>
-            <Text style={styles(colors, isDarkMode).greetingText}>Good Afternoon</Text>
+            <Text style={styles(colors, isDarkMode).greetingText}>{userName ? `Hi, ${userName}` : 'Good Afternoon'}</Text>
             <TouchableOpacity
               style={styles(colors, isDarkMode).locationButton}
               onPress={onLocationPress}
@@ -91,36 +76,21 @@ const LocationHeader = ({
 
         {/* Row 2: Search Bar - NO BACK BUTTON (always visible header) */}
         <View style={styles(colors, isDarkMode).searchRow}>
-          <View style={[
-            styles(colors, isDarkMode).searchContainer,
-            isSearchFocused && styles(colors, isDarkMode).searchContainerFocused
-          ]}>
+          <TouchableOpacity
+            style={styles(colors, isDarkMode).searchContainer}
+            activeOpacity={0.9}
+            onPress={onSearchPress}
+          >
             <Ionicons
               name="search"
               size={18}
-              color={isSearchFocused ? colors.primary : colors.text.secondary}
+              color={colors.text.secondary}
               style={styles(colors, isDarkMode).searchIcon}
             />
-            <TextInput
-              style={styles(colors, isDarkMode).input}
-              placeholder="Search restaurants, cuisines..."
-              placeholderTextColor={colors.text.secondary}
-              value={searchQuery}
-              onChangeText={handleSearchChange}
-              onFocus={() => setIsSearchFocused(true)}
-              onBlur={() => setIsSearchFocused(false)}
-              returnKeyType="search"
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="off"
-              spellCheck={false}
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={clearSearch} style={styles(colors, isDarkMode).clearButton}>
-                <Ionicons name="close-circle" size={18} color={colors.text.secondary} />
-              </TouchableOpacity>
-            )}
-          </View>
+            <Text style={[styles(colors, isDarkMode).input, { paddingVertical: 8, color: colors.text.secondary }]}>
+              Search restaurants, cuisines...
+            </Text>
+          </TouchableOpacity>
         </View>
 
         {/* Dynamic Promo Banner or Welcome Greeting */}
@@ -234,43 +204,7 @@ const LocationHeader = ({
         )}
       </View>
 
-      {/* Autocomplete Suggestions Dropdown */}
-      {isSearchFocused && searchQuery.length > 0 && suggestions.length > 0 && (
-        <View style={styles(colors, isDarkMode).suggestionsContainer}>
-          <ScrollView
-            style={styles(colors, isDarkMode).suggestionsList}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={true}
-          >
-            {suggestions.map((suggestion, index) => (
-              <TouchableOpacity
-                key={suggestion.id || index}
-                style={[
-                  styles(colors, isDarkMode).suggestionItem,
-                  index === suggestions.length - 1 && styles(colors, isDarkMode).suggestionItemLast
-                ]}
-                onPress={() => handleSuggestionTap(suggestion)}
-                activeOpacity={0.7}
-              >
-                <View style={styles(colors, isDarkMode).suggestionIconWrapper}>
-                  <Ionicons name="search" size={18} color={colors.primary} />
-                </View>
-                <View style={styles(colors, isDarkMode).suggestionContent}>
-                  <Text style={styles(colors, isDarkMode).suggestionName} numberOfLines={1}>
-                    {suggestion.name}
-                  </Text>
-                  {suggestion.cuisine && (
-                    <Text style={styles(colors, isDarkMode).suggestionCuisine} numberOfLines={1}>
-                      {suggestion.cuisine}
-                    </Text>
-                  )}
-                </View>
-                <Ionicons name="arrow-forward" size={16} color={colors.primary} />
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
-        </View>
-      )}
+      {/* Autocomplete Suggestions removed - moved to SearchScreen */}
     </View>
   );
 };

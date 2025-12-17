@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Animated, ScrollView } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Animated, ScrollView, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, fontSize } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
@@ -10,32 +10,15 @@ const StickySearchHeader = ({
   onLocationPress,
   area,
   cartItemCount = 0,
-  onSearch,
-  searchQuery = '',
-  suggestions = [],
-  onSuggestionPress,
+  onSearchPress,
 }) => {
   const { colors, isDarkMode } = useTheme();
-  const [isSearchFocused, setIsSearchFocused] = useState(false);
 
   const headerOpacity = scrollY.interpolate({
     inputRange: [80, 150],
     outputRange: [0, 1],
     extrapolate: 'clamp',
   });
-
-  const handleSearchChange = (text) => {
-    onSearch && onSearch(text);
-  };
-
-  const clearSearch = () => {
-    onSearch && onSearch('');
-  };
-
-  const handleSuggestionTap = (suggestion) => {
-    onSuggestionPress && onSuggestionPress(suggestion);
-    setIsSearchFocused(false);
-  };
 
   return (
     <Animated.View
@@ -44,123 +27,54 @@ const StickySearchHeader = ({
     >
       <View style={styles(colors, isDarkMode).container}>
         {/* Row 1: Location & Cart (Clean, Minimal) - Hidden when searching */}
-        {!isSearchFocused && (
-          <View style={styles(colors, isDarkMode).topRow}>
-            <TouchableOpacity
-              style={styles(colors, isDarkMode).locationButton}
-              onPress={onLocationPress}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="location-sharp" size={14} color={colors.text.white || '#FFFFFF'} />
-              <Text style={styles(colors, isDarkMode).locationText} numberOfLines={1}>
-                {area || 'Set location'}
-              </Text>
-              <Ionicons name="chevron-down" size={12} color={colors.text.white || '#FFFFFF'} />
-            </TouchableOpacity>
+        <View style={styles(colors, isDarkMode).topRow}>
+          <TouchableOpacity
+            style={styles(colors, isDarkMode).locationButton}
+            onPress={onLocationPress}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="location-sharp" size={14} color={colors.text.white || '#FFFFFF'} />
+            <Text style={styles(colors, isDarkMode).locationText} numberOfLines={1}>
+              {area || 'Set location'}
+            </Text>
+            <Ionicons name="chevron-down" size={12} color={colors.text.white || '#FFFFFF'} />
+          </TouchableOpacity>
 
-            <TouchableOpacity
-              style={styles(colors, isDarkMode).cartButtonTop}
-              onPress={onCartPress}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="cart-outline" size={20} color={colors.text.white || '#FFFFFF'} />
-              {cartItemCount > 0 && (
-                <View style={styles(colors, isDarkMode).badge}>
-                  <Text style={styles(colors, isDarkMode).badgeText}>{cartItemCount > 99 ? '99+' : cartItemCount}</Text>
-                </View>
-              )}
-            </TouchableOpacity>
-          </View>
-        )}
+          <TouchableOpacity
+            style={styles(colors, isDarkMode).cartButtonTop}
+            onPress={onCartPress}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="cart-outline" size={20} color={colors.text.white || '#FFFFFF'} />
+            {cartItemCount > 0 && (
+              <View style={styles(colors, isDarkMode).badge}>
+                <Text style={styles(colors, isDarkMode).badgeText}>{cartItemCount > 99 ? '99+' : cartItemCount}</Text>
+              </View>
+            )}
+          </TouchableOpacity>
+        </View>
 
         {/* Row 2: Search Bar (PROMINENT, CLEAN) */}
         <View style={styles(colors, isDarkMode).searchRow}>
-          {/* Back button (only when searching) */}
-          {isSearchFocused && (
-            <TouchableOpacity
-              style={styles(colors, isDarkMode).backButton}
-              onPress={() => {
-                setIsSearchFocused(false);
-                if (searchQuery) clearSearch();
-              }}
-              activeOpacity={0.7}
-            >
-              <Ionicons name="arrow-back" size={22} color={colors.text.white || '#FFFFFF'} />
-            </TouchableOpacity>
-          )}
-
           {/* Search Input - FULL WIDTH, CLEAN */}
-          <View style={[
-            styles(colors, isDarkMode).searchContainer,
-            isSearchFocused && styles(colors, isDarkMode).searchContainerFocused
-          ]}>
+          <TouchableOpacity
+            style={styles(colors, isDarkMode).searchContainer}
+            activeOpacity={0.9}
+            onPress={onSearchPress}
+          >
             <Ionicons
               name="search"
               size={18}
-              color={isSearchFocused ? colors.primary : colors.text.secondary}
+              color={colors.text.secondary}
               style={styles(colors, isDarkMode).searchIcon}
             />
-            <TextInput
-              style={styles(colors, isDarkMode).input}
-              placeholder="Search restaurants, cuisines..."
-              placeholderTextColor={colors.text.secondary}
-              value={searchQuery}
-              onChangeText={handleSearchChange}
-              onFocus={() => setIsSearchFocused(true)}
-              returnKeyType="search"
-              autoCapitalize="none"
-              autoCorrect={false}
-              autoComplete="off"
-              spellCheck={false}
-            />
-            {searchQuery.length > 0 && (
-              <TouchableOpacity onPress={clearSearch} style={styles(colors, isDarkMode).clearButton}>
-                <Ionicons name="close-circle" size={18} color={colors.text.secondary} />
-              </TouchableOpacity>
-            )}
-          </View>
+            <Text style={[styles(colors, isDarkMode).input, { paddingVertical: 8, color: colors.text.secondary }]}>
+              Search restaurants, cuisines...
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
 
-      {/* Autocomplete Suggestions Dropdown - OUTSIDE container for proper positioning */}
-      {isSearchFocused && searchQuery.length > 0 && suggestions.length > 0 && (
-        <View style={styles(colors, isDarkMode).suggestionsWrapper}>
-          <View style={styles(colors, isDarkMode).suggestionsContainer}>
-            <ScrollView
-              style={styles(colors, isDarkMode).suggestionsList}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={true}
-            >
-              {suggestions.map((suggestion, index) => (
-                <TouchableOpacity
-                  key={suggestion.id || index}
-                  style={[
-                    styles(colors, isDarkMode).suggestionItem,
-                    index === suggestions.length - 1 && styles(colors, isDarkMode).suggestionItemLast
-                  ]}
-                  onPress={() => handleSuggestionTap(suggestion)}
-                  activeOpacity={0.7}
-                >
-                  <View style={styles(colors, isDarkMode).suggestionIconWrapper}>
-                    <Ionicons name="search" size={18} color={colors.primary} />
-                  </View>
-                  <View style={styles(colors, isDarkMode).suggestionContent}>
-                    <Text style={styles(colors, isDarkMode).suggestionName} numberOfLines={1}>
-                      {suggestion.name}
-                    </Text>
-                    {suggestion.cuisine && (
-                      <Text style={styles(colors, isDarkMode).suggestionCuisine} numberOfLines={1}>
-                        {suggestion.cuisine}
-                      </Text>
-                    )}
-                  </View>
-                  <Ionicons name="arrow-forward" size={16} color={colors.primary} />
-                </TouchableOpacity>
-              ))}
-            </ScrollView>
-          </View>
-        </View>
-      )}
     </Animated.View>
   );
 };

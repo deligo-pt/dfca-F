@@ -12,6 +12,7 @@ export { default as TrackOrderScreen } from './TrackOrderScreen';
 export { default as CheckoutScreen } from './CheckoutScreen';
 export { default as CartDetailScreen } from './CartDetailScreen';
 export { default as SeeAllScreen } from './SeeAllScreen';
+export { default as SearchScreen } from './SearchScreen';
 
 // Account Related Screens
 export { default as EditProfileScreen } from './EditProfileScreen';
