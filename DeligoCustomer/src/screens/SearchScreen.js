@@ -159,6 +159,29 @@ const SearchScreen = ({ navigation }) => {
 
     const matchedDishes = productResults;
 
+    // Derive unique vendor types from all products (for filter chips)
+    const availableVendorTypes = React.useMemo(() => {
+        const vendorTypeMap = new Map();
+        (products || []).forEach((product) => {
+            const vendorType = product._raw?.vendor?.vendorType || product.vendor?.vendorType;
+            if (vendorType && !vendorTypeMap.has(vendorType)) {
+                vendorTypeMap.set(vendorType, {
+                    id: vendorType,
+                    name: vendorType,
+                    // Map vendor types to emojis
+                    icon: vendorType.toLowerCase().includes('resturent') || vendorType.toLowerCase().includes('restaurant')
+                        ? '🍕'
+                        : vendorType.toLowerCase().includes('store') || vendorType.toLowerCase().includes('grocery')
+                            ? '🛒'
+                            : vendorType.toLowerCase().includes('pharmacy')
+                                ? '💊'
+                                : '🏪'
+                });
+            }
+        });
+        return Array.from(vendorTypeMap.values());
+    }, [products]);
+
     const handleRecentClick = (term) => {
         setSearchQuery(term);
         saveRecentSearch(term);
@@ -354,6 +377,7 @@ const SearchScreen = ({ navigation }) => {
                         style={styles(colors, isDarkMode).chipsScroll}
                         contentContainerStyle={{ paddingHorizontal: spacing.md }}
                     >
+                        {/* All filter chip */}
                         <TouchableOpacity
                             style={[
                                 styles(colors, isDarkMode).filterChip,
@@ -369,50 +393,24 @@ const SearchScreen = ({ navigation }) => {
                             </Text>
                         </TouchableOpacity>
 
-                        <TouchableOpacity
-                            style={[
-                                styles(colors, isDarkMode).filterChip,
-                                selectedVendorType === 'Resturent' && styles(colors, isDarkMode).filterChipActive
-                            ]}
-                            onPress={() => setSelectedVendorType('Resturent')}
-                        >
-                            <Text style={[
-                                styles(colors, isDarkMode).filterChipText,
-                                selectedVendorType === 'Resturent' && styles(colors, isDarkMode).filterChipTextActive
-                            ]}>
-                                🍕 {t('food') || 'Food'}
-                            </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[
-                                styles(colors, isDarkMode).filterChip,
-                                selectedVendorType === 'Store' && styles(colors, isDarkMode).filterChipActive
-                            ]}
-                            onPress={() => setSelectedVendorType('Store')}
-                        >
-                            <Text style={[
-                                styles(colors, isDarkMode).filterChipText,
-                                selectedVendorType === 'Store' && styles(colors, isDarkMode).filterChipTextActive
-                            ]}>
-                                🛒 {t('groceries') || 'Groceries'}
-                            </Text>
-                        </TouchableOpacity>
-
-                        <TouchableOpacity
-                            style={[
-                                styles(colors, isDarkMode).filterChip,
-                                selectedVendorType === 'Pharmacy' && styles(colors, isDarkMode).filterChipActive
-                            ]}
-                            onPress={() => setSelectedVendorType('Pharmacy')}
-                        >
-                            <Text style={[
-                                styles(colors, isDarkMode).filterChipText,
-                                selectedVendorType === 'Pharmacy' && styles(colors, isDarkMode).filterChipTextActive
-                            ]}>
-                                💊 {t('pharmacy') || 'Pharmacy'}
-                            </Text>
-                        </TouchableOpacity>
+                        {/* Dynamic vendor type chips from API */}
+                        {availableVendorTypes.map((vendorType) => (
+                            <TouchableOpacity
+                                key={vendorType.id}
+                                style={[
+                                    styles(colors, isDarkMode).filterChip,
+                                    selectedVendorType === vendorType.id && styles(colors, isDarkMode).filterChipActive
+                                ]}
+                                onPress={() => setSelectedVendorType(vendorType.id)}
+                            >
+                                <Text style={[
+                                    styles(colors, isDarkMode).filterChipText,
+                                    selectedVendorType === vendorType.id && styles(colors, isDarkMode).filterChipTextActive
+                                ]}>
+                                    {vendorType.icon} {vendorType.name}
+                                </Text>
+                            </TouchableOpacity>
+                        ))}
                     </ScrollView>
 
                     {/* Sort Dropdown */}
