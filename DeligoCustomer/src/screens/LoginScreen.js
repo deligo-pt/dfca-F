@@ -76,7 +76,10 @@ const LoginScreen = ({ navigation }) => {
       return;
     }
     if (loginMethod === 'mobile') {
-      if (identifier.length < 10) {
+      // Portugal phone numbers are 9 digits, most other countries use 10+
+      const callingCode = country ? country.callingCode[0] : '351';
+      const minLength = callingCode === '351' ? 9 : 10;
+      if (identifier.length < minLength) {
         showModal(t('error'), t('validMobileNumber'));
         return;
       }
@@ -97,10 +100,10 @@ const LoginScreen = ({ navigation }) => {
       if (sendRes && (sendRes.success === true || sendRes.success === 'true')) {
         setIsOtpSent(true);
         showModal(
-            t('otpSent'),
-            // prefer server message if provided otherwise fallback to generic
-            sendRes.message || t('checkOTP'),
-            () => setModalVisible(false)
+          t('otpSent'),
+          // prefer server message if provided otherwise fallback to generic
+          sendRes.message || t('checkOTP'),
+          () => setModalVisible(false)
         );
       } else {
         // API returned but indicates failure - show message from server if present
@@ -195,16 +198,18 @@ const LoginScreen = ({ navigation }) => {
   };
 
   return (
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
       <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.container}>
           {/* Top Decorative Background */}
           <View style={[styles.topShape, { backgroundColor: colors.primary }]} />
           <View style={[styles.topShapeSmall, { backgroundColor: colors.primary }]} />
-
           <ScrollView
-              contentContainerStyle={styles.scrollContent}
-              keyboardShouldPersistTaps="handled"
-              showsVerticalScrollIndicator={false}
+            contentContainerStyle={styles.scrollContent}
+            keyboardShouldPersistTaps="handled"
+            showsVerticalScrollIndicator={false}
+            style={{ backgroundColor: colors.background }}
           >
             {/* Header & Logo */}
             <View style={styles.headerContainer}>
@@ -224,126 +229,126 @@ const LoginScreen = ({ navigation }) => {
 
               {/* Tabs */}
               {!isOtpSent && (
-                  <View style={styles.tabContainer}>
-                    <TouchableOpacity
-                        onPress={() => loginMethod !== 'mobile' && handleChangeMethod()}
-                        style={[styles.tabItem, loginMethod === 'mobile' && styles.tabItemActive, { borderBottomColor: loginMethod === 'mobile' ? colors.primary : 'transparent' }]}
-                    >
-                      <Text style={[styles.tabLabel, { color: loginMethod === 'mobile' ? colors.primary : colors.text.secondary }]}>{t('mobile')}</Text>
-                    </TouchableOpacity>
-                    <TouchableOpacity
-                        onPress={() => loginMethod !== 'email' && handleChangeMethod()}
-                        style={[styles.tabItem, loginMethod === 'email' && styles.tabItemActive, { borderBottomColor: loginMethod === 'email' ? colors.primary : 'transparent' }]}
-                    >
-                      <Text style={[styles.tabLabel, { color: loginMethod === 'email' ? colors.primary : colors.text.secondary }]}>{t('email')}</Text>
-                    </TouchableOpacity>
-                  </View>
+                <View style={[styles.tabContainer, { borderBottomColor: colors.border }]}>
+                  <TouchableOpacity
+                    onPress={() => loginMethod !== 'mobile' && handleChangeMethod()}
+                    style={[styles.tabItem, loginMethod === 'mobile' && styles.tabItemActive, { borderBottomColor: loginMethod === 'mobile' ? colors.primary : 'transparent' }]}
+                  >
+                    <Text style={[styles.tabLabel, { color: loginMethod === 'mobile' ? colors.primary : colors.text.secondary }]}>{t('mobile')}</Text>
+                  </TouchableOpacity>
+                  <TouchableOpacity
+                    onPress={() => loginMethod !== 'email' && handleChangeMethod()}
+                    style={[styles.tabItem, loginMethod === 'email' && styles.tabItemActive, { borderBottomColor: loginMethod === 'email' ? colors.primary : 'transparent' }]}
+                  >
+                    <Text style={[styles.tabLabel, { color: loginMethod === 'email' ? colors.primary : colors.text.secondary }]}>{t('email')}</Text>
+                  </TouchableOpacity>
+                </View>
               )}
 
               {/* Inputs */}
               {!isOtpSent ? (
-                  <View style={styles.inputsSection}>
-                    {loginMethod === 'mobile' ? (
-                        <View style={[styles.inputGroup, { backgroundColor: isDarkMode ? '#1A1A1A' : '#F7F7F7', borderColor: colors.border }]}>
-                          <View style={styles.countryBtn}>
-                            <CountryPicker
-                                countryCode={countryCode}
-                                withFilter
-                                withFlag
-                                withCallingCode
-                                onSelect={country => {
-                                  setCountryCode(country.cca2);
-                                  setCountry(country);
-                                }}
-                            />
-                            <Text style={[styles.callingCode, { color: colors.text.primary }]}>+{country ? country.callingCode[0] : '351'}</Text>
-                            <Ionicons name="chevron-down" size={12} color={colors.text.secondary} style={{ marginLeft: 4 }} />
-                          </View>
-                          <View style={[styles.dividerVertical, { backgroundColor: colors.border }]} />
-                          <TextInput
-                              style={[styles.inputField, { color: colors.text.primary }]}
-                              placeholder={t('mobileNumber')}
-                              placeholderTextColor={colors.text.secondary}
-                              value={identifier}
-                              onChangeText={setIdentifier}
-                              keyboardType="phone-pad"
-                              selectionColor={colors.primary}
-                              autoCapitalize="none"
-                          />
-                        </View>
-                    ) : (
-                        <View style={[styles.inputGroup, { backgroundColor: isDarkMode ? '#1A1A1A' : '#F7F7F7', borderColor: colors.border }]}>
-                          <Ionicons name="mail-outline" size={20} color={colors.text.secondary} style={styles.inputIcon} />
-                          <TextInput
-                              style={[styles.inputField, { color: colors.text.primary }]}
-                              placeholder={t('emailAddress')}
-                              placeholderTextColor={colors.text.secondary}
-                              value={identifier}
-                              onChangeText={setIdentifier}
-                              keyboardType="email-address"
-                              selectionColor={colors.primary}
-                              autoCapitalize="none"
-                          />
-                        </View>
-                    )}
-
-                    <TouchableOpacity
-                        style={[styles.primaryButton, { backgroundColor: colors.primary }, isLoading && { opacity: 0.7 }]}
-                        onPress={handleSendOtp}
-                        disabled={isLoading}
-                        activeOpacity={0.8}
-                    >
-                      {isLoading ? (
-                          <ActivityIndicator color="#FFF" />
-                      ) : (
-                          <Text style={styles.primaryButtonText}>{t('sendOTP')}</Text>
-                      )}
-                    </TouchableOpacity>
-                  </View>
-              ) : (
-                  <View style={styles.inputsSection}>
-                    <Text style={[styles.otpReviewText, { color: colors.text.secondary }]}>
-                      {t('sentCodeTo')} <Text style={{ color: colors.text.primary, fontWeight: '700' }}>{loginMethod === 'mobile' ? `+${country ? country.callingCode[0] : '351'} ${identifier}` : identifier}</Text>
-                    </Text>
-
-                    <View style={{ marginBottom: 24 }}>
-                      <OTPInput
-                          length={loginMethod === 'mobile' ? 6 : 4}
-                          value={otp}
-                          onChangeText={setOtp}
-                          disabled={isLoading}
+                <View style={styles.inputsSection}>
+                  {loginMethod === 'mobile' ? (
+                    <View style={[styles.inputGroup, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                      <View style={styles.countryBtn}>
+                        <CountryPicker
+                          countryCode={countryCode}
+                          withFilter
+                          withFlag
+                          withCallingCode
+                          onSelect={country => {
+                            setCountryCode(country.cca2);
+                            setCountry(country);
+                          }}
+                        />
+                        <Text style={[styles.callingCode, { color: colors.text.primary }]}>+{country ? country.callingCode[0] : '351'}</Text>
+                        <Ionicons name="chevron-down" size={12} color={colors.text.secondary} style={{ marginLeft: 4 }} />
+                      </View>
+                      <View style={[styles.dividerVertical, { backgroundColor: colors.border }]} />
+                      <TextInput
+                        style={[styles.inputField, { color: colors.text.primary }]}
+                        placeholder={t('mobileNumber')}
+                        placeholderTextColor={colors.text.secondary}
+                        value={identifier}
+                        onChangeText={setIdentifier}
+                        keyboardType="phone-pad"
+                        selectionColor={colors.primary}
+                        autoCapitalize="none"
                       />
                     </View>
+                  ) : (
+                    <View style={[styles.inputGroup, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                      <Ionicons name="mail-outline" size={20} color={colors.text.secondary} style={styles.inputIcon} />
+                      <TextInput
+                        style={[styles.inputField, { color: colors.text.primary }]}
+                        placeholder={t('emailAddress')}
+                        placeholderTextColor={colors.text.secondary}
+                        value={identifier}
+                        onChangeText={setIdentifier}
+                        keyboardType="email-address"
+                        selectionColor={colors.primary}
+                        autoCapitalize="none"
+                      />
+                    </View>
+                  )}
 
-                    <TouchableOpacity
-                        style={[styles.primaryButton, { backgroundColor: colors.primary }, isLoading && { opacity: 0.7 }]}
-                        onPress={handleVerifyOtp}
-                        disabled={isLoading}
-                        activeOpacity={0.8}
-                    >
-                      {isLoading ? (
-                          <ActivityIndicator color="#FFF" />
-                      ) : (
-                          <Text style={styles.primaryButtonText}>{t('verifyOTPButton')}</Text>
-                      )}
+                  <TouchableOpacity
+                    style={[styles.primaryButton, { backgroundColor: colors.primary }, isLoading && { opacity: 0.7 }]}
+                    onPress={handleSendOtp}
+                    disabled={isLoading}
+                    activeOpacity={0.8}
+                  >
+                    {isLoading ? (
+                      <ActivityIndicator color="#FFF" />
+                    ) : (
+                      <Text style={styles.primaryButtonText}>{t('sendOTP')}</Text>
+                    )}
+                  </TouchableOpacity>
+                </View>
+              ) : (
+                <View style={styles.inputsSection}>
+                  <Text style={[styles.otpReviewText, { color: colors.text.secondary }]}>
+                    {t('sentCodeTo')} <Text style={{ color: colors.text.primary, fontWeight: '700' }}>{loginMethod === 'mobile' ? `+${country ? country.callingCode[0] : '351'} ${identifier}` : identifier}</Text>
+                  </Text>
+
+                  <View style={{ marginBottom: 24 }}>
+                    <OTPInput
+                      length={loginMethod === 'mobile' ? 6 : 4}
+                      value={otp}
+                      onChangeText={setOtp}
+                      disabled={isLoading}
+                    />
+                  </View>
+
+                  <TouchableOpacity
+                    style={[styles.primaryButton, { backgroundColor: colors.primary }, isLoading && { opacity: 0.7 }]}
+                    onPress={handleVerifyOtp}
+                    disabled={isLoading}
+                    activeOpacity={0.8}
+                  >
+                    {isLoading ? (
+                      <ActivityIndicator color="#FFF" />
+                    ) : (
+                      <Text style={styles.primaryButtonText}>{t('verifyOTPButton')}</Text>
+                    )}
+                  </TouchableOpacity>
+
+                  <View style={styles.otpActions}>
+                    <TouchableOpacity onPress={handleResendOtp} disabled={isLoading}>
+                      <Text style={[styles.actionLink, { color: colors.primary }]}>{t('resend')}</Text>
                     </TouchableOpacity>
 
-                    <View style={styles.otpActions}>
-                      <TouchableOpacity onPress={handleResendOtp} disabled={isLoading}>
-                        <Text style={[styles.actionLink, { color: colors.primary }]}>{t('resend')}</Text>
-                      </TouchableOpacity>
-
-                      <TouchableOpacity onPress={() => setIsOtpSent(false)} disabled={isLoading}>
-                        <Text style={[styles.actionLink, { color: colors.text.secondary }]}>{t('change')}</Text>
-                      </TouchableOpacity>
-                    </View>
+                    <TouchableOpacity onPress={() => setIsOtpSent(false)} disabled={isLoading}>
+                      <Text style={[styles.actionLink, { color: colors.text.secondary }]}>{t('change')}</Text>
+                    </TouchableOpacity>
                   </View>
+                </View>
               )}
 
               {/* Language Selection - Minimal */}
               <TouchableOpacity
-                  style={styles.langCapsule}
-                  onPress={() => setShowLanguageModal(true)}
+                style={styles.langCapsule}
+                onPress={() => setShowLanguageModal(true)}
               >
                 <Ionicons name="globe-outline" size={16} color={colors.text.secondary} />
                 <Text style={[styles.langText, { color: colors.text.secondary }]}>{language === 'en' ? 'English' : 'Português'}</Text>
@@ -369,27 +374,27 @@ const LoginScreen = ({ navigation }) => {
 
           {/* Modals */}
           <CustomModal
-              visible={modalVisible}
-              title={modalTitle}
-              message={modalMessage}
-              onConfirm={() => {
-                setModalVisible(false);
-                if (modalOnConfirmRef.current) modalOnConfirmRef.current();
-              }}
-              onCancel={() => setModalVisible(false)}
-              onlyConfirm={modalOnlyConfirm}
+            visible={modalVisible}
+            title={modalTitle}
+            message={modalMessage}
+            onConfirm={() => {
+              setModalVisible(false);
+              if (modalOnConfirmRef.current) modalOnConfirmRef.current();
+            }}
+            onCancel={() => setModalVisible(false)}
+            onlyConfirm={modalOnlyConfirm}
           />
 
           <Modal
-              visible={showLanguageModal}
-              transparent={true}
-              animationType="fade"
-              onRequestClose={() => setShowLanguageModal(false)}
+            visible={showLanguageModal}
+            transparent={true}
+            animationType="fade"
+            onRequestClose={() => setShowLanguageModal(false)}
           >
             <TouchableOpacity
-                style={styles.modalOverlay}
-                activeOpacity={1}
-                onPress={() => setShowLanguageModal(false)}
+              style={styles.modalOverlay}
+              activeOpacity={1}
+              onPress={() => setShowLanguageModal(false)}
             >
               <View style={[styles.languageModal, { backgroundColor: colors.surface }]}>
                 <View style={[styles.modalHeader, { borderBottomColor: colors.border }]}>
@@ -403,22 +408,22 @@ const LoginScreen = ({ navigation }) => {
                     { code: 'en', name: 'English', flag: '🇬🇧' },
                     { code: 'pt', name: 'Português', flag: '🇵🇹' },
                   ].map((lang) => (
-                      <TouchableOpacity
-                          key={lang.code}
-                          style={[
-                            styles.languageItem,
-                            { backgroundColor: isDarkMode ? colors.background : '#F8F9FA' },
-                            language === lang.code && { borderColor: colors.primary, borderWidth: 1, backgroundColor: isDarkMode ? colors.card : '#FFF0F5' }
-                          ]}
-                          onPress={() => {
-                            changeLanguage(lang.code);
-                            setShowLanguageModal(false);
-                          }}
-                      >
-                        <Text style={{ fontSize: 24, marginRight: 12 }}>{lang.flag}</Text>
-                        <Text style={[styles.languageName, { color: colors.text.primary, fontWeight: language === lang.code ? '700' : '400' }]}>{lang.name}</Text>
-                        {language === lang.code && <Ionicons name="checkmark" size={20} color={colors.primary} />}
-                      </TouchableOpacity>
+                    <TouchableOpacity
+                      key={lang.code}
+                      style={[
+                        styles.languageItem,
+                        { backgroundColor: isDarkMode ? colors.background : '#F8F9FA' },
+                        language === lang.code && { borderColor: colors.primary, borderWidth: 1, backgroundColor: isDarkMode ? colors.card : '#FFF0F5' }
+                      ]}
+                      onPress={() => {
+                        changeLanguage(lang.code);
+                        setShowLanguageModal(false);
+                      }}
+                    >
+                      <Text style={{ fontSize: 24, marginRight: 12 }}>{lang.flag}</Text>
+                      <Text style={[styles.languageName, { color: colors.text.primary, fontWeight: language === lang.code ? '700' : '400' }]}>{lang.name}</Text>
+                      {language === lang.code && <Ionicons name="checkmark" size={20} color={colors.primary} />}
+                    </TouchableOpacity>
                   ))}
                 </View>
               </View>
@@ -427,6 +432,7 @@ const LoginScreen = ({ navigation }) => {
 
         </View>
       </KeyboardAvoidingView>
+    </SafeAreaView>
   );
 };
 
@@ -487,13 +493,13 @@ const styles = StyleSheet.create({
     opacity: 0.8,
   },
   formContainer: {
+    borderBottomColor: '#EEE',
     width: '100%',
   },
   tabContainer: {
     flexDirection: 'row',
     marginBottom: 30,
     borderBottomWidth: 1,
-    borderBottomColor: '#EEE',
   },
   tabItem: {
     flex: 1,
