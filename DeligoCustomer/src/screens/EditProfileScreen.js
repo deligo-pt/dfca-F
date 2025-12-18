@@ -219,7 +219,6 @@ const EditProfileScreen = ({ navigation, route }) => {
   const { updateProfile: updateProfileContext } = useProfile();
   const { saveAddress } = useLocation();
 
-  const [name, setName] = useState('');
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
   const [address, setAddress] = useState(null);
@@ -231,6 +230,9 @@ const EditProfileScreen = ({ navigation, route }) => {
   const [imagePickerVisible, setImagePickerVisible] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState(null);
   const [imageEditorVisible, setImageEditorVisible] = useState(false);
+
+  const [firstName, setFirstName] = useState('');
+  const [lastName, setLastName] = useState('');
 
   const defaultAddress = {
     city: 'Dhaka',
@@ -291,8 +293,25 @@ const EditProfileScreen = ({ navigation, route }) => {
       if (routeUser) {
         setUserDataState(routeUser);
 
-        const derivedName = `${(routeUser.name?.firstName || routeUser.firstName || routeUser.name || routeUser.fullName || '')} ${(routeUser.name?.lastName || routeUser.lastName || '')}`.trim();
-        setName(derivedName || routeUser.displayName || '');
+        let fname = '';
+        let lname = '';
+        if (routeUser.name?.firstName) {
+          fname = routeUser.name.firstName;
+          lname = routeUser.name.lastName || '';
+        } else if (routeUser.firstName) {
+          fname = routeUser.firstName;
+          lname = routeUser.lastName || '';
+        } else if (routeUser.name && typeof routeUser.name === 'string') {
+          const parts = routeUser.name.trim().split(' ');
+          fname = parts[0] || '';
+          lname = parts.slice(1).join(' ') || '';
+        } else if (routeUser.fullName) {
+          const parts = routeUser.fullName.trim().split(' ');
+          fname = parts[0] || '';
+          lname = parts.slice(1).join(' ') || '';
+        }
+        setFirstName(fname);
+        setLastName(lname);
         setEmail(routeUser.email || routeUser.contactEmail || '');
         setMobile(routeUser.contactNumber || routeUser.phone || routeUser.mobile || '');
         setProfilePhoto(routeUser.profilePhoto || routeUser.photo || routeUser.avatar || routeUser.photoUrl || routeUser.avatarUrl || null);
@@ -320,7 +339,8 @@ const EditProfileScreen = ({ navigation, route }) => {
 
       const localUserData = await getUserData();
       setUserDataState(localUserData);
-      setName(localUserData?.name ? `${localUserData.name.firstName} ${localUserData.name.lastName}`.trim() : '');
+      setFirstName(localUserData?.name?.firstName || '');
+      setLastName(localUserData?.name?.lastName || '');
       setEmail(localUserData?.email || '');
       setMobile(localUserData?.contactNumber || '');
       setProfilePhoto(localUserData?.profilePhoto || localUserData?.photo || localUserData?.avatarUrl || localUserData?.avatar || null);
@@ -364,9 +384,6 @@ const EditProfileScreen = ({ navigation, route }) => {
 
       const formData = new FormData();
 
-      const nameParts = name.trim().split(' ');
-      const firstName = nameParts[0] || '';
-      const lastName = nameParts.slice(1).join(' ') || '';
 
       const updatedProfileData = {
         name: { firstName, lastName },
@@ -429,8 +446,8 @@ const EditProfileScreen = ({ navigation, route }) => {
 
   const handleSave = async () => {
     try {
-      if (!name.trim()) {
-        showModal(t('error'), t('enterFullName'), null, true);
+      if (!firstName.trim()) {
+        showModal(t('error'), t('enterFirstName'), null, true);
         return;
       }
 
@@ -449,12 +466,11 @@ const EditProfileScreen = ({ navigation, route }) => {
       // After a successful API call, manually update the local user data.
       // This is more reliable than depending on the API response body.
       const currentLocalUser = await getUserData();
-      const nameParts = name.trim().split(' ');
       const updatedUser = {
         ...currentLocalUser,
         name: {
-          firstName: nameParts[0] || '',
-          lastName: nameParts.slice(1).join(' ') || ''
+          firstName,
+          lastName
         },
         contactNumber: mobile,
         email: email,
@@ -758,7 +774,7 @@ const EditProfileScreen = ({ navigation, route }) => {
               <Image source={{ uri: profilePhoto }} style={styles.avatarImage} resizeMode="cover" />
             ) : (
               <Text style={styles.avatarText}>
-                {name?.charAt(0)?.toUpperCase() || 'U'}
+                {firstName?.charAt(0)?.toUpperCase() || 'U'}
               </Text>
             )}
           </View>
@@ -772,14 +788,29 @@ const EditProfileScreen = ({ navigation, route }) => {
 
         <View style={styles.formSection}>
           <View style={styles.inputGroup}>
-            <Text style={styles.label}>{t('fullName')}</Text>
+            <Text style={styles.label}>{t('firstName')}</Text>
             <View style={isEditing ? [styles.inputContainer, { backgroundColor: colors.background, borderColor: colors.primary }] : styles.inputContainer}>
               <Ionicons name="person-outline" size={20} color={colors.text.secondary} />
               <TextInput
                 style={styles.input}
-                value={name}
-                onChangeText={setName}
-                placeholder={t('enterYourName')}
+                value={firstName}
+                onChangeText={setFirstName}
+                placeholder={t('enterYourFirstName')}
+                editable={isEditing}
+                placeholderTextColor={colors.text.light}
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
+            <Text style={styles.label}>{t('lastName')}</Text>
+            <View style={isEditing ? [styles.inputContainer, { backgroundColor: colors.background, borderColor: colors.primary }] : styles.inputContainer}>
+              <Ionicons name="person-outline" size={20} color={colors.text.secondary} />
+              <TextInput
+                style={styles.input}
+                value={lastName}
+                onChangeText={setLastName}
+                placeholder={t('enterYourLastName')}
                 editable={isEditing}
                 placeholderTextColor={colors.text.light}
               />
