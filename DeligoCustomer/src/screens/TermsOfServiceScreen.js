@@ -1,31 +1,33 @@
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity } from 'react-native';
 import { useTheme } from '../utils/ThemeContext';
+import { useLanguage } from '../utils/LanguageContext';
 
 const TermsOfServiceScreen = ({ navigation }) => {
   const { colors } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <View style={[styles.container, { backgroundColor: colors.background }]}>
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <Text style={[styles.headerTitle, { color: colors.primary }]}>Terms of Service</Text>
+        <Text style={[styles.headerTitle, { color: colors.primary }]}>{t('termsOfServiceTitle')}</Text>
         <TouchableOpacity style={styles.closeBtn} onPress={() => navigation.goBack()}>
           <Text style={[styles.closeText, { color: colors.text.primary }]}>✕</Text>
         </TouchableOpacity>
       </View>
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>Welcome to Deligo</Text>
-        <Text style={[styles.text, { color: colors.text.secondary }]}>By using our app, you agree to the following terms. Please read them carefully.</Text>
-        <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>1. Use of Service</Text>
-        <Text style={[styles.text, { color: colors.text.secondary }]}>You agree to use Deligo only for lawful purposes and in accordance with these terms.</Text>
-        <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>2. User Accounts</Text>
-        <Text style={[styles.text, { color: colors.text.secondary }]}>You are responsible for maintaining the confidentiality of your account and password.</Text>
-        <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>3. Orders & Payments</Text>
-        <Text style={[styles.text, { color: colors.text.secondary }]}>All orders are subject to acceptance and availability. Payments must be made through approved methods.</Text>
-        <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>4. Changes to Terms</Text>
-        <Text style={[styles.text, { color: colors.text.secondary }]}>We may update these terms at any time. Continued use of the app means you accept the new terms.</Text>
-        <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>5. Contact Us</Text>
-        <Text style={[styles.text, { color: colors.text.secondary }]}>For questions, contact support@deligo.com.</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('welcomeToDeligo')}</Text>
+        <Text style={[styles.text, { color: colors.text.secondary }]}>{t('termsIntro')}</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('useOfService')}</Text>
+        <Text style={[styles.text, { color: colors.text.secondary }]}>{t('useOfServiceText')}</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('userAccounts')}</Text>
+        <Text style={[styles.text, { color: colors.text.secondary }]}>{t('userAccountsText')}</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('ordersPayments')}</Text>
+        <Text style={[styles.text, { color: colors.text.secondary }]}>{t('ordersPaymentsText')}</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('changesToTerms')}</Text>
+        <Text style={[styles.text, { color: colors.text.secondary }]}>{t('changesToTermsText')}</Text>
+        <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('contactUs')}</Text>
+        <Text style={[styles.text, { color: colors.text.secondary }]}>{t('contactUsText')}</Text>
       </ScrollView>
     </View>
   );
@@ -78,4 +80,3 @@ const styles = StyleSheet.create({
 });
 
 export default TermsOfServiceScreen;
-

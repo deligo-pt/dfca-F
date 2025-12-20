@@ -286,6 +286,7 @@ export const translations = {
     switchDarkTheme: 'Switch to dark theme',
     locationServices: 'Location Services',
     allowLocation: 'Allow location access',
+    language: 'Language',
     selectLanguage: 'Select Language',
     orderPreferences: 'Order Preferences',
     defaultDeliveryTime: 'Default Delivery Time',
@@ -293,6 +294,8 @@ export const translations = {
     dietaryPreferences: 'Dietary Preferences',
     noneSet: 'None set',
     legal: 'Legal',
+    termsOfService: 'Terms of Service',
+    privacyPolicy: 'Privacy Policy',
     about: 'About',
     version: 'Version 1.0.0',
     account: 'Account',
@@ -309,6 +312,40 @@ export const translations = {
     paymentInfoSecure: 'Your payment information is secure',
     default: 'Default',
     expires: 'Expires',
+
+    // Language Names
+    english: 'English',
+    portuguese: 'Português',
+
+    // Terms of Service
+    termsOfServiceTitle: 'Terms of Service',
+    welcomeToDeligo: 'Welcome to Deligo',
+    termsIntro: 'By using our app, you agree to the following terms. Please read them carefully.',
+    useOfService: '1. Use of Service',
+    useOfServiceText: 'You agree to use Deligo only for lawful purposes and in accordance with these terms.',
+    userAccounts: '2. User Accounts',
+    userAccountsText: 'You are responsible for maintaining the confidentiality of your account and password.',
+    ordersPayments: '3. Orders & Payments',
+    ordersPaymentsText: 'All orders are subject to acceptance and availability. Payments must be made through approved methods.',
+    changesToTerms: '4. Changes to Terms',
+    changesToTermsText: 'We may update these terms at any time. Continued use of the app means you accept the new terms.',
+    contactUs: '5. Contact Us',
+    contactUsText: 'For questions, contact support@deligo.com.',
+
+    // Privacy Policy
+    privacyPolicyTitle: 'Privacy Policy',
+    privacyMatters: 'Your Privacy Matters',
+    privacyIntro: 'We value your privacy and are committed to protecting your personal information.',
+    dataCollection: '1. Data Collection',
+    dataCollectionText: 'We collect information you provide when you use Deligo, such as your name, email, and order details.',
+    dataUsage: '2. Data Usage',
+    dataUsageText: 'Your data is used to provide and improve our services, process orders, and communicate with you.',
+    dataSharing: '3. Data Sharing',
+    dataSharingText: 'We do not sell your data. We may share it with partners only to fulfill your orders or comply with the law.',
+    security: '4. Security',
+    securityText: 'We use industry-standard security measures to protect your data.',
+    privacyContactUs: '5. Contact Us',
+    privacyContactUsText: 'For privacy questions, contact privacy@deligo.com.',
   },
   pt: {
     // Common
@@ -409,6 +446,13 @@ export const translations = {
     updatingCart: 'Atualizando carrinho...',
     goToCheckout: 'Ir para Pagamento',
     setAsActive: 'Definir como Ativo',
+    removeCart: 'Remover Cart',
+    noCartFound: 'No cart found.',
+    yourOrder: 'Your Order',
+    deliveryInstructionsPlaceholder: 'e.g., Leave at door, Ring bell twice...',
+    orderSummary: 'Order Summary',
+    store: 'Store',
+    vendor: 'Vendor',
 
     // Checkout
     checkout: 'Pagamento',
@@ -575,6 +619,7 @@ export const translations = {
     switchDarkTheme: 'Alternar para tema escuro',
     locationServices: 'Serviços de Localização',
     allowLocation: 'Permitir acesso à localização',
+    language: 'Idioma',
     selectLanguage: 'Selecionar Idioma',
     orderPreferences: 'Preferências de Pedido',
     defaultDeliveryTime: 'Tempo de Entrega Padrão',
@@ -582,6 +627,8 @@ export const translations = {
     dietaryPreferences: 'Preferências Alimentares',
     noneSet: 'Nenhuma definida',
     legal: 'Legal',
+    termsOfService: 'Termos de Serviço',
+    privacyPolicy: 'Política de Privacidade',
     about: 'Sobre',
     version: 'Versão 1.0.0',
     account: 'Conta',
@@ -598,6 +645,40 @@ export const translations = {
     paymentInfoSecure: 'Suas informações de pagamento estão seguras',
     default: 'Padrão',
     expires: 'Expira em',
+
+    // Language Names
+    english: 'Inglês',
+    portuguese: 'Português',
+
+    // Terms of Service
+    termsOfServiceTitle: 'Termos de Serviço',
+    welcomeToDeligo: 'Bem-vindo ao Deligo',
+    termsIntro: 'Ao usar nosso aplicativo, você concorda com os seguintes termos. Por favor, leia-os atentamente.',
+    useOfService: '1. Uso do Serviço',
+    useOfServiceText: 'Você concorda em usar o Deligo apenas para fins legais e de acordo com estes termos.',
+    userAccounts: '2. Contas de Usuário',
+    userAccountsText: 'Você é responsável por manter a confidencialidade de sua conta e senha.',
+    ordersPayments: '3. Pedidos e Pagamentos',
+    ordersPaymentsText: 'Todos os pedidos estão sujeitos a aceitação e disponibilidade. Os pagamentos devem ser feitos por métodos aprovados.',
+    changesToTerms: '4. Mudanças nos Termos',
+    changesToTermsText: 'Podemos atualizar estes termos a qualquer momento. O uso contínuo do aplicativo significa que você aceita os novos termos.',
+    contactUs: '5. Contate-nos',
+    contactUsText: 'Para perguntas, entre em contato com support@deligo.com.',
+
+    // Privacy Policy
+    privacyPolicyTitle: 'Política de Privacidade',
+    privacyMatters: 'Sua Privacidade Importa',
+    privacyIntro: 'Valorizamos sua privacidade e estamos comprometidos em proteger suas informações pessoais.',
+    dataCollection: '1. Coleta de Dados',
+    dataCollectionText: 'Coletamos informações que você fornece ao usar o Deligo, como seu nome, email e detalhes do pedido.',
+    dataUsage: '2. Uso de Dados',
+    dataUsageText: 'Seus dados são usados para fornecer e melhorar nossos serviços, processar pedidos e se comunicar com você.',
+    dataSharing: '3. Compartilhamento de Dados',
+    dataSharingText: 'Não vendemos seus dados. Podemos compartilhá-los com parceiros apenas para cumprir seus pedidos ou cumprir a lei.',
+    security: '4. Segurança',
+    securityText: 'Usamos medidas de segurança padrão da indústria para proteger seus dados.',
+    privacyContactUs: '5. Contate-nos',
+    privacyContactUsText: 'Para perguntas sobre privacidade, entre em contato com privacy@deligo.com.',
   }
 };
 

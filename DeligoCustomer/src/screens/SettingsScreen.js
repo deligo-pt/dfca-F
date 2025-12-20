@@ -23,8 +23,8 @@ const SettingsScreen = ({ navigation }) => {
   }, [isDarkMode]);
 
   const languages = [
-    { code: 'en', name: 'English', flag: '🇬🇧' },
-    { code: 'pt', name: 'Português', flag: '🇵🇹' },
+    { code: 'en', name: t('english'), flag: '🇬🇧' },
+    { code: 'pt', name: t('portuguese'), flag: '🇵🇹' },
   ];
 
   const toggleSetting = (key) => {
