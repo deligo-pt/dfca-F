@@ -19,6 +19,8 @@ const LocationDetails = ({
   setSearchLocation,
   streetAddress,
   setStreetAddress,
+  detailedAddress,
+  setDetailedAddress,
   city,
   setCity,
   postalCode,
@@ -955,6 +957,26 @@ const LocationDetails = ({
                   <Text style={styles.internationalErrorText}>{fieldErrors.streetAddress}</Text>
                 </View>
               )}
+            </View>
+
+            <View style={styles.internationalFieldGroup}>
+              <Text style={[styles.internationalFieldLabel, { color: colors.text.primary }]}>
+                {t('buildingApartmentFloor')}
+              </Text>
+              <View style={[styles.internationalInput, {
+                borderColor: colors.border,
+              }]}>
+                <Ionicons name="business-outline" size={20} color={colors.text.secondary} />
+                <TextInput
+                  style={[styles.internationalInputText, { color: colors.text.primary }]}
+                  placeholder="Apartment 4B, 2nd Floor"
+                  placeholderTextColor={colors.text.light}
+                  value={detailedAddress}
+                  onChangeText={(text) => {
+                    setDetailedAddress(text);
+                  }}
+                />
+              </View>
             </View>
 
             <View style={styles.internationalFieldGroup}>

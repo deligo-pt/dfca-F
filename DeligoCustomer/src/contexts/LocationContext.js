@@ -73,8 +73,16 @@ export const LocationProvider = ({ children }) => {
 
             if (addresses && addresses.length > 0) {
                 const addr = addresses[0];
-                mainAddress = [addr.street, addr.name].filter(Boolean).join(', ');
-                locCity = addr.city || addr.subregion || '';
+
+                // Comprehensive address construction matching other screens
+                mainAddress = [
+                    addr.district,
+                    addr.street,
+                    addr.name,
+                    addr.subregion
+                ].filter((val, index, self) => val && val.trim() !== '' && self.indexOf(val) === index).join(', ');
+
+                locCity = addr.city || addr.region || '';
                 locPostalCode = addr.postalCode || '';
             }
 

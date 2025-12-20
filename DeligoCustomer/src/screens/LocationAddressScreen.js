@@ -5,8 +5,11 @@ import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context'
 import * as Location from 'expo-location';
 import { useTheme } from '../utils/ThemeContext';
 import { useLocation } from '../contexts/LocationContext';
+import { useProfile } from '../contexts/ProfileContext';
 import LocationDetails from '../components/Profile/LocationDetails';
 import { spacing, borderRadius, fontSize } from '../theme';
+import { customerApi } from '../utils/api';
+import { getUserId, getUserData } from '../utils/auth';
 
 const LocationAddressScreen = ({ navigation, route }) => {
   const { colors } = useTheme();
@@ -21,6 +24,7 @@ const LocationAddressScreen = ({ navigation, route }) => {
     savedAddresses,
     selectAddress,
   } = useLocation();
+  const { updateProfile: updateProfileContext } = useProfile();
 
   // Local state for LocationDetails component
   const [isMapFullScreen, setIsMapFullScreen] = useState(false);
@@ -34,6 +38,7 @@ const LocationAddressScreen = ({ navigation, route }) => {
   const [locationPermission, setLocationPermission] = useState(false);
   const [searchLocation, setSearchLocation] = useState('');
   const [streetAddress, setStreetAddress] = useState(contextAddress || '');
+  const [detailedAddress, setDetailedAddress] = useState('');
   const [city, setCity] = useState(contextCity || '');
   const [postalCode, setPostalCode] = useState(contextPostalCode || '');
   const [label, setLabel] = useState('Home');
@@ -119,8 +124,17 @@ const LocationAddressScreen = ({ navigation, route }) => {
       const addresses = await Location.reverseGeocodeAsync({ latitude, longitude });
       if (addresses.length > 0) {
         const addr = addresses[0];
-        const newStreet = [addr.street, addr.name].filter(Boolean).join(', ');
-        const newCity = addr.city || addr.subregion || '';
+
+        // Comprehensive address construction matching EditProfile and Header logic
+        const addressParts = [
+          addr.district,
+          addr.street,
+          addr.name,
+          addr.subregion
+        ].filter((val, index, self) => val && val.trim() !== '' && self.indexOf(val) === index);
+
+        const newStreet = addressParts.join(', ');
+        const newCity = addr.city || addr.region || '';
         const newPostal = addr.postalCode || '';
 
         setStreetAddress(newStreet);
@@ -148,6 +162,7 @@ const LocationAddressScreen = ({ navigation, route }) => {
   const handleSelectSavedAddress = async (addr) => {
     await selectAddress(addr);
     setStreetAddress(addr.address);
+    setDetailedAddress(addr.detailedAddress || '');
     setCity(addr.city || '');
     setPostalCode(addr.postalCode || '');
     setLabel(addr.label || 'Home');
@@ -164,28 +179,68 @@ const LocationAddressScreen = ({ navigation, route }) => {
   const handleSave = async () => {
     if (!validate()) return;
 
-    const success = await saveAddress({
-      address: streetAddress,
-      detailedAddress: city, // Storing city as detailedAddress for compatibility if needed, but context handles city separately now too
-      city,
-      postalCode,
-      label, // Use selected label
-      coordinates: markerCoordinate
-    });
+    try {
+      // 1. Save to local LocationContext (storage)
+      const addressData = {
+        address: streetAddress,
+        detailedAddress: detailedAddress,
+        city,
+        postalCode,
+        label,
+        coordinates: markerCoordinate
+      };
 
-    if (success) {
-      if (route.params?.onSave) {
-        route.params.onSave({
-          address: streetAddress,
-          detailedAddress: city,
-          city,
-          postalCode,
-          coordinates: markerCoordinate
-        });
+      const success = await saveAddress(addressData);
+
+      if (success) {
+        // 2. Sync to Backend Profile (Customer update)
+        // This ensures the address is saved on the server immediately
+        try {
+          const customerId = await getUserId();
+          const currentUser = await getUserData();
+
+          if (customerId && currentUser) {
+            const formData = new FormData();
+
+            // Build the same profile update structure used in EditProfileScreen
+            const updatedProfileData = {
+              ...currentUser,
+              address: addressData,
+            };
+
+            formData.append('data', JSON.stringify(updatedProfileData));
+
+            console.debug('[LocationAddressScreen] Syncing address to backend profile...');
+            await customerApi.patch(
+              `/customers/${customerId}`,
+              formData,
+              {
+                headers: {
+                  'Content-Type': 'multipart/form-data',
+                },
+                timeout: 30000,
+              }
+            );
+            console.debug('[LocationAddressScreen] Profile address updated successfully');
+
+            // 3. Update ProfileContext to sync UI (Header, etc.)
+            await updateProfileContext(updatedProfileData);
+          }
+        } catch (syncErr) {
+          console.warn('[LocationAddressScreen] Failed to sync address to backend profile:', syncErr.message);
+          // We still proceed since local save was successful, but warning is logged
+        }
+
+        if (route.params?.onSave) {
+          route.params.onSave(addressData);
+        }
+        navigation.goBack();
+      } else {
+        Alert.alert('Error', 'Failed to save address locally');
       }
-      navigation.goBack();
-    } else {
-      Alert.alert('Error', 'Failed to save address');
+    } catch (err) {
+      console.error('[LocationAddressScreen] handleSave error:', err);
+      Alert.alert('Error', 'An unexpected error occurred while saving.');
     }
   };
 
@@ -216,6 +271,8 @@ const LocationAddressScreen = ({ navigation, route }) => {
           setSearchLocation={setSearchLocation}
           streetAddress={streetAddress}
           setStreetAddress={setStreetAddress}
+          detailedAddress={detailedAddress}
+          setDetailedAddress={setDetailedAddress}
           city={city}
           setCity={setCity}
           postalCode={postalCode}

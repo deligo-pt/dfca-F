@@ -23,6 +23,7 @@ import CheckoutAPI from '../utils/checkoutApi';
 import OrderAPI from '../utils/orderApi';
 import { customerApi } from '../utils/api';
 import { API_ENDPOINTS } from '../constants/config';
+import { getUserId, getUserData } from '../utils/auth';
 
 // Helper component to display location from context
 const ConsumerLocationDisplay = ({ colors, t }) => {
@@ -93,15 +94,40 @@ const CheckoutScreen = ({ route, navigation }) => {
         return;
       }
 
+      // Build full address string from all components
+      const fullAddressParts = [
+        address,
+        detailedAddress,
+        city,
+        postalCode
+      ].filter(part => part && part.trim()).join(', ');
+
+      const completeStreet = [detailedAddress, address]
+        .filter(part => part && part.trim())
+        .join(', ');
+
       const addressData = {
-        address: address || '',
+        // Primary address fields - combine address with details in street
+        address: completeStreet || address || '',
+        street: completeStreet || address || '', // Street should include apartment/building
         detailedAddress: detailedAddress || '',
+        addressLine1: address || '',
+        addressLine2: detailedAddress || '', // Apartment/building as separate line
+        building: detailedAddress || '',
+        apartment: detailedAddress || '',
         city: city || '',
         postalCode: postalCode || '',
+        zipCode: postalCode || '',
+        // Combined full address
+        fullAddress: fullAddressParts,
+        formattedAddress: fullAddressParts,
+        // Coordinates
         coordinates: currentLocation ? {
           latitude: currentLocation.latitude,
           longitude: currentLocation.longitude
-        } : null
+        } : null,
+        latitude: currentLocation?.latitude || null,
+        longitude: currentLocation?.longitude || null,
       };
 
       setInitializingCheckout(true);
@@ -124,31 +150,51 @@ const CheckoutScreen = ({ route, navigation }) => {
         const addresses = profileData?.addresses || [];
         console.debug('[CheckoutScreen] Fetched profile addresses count:', addresses.length);
 
-        // 2. If we have addresses, pick one (prefer default or first)
-        if (Array.isArray(addresses) && addresses.length > 0) {
-          const defaultAddr = addresses.find(a => a.isDefault) || addresses[0];
-          backendAddressId = defaultAddr._id || defaultAddr.id || defaultAddr.addressId;
-          console.debug('[CheckoutScreen] Found existing backend address:', backendAddressId);
-        } else {
-          // 3. No addresses? Add the current one
-          console.debug('[CheckoutScreen] No backend addresses found. Syncing current...');
-          // Ensure label is present
-          const syncPayload = {
-            ...addressData,
-            label: addressData.label || 'Home',
-            isDefault: true
-          };
+        // 2. Always sync current address to backend (Update Profile Address)
+        // Using the same logic as EditProfileScreen to ensure persistence
+        try {
+          const customerId = await getUserId();
+          const currentUser = await getUserData();
 
-          const syncRes = await customerApi.post(API_ENDPOINTS.PROFILE.ADD_ADDRESS, syncPayload);
-          console.debug('[CheckoutScreen] Address synced result:', syncRes);
+          if (customerId && currentUser) {
+            const formData = new FormData();
 
-          const data = syncRes?.data || syncRes;
-          // If data is array (list of all addresses), take last. If object, take id.
-          if (Array.isArray(data) && data.length > 0) {
-            const last = data[data.length - 1];
-            backendAddressId = last._id || last.id;
-          } else {
-            backendAddressId = data?._id || data?.id || data?.addressId;
+            // Build the same profile update structure used in EditProfileScreen
+            const updatedProfileData = {
+              ...currentUser,
+              address: addressData,
+            };
+
+            formData.append('data', JSON.stringify(updatedProfileData));
+
+            console.debug('[CheckoutScreen] Syncing address via main profile update:', customerId);
+            const syncRes = await customerApi.patch(
+              `/customers/${customerId}`,
+              formData,
+              {
+                headers: {
+                  'Content-Type': 'multipart/form-data',
+                },
+                timeout: 30000,
+              }
+            );
+            console.debug('[CheckoutScreen] Profile address updated result:', syncRes);
+
+            const data = syncRes?.data || syncRes;
+            // The patch returns the updated user object; extract address ID if available
+            const updatedAddr = data?.address || data?.location;
+            backendAddressId = updatedAddr?._id || updatedAddr?.id || updatedAddr?.addressId;
+          }
+        } catch (syncErr) {
+          console.warn('[CheckoutScreen] Failed to sync address via profile update, checking existing...', syncErr.message);
+          // Fallback to existing address if sync fails
+          if (Array.isArray(addresses) && addresses.length > 0) {
+            // Find an address with similar coordinates or use default
+            const match = addresses.find(a =>
+              a.latitude === addressData.latitude &&
+              a.longitude === addressData.longitude
+            ) || addresses.find(a => a.isDefault) || addresses[0];
+            backendAddressId = match._id || match.id;
           }
         }
       } catch (e) {
@@ -197,7 +243,7 @@ const CheckoutScreen = ({ route, navigation }) => {
     return () => {
       canceled = true;
     };
-  }, [address, city]); // Re-run if address changes significantly (debounced via standard react flow)
+  }, [address, detailedAddress, city, postalCode]); // Re-run if any address field changes
 
   // Calculate real cart values
   const cartItems = cart?.items ? Object.keys(cart.items).map(id => {

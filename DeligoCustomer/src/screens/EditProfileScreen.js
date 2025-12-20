@@ -640,21 +640,32 @@ const EditProfileScreen = ({ navigation, route }) => {
       if (addresses && addresses.length > 0) {
         const addr = addresses[0];
 
-        setStreetAddress(addr.street || '');
-        setCity(addr.city || '');
-        setPostalCode(addr.postalCode || '');
+        // Comprehensive address construction
+        const addressParts = [
+          addr.district,
+          addr.street,
+          addr.name,
+          addr.subregion
+        ].filter((val, index, self) => val && val.trim() !== '' && self.indexOf(val) === index);
+
+        const newStreet = addressParts.join(', ');
+        const newCity = addr.city || addr.region || '';
+        const newPostal = addr.postalCode || '';
+
+        setStreetAddress(newStreet);
+        setCity(newCity);
+        setPostalCode(newPostal);
 
         setAddress(prev => ({
           ...prev,
-          street: addr.street || prev?.street || '',
-          city: addr.city || prev?.city || '',
+          street: newStreet || prev?.street || '',
+          city: newCity || prev?.city || '',
           state: addr.region || prev?.state || '',
-          postalCode: addr.postalCode || prev?.postalCode || '',
+          postalCode: newPostal || prev?.postalCode || '',
           country: addr.country || prev?.country || '',
           latitude,
           longitude,
           geoAccuracy: 5,
-
           label: label,
         }));
       }

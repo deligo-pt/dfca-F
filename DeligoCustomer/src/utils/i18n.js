@@ -230,6 +230,8 @@ export const translations = {
     contactSupportText: 'If you have trouble finding your location, please contact support.',
     verified: 'Verified',
     gpsCoordinates: 'GPS Coordinates',
+    labelAs: 'Label as',
+    buildingApartmentFloor: 'House / Apartment / Floor',
 
     // Edit Profile Screen
     fullName: 'Full Name',
@@ -458,6 +460,16 @@ export const translations = {
     checkout: 'Checkout',
     deliveryAddress: 'Endereço de Entrega',
     placeOrder: 'Fazer Pedido',
+    confirmLocation: 'Confirmar Localização',
+    selectLabelAndSave: 'Selecione uma etiqueta e salve sua localização',
+    searchBusinessAddress: 'Buscar endereço...',
+    useGPS: 'Usar GPS',
+    locating: 'Localizando...',
+    gettingAddress: 'Obtendo Endereço...',
+    locationConfirmed: 'Localização Confirmada',
+    gpsCoordinates: 'Coordenadas GPS',
+    labelAs: 'Etiquetar como',
+    buildingApartmentFloor: 'Casa / Apartamento / Andar',
 
     // Orders Screen
     ongoing: 'Em Andamento',
