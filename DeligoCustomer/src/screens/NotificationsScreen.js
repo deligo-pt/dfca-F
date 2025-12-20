@@ -1,57 +1,55 @@
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, FlatList } from 'react-native';
+import React from 'react';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { colors, spacing, fontSize } from '../theme';
-import { useLanguage } from '../utils/LanguageContext';
+import { spacing, fontSize } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
 
-const MOCK_NOTIFICATIONS = [
-  {
-    id: '1',
-    type: 'order',
-    title: 'Order Delivered',
-    message: 'Your order from Burger King has been delivered. Enjoy your meal! 🍔',
-    time: '2 mins ago',
-    read: false,
-    icon: 'cube-outline',
-    color: '#4CAF50'
-  },
-  {
-    id: '2',
-    type: 'promo',
-    title: '50% OFF Lunch Deal',
-    message: 'Get 50% off on all Asian cuisines today from 12 PM to 3 PM. 🍜',
-    time: '2 hours ago',
-    read: true,
-    icon: 'pricetag-outline',
-    color: '#FF9800'
-  },
-  {
-    id: '3',
-    type: 'system',
-    title: 'New Feature Available',
-    message: 'Check out our new "Glovo Bubbles" for faster category browsing! 🚀',
-    time: '1 day ago',
-    read: true,
-    icon: 'star-outline',
-    color: '#2196F3'
-  },
-  {
-    id: '4',
-    type: 'order',
-    title: 'Order Confirmed',
-    message: 'Restaurant "Pizza Hut" has confirmed your order. preparing now...',
-    time: '1 day ago',
-    read: true,
-    icon: 'restaurant-outline',
-    color: '#9C27B0'
-  }
-];
-
 const NotificationsScreen = ({ navigation }) => {
-  const { t } = useLanguage();
-  const { colors, isDarkMode } = useTheme();
+  const { colors } = useTheme();
+
+  const MOCK_NOTIFICATIONS = [
+    {
+      id: '1',
+      type: 'order',
+      title: 'Order Delivered',
+      message: 'Your order from Burger King has been delivered. Enjoy your meal! 🍔',
+      time: '2 mins ago',
+      read: false,
+      icon: 'cube-outline',
+      color: colors.success
+    },
+    {
+      id: '2',
+      type: 'promo',
+      title: '50% OFF Lunch Deal',
+      message: 'Get 50% off on all Asian cuisines today from 12 PM to 3 PM. 🍜',
+      time: '2 hours ago',
+      read: true,
+      icon: 'pricetag-outline',
+      color: colors.warning
+    },
+    {
+      id: '3',
+      type: 'system',
+      title: 'New Feature Available',
+      message: 'Check out our new "Glovo Bubbles" for faster category browsing! 🚀',
+      time: '1 day ago',
+      read: true,
+      icon: 'star-outline',
+      color: colors.info
+    },
+    {
+      id: '4',
+      type: 'order',
+      title: 'Order Confirmed',
+      message: 'Restaurant "Pizza Hut" has confirmed your order. preparing now...',
+      time: '1 day ago',
+      read: true,
+      icon: 'restaurant-outline',
+      color: colors.secondary
+    }
+  ];
 
   const NotificationsList = () => (
     <View style={styles.listContainer}>
@@ -75,20 +73,134 @@ const NotificationsScreen = ({ navigation }) => {
 
   const EmptyState = () => (
     <View style={styles.emptyContainer}>
-      <Ionicons name="notifications-off-outline" size={64} color="#CCC" />
+      <Ionicons name="notifications-off-outline" size={64} color={colors.text.light} />
       <Text style={styles.emptyTitle}>No Notifications</Text>
       <Text style={styles.emptyText}>You're all caught up! Check back later for updates.</Text>
     </View>
   );
 
+  const getStyles = (colors) => StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: spacing.md,
+      paddingVertical: spacing.md,
+      backgroundColor: colors.background,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    backButton: {
+      padding: 4,
+    },
+    headerText: {
+      fontSize: fontSize.lg,
+      fontFamily: 'Poppins-SemiBold',
+      color: colors.text.primary,
+    },
+    content: {
+      padding: spacing.md,
+      backgroundColor: colors.background,
+    },
+    listContainer: {
+      gap: spacing.md,
+    },
+    notificationItem: {
+      flexDirection: 'row',
+      alignItems: 'start',
+      padding: spacing.md,
+      backgroundColor: colors.surface,
+      borderRadius: 16,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.05,
+      shadowRadius: 8,
+      elevation: 2,
+      marginBottom: spacing.sm,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    unreadItem: {
+      backgroundColor: colors.primary + '10',
+      borderLeftWidth: 3,
+      borderLeftColor: colors.primary,
+    },
+    iconContainer: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: spacing.md,
+    },
+    textContainer: {
+      flex: 1,
+    },
+    headerRow: {
+      flexDirection: 'row',
+      justifyContent: 'space-between',
+      marginBottom: 4,
+    },
+    title: {
+      fontSize: fontSize.md,
+      fontFamily: 'Poppins-SemiBold',
+      color: colors.text.primary,
+      flex: 1,
+    },
+    time: {
+      fontSize: 12,
+      color: colors.text.secondary,
+      fontFamily: 'Poppins-Regular',
+      marginLeft: 8,
+    },
+    message: {
+      fontSize: fontSize.sm,
+      color: colors.text.secondary,
+      fontFamily: 'Poppins-Regular',
+      lineHeight: 20,
+    },
+    dot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.primary,
+      marginTop: 6,
+      marginLeft: 6,
+    },
+    emptyContainer: {
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingTop: 100,
+    },
+    emptyTitle: {
+      fontSize: 18,
+      fontFamily: 'Poppins-SemiBold',
+      color: colors.text.primary,
+      marginTop: 16,
+    },
+    emptyText: {
+      fontSize: 14,
+      color: colors.text.secondary,
+      textAlign: 'center',
+      marginTop: 8,
+      width: '70%',
+    },
+  });
+
+  const styles = getStyles(colors);
+
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <SafeAreaView style={styles.container} edges={['top']}>
       {/* Header */}
-      <View style={[styles.header, { borderBottomColor: colors.border }]}>
+      <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
-        <Text style={[styles.headerText, { color: colors.text.primary }]}>Notifications</Text>
+        <Text style={styles.headerText}>Notifications</Text>
         <TouchableOpacity>
           <Text style={{ color: colors.primary, fontFamily: 'Poppins-Medium', fontSize: 12 }}>Mark all read</Text>
         </TouchableOpacity>
@@ -100,110 +212,5 @@ const NotificationsScreen = ({ navigation }) => {
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.md,
-    borderBottomWidth: 1,
-  },
-  backButton: {
-    padding: 4,
-  },
-  headerText: {
-    fontSize: fontSize.lg,
-    fontFamily: 'Poppins-SemiBold',
-  },
-  content: {
-    padding: spacing.md,
-  },
-  listContainer: {
-    gap: spacing.md,
-  },
-  notificationItem: {
-    flexDirection: 'row',
-    alignItems: 'start',
-    padding: spacing.md,
-    backgroundColor: '#FFF',
-    borderRadius: 16,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.05,
-    shadowRadius: 8,
-    elevation: 2,
-    marginBottom: spacing.sm,
-  },
-  unreadItem: {
-    backgroundColor: '#F0F9FF',
-    borderLeftWidth: 3,
-    borderLeftColor: colors.primary,
-  },
-  iconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
-  },
-  textContainer: {
-    flex: 1,
-  },
-  headerRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  title: {
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#333',
-    flex: 1,
-  },
-  time: {
-    fontSize: 12,
-    color: '#999',
-    fontFamily: 'Poppins-Regular',
-    marginLeft: 8,
-  },
-  message: {
-    fontSize: fontSize.sm,
-    color: '#666',
-    fontFamily: 'Poppins-Regular',
-    lineHeight: 20,
-  },
-  dot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.primary,
-    marginTop: 6,
-    marginLeft: 6,
-  },
-  emptyContainer: {
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingTop: 100,
-  },
-  emptyTitle: {
-    fontSize: 18,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#555',
-    marginTop: 16,
-  },
-  emptyText: {
-    fontSize: 14,
-    color: '#999',
-    textAlign: 'center',
-    marginTop: 8,
-    width: '70%',
-  },
-});
 
 export default NotificationsScreen;

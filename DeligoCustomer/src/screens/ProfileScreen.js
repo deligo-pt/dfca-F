@@ -156,13 +156,13 @@ const ProfileScreen = ({ onLogout, navigation }) => {
           </ProfileSection>
 
           {/* More Section */}
-          <ProfileSection title="More">
+          <ProfileSection title={t('more')}>
             <MenuItem
               iconName="location-outline"
               title={t('savedAddresses')}
               onPress={() => navigation.navigate('SavedAddresses')}
             />
-            <MenuItem iconName="heart-outline" title="Favorite orders" />
+            <MenuItem iconName="heart-outline" title={t('favoriteOrders')} />
             <MenuItem
               iconName="notifications-outline"
               title={t('notifications')}

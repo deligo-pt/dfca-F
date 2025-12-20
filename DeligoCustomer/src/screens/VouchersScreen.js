@@ -13,7 +13,7 @@ const VouchersScreen = ({ navigation }) => {
     {
       id: 1,
       title: '50% OFF',
-      subtitle: 'On orders above ₹299',
+      subtitle: 'On orders above €299',
       code: 'DELIGO50',
       expiryDate: 'Valid till Dec 31, 2025',
       type: 'available',
@@ -28,8 +28,8 @@ const VouchersScreen = ({ navigation }) => {
     },
     {
       id: 3,
-      title: '₹100 OFF',
-      subtitle: 'On orders above ₹500',
+      title: '€100 OFF',
+      subtitle: 'On orders above €500',
       code: 'SAVE100',
       expiryDate: 'Expired on Oct 20, 2025',
       type: 'expired',
@@ -336,4 +336,3 @@ const styles = StyleSheet.create({
 });
 
 export default VouchersScreen;
-
