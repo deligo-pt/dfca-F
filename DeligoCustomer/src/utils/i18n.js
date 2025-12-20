@@ -77,6 +77,7 @@ export const translations = {
     cart: 'Cart',
     cartEmpty: 'Your cart is empty',
     subtotal: 'Subtotal',
+    tax: 'Tax',
     total: 'Total',
     proceedToCheckout: 'Proceed to Checkout',
     clearAll: 'Clear all',

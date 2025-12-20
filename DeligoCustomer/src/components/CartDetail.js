@@ -316,8 +316,10 @@ export default function CartDetail({ vendorId, navigation }) {
               <Text style={{ color: '#4CAF50', fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>-{formatCurrency(currency, discountTotal)}</Text>
             </View>
           )}
+
+
           <View style={styles.rowBetween}>
-            <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>{t('serviceFee')}</Text>
+            <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>{t('tax')}</Text>
             <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>{formatCurrency(currency, taxTotal)}</Text>
           </View>
 

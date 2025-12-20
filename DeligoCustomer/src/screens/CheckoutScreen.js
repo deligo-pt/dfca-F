@@ -241,7 +241,7 @@ const CheckoutScreen = ({ route, navigation }) => {
 
   // Fees and promo discount
   const deliveryFee = cartData?.deliveryFee || 0;
-  const serviceFee = cartData?.serviceFee || 1.99;
+  const serviceFee = cartData?.serviceFee || 0;
   const discount = cart?.appliedPromo?.discount || cartData?.discount || 0;
 
   // Build baseSubtotal/discountTotal/taxAmount/total to match CartDetail
@@ -678,7 +678,7 @@ const CheckoutScreen = ({ route, navigation }) => {
             <View style={styles(colors).summaryRow}>
               <Text style={styles(colors).summaryLabel}>Delivery Fee</Text>
               <Text style={styles(colors).summaryValue}>
-                {formatCurrency(currency, checkoutResponse?.deliveryCharge || 0)}
+                {formatCurrency(currency, displayTotal - (checkoutResponse?.subTotal || baseSubtotal) + discountTotal)}
               </Text>
             </View>
 
@@ -691,13 +691,6 @@ const CheckoutScreen = ({ route, navigation }) => {
                 <Text style={styles(colors).summaryValueDiscount}>-{formatCurrency(currency, discountTotal)}</Text>
               </View>
             )}
-
-            <View style={styles(colors).summaryRow}>
-              <Text style={styles(colors).summaryLabel}>{t('tax')}</Text>
-              <Text style={styles(colors).summaryValue}>
-                {formatCurrency(currency, checkoutResponse?.tax || taxAmount)}
-              </Text>
-            </View>
 
             <View style={styles(colors).divider} />
 
