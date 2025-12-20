@@ -27,12 +27,12 @@ const RestaurantCard = ({ restaurant, onPress }) => {
   // tags
   const tags = Array.isArray(p.tags) ? p.tags : (Array.isArray(p.tags) ? p.tags : (p.tags || []));
 
-  // --- Reverse Geocoding for City ---
-  const [dynamicCity, setDynamicCity] = React.useState(null);
+  // --- Reverse Geocoding for Location ---
+  const [dynamicLocation, setDynamicLocation] = React.useState(null);
 
   React.useEffect(() => {
     let mounted = true;
-    const fetchCity = async () => {
+    const fetchLocation = async () => {
       // If we already have explicit text, skip
       if (vendor.city || vendor.address || vendor.town) return;
 
@@ -41,25 +41,30 @@ const RestaurantCard = ({ restaurant, onPress }) => {
 
       if (lat && lng) {
         try {
-          // Simple memory cache check (optional optimization could be global)
-          // For now, rely on OS caching or check if redundant
           const res = await Location.reverseGeocodeAsync({ latitude: parseFloat(lat), longitude: parseFloat(lng) });
           if (mounted && res && res.length > 0) {
             const addr = res[0];
-            // Prefer city, then subregion (district), then region
-            const foundCity = addr.city || addr.subregion || addr.region || addr.district || addr.name;
-            if (foundCity) setDynamicCity(foundCity);
+            // Get specific area (neighborhood)
+            const area = addr.street || addr.district || addr.name || addr.subregion;
+            // Get city
+            const city = addr.city || addr.region;
+            // Combine: "Basabo, Dhaka" or just city if no area
+            if (area && city && area !== city) {
+              setDynamicLocation(`${area}, ${city}`);
+            } else {
+              setDynamicLocation(area || city);
+            }
           }
         } catch (e) {
           // ignore geocode errors
         }
       }
     };
-    fetchCity();
+    fetchLocation();
     return () => { mounted = false; };
   }, [vendor.city, vendor.address, p.latitude, p.longitude, vendor.latitude, vendor.longitude]);
 
-  const displayCity = vendor.city || vendor.address || dynamicCity;
+  const displayLocation = vendor.city || vendor.address || dynamicLocation;
 
   return (
     <TouchableOpacity
@@ -93,12 +98,17 @@ const RestaurantCard = ({ restaurant, onPress }) => {
             </View>
           </View>
 
-          {/* Subtitle Row: Delivery Fee • Tag • City */}
+          {/* Subtitle Row: Tag • Location with icon */}
           <View style={styles(colors).tagsRow}>
             <Text style={styles(colors).tagText}>
               {tags[0] || 'Food'}
-              {displayCity ? ` • ${displayCity}` : ''}
             </Text>
+            {displayLocation && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
+                <Ionicons name="location-outline" size={13} color={colors.text.secondary} />
+                <Text style={[styles(colors).tagText, { marginLeft: 2 }]}>{displayLocation}</Text>
+              </View>
+            )}
           </View>
         </View>
       </View>

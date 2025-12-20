@@ -102,11 +102,11 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const [menuLoading, setMenuLoading] = useState(false);
   const vendorProducts = menuProducts;
 
-  // --- Reverse Geocoding for City in Header ---
-  const [dynamicCity, setDynamicCity] = useState(null);
+  // --- Reverse Geocoding for Location in Header ---
+  const [dynamicLocation, setDynamicLocation] = useState(null);
   useEffect(() => {
     let mounted = true;
-    const fetchCity = async () => {
+    const fetchLocation = async () => {
       const v = restaurant._raw?.vendor || restaurant.vendor || {};
       if (v.city || v.address || v.town) return; // explicit exists
 
@@ -118,13 +118,21 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
           const res = await Location.reverseGeocodeAsync({ latitude: parseFloat(lat), longitude: parseFloat(lng) });
           if (mounted && res && res.length > 0) {
             const addr = res[0];
-            const foundCity = addr.city || addr.subregion || addr.region || addr.district || addr.name;
-            if (foundCity) setDynamicCity(foundCity);
+            // Get specific area (neighborhood)
+            const area = addr.street || addr.district || addr.name || addr.subregion;
+            // Get city
+            const city = addr.city || addr.region;
+            // Combine: "Basabo, Dhaka" or just city if no area
+            if (area && city && area !== city) {
+              setDynamicLocation(`${area}, ${city}`);
+            } else {
+              setDynamicLocation(area || city);
+            }
           }
         } catch (e) { /* ignore */ }
       }
     };
-    fetchCity();
+    fetchLocation();
     return () => { mounted = false; };
   }, [restaurant]);
 
@@ -132,7 +140,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const displayName = (
     restaurant?.name || restaurant?._raw?.name || restaurant?._raw?.product?.name || restaurant?._raw?.productName || restaurant?._raw?.vendor?.vendorName || 'Restaurant'
   );
-  const displayCity = (restaurant._raw?.vendor?.city || restaurant._raw?.vendor?.address) || dynamicCity;
+  const displayLocation = (restaurant._raw?.vendor?.city || restaurant._raw?.vendor?.address) || dynamicLocation;
 
   // Vendor currency
   const vendorCurrency = (() => {
@@ -515,10 +523,13 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
           />
           <View style={styles.restaurantInfo}>
             <Text style={[styles.restaurantName, { color: colors.text.primary }]}>{displayName}</Text>
-            {displayCity && (
-              <Text style={{ color: colors.text.secondary, fontSize: 13, fontFamily: 'Poppins-Regular', marginTop: 2 }}>
-                {displayCity}
-              </Text>
+            {displayLocation && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
+                <Ionicons name="location-outline" size={14} color={colors.text.secondary} />
+                <Text style={{ color: colors.text.secondary, fontSize: 13, fontFamily: 'Poppins-Regular', marginLeft: 4 }}>
+                  {displayLocation}
+                </Text>
+              </View>
             )}
           </View>
         </View>
