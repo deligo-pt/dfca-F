@@ -11,4 +11,3 @@ export default function formatCurrency(currency, amount) {
   if (code) return `${code} ${formatted}`;
   return formatted;
 }
-
