@@ -1,4 +1,3 @@
-
 import React from 'react';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBarStyle } from 'expo-status-bar';
@@ -21,6 +20,7 @@ import {
     NotificationsScreen,
     SettingsScreen,
     HelpCenterScreen,
+    ChatScreen,
     CartDetailScreen,
     SeeAllScreen,
     SearchScreen
@@ -69,6 +69,7 @@ export default function RootNavigator() {
             <Stack.Screen name="Notifications" component={NotificationsScreen} />
             <Stack.Screen name="Settings" component={SettingsScreen} />
             <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
+            <Stack.Screen name="Chat" component={ChatScreen} />
         </Stack.Navigator>
     );
 }

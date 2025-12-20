@@ -23,3 +23,4 @@ export { default as ReferralsScreen } from './ReferralsScreen';
 export { default as NotificationsScreen } from './NotificationsScreen';
 export { default as SettingsScreen } from './SettingsScreen';
 export { default as HelpCenterScreen } from './HelpCenterScreen';
+export { default as ChatScreen } from './ChatScreen';

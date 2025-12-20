@@ -20,19 +20,168 @@ const HelpCenterScreen = ({ navigation }) => {
   const quickActions = [
     { id: 1, icon: 'chatbubbles-outline', title: t('liveChat'), subtitle: t('chatWithSupport'), color: colors.primary },
     { id: 2, icon: 'mail-outline', title: t('emailUs'), subtitle: 'support@deligo.com', color: colors.info },
-    { id: 3, icon: 'call-outline', title: t('callUs'), subtitle: '+91 1800-123-456', color: colors.success },
+    { id: 3, icon: 'call-outline', title: t('callUs'), subtitle: '+351 920 136 680', color: colors.success },
   ];
 
   const handleQuickAction = (action) => {
     if (action.id === 2) {
       Linking.openURL('mailto:support@deligo.com');
     } else if (action.id === 3) {
-      Linking.openURL('tel:+911800123456');
+      Linking.openURL('tel:+351920136680');
     } else {
-      // Live chat placeholder
-      console.log('Open live chat');
+      // Open live chat modal
+      navigation.navigate('Chat');
     }
   };
+
+  const styles = StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    header: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      justifyContent: 'space-between',
+      paddingHorizontal: 20,
+      paddingVertical: 16,
+      backgroundColor: colors.background,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      justifyContent: 'center',
+    },
+    headerText: {
+      fontSize: 18,
+      fontWeight: '600',
+      color: colors.text.primary,
+      fontFamily: 'Poppins-SemiBold',
+      flex: 1,
+      textAlign: 'center',
+    },
+    placeholder: {
+      width: 40,
+    },
+    content: {
+      padding: 16,
+      paddingBottom: 24,
+    },
+    searchContainer: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: 12,
+      paddingHorizontal: 16,
+      paddingVertical: 12,
+      marginBottom: 24,
+      borderWidth: 1,
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+    },
+    searchInput: {
+      flex: 1,
+      fontSize: 16,
+      fontFamily: 'Poppins-Regular',
+      marginLeft: 12,
+      color: colors.text.primary,
+    },
+    section: {
+      marginBottom: 24,
+    },
+    sectionTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text.primary,
+      fontFamily: 'Poppins-SemiBold',
+      marginBottom: 12,
+    },
+    quickActionCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 12,
+      borderWidth: 1,
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+    },
+    quickActionIcon: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 16,
+    },
+    quickActionContent: {
+      flex: 1,
+    },
+    quickActionTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text.primary,
+      fontFamily: 'Poppins-SemiBold',
+      marginBottom: 2,
+    },
+    quickActionSubtitle: {
+      fontSize: 13,
+      color: colors.text.secondary,
+      fontFamily: 'Poppins-Regular',
+    },
+    categoryCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 12,
+      borderWidth: 1,
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+    },
+    categoryIconContainer: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor: colors.background === '#FFFFFF' ? '#FFF0F6' : 'rgba(220, 49, 115, 0.15)',
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 16,
+    },
+    categoryContent: {
+      flex: 1,
+    },
+    categoryTitle: {
+      fontSize: 16,
+      fontWeight: '600',
+      color: colors.text.primary,
+      fontFamily: 'Poppins-SemiBold',
+      marginBottom: 2,
+    },
+    categoryDescription: {
+      fontSize: 13,
+      color: colors.text.secondary,
+      fontFamily: 'Poppins-Regular',
+    },
+    questionCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderRadius: 12,
+      padding: 16,
+      marginBottom: 8,
+      borderWidth: 1,
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+    },
+    questionText: {
+      flex: 1,
+      fontSize: 15,
+      color: colors.text.primary,
+      fontFamily: 'Poppins-Regular',
+      marginLeft: 12,
+    },
+  });
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
@@ -120,135 +269,5 @@ const HelpCenterScreen = ({ navigation }) => {
     </SafeAreaView>
   );
 };
-
-const styles = StyleSheet.create({
-  container: {
-    flex: 1,
-  },
-  header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    borderBottomWidth: 1,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    justifyContent: 'center',
-  },
-  headerText: {
-    fontSize: 18,
-    fontWeight: '600',
-    fontFamily: 'Poppins-SemiBold',
-    flex: 1,
-    textAlign: 'center',
-  },
-  placeholder: {
-    width: 40,
-  },
-  content: {
-    padding: 16,
-    paddingBottom: 24,
-  },
-  searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 12,
-    paddingHorizontal: 16,
-    paddingVertical: 12,
-    marginBottom: 24,
-    borderWidth: 1,
-  },
-  searchInput: {
-    flex: 1,
-    fontSize: 16,
-    fontFamily: 'Poppins-Regular',
-    marginLeft: 12,
-  },
-  section: {
-    marginBottom: 24,
-  },
-  sectionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Poppins-SemiBold',
-    marginBottom: 12,
-  },
-  quickActionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-  },
-  quickActionIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  quickActionContent: {
-    flex: 1,
-  },
-  quickActionTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Poppins-SemiBold',
-    marginBottom: 2,
-  },
-  quickActionSubtitle: {
-    fontSize: 13,
-    fontFamily: 'Poppins-Regular',
-  },
-  categoryCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 12,
-    borderWidth: 1,
-  },
-  categoryIconContainer: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: '#FFF0F6',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-  },
-  categoryContent: {
-    flex: 1,
-  },
-  categoryTitle: {
-    fontSize: 16,
-    fontWeight: '600',
-    fontFamily: 'Poppins-SemiBold',
-    marginBottom: 2,
-  },
-  categoryDescription: {
-    fontSize: 13,
-    fontFamily: 'Poppins-Regular',
-  },
-  questionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderRadius: 12,
-    padding: 16,
-    marginBottom: 8,
-    borderWidth: 1,
-  },
-  questionText: {
-    flex: 1,
-    fontSize: 15,
-    fontFamily: 'Poppins-Regular',
-    marginLeft: 12,
-  },
-});
 
 export default HelpCenterScreen;
