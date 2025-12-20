@@ -138,7 +138,8 @@ const CategoriesScreen = ({ navigation }) => {
             try {
                 const qs = new URLSearchParams();
                 qs.set('page', 1);
-                qs.set('limit', 20);
+                qs.set('page', 1);
+                qs.set('limit', 1000);
                 const cacheKey = `productsCache:${qs.toString()}`;
                 const cached = await StorageService.getItem(cacheKey);
                 if (!mounted) return;
@@ -428,13 +429,49 @@ const CategoriesScreen = ({ navigation }) => {
                 }
             }
             const list = Array.from(map.values());
-            list.sort((a, b) => (String(a.name || '').localeCompare(String(b.name || ''))));
+            console.log(`[CategoriesScreen] Sorting ${list.length} items by distance...`);
+
+            // Helper: Haversine Distance Calculation
+            const getDistance = (lat1, lon1, lat2, lon2) => {
+                if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
+                const R = 6371; // Radius of the earth in km
+                const dLat = (lat2 - lat1) * (Math.PI / 180);
+                const dLon = (lon2 - lon1) * (Math.PI / 180);
+                const a =
+                    Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                    Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+                    Math.sin(dLon / 2) * Math.sin(dLon / 2);
+                const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+                return R * c; // Distance in km
+            };
+
+            const userLat = currentLocation?.latitude;
+            const userLng = currentLocation?.longitude;
+
+            list.sort((a, b) => {
+                // Get vendor coords
+                const latA = a._raw?.vendor?.latitude || a.vendor?.latitude;
+                const lngA = a._raw?.vendor?.longitude || a.vendor?.longitude;
+                const latB = b._raw?.vendor?.latitude || b.vendor?.latitude;
+                const lngB = b._raw?.vendor?.longitude || b.vendor?.longitude;
+
+                const distA = getDistance(userLat, userLng, latA, lngA);
+                const distB = getDistance(userLat, userLng, latB, lngB);
+
+                // Sort ascending (nearest first)
+                if (distA !== distB) return distA - distB;
+
+                return (String(a.name || '').localeCompare(String(b.name || '')));
+            });
+            console.log(`[CategoriesScreen] displayedByVendor count: ${list.length}`);
             return list;
         } catch (e) {
+            console.warn('[CategoriesScreen] Sort error:', e);
             // On any unexpected shape issues, fall back to raw displayedProducts
+            // Deduplicate even in fallback to avoid crash
             return Array.isArray(displayedProducts) ? displayedProducts : [];
         }
-    }, [displayedProducts]);
+    }, [displayedProducts, currentLocation]);
 
     const handleVendorTypePress = React.useCallback((vendor) => {
         const vendorId = vendor.id || vendor.name;

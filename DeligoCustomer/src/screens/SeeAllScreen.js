@@ -14,10 +14,12 @@ import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
 import { spacing, fontSize, borderRadius } from '../theme';
 import RestaurantCard from '../components/RestaurantCard';
+import { useLocation } from '../contexts/LocationContext';
 
 const SeeAllScreen = ({ navigation, route }) => {
     const { colors } = useTheme();
     const { t } = useLanguage();
+    const { currentLocation } = useLocation();
 
     // Get data passed from CategoriesScreen
     const {
@@ -30,7 +32,7 @@ const SeeAllScreen = ({ navigation, route }) => {
     // Filter and sort state
     const [selectedVendorType, setSelectedVendorType] = useState(null);
     const [selectedCuisine, setSelectedCuisine] = useState(null);
-    const [sortBy, setSortBy] = useState('name'); // 'name', 'rating', 'distance'
+    const [sortBy, setSortBy] = useState('distance'); // Default to distance
     const [searchQuery, setSearchQuery] = useState('');
 
     // Deduplicate items by vendor name
@@ -76,16 +78,44 @@ const SeeAllScreen = ({ navigation, route }) => {
             });
         }
 
+        // Parse distance string (e.g., "1.2 km", "500 m") to meters or calculate using params
+        const getDistance = (lat1, lon1, lat2, lon2) => {
+            if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
+            const R = 6371; // Radius of the earth in km
+            const dLat = (lat2 - lat1) * (Math.PI / 180);
+            const dLon = (lon2 - lon1) * (Math.PI / 180);
+            const a =
+                Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+                Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+                Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            return R * c; // Distance in km
+        };
+
+        const userLat = currentLocation?.latitude;
+        const userLng = currentLocation?.longitude;
+
         // Sort
         result.sort((a, b) => {
             if (sortBy === 'rating') {
                 return (b.rating || 0) - (a.rating || 0);
             }
+            if (sortBy === 'distance') {
+                const latA = a._raw?.vendor?.latitude || a.vendor?.latitude;
+                const lngA = a._raw?.vendor?.longitude || a.vendor?.longitude;
+                const latB = b._raw?.vendor?.latitude || b.vendor?.latitude;
+                const lngB = b._raw?.vendor?.longitude || b.vendor?.longitude;
+
+                const distA = getDistance(userLat, userLng, latA, lngA);
+                const distB = getDistance(userLat, userLng, latB, lngB);
+
+                if (distA !== distB) return distA - distB;
+            }
             return String(a.name || '').localeCompare(String(b.name || ''));
         });
 
         return result;
-    }, [deduplicatedItems, searchQuery, selectedVendorType, selectedCuisine, sortBy]);
+    }, [deduplicatedItems, searchQuery, selectedVendorType, selectedCuisine, sortBy, currentLocation]);
 
     const handleRestaurantPress = (restaurant) => {
         navigation.navigate('RestaurantDetails', { restaurant });
@@ -175,6 +205,12 @@ const SeeAllScreen = ({ navigation, route }) => {
                     {filteredItems.length} {filteredItems.length === 1 ? 'result' : 'results'}
                 </Text>
                 <View style={styles.sortButtons}>
+                    <TouchableOpacity
+                        style={[styles.sortButton, sortBy === 'distance' && { backgroundColor: colors.primary + '20' }]}
+                        onPress={() => setSortBy('distance')}
+                    >
+                        <Ionicons name="location" size={16} color={sortBy === 'distance' ? colors.primary : colors.text.secondary} />
+                    </TouchableOpacity>
                     <TouchableOpacity
                         style={[styles.sortButton, sortBy === 'name' && { backgroundColor: colors.primary + '20' }]}
                         onPress={() => setSortBy('name')}

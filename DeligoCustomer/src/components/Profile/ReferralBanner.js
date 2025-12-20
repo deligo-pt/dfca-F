@@ -1,10 +1,12 @@
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+import { useLanguage } from '../../utils/LanguageContext';
 import { useTheme } from '../../utils/ThemeContext';
 
 const ReferralBanner = ({ navigation }) => {
   const { colors } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <TouchableOpacity
@@ -17,8 +19,8 @@ const ReferralBanner = ({ navigation }) => {
           <Text style={styles.referralEmoji}>🎉</Text>
         </View>
         <View style={styles.referralMiddle}>
-          <Text style={[styles.referralTitle, { color: colors.text.primary }]}>Invite Friends, Earn Rewards!</Text>
-          <Text style={[styles.referralSubtitle, { color: colors.primary }]}>Give €10, Get €10 for each friend</Text>
+          <Text style={[styles.referralTitle, { color: colors.text.primary }]}>{t('referralBannerTitle')}</Text>
+          <Text style={[styles.referralSubtitle, { color: colors.primary }]}>{t('referralBannerSubtitle')}</Text>
         </View>
         <View style={styles.referralRight}>
           <Ionicons name="chevron-forward" size={24} color={colors.primary} />

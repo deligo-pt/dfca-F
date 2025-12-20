@@ -3,6 +3,7 @@ import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { spacing } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
+import * as Location from 'expo-location';
 
 const RestaurantCard = ({ restaurant, onPress }) => {
   const { colors, isDarkMode } = useTheme();
@@ -25,6 +26,40 @@ const RestaurantCard = ({ restaurant, onPress }) => {
 
   // tags
   const tags = Array.isArray(p.tags) ? p.tags : (Array.isArray(p.tags) ? p.tags : (p.tags || []));
+
+  // --- Reverse Geocoding for City ---
+  const [dynamicCity, setDynamicCity] = React.useState(null);
+
+  React.useEffect(() => {
+    let mounted = true;
+    const fetchCity = async () => {
+      // If we already have explicit text, skip
+      if (vendor.city || vendor.address || vendor.town) return;
+
+      const lat = p.latitude || vendor.latitude;
+      const lng = p.longitude || vendor.longitude;
+
+      if (lat && lng) {
+        try {
+          // Simple memory cache check (optional optimization could be global)
+          // For now, rely on OS caching or check if redundant
+          const res = await Location.reverseGeocodeAsync({ latitude: parseFloat(lat), longitude: parseFloat(lng) });
+          if (mounted && res && res.length > 0) {
+            const addr = res[0];
+            // Prefer city, then subregion (district), then region
+            const foundCity = addr.city || addr.subregion || addr.region || addr.district || addr.name;
+            if (foundCity) setDynamicCity(foundCity);
+          }
+        } catch (e) {
+          // ignore geocode errors
+        }
+      }
+    };
+    fetchCity();
+    return () => { mounted = false; };
+  }, [vendor.city, vendor.address, p.latitude, p.longitude, vendor.latitude, vendor.longitude]);
+
+  const displayCity = vendor.city || vendor.address || dynamicCity;
 
   return (
     <TouchableOpacity
@@ -58,10 +93,11 @@ const RestaurantCard = ({ restaurant, onPress }) => {
             </View>
           </View>
 
-          {/* Subtitle Row: Delivery Fee • Tag */}
+          {/* Subtitle Row: Delivery Fee • Tag • City */}
           <View style={styles(colors).tagsRow}>
             <Text style={styles(colors).tagText}>
-              • {tags[0] || 'Food'}
+              {tags[0] || 'Food'}
+              {displayCity ? ` • ${displayCity}` : ''}
             </Text>
           </View>
         </View>

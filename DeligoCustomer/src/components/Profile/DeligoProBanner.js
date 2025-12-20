@@ -11,7 +11,7 @@ const DeligoProBanner = () => {
         </View>
         <View style={styles.proTextContainer}>
           <View style={styles.proTitleRow}>
-            <Text style={styles.proTitle}>Try Deligo Pro</Text>
+            <Text style={styles.proTitle}>Try DeliGo Pro</Text>
             <View style={styles.freeBadge}>
               <Text style={styles.freeBadgeText}>FREE</Text>
             </View>

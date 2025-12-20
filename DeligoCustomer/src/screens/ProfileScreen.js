@@ -73,7 +73,7 @@ const ProfileScreen = ({ onLogout, navigation }) => {
   const handleLogout = () => {
     showModal(
       t('logout'),
-      'Are you sure you want to logout?',
+      t('logoutConfirmation'),
       async () => {
         setIsLoggingOut(true);
         try {

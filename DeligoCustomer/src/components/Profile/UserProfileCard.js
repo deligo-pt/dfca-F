@@ -143,7 +143,7 @@ export default function UserProfileCard({ user: userProp, navigation }) {
 
                 console.log('Hitting API:', API_URL);
                 console.log('With Auth Token:', authToken);
-                console.log('Refresh Token (masked):', refreshToken ? `${refreshToken.slice(0,6)}...${refreshToken.slice(-4)}` : null);
+                console.log('Refresh Token (masked):', refreshToken ? `${refreshToken.slice(0, 6)}...${refreshToken.slice(-4)}` : null);
 
                 const response = await fetch(API_URL, {
                     method: 'GET',
@@ -185,7 +185,7 @@ export default function UserProfileCard({ user: userProp, navigation }) {
         return (
             <View style={styles.centered}>
                 <ActivityIndicator size="large" color={colors?.primary || undefined} />
-                <Text style={[styles.loadingText, { color: colors?.text?.primary }]}>{'Loading profile...'}</Text>
+                <Text style={[styles.loadingText, { color: colors?.text?.primary }]}>{t('loadingProfile')}</Text>
             </View>
         );
     }
@@ -193,7 +193,7 @@ export default function UserProfileCard({ user: userProp, navigation }) {
     if (error) {
         return (
             <View style={styles.centered}>
-                <Text style={[styles.errorText, { color: colors?.error || 'red' }]}>Failed to load profile:</Text>
+                <Text style={[styles.errorText, { color: colors?.error || 'red' }]}>{t('failedLoadProfile')}</Text>
                 <Text style={[styles.errorText, { color: colors?.error || 'red' }]}>{error}</Text>
             </View>
         );
@@ -202,7 +202,7 @@ export default function UserProfileCard({ user: userProp, navigation }) {
     if (!profile) {
         return (
             <View style={styles.centered}>
-                <Text style={[styles.noProfileText, { color: colors?.text?.primary }]}>No profile data found.</Text>
+                <Text style={[styles.noProfileText, { color: colors?.text?.primary }]}>{t('noProfileFound')}</Text>
             </View>
         );
     }
@@ -211,8 +211,8 @@ export default function UserProfileCard({ user: userProp, navigation }) {
     const avatarSource = avatarUri ? { uri: avatarUri } : require('../../assets/images/logonew.png');
 
     const fullName = `${(profile.name?.firstName || profile.firstName || '')} ${(profile.name?.lastName || profile.lastName || '')}`.trim();
-    const email = profile.email || profile.contactEmail || 'Not provided';
-    const contact = profile.contactNumber || profile.phone || profile.mobile || 'Not provided';
+    const email = profile.email || profile.contactEmail || t('notProvided');
+    const contact = profile.contactNumber || profile.phone || profile.mobile || t('notProvided');
 
     return (
         <View style={[styles.card, { backgroundColor: colors?.surface || '#fff', shadowColor: colors?.shadow || '#000' }]}>
@@ -223,8 +223,8 @@ export default function UserProfileCard({ user: userProp, navigation }) {
             <View style={styles.contentColumn}>
                 <View style={styles.info}>
                     <View style={styles.nameRow}>
-                        <Text style={[styles.name, { color: colors?.text?.primary }]} numberOfLines={2} ellipsizeMode="tail">{fullName || 'Unnamed User'}</Text>
-                        { (profile.verified || profile.isVerified) && (
+                        <Text style={[styles.name, { color: colors?.text?.primary }]} numberOfLines={2} ellipsizeMode="tail">{fullName || t('unnamedUser')}</Text>
+                        {(profile.verified || profile.isVerified) && (
                             <Ionicons name="checkmark-circle" size={16} color={colors?.success || '#4CAF50'} style={styles.verifiedIcon} />
                         )}
                     </View>

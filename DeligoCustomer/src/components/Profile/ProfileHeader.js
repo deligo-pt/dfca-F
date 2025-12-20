@@ -1,9 +1,11 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
 import { useTheme } from '../../utils/ThemeContext'; // Adjust path as needed
+import { useLanguage } from '../../utils/LanguageContext';
 
 const ProfileHeader = () => {
   const { colors } = useTheme();
+  const { t } = useLanguage();
 
   return (
     <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
@@ -14,8 +16,8 @@ const ProfileHeader = () => {
           resizeMode="contain"
         />
         <View style={styles.headerTextContainer}>
-          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>Deligo</Text>
-          <Text style={[styles.headerSubtitle, { color: colors.text.secondary }]}>Your favorite food, delivered fast 🍔</Text>
+          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>DeliGo</Text>
+          <Text style={[styles.headerSubtitle, { color: colors.text.secondary }]}>{t('headerSubtitle')}</Text>
         </View>
       </View>
     </View>

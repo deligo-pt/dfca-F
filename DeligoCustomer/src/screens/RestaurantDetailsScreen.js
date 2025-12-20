@@ -3,7 +3,7 @@
  * Professional restaurant menu with enhanced product modal
  */
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import {
   View,
   Text,
@@ -18,7 +18,9 @@ import {
   LayoutAnimation,
   Platform,
   UIManager,
+  RefreshControl,
 } from 'react-native';
+import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { spacing, fontSize, borderRadius } from '../theme';
@@ -27,6 +29,7 @@ import { useProducts } from '../contexts/ProductsContext';
 import { useLanguage } from '../utils/LanguageContext';
 import { useCart } from '../contexts/CartContext';
 import formatCurrency from '../utils/currency';
+import * as Location from 'expo-location';
 
 const RestaurantDetailsScreen = ({ route, navigation }) => {
   const { colors, isDark } = useTheme();
@@ -45,7 +48,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     ratingValue = _r.vendor.rating;
   }
 
-  const [selectedCategory, setSelectedCategory] = useState('Popular');
+  const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
   const { addItem, updateQuantity: cartUpdateQuantity, itemsMap } = useCart();
@@ -81,21 +84,55 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   };
 
   // Use ProductsContext
-  const { products: allProducts } = useProducts();
-
-  const displayName = (
-    restaurant?.name || restaurant?._raw?.name || restaurant?._raw?.product?.name || restaurant?._raw?.productName || restaurant?._raw?.vendor?.vendorName || 'Restaurant'
-  );
+  const { products: allProducts, fetchRestaurantMenu } = useProducts();
 
   const vendorId = (
     restaurant?._raw?.vendor?.vendorId || restaurant?.vendor?.vendorId || restaurant?.vendorId || restaurant?._raw?.vendorId || null
   );
 
-  // Filter products that belong to this vendor
-  const vendorProducts = (allProducts || []).filter((p) => {
-    const rawVendorId = p?._raw?.vendor?.vendorId || p?.vendor?.vendorId || p?.vendorId || null;
-    return rawVendorId && vendorId && String(rawVendorId) === String(vendorId);
-  });
+  // Local state for menu products - filtered initial from global, then updated via explicit fetch
+  // HYBRID: Start with cache so user sees something, then update with fresh data
+  const [menuProducts, setMenuProducts] = useState(
+    (allProducts || []).filter((p) => {
+      const raw = p._raw || p;
+      const rawVendorId = raw.vendor?.vendorId || raw.vendorId || null;
+      return rawVendorId && vendorId && String(rawVendorId) === String(vendorId);
+    })
+  );
+  const [menuLoading, setMenuLoading] = useState(false);
+  const vendorProducts = menuProducts;
+
+  // --- Reverse Geocoding for City in Header ---
+  const [dynamicCity, setDynamicCity] = useState(null);
+  useEffect(() => {
+    let mounted = true;
+    const fetchCity = async () => {
+      const v = restaurant._raw?.vendor || restaurant.vendor || {};
+      if (v.city || v.address || v.town) return; // explicit exists
+
+      const lat = v.latitude;
+      const lng = v.longitude;
+
+      if (lat && lng) {
+        try {
+          const res = await Location.reverseGeocodeAsync({ latitude: parseFloat(lat), longitude: parseFloat(lng) });
+          if (mounted && res && res.length > 0) {
+            const addr = res[0];
+            const foundCity = addr.city || addr.subregion || addr.region || addr.district || addr.name;
+            if (foundCity) setDynamicCity(foundCity);
+          }
+        } catch (e) { /* ignore */ }
+      }
+    };
+    fetchCity();
+    return () => { mounted = false; };
+  }, [restaurant]);
+
+  // Derived values
+  const displayName = (
+    restaurant?.name || restaurant?._raw?.name || restaurant?._raw?.product?.name || restaurant?._raw?.productName || restaurant?._raw?.vendor?.vendorName || 'Restaurant'
+  );
+  const displayCity = (restaurant._raw?.vendor?.city || restaurant._raw?.vendor?.address) || dynamicCity;
 
   // Vendor currency
   const vendorCurrency = (() => {
@@ -111,7 +148,63 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     else if (raw.category) derivedCategories.add(raw.category);
     else if (Array.isArray(p.categories) && p.categories.length) p.categories.forEach(c => derivedCategories.add(c));
   });
-  const menuCategories = ['Popular', ...Array.from(derivedCategories)];
+  const menuCategories = ['All', 'Popular', ...Array.from(derivedCategories)];
+
+  // Fetch menu on focus - ALWAYS get fresh data from API
+  useFocusEffect(
+    useCallback(() => {
+      let active = true;
+      const loadMenu = async () => {
+        if (!vendorId) {
+          setMenuLoading(false);
+          return;
+        }
+        setMenuLoading(true);
+        try {
+          console.log('[RestaurantDetails] Fetching fresh menu for', vendorId);
+          const freshItems = await fetchRestaurantMenu(vendorId);
+          if (active) {
+            // ALWAYS update with fresh data, even if empty
+            if (freshItems && freshItems.length > 0) {
+              setMenuProducts(freshItems);
+              console.log('[RestaurantDetails] Updated menu with', freshItems.length, 'items');
+            } else {
+              console.log('[RestaurantDetails] Fresh menu empty, keeping previous/cached data if any');
+            }
+          }
+        } catch (err) {
+          console.error('[RestaurantDetails] Failed to load menu', err);
+          // if (active) setMenuProducts([]); // DO NOT CLEAR ON ERROR - Keep cached data
+        } finally {
+          if (active) setMenuLoading(false);
+        }
+      };
+      loadMenu();
+      return () => { active = false; };
+    }, [vendorId, fetchRestaurantMenu])
+  );
+
+  const [refreshing, setRefreshing] = useState(false);
+  const onRefresh = useCallback(async () => {
+    setRefreshing(true);
+    try {
+      console.log('[RestaurantDetails] Refreshing menu for', vendorId);
+      const freshItems = await fetchRestaurantMenu(vendorId);
+      // ALWAYS update with fresh data IF valid
+      if (freshItems && freshItems.length > 0) {
+        setMenuProducts(freshItems);
+        console.log('[RestaurantDetails] Refreshed menu with', freshItems.length, 'items');
+      } else {
+        console.log('[RestaurantDetails] Refreshed menu empty, keeping previous data');
+      }
+    } catch (err) {
+      console.error('Refresh failed', err);
+    } finally {
+      setRefreshing(false);
+    }
+  }, [fetchRestaurantMenu, vendorId]);
+
+
 
   // Update add/remove with optimistic updates and animation
   const addToCart = async (item) => {
@@ -155,15 +248,18 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   // Filter menu items
   const getFilteredMenuItems = () => {
     let items = vendorProducts;
-    if (selectedCategory && selectedCategory !== 'Popular') {
+    // "All" shows everything - no filtering
+    if (selectedCategory === 'All') {
+      // No filter - show all items
+    } else if (selectedCategory === 'Popular') {
+      const popular = items.filter(p => (p._raw?.meta && p._raw.meta.isFeatured) || p._raw?.isFeatured);
+      if (popular.length) items = popular;
+    } else if (selectedCategory) {
       items = items.filter((p) => {
         const raw = p._raw || {};
         const cat = raw.subCategory || raw.category || (Array.isArray(p.categories) && p.categories[0]) || '';
         return String(cat) === String(selectedCategory);
       });
-    } else if (selectedCategory === 'Popular') {
-      const popular = items.filter(p => (p._raw?.meta && p._raw.meta.isFeatured) || p._raw?.isFeatured);
-      if (popular.length) items = popular;
     }
 
     if (!searchQuery.trim()) return items;
@@ -393,55 +489,36 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
         </View>
       )}
 
-      <ScrollView style={{ flex: 1 }} showsVerticalScrollIndicator={false}>
-        {/* Restaurant Info Card */}
+      <ScrollView
+        style={{ flex: 1 }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={onRefresh}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+            title={t('loading') || 'Loading...'}
+            titleColor={colors.text.secondary}
+          />
+        }
+      >
+        {/* Vendor Section - Show only vendor name and image */}
         <View style={[styles.restaurantCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Image
             source={
-              restaurant.image
-                ? { uri: restaurant.image }
-                : (restaurant._raw?.vendor?.storePhoto ? { uri: restaurant._raw.vendor.storePhoto } : require('../assets/images/logonew.png'))
+              restaurant._raw?.vendor?.storePhoto
+                ? { uri: restaurant._raw.vendor.storePhoto }
+                : (restaurant.image ? { uri: restaurant.image } : require('../assets/images/logonew.png'))
             }
             style={styles.restaurantImage}
           />
-
           <View style={styles.restaurantInfo}>
             <Text style={[styles.restaurantName, { color: colors.text.primary }]}>{displayName}</Text>
-            <Text style={[styles.restaurantCategories, { color: colors.text.secondary }]}>
-              {(restaurant.categories && restaurant.categories.length) ? restaurant.categories.join(' • ') : (restaurant._raw?.tags ? restaurant._raw.tags.join(' • ') : '')}
-            </Text>
-
-            <View style={styles.restaurantMeta}>
-              <View style={styles.metaItem}>
-                <Ionicons name="star" size={16} color="#FFA000" />
-                <Text style={[styles.metaText, { color: colors.text.primary }]}> {ratingValue !== null ? ratingValue : 'N/A'}</Text>
-              </View>
-              <Text style={[styles.metaDot, { color: colors.text.light }]}>•</Text>
-              <View style={styles.metaItem}>
-                <Ionicons name="time-outline" size={16} color={colors.text.secondary} />
-                <Text style={[styles.metaText, { color: colors.text.primary }]}> {restaurant.deliveryTime}</Text>
-              </View>
-              <Text style={[styles.metaDot, { color: colors.text.light }]}>•</Text>
-              <View style={styles.metaItem}>
-                <Ionicons name="location-outline" size={16} color={colors.text.secondary} />
-                <Text style={[styles.metaText, { color: colors.text.primary }]}> {restaurant.distance}</Text>
-              </View>
-            </View>
-
-            {/* Delivery Info */}
-            <View style={[styles.deliveryInfo, { borderTopColor: colors.border }]}>
-              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                <MaterialCommunityIcons name="bike-fast" size={18} color={colors.primary} />
-                <Text style={[styles.deliveryLabel, { color: colors.text.secondary }]}> {t('deliveryFee') || 'Delivery'}</Text>
-              </View>
-              <Text style={[styles.deliveryValue, { color: colors.primary }]}>{restaurant.deliveryFee}</Text>
-            </View>
-
-            {restaurant.offer && (
-              <View style={[styles.offerBadge, { backgroundColor: colors.success || '#4CAF50' }]}>
-                <Ionicons name="pricetag" size={14} color="#fff" />
-                <Text style={styles.offerText}> {restaurant.offer}</Text>
-              </View>
+            {displayCity && (
+              <Text style={{ color: colors.text.secondary, fontSize: 13, fontFamily: 'Poppins-Regular', marginTop: 2 }}>
+                {displayCity}
+              </Text>
             )}
           </View>
         </View>

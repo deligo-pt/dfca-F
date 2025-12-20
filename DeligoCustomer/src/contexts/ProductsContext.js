@@ -12,7 +12,7 @@ const ProductsContext = createContext(null);
 
 export const useProducts = () => useContext(ProductsContext);
 
-function normalizeProduct(p) {
+export function normalizeProduct(p) {
   const raw = p._raw || p;
   const vendor = raw.vendor || {};
 
@@ -37,7 +37,8 @@ function normalizeProduct(p) {
   return {
     _raw: raw,
     id: chosenId,
-    image: raw.image || vendor.storePhoto || (Array.isArray(raw.images) && raw.images[0]) || null,
+    // Fix: Prioritize product images over store photo, and do NOT fallback to storePhoto for product cards logic
+    image: raw.image || (Array.isArray(raw.images) && raw.images[0]) || null,
     name: vendor.vendorName || raw.name || raw.productName || p.name || 'Unknown',
     categories: Array.isArray(raw.tags) ? raw.tags : (raw.category ? [raw.category] : []),
     rating: (raw.rating && (typeof raw.rating === 'number' ? raw.rating : raw.rating.average)) || vendor.rating || 0,
@@ -59,7 +60,7 @@ export const ProductsProvider = ({ children }) => {
   const [lastUpdated, setLastUpdated] = useState(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
-  const [params, setParams] = useState({ page: 1, limit: 20 });
+  const [params, setParams] = useState({ page: 1, limit: 1000 });
 
   // Use ref to store params to avoid infinite loops
   const paramsRef = useRef(params);
@@ -95,9 +96,16 @@ export const ProductsProvider = ({ children }) => {
       if (final.lat) qs.set('lat', final.lat);
       if (final.lng) qs.set('lng', final.lng);
       qs.set('page', final.page || 1);
-      qs.set('limit', final.limit || 20);
+      qs.set('limit', final.limit || 1000);
+
+      // Explicit overrides only - no auto-injection
+      if (final.lat && final.lng) {
+        qs.set('lat', final.lat);
+        qs.set('lng', final.lng);
+      }
 
       const url = `${API_URL}?${qs.toString()}`;
+      console.log('[ProductsContext] Generated URL:', url, 'Params:', JSON.stringify(final));
       const cacheKey = `productsCache:${qs.toString()}`;
       // Try to read cached full response for this exact query string
       let cachedRaw = null;
@@ -285,6 +293,19 @@ export const ProductsProvider = ({ children }) => {
       }
 
       console.log(`[ProductsContext] Parsed ${items.length} items from API response`);
+
+      // DEBUG: Inspect the first item to see vendor structure
+      if (items.length > 0) {
+        const first = items[0];
+        console.log('[ProductsContext] Valid Product Sample:', JSON.stringify({
+          id: first.id || first._id || first.productId,
+          name: first.name || first.productName,
+          vendorId: first.vendorId,
+          vendor_object: first.vendor,
+          raw_vendorId: first._raw?.vendor?.vendorId || first.vendor?.id || first.vendor?._id
+        }, null, 2));
+      }
+
       if (items.length === 0) {
         console.log('[ProductsContext] API returned 0 items. Full response keys:', Object.keys(json));
       }
@@ -322,6 +343,154 @@ export const ProductsProvider = ({ children }) => {
     }
   }, []); // Empty deps - using paramsRef.current to avoid infinite loop
 
+  // Fetch specific restaurant menu (direct, no caching for instant updates)
+  const fetchRestaurantMenu = useCallback(async (vendorId) => {
+    if (!vendorId) return [];
+
+    // Helper to perform fetch
+    const doFetch = async (u, h) => fetch(u, { headers: h });
+
+    try {
+      let token = await getAccessToken();
+      if (token && typeof token === 'object') token = token.accessToken || token.token || null;
+
+      const headers = { Accept: 'application/json' };
+      if (token) headers.Authorization = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+
+      // Use the generic products endpoint with a vendor filter
+      const endpoint = API_ENDPOINTS.PRODUCTS.GET_ALL;
+      const url = `${BASE_API_URL}${endpoint}?vendor=${vendorId}&limit=100&_t=${Date.now()}`;
+
+      console.log('[ProductsContext] Fetching menu for vendor:', vendorId, url);
+      let res = await doFetch(url, headers);
+
+      // Handle 401 with retry logic similar to fetchProducts
+      if (res.status === 401) {
+        console.log('[ProductsContext] Menu fetch got 401, attempting refresh...');
+        let refreshToken = await getRefreshToken();
+
+        // Normalize refresh token
+        if (refreshToken && typeof refreshToken === 'object') {
+          refreshToken = refreshToken.refreshToken || refreshToken.token || refreshToken.value || null;
+        }
+
+        if (refreshToken) {
+          try {
+            const refreshUrl = `${BASE_API_URL}${API_ENDPOINTS.AUTH.REFRESH_TOKEN}`;
+            const rres = await fetch(refreshUrl, {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+              body: JSON.stringify({ refreshToken, token: refreshToken, refresh_token: refreshToken }),
+            });
+
+            if (rres.ok) {
+              const rjson = await rres.json().catch(() => null);
+              const newAccess = rjson?.accessToken || rjson?.token || rjson?.data?.accessToken || rjson?.data?.token || rjson?.access_token || null;
+              const newRefresh = rjson?.refreshToken || rjson?.data?.refreshToken || rjson?.refresh_token || null;
+
+              if (newAccess) {
+                await setAccessToken(newAccess);
+                if (newRefresh) await setRefreshToken(newRefresh);
+
+                // Retry with new token using robust header candidates
+                console.log('[ProductsContext] Token refreshed, retrying menu fetch');
+
+                const candidates = [];
+                // Prefer Bearer form
+                candidates.push(newAccess.startsWith('Bearer ') ? newAccess : `Bearer ${newAccess}`);
+                // Raw token (no Bearer)
+                candidates.push(newAccess);
+
+                let retryRes = null;
+                // Try Authorization header variants
+                for (const cand of candidates) {
+                  const tryHeaders = { ...headers, Authorization: cand };
+                  try {
+                    console.log('[ProductsContext] Retry attempt with Authorization prefix:', cand.startsWith('Bearer ') ? 'Bearer' : 'Raw');
+                    retryRes = await doFetch(url, tryHeaders);
+                  } catch (e) {
+                    retryRes = { status: 0 };
+                  }
+                  if (retryRes && retryRes.status !== 401) {
+                    res = retryRes;
+                    break;
+                  }
+                }
+
+                // If still 401, try x-access-token header
+                if (retryRes && retryRes.status === 401) {
+                  const tryHeaders2 = { ...headers };
+                  delete tryHeaders2.Authorization;
+                  tryHeaders2['x-access-token'] = newAccess;
+                  try {
+                    console.log('[ProductsContext] Retry attempt with x-access-token');
+                    retryRes = await doFetch(url, tryHeaders2);
+                    if (retryRes.status !== 401) {
+                      res = retryRes;
+                    }
+                  } catch (e) { }
+                }
+              }
+            } else {
+              console.warn('[ProductsContext] Refresh token failed during menu fetch');
+            }
+          } catch (refreshErr) {
+            console.error('[ProductsContext] Refresh error during menu fetch:', refreshErr);
+          }
+        }
+      }
+
+      if (!res.ok) {
+        console.warn('[ProductsContext] Menu fetch failed:', res.status);
+        throw new Error(`Menu fetch failed: ${res.status}`);
+      }
+
+      const json = await res.json();
+      console.log('[ProductsContext] Raw Menu Response:', JSON.stringify(json).slice(0, 500)); // Log first 500 chars
+
+      let items = [];
+      // Robust parsing similar to fetchProducts
+      if (Array.isArray(json)) items = json;
+      else if (Array.isArray(json.data)) items = json.data;
+      else if (Array.isArray(json.products)) items = json.products;
+      else if (Array.isArray(json.items)) items = json.items;
+      else if (json.data && Array.isArray(json.data.products)) items = json.data.products;
+
+      console.log(`[ProductsContext] Menu fetched: ${items.length} items`);
+
+      // FIX: CLEAR ALL product caches to ensure fresh data on next startup ("native fill")
+      // This forces fetchProducts to do a fresh network call instead of using ANY stale cache
+      try {
+        // 1. Clear ALL product caches using prefix removal - this ensures no cache key mismatch issues
+        await StorageService.removeKeysByPrefix('productsCache:');
+        console.log('[ProductsContext] CLEARED ALL product caches - will fetch fresh on next startup');
+
+        // 2. Also update in-memory state immediately with fresh data
+        const freshNormalized = items.map(normalizeProduct);
+        setProducts(prev => {
+          const freshMap = new Map();
+          freshNormalized.forEach(p => freshMap.set(p.id, p));
+          return prev.map(p => {
+            const normP = normalizeProduct(p);
+            if (freshMap.has(normP.id)) {
+              return freshMap.get(normP.id);
+            }
+            return p;
+          });
+        });
+        console.log('[ProductsContext] Updated in-memory products state');
+
+      } catch (cacheErr) {
+        console.warn('[ProductsContext] Failed to clear cache:', cacheErr);
+      }
+
+      return items.map(normalizeProduct);
+    } catch (err) {
+      console.error('[ProductsContext] Error fetching menu:', err);
+      throw err;
+    }
+  }, []);
+
   // initial load
   useEffect(() => {
     // Trigger initial fetch using default params; fetchProducts will serve cache immediately if present
@@ -336,8 +505,10 @@ export const ProductsProvider = ({ children }) => {
     setProducts,
     params,
     setParams,
-    lastUpdated
-  }), [products, loading, error, fetchProducts, params, lastUpdated]);
+    setParams,
+    lastUpdated,
+    fetchRestaurantMenu
+  }), [products, loading, error, fetchProducts, params, lastUpdated, fetchRestaurantMenu]);
 
   return (
     <ProductsContext.Provider value={contextValue}>
