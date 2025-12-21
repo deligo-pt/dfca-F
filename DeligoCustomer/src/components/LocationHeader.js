@@ -64,7 +64,7 @@ const LocationHeader = ({
               <View style={styles(colors, isDarkMode).locationContent}>
                 <Ionicons name="location-sharp" size={14} color="#FFFFFF" />
                 <Text style={styles(colors, isDarkMode).locationText} numberOfLines={1}>
-                  {area || 'Set location'}
+                  {area || t('setYourLocation')}
                 </Text>
                 <Ionicons name="chevron-down" size={12} color="#FFFFFF" />
               </View>
@@ -90,7 +90,7 @@ const LocationHeader = ({
             <Ionicons name="search" size={22} color={colors.primary} />
           </View>
           <Text style={styles(colors, isDarkMode).searchPlaceholder}>
-            Search restaurants, cuisines, dishes...
+            {t('searchPlaceholderHeader')}
           </Text>
         </TouchableOpacity>
 

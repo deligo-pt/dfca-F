@@ -87,7 +87,7 @@ const LocationAddressScreen = ({ navigation, route }) => {
       }
     } catch (error) {
       console.error(error);
-      Alert.alert('Error', 'Failed to get current location');
+      Alert.alert(t('error'), t('failedToGetLocation'));
     } finally {
       setIsLoadingLocation(false);
     }
@@ -109,11 +109,11 @@ const LocationAddressScreen = ({ navigation, route }) => {
         });
         await reverseGeocode(latitude, longitude);
       } else {
-        Alert.alert('Not Found', 'Location not found');
+        Alert.alert(t('error'), t('locationNotFound'));
       }
     } catch (error) {
       console.error(error);
-      Alert.alert('Error', 'Failed to search location');
+      Alert.alert(t('error'), t('addressSearchFailed'));
     } finally {
       setIsLoadingLocation(false);
     }
@@ -152,9 +152,9 @@ const LocationAddressScreen = ({ navigation, route }) => {
 
   const validate = () => {
     const errors = {};
-    if (!streetAddress.trim()) errors.streetAddress = 'Street address is required';
-    if (!city.trim()) errors.city = 'City is required';
-    if (!postalCode.trim()) errors.postalCode = 'Postal code is required';
+    if (!streetAddress.trim()) errors.streetAddress = t('streetAddressRequired');
+    if (!city.trim()) errors.city = t('cityRequired');
+    if (!postalCode.trim()) errors.postalCode = t('postalCodeRequired');
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -236,11 +236,11 @@ const LocationAddressScreen = ({ navigation, route }) => {
         }
         navigation.goBack();
       } else {
-        Alert.alert('Error', 'Failed to save address locally');
+        Alert.alert(t('error'), t('saveFailed'));
       }
     } catch (err) {
       console.error('[LocationAddressScreen] handleSave error:', err);
-      Alert.alert('Error', 'An unexpected error occurred while saving.');
+      Alert.alert(t('error'), t('unexpectedError'));
     }
   };
 
@@ -252,7 +252,7 @@ const LocationAddressScreen = ({ navigation, route }) => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text.primary }]}>Add Address</Text>
+        <Text style={[styles.headerTitle, { color: colors.text.primary }]}>{t('addNewAddress')}</Text>
         <View style={{ width: 40 }} />
       </View>
 
@@ -299,7 +299,7 @@ const LocationAddressScreen = ({ navigation, route }) => {
             style={[styles.saveButton, { backgroundColor: colors.primary }]}
             onPress={handleSave}
           >
-            <Text style={styles.saveButtonText}>Save Address</Text>
+            <Text style={styles.saveButtonText}>{t('save')}</Text>
           </TouchableOpacity>
         </View>
       )}

@@ -202,7 +202,7 @@ const SeeAllScreen = ({ navigation, route }) => {
             {/* Sort Options */}
             <View style={styles.sortRow}>
                 <Text style={[styles.resultCount, { color: colors.text.secondary }]}>
-                    {filteredItems.length} {filteredItems.length === 1 ? 'result' : 'results'}
+                    {filteredItems.length} {filteredItems.length === 1 ? t('result') : t('results')}
                 </Text>
                 <View style={styles.sortButtons}>
                     <TouchableOpacity
@@ -246,7 +246,7 @@ const SeeAllScreen = ({ navigation, route }) => {
                             style={[styles.clearButton, { backgroundColor: colors.primary }]}
                             onPress={() => { setSelectedVendorType(null); setSelectedCuisine(null); }}
                         >
-                            <Text style={styles.clearButtonText}>Clear Filters</Text>
+                            <Text style={styles.clearButtonText}>{t('clearFilters')}</Text>
                         </TouchableOpacity>
                     )}
                 </View>

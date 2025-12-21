@@ -843,7 +843,7 @@ const LocationDetails = ({
               <View style={styles.mapPreviewOverlay}>
                 <View style={[styles.mapPreviewExpandButton, { backgroundColor: colors.primary }]}>
                   <Ionicons name="expand" size={18} color={colors.text.white} />
-                  <Text style={styles.mapPreviewExpandText}>Tap to expand map</Text>
+                  <Text style={styles.mapPreviewExpandText}>{t('tapToExpandMap')}</Text>
                 </View>
               </View>
             </TouchableOpacity>
@@ -898,13 +898,13 @@ const LocationDetails = ({
 
           <View style={styles.internationalFormSection}>
             <Text style={[styles.formSectionTitle, { color: colors.text.primary }]}>
-              Address Details
+              {t('addressDetails')}
             </Text>
 
             {/* Label Selection */}
             <View style={{ marginBottom: 20 }}>
               <Text style={[styles.internationalFieldLabel, { color: colors.text.primary }]}>
-                Label as <Text style={styles.requiredMark}>*</Text>
+                {t('labelAs')} <Text style={styles.requiredMark}>*</Text>
               </Text>
               <View style={{ flexDirection: 'row', gap: 10 }}>
                 {labels.map((l) => (
@@ -934,7 +934,7 @@ const LocationDetails = ({
 
             <View style={styles.internationalFieldGroup}>
               <Text style={[styles.internationalFieldLabel, { color: colors.text.primary }]}>
-                Street Address <Text style={styles.requiredMark}>*</Text>
+                {t('streetAddress')} <Text style={styles.requiredMark}>*</Text>
               </Text>
               <View style={[styles.internationalInput, {
                 borderColor: fieldErrors.streetAddress ? colors.error : colors.border,
@@ -981,7 +981,7 @@ const LocationDetails = ({
 
             <View style={styles.internationalFieldGroup}>
               <Text style={[styles.internationalFieldLabel, { color: colors.text.primary }]}>
-                City <Text style={styles.requiredMark}>*</Text>
+                {t('city')} <Text style={styles.requiredMark}>*</Text>
               </Text>
               <View style={[styles.internationalInput, {
                 borderColor: fieldErrors.city ? colors.error : colors.border,
@@ -1008,7 +1008,7 @@ const LocationDetails = ({
 
             <View style={styles.internationalFieldGroup}>
               <Text style={[styles.internationalFieldLabel, { color: colors.text.primary }]}>
-                Postal Code / ZIP Code <Text style={styles.requiredMark}>*</Text>
+                {t('postalCodeZipCode')} <Text style={styles.requiredMark}>*</Text>
               </Text>
               <View style={[styles.internationalInput, {
                 borderColor: fieldErrors.postalCode ? colors.error : colors.border,
@@ -1041,14 +1041,14 @@ const LocationDetails = ({
               }]}>
                 <View style={styles.gpsCoordinatesHeader}>
                   <Ionicons name="navigate-circle" size={20} color={colors.primary} />
-                  <Text style={styles.gpsCoordinatesLabel}>{t('gpsCoordinates') || 'GPS Coordinates'}</Text>
+                  <Text style={styles.gpsCoordinatesLabel}>{t('gpsCoordinates')}</Text>
                 </View>
                 <Text style={styles.gpsCoordinatesValue}>
                   Lat: {markerCoordinate.latitude.toFixed(7)}, Lng: {markerCoordinate.longitude.toFixed(7)}
                 </Text>
                 <View style={styles.gpsCoordinatesStatus}>
                   <Ionicons name="checkmark-circle" size={16} color={colors.success} />
-                  <Text style={styles.gpsCoordinatesStatusText}>{t('verified') || 'Verified'}</Text>
+                  <Text style={styles.gpsCoordinatesStatusText}>{t('verified')}</Text>
                 </View>
               </View>
             )}
@@ -1060,7 +1060,7 @@ const LocationDetails = ({
           {savedAddresses && savedAddresses.length > 0 && (
             <View style={styles.savedAddressesSection}>
               <Text style={[styles.formSectionTitle, { color: colors.text.primary, paddingHorizontal: 16, marginBottom: 12 }]}>
-                {t('savedAddressesText')}
+                {t('savedAddresses')}
               </Text>
               <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}>
                 {savedAddresses.map((addr) => (

@@ -512,7 +512,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
         <View style={styles.mapContainer}>
           <View style={[styles.map, styles.mapLoading]}>
             <Ionicons name="map-outline" size={48} color={colors.text.light} />
-            <Text style={styles.mapLoadingText}>{t('loadingMap') || 'Loading map...'}</Text>
+            <Text style={styles.mapLoadingText}>{t('loadingMap')}</Text>
           </View>
         </View>
       );
@@ -545,7 +545,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
             <Marker
               coordinate={restaurantLocation}
               title={orderData.restaurantName}
-              description="Restaurant"
+              description={t('restaurant')}
             >
               <View style={styles.customMarker}>
                 <View style={styles.restaurantMarker}>
@@ -560,7 +560,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
             <Marker
               coordinate={driverLocation}
               title={orderData.driverName}
-              description="Delivery Rider"
+              description={t('deliveryRider')}
               anchor={{ x: 0.5, y: 0.5 }}
             >
               <View style={styles.customMarker}>
@@ -576,7 +576,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
           {userLocation && (
             <Marker
               coordinate={userLocation}
-              title="Your Location"
+              title={t('yourLocation')}
               description={orderData.deliveryAddress}
             >
               <View style={styles.customMarker}>
@@ -993,7 +993,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
           {!userLocation ? (
             <View style={[styles.map, styles.mapLoading]}>
               <Ionicons name="map-outline" size={48} color={colors.text.light} />
-              <Text style={styles.mapLoadingText}>{t('loadingMap') || 'Loading map...'}</Text>
+              <Text style={styles.mapLoadingText}>{t('loadingMap')}</Text>
             </View>
           ) : (
             <>
@@ -1018,7 +1018,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
                   <Marker
                     coordinate={restaurantLocation}
                     title={orderData.restaurantName}
-                    description="Restaurant"
+                    description={t('restaurant')}
                   >
                     <View style={styles.customMarker}>
                       <View style={styles.restaurantMarker}>
@@ -1033,7 +1033,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
                   <Marker
                     coordinate={driverLocation}
                     title={orderData.driverName}
-                    description="Delivery Rider"
+                    description={t('deliveryRider')}
                     anchor={{ x: 0.5, y: 0.5 }}
                   >
                     <View style={styles.customMarker}>
@@ -1049,7 +1049,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
                 {userLocation && (
                   <Marker
                     coordinate={userLocation}
-                    title="Your Location"
+                    title={t('yourLocation')}
                     description={orderData.deliveryAddress}
                   >
                     <View style={styles.customMarker}>

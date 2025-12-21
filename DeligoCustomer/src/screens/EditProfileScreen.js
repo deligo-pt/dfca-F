@@ -3,7 +3,7 @@ import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image,
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
-import { getUserData, saveUserData, getUserId } from '../utils/auth';
+import { getUserData, getUserId } from '../utils/auth';
 import { useLanguage } from '../utils/LanguageContext';
 import LocationDetails from '../components/Profile/LocationDetails';
 import * as Location from 'expo-location';
@@ -263,7 +263,7 @@ const EditProfileScreen = ({ navigation, route }) => {
   const [city, setCity] = useState(defaultAddress.city);
   const [postalCode, setPostalCode] = useState(defaultAddress.postalCode);
 
-  const [label, setLabel] = useState('Home');
+  const [label, setLabel] = useState(t('home'));
   const [fieldErrors, setFieldErrors] = useState({});
 
   const constructAddressFromFields = () => {
@@ -333,7 +333,7 @@ const EditProfileScreen = ({ navigation, route }) => {
         setCity(addr.city || defaultAddress.city);
 
         setPostalCode(addr.postalCode || defaultAddress.postalCode);
-        setLabel(addr.label || 'Home');
+        setLabel(addr.label || t('home'));
         return;
       }
 
@@ -373,13 +373,13 @@ const EditProfileScreen = ({ navigation, route }) => {
     setModalVisible(true);
   };
 
-  const updateProfile = async (profileData, imageFile = null, userInfo = null) => {
+  const updateProfile = async (profileData, imageFile = null) => {
     try {
       const customerId = await getUserId();
 
       if (!customerId) {
         console.error('No customer ID found from token');
-        throw new Error('Customer ID not found. Please log in again.');
+        throw new Error(t('sessionExpired'));
       }
 
       const formData = new FormData();
@@ -428,18 +428,18 @@ const EditProfileScreen = ({ navigation, route }) => {
         const message = error.response.data?.message || error.response.data?.error;
 
         if (status === 401) {
-          throw new Error('Session expired. Please log in again.');
+          throw new Error(t('sessionExpired'));
         } else if (status === 404) {
-          throw new Error('Customer profile not found.');
+          throw new Error(t('customerNotFound'));
         } else if (status >= 500) {
-          throw new Error('Server error. Please try again later.');
+          throw new Error(t('serverError'));
         } else {
-          throw new Error(message || 'Failed to update profile');
+          throw new Error(message || t('failedToUpdateProfile'));
         }
       } else if (error.request) {
-        throw new Error('Network error. Please check your connection.');
+        throw new Error(t('networkError'));
       } else {
-        throw new Error(error.message || 'An unexpected error occurred');
+        throw new Error(error.message || t('unexpectedError'));
       }
     }
   };
@@ -923,7 +923,7 @@ const EditProfileScreen = ({ navigation, route }) => {
           else setModalVisible(false);
         }}
         onlyConfirm={modalConfig.onlyConfirm}
-        confirmText="OK"
+        confirmText={t('ok')}
       />
       <Modal
         visible={imagePickerVisible}

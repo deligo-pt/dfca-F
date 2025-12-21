@@ -526,7 +526,7 @@ const CheckoutScreen = ({ route, navigation }) => {
         <View style={styles(colors).headerCenter}>
           <Text style={styles(colors).headerTitle}>{cart?.vendorName || cartData?.vendorName || t('checkout')}</Text>
           <Text style={styles(colors).headerSubtitle}>
-            {cartItems.length} {cartItems.length === 1 ? 'item' : 'items'} • {t('estimated')} 25-35 {t('min')}
+            {cartItems.length} {cartItems.length === 1 ? t('item') : t('items')} • {t('estimated')} 25-35 {t('min')}
           </Text>
         </View>
         <View style={styles(colors).headerRight} />
@@ -722,7 +722,7 @@ const CheckoutScreen = ({ route, navigation }) => {
             </View>
 
             <View style={styles(colors).summaryRow}>
-              <Text style={styles(colors).summaryLabel}>Delivery Fee</Text>
+              <Text style={styles(colors).summaryLabel}>{t('deliveryFee')}</Text>
               <Text style={styles(colors).summaryValue}>
                 {formatCurrency(currency, displayTotal - (checkoutResponse?.subTotal || baseSubtotal) + discountTotal)}
               </Text>

@@ -114,13 +114,13 @@ const CategoriesScreen = ({ navigation }) => {
             _raw: p,
             id: p._id || p.productId || vendor.vendorId || `${Math.random().toString(36).slice(2)}`,
             image: vendor.storePhoto || (Array.isArray(p.images) && p.images[0]) || null,
-            name: vendor.vendorName || p.name || 'Unknown',
+            name: vendor.vendorName || p.name || t('unknown'),
             categories: Array.isArray(p.tags) ? p.tags : (p.category ? [p.category] : []),
             rating: (p.rating && (typeof p.rating === 'number' ? p.rating : p.rating.average)) || vendor.rating || 0,
             deliveryTime: p.deliveryTime || '',
             distance: p.distance || '',
             deliveryFee: (p.pricing && typeof p.pricing.price !== 'undefined') ? formatCurrency(p.pricing.currency || '', p.pricing.price) : '',
-            offer: (p.pricing && p.pricing.discount) ? `${p.pricing.discount}% OFF` : null,
+            offer: (p.pricing && p.pricing.discount) ? `${p.pricing.discount}% ${t('off')}` : null,
         };
     };
 
@@ -349,11 +349,11 @@ const CategoriesScreen = ({ navigation }) => {
     const formatAgo = (ts) => {
         if (!ts) return 'never';
         const sec = Math.floor((Date.now() - ts) / 1000);
-        if (sec < 60) return `${sec}s ago`;
+        if (sec < 60) return `${sec}${t('sAgo')}`;
         const min = Math.floor(sec / 60);
-        if (min < 60) return `${min}m ago`;
+        if (min < 60) return `${min}${t('mAgo')}`;
         const hr = Math.floor(min / 60);
-        return `${hr}h ago`;
+        return `${hr}${t('hAgo')}`;
     };
 
     const setTtl = async (ms) => {
@@ -666,7 +666,7 @@ const CategoriesScreen = ({ navigation }) => {
 
                 {/* Results Section */}
                 <SectionHeader
-                    title={searchQuery ? `Search Results (${(products || []).length})` : t('nearYou')}
+                    title={searchQuery ? `${t('searchResults')} (${(products || []).length})` : t('nearYou')}
                     onSeeAll={!searchQuery ? () => navigation.navigate('SeeAll', {
                         allItems: sourceProducts,  // ALL products (unfiltered)
                         vendorTypes: vendorTypes,  // For filter chips
@@ -684,14 +684,14 @@ const CategoriesScreen = ({ navigation }) => {
                     <View style={styles(colors).noResultsContainer}>
                         <Text style={styles(colors).noResultsText}>
                             {selectedVendorType || selectedCuisine
-                                ? (t('noResultsFor') + ' ' + (selectedVendorType || selectedCuisine) || 'No restaurants match your selection')
-                                : (t('noResultsFor') + ' ' + (selectedVendorType || selectedCuisine) || 'No restaurants found')
+                                ? (t('noResultsFor') + ' ' + (selectedVendorType || selectedCuisine) || t('noMatchSelection'))
+                                : (t('noResultsFor') + ' ' + (selectedVendorType || selectedCuisine) || t('noResultsFound'))
                             }
                         </Text>
                         <Text style={styles(colors).noResultsSubtext}>
                             {selectedVendorType || selectedCuisine
-                                ? (t('tryDifferentFilter') || 'Try a different category or cuisine')
-                                : (t('tryAdjustingFilters') || 'Try adjusting filters or pull to refresh')
+                                ? t('tryDifferentFilter')
+                                : t('tryAdjustingFilters')
                             }
                         </Text>
                         {(selectedVendorType || selectedCuisine) && (
@@ -704,7 +704,7 @@ const CategoriesScreen = ({ navigation }) => {
                                 }}
                                 style={styles(colors).clearFiltersButton}
                             >
-                                <Text style={styles(colors).clearFiltersText}>{t('clearFilters') || 'Clear Filters'}</Text>
+                                <Text style={styles(colors).clearFiltersText}>{t('clearFilters')}</Text>
                             </TouchableOpacity>
                         )}
                     </View>
