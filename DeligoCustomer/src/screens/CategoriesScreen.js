@@ -28,7 +28,7 @@ import { useProfile } from '../contexts/ProfileContext';
 import formatCurrency from '../utils/currency';
 
 const CategoriesScreen = ({ navigation }) => {
-    const { colors, isDark } = useTheme();
+    const { colors, isDarkMode } = useTheme();
     const { t } = useLanguage();
     const insets = useSafeAreaInsets();
 

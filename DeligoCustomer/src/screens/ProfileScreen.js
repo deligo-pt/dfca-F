@@ -1,5 +1,5 @@
 import React, { useState, useRef, useCallback } from 'react';
-import { View, StyleSheet, ScrollView, Animated, RefreshControl } from 'react-native';
+import { View, StyleSheet, ScrollView, Animated, RefreshControl, StatusBar } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useTheme } from '../utils/ThemeContext';
 import { getUserData } from '../utils/auth';
@@ -20,7 +20,7 @@ import { useFocusEffect } from '@react-navigation/native';
 
 const ProfileScreen = ({ onLogout, navigation }) => {
   const { t } = useLanguage();
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const { logout } = useProfile();
   const insets = useSafeAreaInsets();
   const [user, setUser] = useState(null);
@@ -103,6 +103,12 @@ const ProfileScreen = ({ onLogout, navigation }) => {
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={["top"]}>
+      <StatusBar
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        backgroundColor="transparent"
+        translucent={true}
+        animated={true}
+      />
       <View style={[styles.container, { backgroundColor: colors.background }]}>
         <ScrollView
           contentContainerStyle={[styles.content, { paddingBottom: Math.max(100, insets.bottom + 90) }]}

@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Modal } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Modal, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../utils/LanguageContext';
@@ -233,6 +233,12 @@ const SettingsScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
+      <StatusBar
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        backgroundColor="transparent"
+        translucent={true}
+        animated={true}
+      />
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
@@ -287,14 +293,14 @@ const SettingsScreen = ({ navigation }) => {
               icon="time-outline"
               title={t('defaultDeliveryTime')}
               subtitle={t('asap')}
-              onPress={() => {}}
+              onPress={() => { }}
             />
             <View style={styles.divider} />
             <SettingItem
               icon="restaurant-outline"
               title={t('dietaryPreferences')}
               subtitle={t('noneSet')}
-              onPress={() => {}}
+              onPress={() => { }}
             />
           </View>
         </View>
@@ -319,7 +325,7 @@ const SettingsScreen = ({ navigation }) => {
               icon="information-circle-outline"
               title={t('about')}
               subtitle={t('version')}
-              onPress={() => {}}
+              onPress={() => { }}
             />
           </View>
         </View>
@@ -332,7 +338,7 @@ const SettingsScreen = ({ navigation }) => {
               icon="trash-outline"
               title={t('deleteAccount')}
               subtitle={t('permanentlyDelete')}
-              onPress={() => {}}
+              onPress={() => { }}
               hasChevron={false}
             />
           </View>

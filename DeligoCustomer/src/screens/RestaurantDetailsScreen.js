@@ -32,7 +32,7 @@ import formatCurrency from '../utils/currency';
 import * as Location from 'expo-location';
 
 const RestaurantDetailsScreen = ({ route, navigation }) => {
-  const { colors, isDark } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const { t } = useLanguage();
   const { restaurant } = route.params;
   const insets = useSafeAreaInsets();
@@ -464,7 +464,12 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.surface} />
+      <StatusBar
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        backgroundColor="transparent"
+        translucent={true}
+        animated={true}
+      />
 
       {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>

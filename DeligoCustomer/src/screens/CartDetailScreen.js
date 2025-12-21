@@ -1,7 +1,7 @@
 import React from 'react';
 import { useLanguage } from '../utils/LanguageContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
 import CartDetail from '../components/CartDetail';
 import { useTheme } from '../utils/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
@@ -10,12 +10,18 @@ import { useCart } from '../contexts/CartContext';
 export default function CartDetailScreen({ route, navigation }) {
   const { t } = useLanguage();
   const { vendorId } = route.params || {};
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const { getVendorCart } = useCart();
   const vendor = getVendorCart(vendorId) || {};
 
   return (
-    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+    <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
+      <StatusBar
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        backgroundColor="transparent"
+        translucent={true}
+        animated={true}
+      />
       <View style={[styles.header, { borderBottomColor: colors.border, backgroundColor: colors.surface }]}>
         <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
           <Ionicons name="arrow-back" size={22} color={colors.text.primary} />

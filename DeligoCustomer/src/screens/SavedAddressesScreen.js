@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
@@ -64,6 +64,12 @@ const SavedAddressesScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles(colors).container} edges={['top']}>
+      <StatusBar
+        barStyle={colors.background === '#FFFFFF' ? 'dark-content' : 'light-content'}
+        backgroundColor="transparent"
+        translucent={true}
+        animated={true}
+      />
       {/* Header */}
       <View style={styles(colors).header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles(colors).backButton}>

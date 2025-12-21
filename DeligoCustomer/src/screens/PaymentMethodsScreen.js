@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
@@ -7,7 +7,7 @@ import { useLanguage } from '../utils/LanguageContext';
 
 const PaymentMethodsScreen = ({ navigation }) => {
   const { t } = useLanguage();
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const [paymentMethods, setPaymentMethods] = useState([
     {
       id: 1,
@@ -92,7 +92,7 @@ const PaymentMethodsScreen = ({ navigation }) => {
       width: 48,
       height: 48,
       borderRadius: 24,
-      backgroundColor: colors.isDarkMode ? '#2A1A2E' : '#FFF0F6', // Dark pink for dark mode
+      backgroundColor: isDarkMode ? '#2A1A2E' : '#FFF0F6', // Dark pink for dark mode
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: 16,
@@ -113,7 +113,7 @@ const PaymentMethodsScreen = ({ navigation }) => {
       marginRight: 8,
     },
     defaultBadge: {
-      backgroundColor: colors.isDarkMode ? '#1B2E1B' : '#E8F5E9', // Dark green for dark mode
+      backgroundColor: isDarkMode ? '#1B2E1B' : '#E8F5E9', // Dark green for dark mode
       paddingHorizontal: 8,
       paddingVertical: 2,
       borderRadius: 12,
@@ -152,7 +152,7 @@ const PaymentMethodsScreen = ({ navigation }) => {
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: colors.isDarkMode ? '#2A2A2A' : '#F8F8F8', // Dark gray for dark mode
+      backgroundColor: isDarkMode ? '#2A2A2A' : '#F8F8F8', // Dark gray for dark mode
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: 16,
@@ -167,7 +167,7 @@ const PaymentMethodsScreen = ({ navigation }) => {
     infoCard: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.isDarkMode ? '#1B2E1B' : '#E8F5E9', // Dark green for dark mode
+      backgroundColor: isDarkMode ? '#1B2E1B' : '#E8F5E9', // Dark green for dark mode
       borderRadius: 12,
       padding: 16,
       marginTop: 8,
@@ -219,6 +219,12 @@ const PaymentMethodsScreen = ({ navigation }) => {
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
+      <StatusBar
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        backgroundColor="transparent"
+        translucent={true}
+        animated={true}
+      />
       {/* Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>

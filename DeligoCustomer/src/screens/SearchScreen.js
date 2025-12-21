@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Keyboard } from 'react-native';
+import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Keyboard, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, fontSize } from '../theme';
@@ -339,6 +339,12 @@ const SearchScreen = ({ navigation }) => {
 
     return (
         <SafeAreaView style={styles(colors, isDarkMode).safeArea}>
+            <StatusBar
+                barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+                backgroundColor="transparent"
+                translucent={true}
+                animated={true}
+            />
             {/* Header: Back + Search Input + Clear */}
             <View style={styles(colors, isDarkMode).header}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles(colors, isDarkMode).backButton}>

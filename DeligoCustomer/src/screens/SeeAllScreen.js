@@ -6,7 +6,8 @@ import {
     TouchableOpacity,
     Text,
     ScrollView,
-    TextInput
+    TextInput,
+    StatusBar,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -139,6 +140,12 @@ const SeeAllScreen = ({ navigation, route }) => {
 
     return (
         <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+            <StatusBar
+                barStyle={colors.background === '#FFFFFF' ? 'dark-content' : 'light-content'}
+                backgroundColor="transparent"
+                translucent={true}
+                animated={true}
+            />
             {/* Header */}
             <View style={[styles.header, { borderBottomColor: colors.border }]}>
                 <TouchableOpacity

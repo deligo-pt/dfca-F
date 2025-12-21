@@ -58,7 +58,7 @@ const ConsumerLocationDisplay = ({ colors, t }) => {
 };
 
 const CheckoutScreen = ({ route, navigation }) => {
-  const { colors, isDark } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
   const { cartData } = route.params || {};
@@ -513,7 +513,12 @@ const CheckoutScreen = ({ route, navigation }) => {
 
   return (
     <SafeAreaView style={styles(colors).container} edges={['top']}>
-      <StatusBar barStyle={isDark ? 'light-content' : 'dark-content'} backgroundColor={colors.surface} />
+      <StatusBar
+        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        backgroundColor="transparent"
+        translucent={true}
+        animated={true}
+      />
 
       {/* Header */}
       <View style={styles(colors).header}>
