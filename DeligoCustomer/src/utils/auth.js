@@ -193,7 +193,8 @@ export const getUserId = async () => {
     const token = await AuthService.getAccessToken();
     if (!token) return null;
     const payload = JSON.parse(atob(token.split('.')[1]));
-    return payload.sub || payload.userId || payload.id || payload.customerId || null;
+    // backend expects userId (prefixed with 'C-') for customer endpoints
+    return payload.userId || payload.id || payload.sub || payload.customerId || null;
   } catch (err) {
     console.warn('getUserId error', err);
     return null;

@@ -97,7 +97,15 @@ export const ProfileProvider = ({ children }) => {
             }
 
             // Call API to update profile on server
-            const response = await customerApi.patch(API_ENDPOINTS.PROFILE.UPDATE, formData, {
+            // Prefer userId (e.g., C-xxxx) for the /customers/:id endpoint as requested by backend
+            const userId = user?.userId || user?._id || user?.id;
+            if (!userId) {
+                throw new Error('User ID not found. Please log in again.');
+            }
+
+            const updateUrl = API_ENDPOINTS.PROFILE.UPDATE.replace(':id', userId);
+
+            const response = await customerApi.patch(updateUrl, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 }

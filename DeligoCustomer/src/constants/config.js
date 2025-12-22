@@ -54,7 +54,7 @@ export const API_ENDPOINTS = {
   // Customer Profile & Data
   PROFILE: {
     GET: '/profile',
-    UPDATE: '/profile',
+    UPDATE: '/customers/:id',
     ADDRESSES: '/profile/addresses',
     ADD_ADDRESS: '/profile/addresses/add',
     UPDATE_ADDRESS: '/profile/addresses/:addressId/update',

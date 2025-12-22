@@ -17,6 +17,7 @@ import { useTheme } from '../utils/ThemeContext';
 import { BASE_API_URL, API_ENDPOINTS } from '../constants/config';
 import StorageService from '../utils/storage';
 import { useCart } from '../contexts/CartContext';
+import { useProducts } from '../contexts/ProductsContext';
 
 const OrdersScreen = ({ navigation }) => {
   const { t } = useLanguage();
@@ -26,6 +27,9 @@ const OrdersScreen = ({ navigation }) => {
   const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
   const [error, setError] = useState(null);
+
+  // Get products from ProductsContext to lookup vendor businessName
+  const { products } = useProducts();
 
   // Fetch orders from API
   const fetchOrders = async (isRefreshing = false) => {
@@ -73,7 +77,78 @@ const OrdersScreen = ({ navigation }) => {
 
         // Extract orders from response
         const ordersData = responseData?.data || [];
-        setOrders(ordersData);
+        // Normalize vendorId, vendorName, customerId, deliveryAddress, and items
+        const normalizedOrders = ordersData.map(order => {
+          // Handle vendorId - extract _id and build vendorName from businessName or nested name object
+          let normalizedVendorId = order.vendorId;
+          let vendorName = order.vendorName;
+          if (typeof order.vendorId === 'object' && order.vendorId) {
+            normalizedVendorId = order.vendorId._id || order.vendorId;
+            // Priority: businessName > businessDetails.businessName > firstName+lastName
+            const vendor = order.vendorId;
+            const businessDetails = vendor.businessDetails || {};
+            if (vendor.businessName) {
+              vendorName = vendor.businessName;
+            } else if (businessDetails.businessName) {
+              vendorName = businessDetails.businessName;
+            } else if (typeof vendor.name === 'object' && vendor.name) {
+              // Handle nested name object with firstName/lastName
+              vendorName = `${vendor.name.firstName || ''} ${vendor.name.lastName || ''}`.trim() || 'Vendor';
+            } else {
+              vendorName = vendor.name || vendor.vendorName || vendorName || 'Vendor';
+            }
+          }
+
+          // Handle deliveryAddress - build address string from object
+          let deliveryAddressString = order.deliveryAddress;
+          if (typeof order.deliveryAddress === 'object' && order.deliveryAddress) {
+            const addr = order.deliveryAddress;
+            deliveryAddressString = [addr.street, addr.city, addr.state, addr.country]
+              .filter(Boolean)
+              .join(', ') || 'Address';
+          }
+
+          // Handle customerId - extract _id and build customer name from nested name object
+          let normalizedCustomerId = order.customerId;
+          let customerName = '';
+          if (typeof order.customerId === 'object' && order.customerId) {
+            normalizedCustomerId = order.customerId._id || order.customerId;
+            // Handle nested name object with firstName/lastName
+            if (typeof order.customerId.name === 'object' && order.customerId.name) {
+              customerName = `${order.customerId.name.firstName || ''} ${order.customerId.name.lastName || ''}`.trim() || 'Customer';
+            } else {
+              customerName = order.customerId.name || 'Customer';
+            }
+          }
+
+          // Handle items - extract product name from productId object
+          const normalizedItems = (order.items || []).map(item => {
+            let productName = item.name;
+            if (typeof item.productId === 'object' && item.productId) {
+              productName = item.productId.name || item.name || 'Product';
+            }
+            return {
+              ...item,
+              name: productName,
+              productId: typeof item.productId === 'object' ? item.productId._id : item.productId
+            };
+          });
+
+          return {
+            ...order,
+            vendorId: normalizedVendorId,
+            vendorName: vendorName,
+            deliveryAddress: deliveryAddressString,
+            customerId: normalizedCustomerId,
+            customerName: customerName,
+            items: normalizedItems
+          };
+        });
+        setOrders(normalizedOrders);
+
+        // Update vendor business names from ProductsContext
+        // This is called synchronously since we already have the products data
+        setTimeout(() => updateOrdersWithBusinessNames(normalizedOrders), 0);
       } catch (fetchError) {
         clearTimeout(timeoutId);
         // If aborted due to timeout or network error, still set loading to false
@@ -95,10 +170,58 @@ const OrdersScreen = ({ navigation }) => {
       setRefreshing(false);
     }
   };
+  // Get vendor business names from ProductsContext products
+  const getVendorBusinessNames = (vendorIds) => {
+    const vendorNameMap = {};
+
+    vendorIds.forEach(vendorId => {
+      // Find a product from this vendor in the products array
+      const productFromVendor = products.find(product => {
+        // Check the normalized vendor object (from normalizeProduct)
+        const prodVendorId = product.vendor?.id || product._raw?.vendorId?._id || product._raw?.vendorId;
+        return prodVendorId === vendorId;
+      });
+
+      if (productFromVendor) {
+        // The normalized product has vendor.vendorName which contains businessName
+        // from normalizeProduct logic: vendorSource.businessName || businessDetails.businessName
+        const businessName = productFromVendor.vendor?.vendorName;
+        if (businessName && businessName !== 'Unknown') {
+          vendorNameMap[vendorId] = businessName;
+          console.debug(`[OrdersScreen] Found businessName for vendor ${vendorId}:`, businessName);
+        }
+      }
+    });
+
+    return vendorNameMap;
+  };
+
+  // Update orders with vendor business names from ProductsContext
+  const updateOrdersWithBusinessNames = (ordersToUpdate) => {
+    const uniqueVendorIds = [...new Set(ordersToUpdate.map(o => o.vendorId).filter(Boolean))];
+    if (uniqueVendorIds.length === 0) return;
+
+    const vendorNameMap = getVendorBusinessNames(uniqueVendorIds);
+
+    if (Object.keys(vendorNameMap).length > 0) {
+      setOrders(prevOrders => prevOrders.map(order => ({
+        ...order,
+        vendorName: vendorNameMap[order.vendorId] || order.vendorName
+      })));
+      console.debug('[OrdersScreen] Updated orders with vendor business names from ProductsContext:', vendorNameMap);
+    }
+  };
 
   useEffect(() => {
     fetchOrders();
   }, []);
+
+  // Update orders with business names when products change (in case products load after orders)
+  useEffect(() => {
+    if (orders.length > 0 && products.length > 0) {
+      updateOrdersWithBusinessNames(orders);
+    }
+  }, [products]); // Re-run when products update
 
   const handleRefresh = () => {
     setRefreshing(true);
@@ -199,7 +322,7 @@ const OrdersScreen = ({ navigation }) => {
             const vData = await vRes.json();
             const v = vData.data || vData;
             if (v) {
-              vendorDetails.vendorName = v.vendorName || v.name || v.restaurantName;
+              vendorDetails.vendorName = v.businessDetails?.businessName || v.businessName || v.vendorName || v.name || v.restaurantName;
               vendorDetails.vendorImage = v.storePhoto || v.logo || v.image;
               console.log('[OrdersScreen] Fetched vendor details for reorder:', vendorDetails);
             }
@@ -292,10 +415,10 @@ const OrdersScreen = ({ navigation }) => {
           <View style={styles.headerContent}>
             <View style={styles.headerRow}>
               <Text style={[styles.restaurantName, { color: colors.text.primary }]} numberOfLines={1}>
-                {order.vendorId || t('groceriesAndFood') || 'Groceries & Food'}
+                {order.vendorName || t('groceriesAndFood') || 'Groceries & Food'}
               </Text>
               <Text style={[styles.orderPrice, { color: colors.text.primary }]}>
-                €{order.finalAmount?.toFixed(2) || order.totalPrice?.toFixed(2) || '0.00'}
+                €{order.subTotal?.toFixed(2) || '0.00'}
               </Text>
             </View>
             <View style={styles.subHeaderRow}>

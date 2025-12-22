@@ -213,8 +213,10 @@ const CheckoutScreen = ({ route, navigation }) => {
       }
 
       let backendAddressId = null;
+      let currentUser = null;
 
       try {
+        currentUser = await getUserData();
         console.debug('[CheckoutScreen] Fetching existing backend addresses...');
 
         // 1. Try to get existing addresses
@@ -232,8 +234,8 @@ const CheckoutScreen = ({ route, navigation }) => {
         // 2. Always sync current address to backend (Update Profile Address)
         // Using the same logic as EditProfileScreen to ensure persistence
         try {
-          const customerId = await getUserId();
-          const currentUser = await getUserData();
+          // Prefer userId (e.g., C-xxxx) for the /customers/:id endpoint
+          const customerId = currentUser?.userId || currentUser?._id || currentUser?.id;
 
           if (customerId && currentUser) {
             const formData = new FormData();
@@ -248,8 +250,9 @@ const CheckoutScreen = ({ route, navigation }) => {
             formData.append('data', JSON.stringify(updatedProfileData));
 
             console.debug('[CheckoutScreen] Syncing address via main profile update:', customerId);
+            const updateUrl = API_ENDPOINTS.PROFILE.UPDATE.replace(':id', customerId);
             const syncRes = await customerApi.patch(
-              `/customers/${customerId}`,
+              updateUrl,
               formData,
               {
                 headers: {
@@ -282,7 +285,18 @@ const CheckoutScreen = ({ route, navigation }) => {
       }
 
       // Prepare Final Payload
-      const finalPayload = { ...addressData, label: addressData.label || 'Home' };
+      // Fallback to getUserData if currentUser is still null
+      if (!currentUser) {
+        currentUser = await getUserData();
+      }
+
+      const finalPayload = {
+        ...addressData,
+        label: addressData.label || 'Home',
+        customerName: `${currentUser?.name?.firstName || ''} ${currentUser?.name?.lastName || ''}`.trim(),
+        customerEmail: currentUser?.email || '',
+        customerPhone: currentUser?.contactNumber || currentUser?.phone || currentUser?.mobile || '',
+      };
       if (backendAddressId) {
         finalPayload.deliveryAddressId = backendAddressId;
         finalPayload.addressId = backendAddressId;
@@ -469,7 +483,7 @@ const CheckoutScreen = ({ route, navigation }) => {
         return;
       }
 
-      const declaredFinalAmount = checkoutResponse?.data?.finalAmount || checkoutResponse?.finalAmount;
+      const declaredFinalAmount = checkoutResponse?.data?.subTotal || checkoutResponse?.subTotal;
       if (declaredFinalAmount && Math.abs(declaredFinalAmount - total) > 0.01) {
         console.debug('[CheckoutScreen] finalAmount mismatch', {
           declaredFinalAmount,
@@ -807,14 +821,14 @@ const CheckoutScreen = ({ route, navigation }) => {
             <View style={styles(colors).summaryRow}>
               <Text style={styles(colors).summaryLabel}>{t('subtotal')}</Text>
               <Text style={styles(colors).summaryValue}>
-                {formatCurrency(currency, checkoutResponse?.subTotal || baseSubtotal)}
+                {formatCurrency(currency, baseSubtotal)}
               </Text>
             </View>
 
             <View style={styles(colors).summaryRow}>
               <Text style={styles(colors).summaryLabel}>{t('deliveryFee')}</Text>
               <Text style={styles(colors).summaryValue}>
-                {formatCurrency(currency, displayTotal - (checkoutResponse?.subTotal || baseSubtotal) + discountTotal)}
+                {formatCurrency(currency, (checkoutResponse?.data?.subTotal || displayTotal) - baseSubtotal + discountTotal)}
               </Text>
             </View>
 
@@ -833,7 +847,7 @@ const CheckoutScreen = ({ route, navigation }) => {
             <View style={styles(colors).summaryRow}>
               <Text style={styles(colors).totalLabel}>{t('total')}</Text>
               <Text style={styles(colors).totalValue}>
-                {formatCurrency(currency, displayTotal)}
+                {formatCurrency(currency, checkoutResponse?.data?.subTotal || displayTotal)}
               </Text>
             </View>
           </View>

@@ -47,7 +47,25 @@ const TrackOrderScreen = ({ route, navigation }) => {
   const { colors, isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
   const { order } = route.params || {};
-  const [currentStatus, setCurrentStatus] = useState('on_the_way'); // preparing, ready, picked_up, on_the_way, nearby, delivered
+
+  // Map API order status to internal stage IDs
+  const mapOrderStatusToStage = (status) => {
+    const statusMap = {
+      'PENDING': 'preparing',
+      'ACCEPTED': 'ready',
+      'ASSIGNED': 'picked_up',
+      'PICKED_UP': 'picked_up',
+      'ON_THE_WAY': 'on_the_way',
+      'NEARBY': 'nearby',
+      'DELIVERED': 'delivered',
+      'CANCELED': 'delivered',
+      'REJECTED': 'delivered',
+    };
+    return statusMap[status?.toUpperCase()] || 'preparing';
+  };
+
+  const initialStatus = order?.orderStatus ? mapOrderStatusToStage(order.orderStatus) : 'preparing';
+  const [currentStatus, setCurrentStatus] = useState(initialStatus);
   const [progressAnim] = useState(new Animated.Value(0));
   const mapRef = useRef(null);
 
@@ -63,46 +81,115 @@ const TrackOrderScreen = ({ route, navigation }) => {
   const normalizeOrderData = (data) => {
     if (!data) return null;
 
-    // If items is array of strings, convert to objects
-    const normalizedItems = data.items?.map((item) => {
+    // Extract order items with proper names
+    const normalizedItems = (data.items || []).map((item) => {
       if (typeof item === 'string') {
         return { name: item, quantity: 1, price: 0 };
       }
-      return item;
-    }) || [];
+      // Handle productId object structure
+      let productName = item.name;
+      if (typeof item.productId === 'object' && item.productId) {
+        productName = item.productId.name || item.name || 'Product';
+      }
+      return {
+        name: productName,
+        quantity: item.quantity || 1,
+        price: item.price || item.subtotal / (item.quantity || 1) || 0,
+        subtotal: item.subtotal || item.price * (item.quantity || 1) || 0
+      };
+    });
 
-    const deliveryAddrStr = formatAddress(data.deliveryAddress) || '456 Park Avenue, Apartment 5B, 2nd Floor';
+    // Build items text for display
+    const itemsText = normalizedItems.map(item =>
+      item.quantity > 1 ? `${item.name} x${item.quantity}` : item.name
+    );
+
+    // Format delivery address from object
+    const deliveryAddrStr = formatAddress(data.deliveryAddress);
+
+    // Format order date and time from createdAt
+    let orderDate = '';
+    let orderTime = '';
+    if (data.createdAt) {
+      try {
+        const date = new Date(data.createdAt);
+        orderDate = date.toLocaleDateString('en-US', { month: 'short', day: 'numeric', year: 'numeric' });
+        orderTime = date.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit' });
+      } catch (e) {
+        orderDate = 'N/A';
+        orderTime = 'N/A';
+      }
+    }
+
+    // Extract vendor/restaurant name - handle both string and object vendorId
+    let restaurantName = data.vendorName || data.restaurantName;
+    if (!restaurantName && typeof data.vendorId === 'object' && data.vendorId) {
+      const vendor = data.vendorId;
+      restaurantName = vendor.businessDetails?.businessName
+        || vendor.businessName
+        || (vendor.name && typeof vendor.name === 'object'
+          ? `${vendor.name.firstName || ''} ${vendor.name.lastName || ''}`.trim()
+          : vendor.name)
+        || 'Restaurant';
+    }
+    restaurantName = restaurantName || 'Restaurant';
+
+    // Extract delivery partner info if available
+    let driverName = t('awaitingDriver') || 'Awaiting driver';
+    let driverPhone = '';
+    let driverRating = 0;
+    let vehicleType = '';
+    let vehicleNumber = '';
+
+    if (data.deliveryPartnerId && typeof data.deliveryPartnerId === 'object') {
+      const partner = data.deliveryPartnerId;
+      if (partner.name && typeof partner.name === 'object') {
+        driverName = `${partner.name.firstName || ''} ${partner.name.lastName || ''}`.trim() || driverName;
+      } else if (partner.name) {
+        driverName = partner.name;
+      }
+      driverPhone = partner.phone || partner.phoneNumber || '';
+      driverRating = partner.rating || 0;
+      vehicleType = partner.vehicleType || partner.vehicle?.type || '';
+      vehicleNumber = partner.vehicleNumber || partner.vehicle?.number || '';
+    }
+
+    // Calculate subtotal from items if not provided
+    const calculatedSubtotal = normalizedItems.reduce((sum, item) => sum + (item.subtotal || 0), 0);
 
     return {
-      id: data.id || '1',
-      orderNumber: data.orderNumber || '#DLG-2024-1234',
-      orderDate: data.orderDate || 'Oct 26, 2025',
-      orderTime: data.orderTime || '2:45 PM',
-      restaurantName: data.restaurantName || 'Burger King',
-      restaurantAddress: data.restaurantAddress || '123 Main Street, Downtown District',
-      restaurantPhone: data.restaurantPhone || '+1 (555) 123-4567',
-      restaurantImage: data.restaurantImage || '🍔',
+      id: data._id || data.id || '1',
+      orderNumber: data.orderId || `#${data._id?.slice(-8) || 'ORDER'}`,
+      orderDate: orderDate,
+      orderTime: orderTime,
+      restaurantName: restaurantName,
+      restaurantAddress: data.restaurantAddress || '',
+      restaurantPhone: data.restaurantPhone || '',
+      restaurantImage: data.restaurantImage || '�️',
       items: normalizedItems,
-      itemsText: data.itemsText || data.items || [],
-      subtotal: data.subtotal || data.totalAmount || 0,
-      deliveryFee: data.deliveryFee || 2.99,
-      serviceFee: data.serviceFee || 1.99,
+      itemsText: itemsText,
+      subtotal: data.totalPrice || calculatedSubtotal || 0, // Item subtotal (before delivery charge)
+      deliveryFee: data.deliveryCharge || 0,
+      serviceFee: data.serviceFee || 0,
       discount: data.discount || 0,
-      totalAmount: data.totalAmount || 0,
-      estimatedTime: data.estimatedTime || '20-25 min',
-      estimatedArrival: data.estimatedArrival || '3:10 PM',
-      deliveryAddress: deliveryAddrStr,
-      deliveryLandmark: data.deliveryLandmark || 'Near Central Park',
-      deliveryInstructions: data.deliveryInstructions || 'Please ring the bell twice',
-      driverName: data.driverName || 'Michael Rodriguez',
-      driverPhone: data.driverPhone || '+1 (555) 987-6543',
-      driverRating: data.driverRating || 4.9,
-      driverTotalDeliveries: data.driverTotalDeliveries || 1247,
-      vehicleType: data.vehicleType || 'Motorcycle',
-      vehicleNumber: data.vehicleNumber || 'DLG-8845',
-      vehicleColor: data.vehicleColor || 'Red',
-      paymentMethod: data.paymentMethod || 'Credit Card •••• 4242',
-      promoCode: data.promoCode || 'SAVE5',
+      totalAmount: data.subTotal || data.totalAmount || 0, // Final amount (with delivery charge)
+      estimatedTime: data.estimatedDeliveryTime || '20-30 min',
+      estimatedArrival: data.estimatedArrival || '',
+      deliveryAddress: deliveryAddrStr || 'Delivery address',
+      deliveryLandmark: data.deliveryAddress?.landmark || '',
+      deliveryInstructions: data.remarks || data.deliveryInstructions || '',
+      driverName: driverName,
+      driverPhone: driverPhone,
+      driverRating: driverRating,
+      driverTotalDeliveries: data.driverTotalDeliveries || 0,
+      vehicleType: vehicleType,
+      vehicleNumber: vehicleNumber,
+      vehicleColor: data.vehicleColor || '',
+      paymentMethod: data.paymentMethod || 'N/A',
+      paymentStatus: data.paymentStatus || '',
+      orderStatus: data.orderStatus || 'PENDING',
+      promoCode: data.couponId?.code || '',
+      isOtpVerified: data.isOtpVerified || false,
     };
   };
 
@@ -333,25 +420,35 @@ const TrackOrderScreen = ({ route, navigation }) => {
   useEffect(() => {
     (async () => {
       try {
+        // Check if order has delivery coordinates
+        const orderDeliveryCoords = order?.deliveryAddress?.latitude && order?.deliveryAddress?.longitude
+          ? {
+            latitude: order.deliveryAddress.latitude,
+            longitude: order.deliveryAddress.longitude,
+          }
+          : null;
+
         const { status } = await Location.requestForegroundPermissionsAsync();
         if (status !== 'granted') {
           console.log('Permission to access location was denied');
-          // Set default location (fallback)
-          const defaultCoords = {
-            latitude: 37.78825,
-            longitude: -122.4324,
+          // Use order delivery coordinates if available, otherwise fallback
+          const defaultCoords = orderDeliveryCoords || {
+            latitude: 23.745038, // Dhaka fallback
+            longitude: 90.4395245,
           };
           setUserLocation(defaultCoords);
 
+          // Restaurant location offset from delivery
           const restaurantCoords = {
-            latitude: 37.78825 + 0.01,
-            longitude: -122.4324 + 0.008,
+            latitude: defaultCoords.latitude + 0.01,
+            longitude: defaultCoords.longitude + 0.008,
           };
           setRestaurantLocation(restaurantCoords);
 
+          // Driver between restaurant and delivery
           const driverCoords = {
-            latitude: 37.78825 + 0.005,
-            longitude: -122.4324 + 0.004,
+            latitude: defaultCoords.latitude + 0.005,
+            longitude: defaultCoords.longitude + 0.004,
           };
           setDriverLocation(driverCoords);
 
@@ -359,56 +456,68 @@ const TrackOrderScreen = ({ route, navigation }) => {
           return;
         }
 
-        const location = await Location.getCurrentPositionAsync({
-          accuracy: Location.Accuracy.Balanced,
-        });
-        const userCoords = {
-          latitude: location.coords.latitude,
-          longitude: location.coords.longitude,
-        };
+        // If we have order delivery coordinates, use them as user location
+        // Otherwise get current device location
+        let userCoords;
+        if (orderDeliveryCoords) {
+          userCoords = orderDeliveryCoords;
+        } else {
+          const location = await Location.getCurrentPositionAsync({
+            accuracy: Location.Accuracy.Balanced,
+          });
+          userCoords = {
+            latitude: location.coords.latitude,
+            longitude: location.coords.longitude,
+          };
+        }
         setUserLocation(userCoords);
 
-        // Set mock restaurant location (offset from user)
+        // Set restaurant location (offset from delivery address)
         const restaurantCoords = {
-          latitude: location.coords.latitude + 0.01,
-          longitude: location.coords.longitude + 0.008,
+          latitude: userCoords.latitude + 0.01,
+          longitude: userCoords.longitude + 0.008,
         };
         setRestaurantLocation(restaurantCoords);
 
         // Set initial driver location (between restaurant and user)
         const driverCoords = {
-          latitude: location.coords.latitude + 0.005,
-          longitude: location.coords.longitude + 0.004,
+          latitude: userCoords.latitude + 0.005,
+          longitude: userCoords.longitude + 0.004,
         };
         setDriverLocation(driverCoords);
 
-        // Create route coordinates (simple straight line for demo)
+        // Create route coordinates
         setRouteCoordinates([restaurantCoords, driverCoords, userCoords]);
       } catch (error) {
         console.error('Error getting location:', error);
-        // Set default location on error
-        const defaultCoords = {
-          latitude: 37.78825,
-          longitude: -122.4324,
-        };
+        // Use order delivery coordinates if available, otherwise fallback
+        const defaultCoords = order?.deliveryAddress?.latitude && order?.deliveryAddress?.longitude
+          ? {
+            latitude: order.deliveryAddress.latitude,
+            longitude: order.deliveryAddress.longitude,
+          }
+          : {
+            latitude: 23.745038,
+            longitude: 90.4395245,
+          };
         setUserLocation(defaultCoords);
 
         const restaurantCoords = {
-          latitude: 37.78825 + 0.01,
-          longitude: -122.4324 + 0.008,
+          latitude: defaultCoords.latitude + 0.01,
+          longitude: defaultCoords.longitude + 0.008,
         };
         setRestaurantLocation(restaurantCoords);
 
         const driverCoords = {
-          latitude: 37.78825 + 0.005,
-          longitude: -122.4324 + 0.004,
+          latitude: defaultCoords.latitude + 0.005,
+          longitude: defaultCoords.longitude + 0.004,
         };
         setDriverLocation(driverCoords);
 
         setRouteCoordinates([restaurantCoords, driverCoords, defaultCoords]);
       }
     })();
-  }, []);
+  }, [order]);
 
   // Simulate driver movement towards user
   useEffect(() => {
@@ -928,10 +1037,6 @@ const TrackOrderScreen = ({ route, navigation }) => {
             <View style={styles.billRow}>
               <Text style={styles.billLabel}>{t('deliveryFee')}</Text>
               <Text style={styles.billValue}>€{orderData.deliveryFee ? orderData.deliveryFee.toFixed(2) : '0.00'}</Text>
-            </View>
-            <View style={styles.billRow}>
-              <Text style={styles.billLabel}>{t('serviceFee')}</Text>
-              <Text style={styles.billValue}>€{orderData.serviceFee ? orderData.serviceFee.toFixed(2) : '0.00'}</Text>
             </View>
 
             {orderData.discount > 0 && (
