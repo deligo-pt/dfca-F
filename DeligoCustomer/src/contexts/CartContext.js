@@ -12,23 +12,43 @@ function normalizeProductForCart(p) {
   const raw = p._raw || p;
 
   // Collect all possible ID candidates
-  const candidates = [raw.productId, raw._id, raw.product?._id, p.id, raw.id];
+  // Handle populated productId object (raw.productId._id)
+  const candidates = [
+    raw.productId?._id,
+    raw.productId,
+    raw._id,
+    raw.product?._id,
+    p.id,
+    raw.id
+  ];
 
-  // IMPORTANT: Prioritize PROD-XXXX format (SKU) as backend expects it
+  // IMPORTANT: Prioritize MongoDB ID (_id) as requested by user
   let chosen = null;
   let source = null;
 
-  // First pass: Look for SKU format (PROD-XXXX)
+  // First pass: Look for Mongo ID format (24 hex chars)
   for (const c of candidates) {
-    if (c && typeof c === 'string' && /^PROD-/i.test(c)) {
+    if (isValidObjectId(c)) {
       chosen = c;
       source = c;
-      console.debug('[cart:id-debug] Found SKU format:', chosen);
+      console.debug('[cart:id-debug] Found Mongo ID format:', chosen);
       break;
     }
   }
 
-  // Second pass: If no SKU, fall back to any valid ID
+  // Second pass: If no Mongo ID, look for SKU format (PROD-XXXX)
+  if (!chosen) {
+    for (const c of candidates) {
+      if (c && typeof c === 'string' && /^PROD-/i.test(c)) {
+        chosen = c;
+        source = c;
+        console.debug('[cart:id-debug] Found SKU format:', chosen);
+        break;
+      }
+    }
+  }
+
+  // Third pass: Fall back to any valid ID
   if (!chosen) {
     for (const c of candidates) {
       if (c && typeof c === 'string') {
@@ -48,7 +68,12 @@ function normalizeProductForCart(p) {
 
   // Extract vendor info more robustly
   const vendor = raw.vendor || {};
-  const vendorId = vendor.vendorId || raw.vendorId || null;
+  let vendorId = vendor.vendorId || raw.vendorId || null;
+
+  // Handle populated vendorId object
+  if (vendorId && typeof vendorId === 'object') {
+    vendorId = vendorId._id || vendorId.id || null;
+  }
 
   // Pricing extraction
   const pricing = raw.pricing || {};

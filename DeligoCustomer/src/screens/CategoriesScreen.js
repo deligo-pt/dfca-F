@@ -108,19 +108,44 @@ const CategoriesScreen = ({ navigation }) => {
     const { products, fetchProducts, loading: productsLoading, error: productsError, lastUpdated } = useProducts();
     const [refreshing, setRefreshing] = useState(false);
     // Local normalize function (same shape as ProductsContext.normalizeProduct)
+    // Updated to handle nested vendorId object
     const localNormalize = (p) => {
-        const vendor = p.vendor || {};
+        const raw = p._raw || p;
+        let vendorSource = raw.vendor || {};
+        if (raw.vendorId && typeof raw.vendorId === 'object') {
+            vendorSource = { ...vendorSource, ...raw.vendorId };
+        }
+
+        const businessDetails = vendorSource.businessDetails || {};
+        const businessLocation = vendorSource.businessLocation || {};
+
+        const vendorName = vendorSource.businessName || businessDetails.businessName || vendorSource.vendorName || raw.name || t('unknown');
+        // Check both businessType (new) and vendorType (old)
+        const vendorType = vendorSource.businessType || businessDetails.businessType || vendorSource.vendorType || '';
+        const vendorRating = (vendorSource.rating && typeof vendorSource.rating === 'number') ? vendorSource.rating : 0;
+
+        const price = (p.pricing && typeof p.pricing.price !== 'undefined') ? p.pricing.price : (raw.price || 0);
+
         return {
-            _raw: p,
-            id: p._id || p.productId || vendor.vendorId || `${Math.random().toString(36).slice(2)}`,
-            image: vendor.storePhoto || (Array.isArray(p.images) && p.images[0]) || null,
-            name: vendor.vendorName || p.name || t('unknown'),
+            _raw: raw,
+            id: p._id || p.productId || vendorSource._id || `${Math.random().toString(36).slice(2)}`,
+            image: vendorSource.storePhoto || (Array.isArray(p.images) && p.images[0]) || null,
+            name: vendorName,
             categories: Array.isArray(p.tags) ? p.tags : (p.category ? [p.category] : []),
-            rating: (p.rating && (typeof p.rating === 'number' ? p.rating : p.rating.average)) || vendor.rating || 0,
+            rating: (p.rating && (typeof p.rating === 'number' ? p.rating : p.rating.average)) || vendorRating || 0,
             deliveryTime: p.deliveryTime || '',
             distance: p.distance || '',
-            deliveryFee: (p.pricing && typeof p.pricing.price !== 'undefined') ? formatCurrency(p.pricing.currency || '', p.pricing.price) : '',
+            deliveryFee: formatCurrency(p.pricing?.currency || '', price),
             offer: (p.pricing && p.pricing.discount) ? `${p.pricing.discount}% ${t('off')}` : null,
+            vendor: {
+                id: vendorSource._id || vendorSource.vendorId || vendorSource.id,
+                vendorName: vendorName,
+                vendorType: vendorType,
+                rating: vendorRating,
+                latitude: vendorSource.latitude || businessLocation.latitude,
+                longitude: vendorSource.longitude || businessLocation.longitude,
+                storePhoto: vendorSource.storePhoto || vendorSource.logo
+            }
         };
     };
 
@@ -206,20 +231,24 @@ const CategoriesScreen = ({ navigation }) => {
     const vendorTypesFromProducts = React.useMemo(() => {
         const map = new Map();
         (sourceProducts || []).forEach((p) => {
-            const rawVendor = (p._raw && p._raw.vendor) || p.vendor || {};
-            const vendorType = rawVendor.vendorType;
-            if (vendorType && String(vendorType).trim()) {
-                const key = String(vendorType).trim();
-                if (!map.has(key)) {
-                    // Map vendor types to icons for header
-                    const icon = key.toLowerCase().includes('resturent') || key.toLowerCase().includes('restaurant')
-                        ? '🍕'
-                        : key.toLowerCase().includes('store') || key.toLowerCase().includes('grocery')
-                            ? '🛒'
-                            : key.toLowerCase().includes('pharmacy')
-                                ? '💊'
-                                : '🏪';
-                    map.set(key, { id: key, name: key, icon });
+            // Use normalized vendor object from context logic
+            const vt = p.vendor?.vendorType || (p._raw?.vendor?.vendorType) || '';
+
+            if (vt && String(vt).trim()) {
+                const key = String(vt).trim();
+                // Avoid logging object IDs as keys
+                if (key.length < 24 || !/^[0-9a-fA-F]{24}$/.test(key)) {
+                    if (!map.has(key)) {
+                        // Map vendor types to icons for header
+                        const icon = key.toLowerCase().includes('resturent') || key.toLowerCase().includes('restaurant')
+                            ? '🍕'
+                            : key.toLowerCase().includes('store') || key.toLowerCase().includes('grocery')
+                                ? '🛒'
+                                : key.toLowerCase().includes('pharmacy')
+                                    ? '💊'
+                                    : '🏪';
+                        map.set(key, { id: key, name: key, icon });
+                    }
                 }
             }
         });
@@ -231,9 +260,10 @@ const CategoriesScreen = ({ navigation }) => {
         const map = new Map();
         const arr = Array.isArray(sourceProducts) ? sourceProducts : [];
         for (const p of arr) {
-            const vtRaw = p._raw?.vendor?.vendorType ?? p.vendor?.vendorType ?? null;
-            const vt = vtRaw != null ? String(vtRaw).trim() : null;
-            if (selectedVendorType && vt !== selectedVendorType) continue;
+            const vt = p.vendor?.vendorType || (p._raw?.vendor?.vendorType) || '';
+
+            if (selectedVendorType && String(vt).trim() !== selectedVendorType) continue;
+
             const catRaw = p._raw?.category ?? p.category ?? (Array.isArray(p.tags) ? p.tags[0] : null);
             const cat = catRaw != null ? String(catRaw).trim() : null;
             if (!cat) continue;

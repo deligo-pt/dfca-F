@@ -18,6 +18,8 @@ const LocationAddressScreen = ({ navigation, route }) => {
     address: contextAddress,
     city: contextCity,
     postalCode: contextPostalCode,
+    state: contextState,
+    country: contextCountry,
     currentLocation: contextLocation,
     getCurrentLocation: contextGetCurrentLocation,
     loading: contextLoading,
@@ -41,6 +43,8 @@ const LocationAddressScreen = ({ navigation, route }) => {
   const [detailedAddress, setDetailedAddress] = useState('');
   const [city, setCity] = useState(contextCity || '');
   const [postalCode, setPostalCode] = useState(contextPostalCode || '');
+  const [state, setState] = useState(contextState || '');
+  const [country, setCountry] = useState(contextCountry || '');
   const [label, setLabel] = useState('Home');
   const [fieldErrors, setFieldErrors] = useState({});
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
@@ -84,6 +88,8 @@ const LocationAddressScreen = ({ navigation, route }) => {
         setStreetAddress(data.address || '');
         setCity(data.city || '');
         setPostalCode(data.postalCode || '');
+        setState(data.state || '');
+        setCountry(data.country || '');
       }
     } catch (error) {
       console.error(error);
@@ -134,12 +140,16 @@ const LocationAddressScreen = ({ navigation, route }) => {
         ].filter((val, index, self) => val && val.trim() !== '' && self.indexOf(val) === index);
 
         const newStreet = addressParts.join(', ');
-        const newCity = addr.city || addr.region || '';
+        const newCity = addr.city || addr.region || addr.subregion || '';
         const newPostal = addr.postalCode || '';
+        const newState = addr.region || addr.subregion || '';
+        const newCountry = addr.country || '';
 
         setStreetAddress(newStreet);
         setCity(newCity);
         setPostalCode(newPostal);
+        setState(newState);
+        setCountry(newCountry);
       }
     } catch (error) {
       console.error(error);
@@ -153,8 +163,10 @@ const LocationAddressScreen = ({ navigation, route }) => {
   const validate = () => {
     const errors = {};
     if (!streetAddress.trim()) errors.streetAddress = t('streetAddressRequired');
-    if (!city.trim()) errors.city = t('cityRequired');
-    if (!postalCode.trim()) errors.postalCode = t('postalCodeRequired');
+    if (!city.trim()) errors.city = 'Please complete your profile before checking out';
+    if (!state.trim()) errors.state = 'Please complete your profile before checking out';
+    if (!country.trim()) errors.country = 'Please complete your profile before checking out';
+    if (!postalCode.trim()) errors.postalCode = 'Please complete your profile before checking out';
     setFieldErrors(errors);
     return Object.keys(errors).length === 0;
   };
@@ -165,6 +177,8 @@ const LocationAddressScreen = ({ navigation, route }) => {
     setDetailedAddress(addr.detailedAddress || '');
     setCity(addr.city || '');
     setPostalCode(addr.postalCode || '');
+    setState(addr.state || '');
+    setCountry(addr.country || '');
     setLabel(addr.label || 'Home');
     if (addr.coordinates) {
       setMarkerCoordinate(addr.coordinates);
@@ -186,6 +200,8 @@ const LocationAddressScreen = ({ navigation, route }) => {
         detailedAddress: detailedAddress,
         city,
         postalCode,
+        state,
+        country,
         label,
         coordinates: markerCoordinate
       };
@@ -193,38 +209,24 @@ const LocationAddressScreen = ({ navigation, route }) => {
       const success = await saveAddress(addressData);
 
       if (success) {
-        // 2. Sync to Backend Profile (Customer update)
-        // This ensures the address is saved on the server immediately
+        // 2. Sync to Backend Profile via ProfileContext
+        // This ensures the address is saved on the server AND UI is updated
         try {
-          const customerId = await getUserId();
           const currentUser = await getUserData();
 
-          if (customerId && currentUser) {
-            const formData = new FormData();
-
+          if (currentUser) {
             // Build the same profile update structure used in EditProfileScreen
             const updatedProfileData = {
               ...currentUser,
               address: addressData,
             };
 
-            formData.append('data', JSON.stringify(updatedProfileData));
+            // Remove contactNumber because backend doesn't allow customers to update it
+            delete updatedProfileData.contactNumber;
 
             console.debug('[LocationAddressScreen] Syncing address to backend profile...');
-            await customerApi.patch(
-              `/customers/${customerId}`,
-              formData,
-              {
-                headers: {
-                  'Content-Type': 'multipart/form-data',
-                },
-                timeout: 30000,
-              }
-            );
-            console.debug('[LocationAddressScreen] Profile address updated successfully');
-
-            // 3. Update ProfileContext to sync UI (Header, etc.)
             await updateProfileContext(updatedProfileData);
+            console.debug('[LocationAddressScreen] Profile address updated successfully');
           }
         } catch (syncErr) {
           console.warn('[LocationAddressScreen] Failed to sync address to backend profile:', syncErr.message);
@@ -283,6 +285,10 @@ const LocationAddressScreen = ({ navigation, route }) => {
           setCity={setCity}
           postalCode={postalCode}
           setPostalCode={setPostalCode}
+          state={state}
+          setState={setState}
+          country={country}
+          setCountry={setCountry}
           fieldErrors={fieldErrors}
           clearFieldError={clearFieldError}
           getCurrentLocation={getCurrentLocation}

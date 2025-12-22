@@ -16,7 +16,7 @@ const API_BASE_URLS = {
   // development: 'http://192.168.1.100:5000',  // Uncomment and use your PC's IP for physical device
   // development: 'http://localhost:5000',  // For iOS Simulator only
 
-  staging: 'https://deligo-food-delivery-server.vercel.app/',
+  staging: 'https://deligo-test-server.vercel.app',
   production: 'https://api.deligo.com',
 };
 
@@ -54,7 +54,7 @@ export const API_ENDPOINTS = {
   // Customer Profile & Data
   PROFILE: {
     GET: '/profile',
-    UPDATE: '/profile/update',
+    UPDATE: '/profile',
     ADDRESSES: '/profile/addresses',
     ADD_ADDRESS: '/profile/addresses/add',
     UPDATE_ADDRESS: '/profile/addresses/:addressId/update',

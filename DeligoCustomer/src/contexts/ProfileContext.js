@@ -1,7 +1,5 @@
-
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import AuthService, { logoutUser as apiLogout } from '../utils/auth';
-import StorageService from '../utils/storage';
 
 export const ProfileContext = createContext(null);
 
@@ -68,17 +66,77 @@ export const ProfileProvider = ({ children }) => {
         }
     };
 
-    const updateProfile = async (updatedData) => {
+    const updateProfile = async (updatedData, imageFile = null) => {
         try {
-            const newUser = { ...user, ...updatedData };
-            setUser(newUser);
+            const { customerApi } = await import('../utils/api');
+            const { API_ENDPOINTS } = await import('../constants/config').then(m => m.default || m);
 
-            // Save using auth helper
-            await import('../utils/auth').then(mod => mod.saveUserData(newUser));
-            return true;
+            // Clone data to avoid mutating original object
+            const dataToUpdate = { ...updatedData };
+            
+            // Backend forbids customers from updating their contact number.
+            // Removing it here as a safety measure for all profile updates.
+            delete dataToUpdate.contactNumber;
+
+            // Profile photo must be uploaded as a file, not as a string in the JSON data.
+            // If we have an image file that is a local URI (not a remote URL), we upload it.
+            // We remove it from the JSON data in all cases to avoid the "text" error from backend.
+            delete dataToUpdate.profilePhoto;
+
+            // Prepare form data - Backend expects a 'data' field with JSON string for profile updates
+            const formData = new FormData();
+            formData.append('data', JSON.stringify(dataToUpdate));
+
+            // Add image file if present and it's a local file
+            if (imageFile && imageFile.uri && !imageFile.uri.startsWith('http')) {
+                formData.append('file', {
+                    uri: imageFile.uri,
+                    type: imageFile.type || 'image/jpeg',
+                    name: imageFile.name || `profile-${Date.now()}.jpg`
+                });
+            }
+
+            // Call API to update profile on server
+            const response = await customerApi.patch(API_ENDPOINTS.PROFILE.UPDATE, formData, {
+                headers: {
+                    'Content-Type': 'multipart/form-data',
+                }
+            });
+            const updatedUser = response?.data || response;
+
+            if (updatedUser) {
+                setUser(updatedUser);
+                // Save to local storage
+                await import('../utils/auth').then(mod => mod.saveUserData(updatedUser));
+                return true;
+            } else {
+                console.error('ProfileContext: No data returned from update API');
+                return false;
+            }
         } catch (error) {
             console.error('ProfileContext: Update profile failed', error);
-            return false;
+            
+            // Re-throw with meaningful message if possible for the UI to catch
+            if (error.response) {
+                const data = error.response.data;
+                
+                // Handle MongoDB Duplicate Key Error
+                if (data?.err?.code === 11000) {
+                    const stack = data.err.stack || '';
+                    if (stack.includes('contactNumber')) {
+                        throw new Error('This mobile number is already in use by another account.');
+                    } else if (stack.includes('email')) {
+                        throw new Error('This email is already in use by another account.');
+                    }
+                    throw new Error('Account details already in use.');
+                }
+                
+                if (data?.message) {
+                    throw new Error(data.message);
+                }
+            }
+            
+            throw error;
         }
     };
 

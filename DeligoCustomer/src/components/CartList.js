@@ -18,7 +18,9 @@ export default function CartList({ navigation }) {
   const [switchingVendorId, setSwitchingVendorId] = useState(null);
   const [vendorDetailsCache, setVendorDetailsCache] = useState({});
 
-  // Effect: Check for missing/generic vendor names and fetch details
+  // NOTE: Vendor details fetch disabled - endpoint /restaurants/:id doesn't exist on backend
+  // ProductsContext and cart data already provide vendor information
+  /*
   React.useEffect(() => {
     const fetchMissingDetails = async () => {
       if (!cartsArray) return;
@@ -82,6 +84,7 @@ export default function CartList({ navigation }) {
     const t = setTimeout(fetchMissingDetails, 500);
     return () => clearTimeout(t);
   }, [cartsArray, vendorDetailsCache]);
+  */
 
   if (!cartsArray || cartsArray.length === 0) {
     return null;

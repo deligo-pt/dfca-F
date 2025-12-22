@@ -16,6 +16,8 @@ export const LocationProvider = ({ children }) => {
     const [detailedAddress, setDetailedAddress] = useState('');
     const [city, setCity] = useState('');
     const [postalCode, setPostalCode] = useState('');
+    const [state, setState] = useState('');
+    const [country, setCountry] = useState('');
     const [savedAddresses, setSavedAddresses] = useState([]);
     const [label, setLabel] = useState('Home');
     const [loading, setLoading] = useState(false);
@@ -36,6 +38,8 @@ export const LocationProvider = ({ children }) => {
                 setDetailedAddress(storedLocation.detailedAddress || '');
                 setCity(storedLocation.city || '');
                 setPostalCode(storedLocation.postalCode || '');
+                setState(storedLocation.state || '');
+                setCountry(storedLocation.country || '');
                 setCurrentLocation(storedLocation.coordinates || null);
                 setLabel(storedLocation.label || 'Home');
             }
@@ -70,6 +74,8 @@ export const LocationProvider = ({ children }) => {
             let mainAddress = '';
             let locCity = '';
             let locPostalCode = '';
+            let locState = '';
+            let locCountry = '';
 
             if (addresses && addresses.length > 0) {
                 const addr = addresses[0];
@@ -82,15 +88,19 @@ export const LocationProvider = ({ children }) => {
                     addr.subregion
                 ].filter((val, index, self) => val && val.trim() !== '' && self.indexOf(val) === index).join(', ');
 
-                locCity = addr.city || addr.region || '';
+                locCity = addr.city || addr.region || addr.subregion || '';
                 locPostalCode = addr.postalCode || '';
+                locState = addr.region || addr.subregion || '';
+                locCountry = addr.country || '';
             }
 
             const locationData = {
                 coords: loc.coords,
                 address: mainAddress,
                 city: locCity,
-                postalCode: locPostalCode
+                postalCode: locPostalCode,
+                state: locState,
+                country: locCountry
             };
 
             // We don't automatically save this as the "selected" address unless confirmed,
@@ -99,6 +109,8 @@ export const LocationProvider = ({ children }) => {
             setAddress(mainAddress);
             setCity(locCity);
             setPostalCode(locPostalCode);
+            setState(locState);
+            setCountry(locCountry);
 
             return locationData;
         } catch (err) {
@@ -112,7 +124,7 @@ export const LocationProvider = ({ children }) => {
 
     const saveAddress = async (newAddressData) => {
         try {
-            // newAddressData: { address, detailedAddress, city, postalCode, label, coordinates }
+            // newAddressData: { address, detailedAddress, city, postalCode, state, country, label, coordinates }
             const newAddress = {
                 id: Date.now().toString(), // Simple ID generation
                 ...newAddressData
@@ -123,10 +135,13 @@ export const LocationProvider = ({ children }) => {
             await StorageService.setItem(STORAGE_KEY_SAVED_ADDRESSES, updatedAddresses);
 
             // Also set as current active address
+            // Also set as current active address
             setAddress(newAddress.address);
             setDetailedAddress(newAddress.detailedAddress);
             setCity(newAddress.city);
             setPostalCode(newAddress.postalCode);
+            setState(newAddress.state || '');
+            setCountry(newAddress.country || '');
             setLabel(newAddress.label);
             setCurrentLocation(newAddress.coordinates);
 
@@ -144,6 +159,8 @@ export const LocationProvider = ({ children }) => {
         setDetailedAddress(selectedAddress.detailedAddress || '');
         setCity(selectedAddress.city || '');
         setPostalCode(selectedAddress.postalCode || '');
+        setState(selectedAddress.state || '');
+        setCountry(selectedAddress.country || '');
         setLabel(selectedAddress.label || 'Home');
         setCurrentLocation(selectedAddress.coordinates);
         await StorageService.setItem(STORAGE_KEY_LOCATION, selectedAddress);
@@ -162,6 +179,8 @@ export const LocationProvider = ({ children }) => {
             detailedAddress,
             city,
             postalCode,
+            state,
+            country,
             label,
             savedAddresses,
             loading,
@@ -174,6 +193,8 @@ export const LocationProvider = ({ children }) => {
             setDetailedAddress,
             setCity,
             setPostalCode,
+            setState,
+            setCountry,
             setLabel
         }}>
             {children}

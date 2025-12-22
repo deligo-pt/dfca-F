@@ -40,8 +40,27 @@ const SeeAllScreen = ({ navigation, route }) => {
     const deduplicatedItems = useMemo(() => {
         const map = new Map();
         for (const p of allItems) {
-            const vendorName = (p && (p._raw?.vendor?.vendorName || p.vendor?.vendorName || p.name)) || '';
-            const key = String(vendorName || '').trim().toLowerCase();
+            // Updated extraction logic for nested vendorId objects
+            const raw = p._raw || p;
+            const normVendor = p.vendor || {};
+
+            // Try to find a valid name
+            const vendorName = normVendor.vendorName ||
+                normVendor.businessName ||
+                (typeof raw.vendorId === 'object' ? raw.vendorId.businessDetails?.businessName : null) ||
+                raw.vendor?.vendorName ||
+                (p && p.name) || '';
+
+            // Try to find a valid ID for uniqueness
+            let uniqueId = normVendor.id || normVendor.vendorId;
+            if (!uniqueId) {
+                const rawVID = raw.vendorId || raw.vendor?.vendorId;
+                if (typeof rawVID === 'object' && rawVID) uniqueId = rawVID._id || rawVID.id;
+                else uniqueId = rawVID;
+            }
+            // Fallback to name as key if ID is missing (legacy behavior)
+            const key = uniqueId ? String(uniqueId) : String(vendorName || '').trim().toLowerCase();
+
             if (!map.has(key) && key) {
                 map.set(key, { ...p, name: vendorName || (p && p.name) || '' });
             }

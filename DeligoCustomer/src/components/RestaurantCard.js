@@ -9,18 +9,34 @@ const RestaurantCard = ({ restaurant, onPress }) => {
   const { colors, isDarkMode } = useTheme();
 
   // Accept either a mapped restaurant shape or raw product in restaurant._raw
+  // If 'restaurant' comes from normalizeProduct, it has a 'vendor' object with name/type/etc.
+  const refinedVendor = restaurant.vendor || {};
   const p = restaurant && restaurant._raw ? restaurant._raw : restaurant || {};
-  const vendor = p.vendor || {};
 
-  const imageUrl = vendor.storePhoto || (Array.isArray(p.images) && p.images[0]) || null;
+  // Fallback to raw vendor handling if normalized 'restaurant.vendor' is missing properties
+  const rawVendor = p.vendor || {};
+  const rawVendorIdObj = (p.vendorId && typeof p.vendorId === 'object') ? p.vendorId : {};
+
+  // Merge sources: refined -> raw.vendorId object -> raw.vendor
+  const mergedVendor = {
+    ...rawVendor,
+    ...rawVendorIdObj,
+    ...refinedVendor,
+  };
+
+  // Also check businessDetails if present in merged source
+  const businessDetails = mergedVendor.businessDetails || {};
+
+  const imageUrl = mergedVendor.storePhoto || mergedVendor.logo || (Array.isArray(p.images) && p.images[0]) || null;
   const imageSource = imageUrl ? { uri: imageUrl } : require('../assets/images/logonew.png');
 
-  const vendorName = vendor.vendorName || p.vendorName || p.name || 'Unknown';
-  const isVerified = vendor.isVerified || false; // Assuming a isVerified flag
+  // Name extraction order: businessName -> vendorName -> product name -> 'Unknown'
+  const vendorName = mergedVendor.vendorName || businessDetails.businessName || mergedVendor.businessName || p.vendorName || p.name || 'Unknown';
+  const isVerified = mergedVendor.isVerified || false;
 
   // rating normalization (average may be nested)
   let ratingValue = null;
-  if (vendor && typeof vendor.rating === 'number') ratingValue = vendor.rating;
+  if (typeof mergedVendor.rating === 'number') ratingValue = mergedVendor.rating;
   else if (p.rating && typeof p.rating === 'number') ratingValue = p.rating;
   else if (p.rating && typeof p.rating === 'object' && typeof p.rating.average === 'number') ratingValue = p.rating.average;
 
@@ -34,10 +50,10 @@ const RestaurantCard = ({ restaurant, onPress }) => {
     let mounted = true;
     const fetchLocation = async () => {
       // If we already have explicit text, skip
-      if (vendor.city || vendor.address || vendor.town) return;
+      if (mergedVendor.city || mergedVendor.address || mergedVendor.town) return;
 
-      const lat = p.latitude || vendor.latitude;
-      const lng = p.longitude || vendor.longitude;
+      const lat = mergedVendor.latitude || p.latitude;
+      const lng = mergedVendor.longitude || p.longitude;
 
       if (lat && lng) {
         try {
@@ -62,9 +78,9 @@ const RestaurantCard = ({ restaurant, onPress }) => {
     };
     fetchLocation();
     return () => { mounted = false; };
-  }, [vendor.city, vendor.address, p.latitude, p.longitude, vendor.latitude, vendor.longitude]);
+  }, [mergedVendor.city, mergedVendor.address, p.latitude, p.longitude, mergedVendor.latitude, mergedVendor.longitude]);
 
-  const displayLocation = vendor.city || vendor.address || dynamicLocation;
+  const displayLocation = mergedVendor.city || mergedVendor.address || dynamicLocation;
 
   return (
     <TouchableOpacity

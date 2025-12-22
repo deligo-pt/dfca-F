@@ -23,6 +23,10 @@ const LocationDetails = ({
   setDetailedAddress,
   city,
   setCity,
+  state,
+  setState,
+  country,
+  setCountry,
   postalCode,
   setPostalCode,
   fieldErrors,
@@ -891,7 +895,7 @@ const LocationDetails = ({
                 <Text style={styles.addressConfirmedTitle}>{t('locationConfirmed')}</Text>
               </View>
               <Text style={[styles.addressConfirmedText, { color: colors.text.primary }]}>
-                {[streetAddress, city, postalCode].filter(Boolean).join(', ')}
+                {[streetAddress, city, state, country, postalCode].filter(Boolean).join(', ')}
               </Text>
             </View>
           )}
@@ -1030,6 +1034,62 @@ const LocationDetails = ({
                 <View style={styles.internationalErrorRow}>
                   <Ionicons name="alert-circle" size={14} color={colors.error} />
                   <Text style={styles.internationalErrorText}>{fieldErrors.postalCode}</Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.internationalFieldGroup}>
+              <Text style={[styles.internationalFieldLabel, { color: colors.text.primary }]}>
+                {t('stateProvince')} <Text style={styles.requiredMark}>*</Text>
+              </Text>
+              <View style={[styles.internationalInput, {
+                borderColor: fieldErrors.state ? colors.error : colors.border,
+              }]}>
+                <Ionicons name="map-outline" size={20} color={colors.text.secondary} />
+                <TextInput
+                  style={[styles.internationalInputText, { color: colors.text.primary }]}
+                  placeholder={t('state')}
+                  placeholderTextColor={colors.text.light}
+                  value={state}
+                  onChangeText={(text) => {
+                    setState(text);
+                    clearFieldError('state');
+                  }}
+                  keyboardType="default"
+                />
+              </View>
+              {fieldErrors.state && (
+                <View style={styles.internationalErrorRow}>
+                  <Ionicons name="alert-circle" size={14} color={colors.error} />
+                  <Text style={styles.internationalErrorText}>{fieldErrors.state}</Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.internationalFieldGroup}>
+              <Text style={[styles.internationalFieldLabel, { color: colors.text.primary }]}>
+                {t('country')} <Text style={styles.requiredMark}>*</Text>
+              </Text>
+              <View style={[styles.internationalInput, {
+                borderColor: fieldErrors.country ? colors.error : colors.border,
+              }]}>
+                <Ionicons name="globe-outline" size={20} color={colors.text.secondary} />
+                <TextInput
+                  style={[styles.internationalInputText, { color: colors.text.primary }]}
+                  placeholder={t('country')}
+                  placeholderTextColor={colors.text.light}
+                  value={country}
+                  onChangeText={(text) => {
+                    setCountry(text);
+                    clearFieldError('country');
+                  }}
+                  keyboardType="default"
+                />
+              </View>
+              {fieldErrors.country && (
+                <View style={styles.internationalErrorRow}>
+                  <Ionicons name="alert-circle" size={14} color={colors.error} />
+                  <Text style={styles.internationalErrorText}>{fieldErrors.country}</Text>
                 </View>
               )}
             </View>

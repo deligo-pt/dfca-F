@@ -7,13 +7,14 @@
 
 import { BASE_API_URL, API_ENDPOINTS } from '../constants/config';
 import StorageService from './storage';
+import { isValidObjectId } from './objectId';
 
 const maskToken = (t) => {
   try {
     if (!t) return null;
     const s = t.toString();
-    if (s.length <= 12) return `${s.slice(0,4)}...`;
-    return `${s.slice(0,8)}...${s.slice(-4)}`;
+    if (s.length <= 12) return `${s.slice(0, 4)}...`;
+    return `${s.slice(0, 8)}...${s.slice(-4)}`;
   } catch (e) { return null; }
 };
 
@@ -63,18 +64,24 @@ class CartAPI {
           const sku = it.productId.trim();
           const internal = typeof it.internalId === 'string' && /^[0-9a-fA-F]{24}$/.test(it.internalId) ? it.internalId : null;
 
-          // IMPORTANT: Backend expects PROD-XXXX format (SKU), NOT ObjectId
-          // Always prefer SKU format if available
+          // IMPORTANT: User requested to prioritize Mongo ID. 
+          // The previous logic forced SKU. Now we trust the passed ID (sku variable matches productId) 
+          // but we still check for regex to be safe if that's what was passed.
+
           if (/^PROD-/i.test(sku)) {
-            // SKU format found - use it directly
+            // SKU format passed
             console.debug('[CartAPI] Using SKU format:', sku);
             return { productId: sku, quantity: it.quantity };
+          } else if (isValidObjectId(sku)) {
+            // Mongo ID passed
+            console.debug('[CartAPI] Using Mongo ID:', sku);
+            return { productId: sku, quantity: it.quantity };
           } else if (internal) {
-            // No SKU, but have ObjectId - use ObjectId
-            console.debug('[CartAPI] Using ObjectId:', internal);
+            // Internal ID fallback
+            console.debug('[CartAPI] Using internal ID:', internal);
             return { productId: internal, quantity: it.quantity };
           } else {
-            // Fallback to whatever we have
+            // Fallback
             console.debug('[CartAPI] Using fallback ID:', sku);
             return { productId: sku, quantity: it.quantity };
           }

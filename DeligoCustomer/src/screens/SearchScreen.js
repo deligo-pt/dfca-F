@@ -132,24 +132,50 @@ const SearchScreen = ({ navigation }) => {
 
         const vendorMap = new Map();
         productResults.forEach((product) => {
-            const vendor = product._raw?.vendor || product.vendor;
-            if (!vendor || !vendor.vendorId) return;
+            // "product" here is already normalized by ProductsContext or follows normalized shape
+            // But we check _raw for robustness
+            const pRaw = product._raw || product;
 
-            // Use vendor ID as key to avoid duplicates
-            if (!vendorMap.has(vendor.vendorId)) {
-                vendorMap.set(vendor.vendorId, {
-                    id: vendor.vendorId,
-                    _id: vendor.vendorId,
-                    vendorName: vendor.vendorName || vendor.name || 'Unknown',
-                    name: vendor.vendorName || vendor.name || 'Unknown',
-                    image: vendor.storePhoto || vendor.logo,
-                    rating: vendor.rating || 0,
-                    deliveryTime: vendor.deliveryTime || '',
-                    deliveryFee: vendor.deliveryFee || '',
-                    distance: vendor.distance || '',
-                    vendorType: vendor.vendorType || '',
+            // Prioritize normalized vendor object
+            const normVendor = product.vendor || {};
+
+            // Determine vendorId string safely
+            let vId = normVendor.id || normVendor.vendorId;
+            if (!vId) {
+                const rawC = pRaw.vendorId || pRaw.vendor?.vendorId;
+                if (typeof rawC === 'object' && rawC) vId = rawC._id || rawC.id;
+                else vId = rawC;
+            }
+
+            if (!vId) return;
+
+            // Use vendor ID string as key to avoid duplicates
+            if (!vendorMap.has(String(vId))) {
+                // Construct vendor object for the card
+                // Ideally use the normalized vendor data
+                const vName = normVendor.vendorName || normVendor.businessName || pRaw.vendor?.vendorName || pRaw.vendorId?.businessDetails?.businessName || 'Unknown';
+                const vImage = normVendor.storePhoto || normVendor.logo || pRaw.vendor?.storePhoto || null;
+                const vType = normVendor.vendorType || normVendor.businessType || pRaw.vendor?.vendorType || '';
+
+                vendorMap.set(String(vId), {
+                    id: String(vId),
+                    _id: String(vId),
+                    vendorName: vName,
+                    name: vName,
+                    image: vImage,
+                    rating: normVendor.rating || 0,
+                    deliveryTime: normVendor.deliveryTime || '',
+                    deliveryFee: product.deliveryFee || '',
+                    distance: product.distance || '',
+                    vendorType: vType,
                     // Include full vendor object for navigation
-                    _raw: { vendor }
+                    _raw: {
+                        vendor: {
+                            ...normVendor,
+                            vendorId: vId, // ensure it's simple
+                            vendorName: vName
+                        }
+                    }
                 });
             }
         });

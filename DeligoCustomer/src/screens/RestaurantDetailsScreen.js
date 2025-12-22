@@ -86,17 +86,33 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   // Use ProductsContext
   const { products: allProducts, fetchRestaurantMenu } = useProducts();
 
+  // Determine vendorId using robust check
+  // Access normalized vendor if available, else raw nested object, else raw flat props
+  const normVendor = restaurant.vendor || {};
+  const rawVendorObj = restaurant._raw?.vendorId || {};
+  // If vendorId is an object in _raw, use its _id
+  const rawVendorId = (typeof rawVendorObj === 'object') ? rawVendorObj._id : rawVendorObj;
+
   const vendorId = (
-    restaurant?._raw?.vendor?.vendorId || restaurant?.vendor?.vendorId || restaurant?.vendorId || restaurant?._raw?.vendorId || null
+    normVendor.id ||
+    normVendor.vendorId ||
+    rawVendorId ||
+    restaurant?._raw?.vendor?.vendorId ||
+    restaurant?.vendorId ||
+    restaurant?._raw?.vendorId ||
+    null
   );
 
   // Local state for menu products - filtered initial from global, then updated via explicit fetch
   // HYBRID: Start with cache so user sees something, then update with fresh data
   const [menuProducts, setMenuProducts] = useState(
     (allProducts || []).filter((p) => {
-      const raw = p._raw || p;
-      const rawVendorId = raw.vendor?.vendorId || raw.vendorId || null;
-      return rawVendorId && vendorId && String(rawVendorId) === String(vendorId);
+      // Use robust vendorId extraction for filtering
+      const pRaw = p._raw || p;
+      const pRawVendorObj = pRaw.vendorId || {};
+      const pRawVendorId = (typeof pRawVendorObj === 'object') ? pRawVendorObj._id : pRawVendorObj;
+      const pId = p.vendor?.id || pRaw.vendor?.vendorId || pRawVendorId || pRaw.vendorId;
+      return pId && vendorId && String(pId) === String(vendorId);
     })
   );
   const [menuLoading, setMenuLoading] = useState(false);
@@ -107,11 +123,17 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   useEffect(() => {
     let mounted = true;
     const fetchLocation = async () => {
+      // Prioritize normalized vendor location
+      if (normVendor.address || normVendor.city) return;
+
       const v = restaurant._raw?.vendor || restaurant.vendor || {};
+      // Fallback: check nested vendorId object
+      const vNested = (typeof restaurant._raw?.vendorId === 'object') ? restaurant._raw.vendorId : {};
+
       if (v.city || v.address || v.town) return; // explicit exists
 
-      const lat = v.latitude;
-      const lng = v.longitude;
+      const lat = normVendor.latitude || vNested.businessLocation?.latitude || vNested.latitude || v.latitude;
+      const lng = normVendor.longitude || vNested.businessLocation?.longitude || vNested.longitude || v.longitude;
 
       if (lat && lng) {
         try {
@@ -136,11 +158,20 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     return () => { mounted = false; };
   }, [restaurant]);
 
-  // Derived values
+  // Derived values using normalized data
   const displayName = (
-    restaurant?.name || restaurant?._raw?.name || restaurant?._raw?.product?.name || restaurant?._raw?.productName || restaurant?._raw?.vendor?.vendorName || 'Restaurant'
+    normVendor.vendorName ||
+    normVendor.businessName ||
+    (typeof restaurant._raw?.vendorId === 'object' ? restaurant._raw.vendorId.businessDetails?.businessName : null) ||
+    restaurant?.name ||
+    restaurant?._raw?.name ||
+    restaurant?._raw?.product?.name ||
+    restaurant?._raw?.productName ||
+    restaurant?._raw?.vendor?.vendorName ||
+    'Restaurant'
   );
-  const displayLocation = (restaurant._raw?.vendor?.city || restaurant._raw?.vendor?.address) || dynamicLocation;
+
+  const displayLocation = (normVendor.address || restaurant._raw?.vendor?.city || restaurant._raw?.vendor?.address) || dynamicLocation;
 
   // Vendor currency
   const vendorCurrency = (() => {

@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, Image, Platform, ActivityIndicator } from 'react-native';
 import { useCart } from '../contexts/CartContext';
 import { useProducts } from '../contexts/ProductsContext';
@@ -11,6 +12,7 @@ import CheckoutAPI from '../utils/checkoutApi';
 
 export default function CartDetail({ vendorId, navigation }) {
   const { t } = useLanguage();
+  const insets = useSafeAreaInsets();
   const { getVendorCart, updateQuantity, removeItem, setDeliveryInstructionsForVendor } = useCart();
   const { products } = useProducts();
   const cart = getVendorCart(vendorId);
@@ -173,7 +175,7 @@ export default function CartDetail({ vendorId, navigation }) {
   };
 
   // bottom bar height used to pad scroll area
-  const footerHeight = 88 + (Platform.OS === 'ios' ? 24 : 0);
+  const footerHeight = 88 + insets.bottom;
 
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
@@ -333,7 +335,11 @@ export default function CartDetail({ vendorId, navigation }) {
       </ScrollView>
 
       {/* Sticky footer */}
-      <View style={[styles.footer, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
+      <View style={[styles.footer, {
+        backgroundColor: colors.surface,
+        borderTopColor: colors.border,
+        paddingBottom: spacing.md + insets.bottom
+      }]}>
         <View style={{ flex: 1 }}>
           <Text style={{ color: colors.text.secondary, fontSize: 13 }}>{items.reduce((s, it) => s + it.qty, 0)} {t('items')}</Text>
           <Text style={{ color: colors.primary, fontFamily: 'Poppins-Bold', fontSize: 20 }}>{formatCurrency(currency, total)}</Text>

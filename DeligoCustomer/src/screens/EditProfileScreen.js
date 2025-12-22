@@ -262,6 +262,8 @@ const EditProfileScreen = ({ navigation, route }) => {
   const [streetAddress, setStreetAddress] = useState(defaultAddress.street);
   const [city, setCity] = useState(defaultAddress.city);
   const [postalCode, setPostalCode] = useState(defaultAddress.postalCode);
+  const [state, setState] = useState(defaultAddress.state);
+  const [country, setCountry] = useState(defaultAddress.country);
 
   const [label, setLabel] = useState(t('home'));
   const [fieldErrors, setFieldErrors] = useState({});
@@ -270,8 +272,8 @@ const EditProfileScreen = ({ navigation, route }) => {
     const newAddress = {
       street: streetAddress || '',
       city: city || '',
-      state: defaultAddress.state,
-      country: defaultAddress.country,
+      state: state || defaultAddress.state,
+      country: country || defaultAddress.country,
       postalCode: postalCode || '',
       latitude: markerCoordinate.latitude,
       longitude: markerCoordinate.longitude,
@@ -331,6 +333,8 @@ const EditProfileScreen = ({ navigation, route }) => {
         });
         setStreetAddress(addr.street || defaultAddress.street);
         setCity(addr.city || defaultAddress.city);
+        setState(addr.state || '');
+        setCountry(addr.country || '');
 
         setPostalCode(addr.postalCode || defaultAddress.postalCode);
         setLabel(addr.label || t('home'));
@@ -360,6 +364,8 @@ const EditProfileScreen = ({ navigation, route }) => {
       });
       setStreetAddress(addr.street || defaultAddress.street);
       setCity(addr.city || defaultAddress.city);
+      setState(addr.state || '');
+      setCountry(addr.country || '');
 
       setPostalCode(addr.postalCode || defaultAddress.postalCode);
       setLabel(addr.label || 'Home');
@@ -373,113 +379,73 @@ const EditProfileScreen = ({ navigation, route }) => {
     setModalVisible(true);
   };
 
-  const updateProfile = async (profileData, imageFile = null) => {
-    try {
-      const customerId = await getUserId();
-
-      if (!customerId) {
-        console.error('No customer ID found from token');
-        throw new Error(t('sessionExpired'));
-      }
-
-      const formData = new FormData();
-
-
-      const updatedProfileData = {
-        name: { firstName, lastName },
-        contactNumber: mobile,
-        email: email,
-        ...profileData,
-      };
-
-      formData.append('data', JSON.stringify(updatedProfileData));
-
-      if (imageFile && imageFile.uri) {
-        formData.append('file', {
-          uri: imageFile.uri,
-          type: imageFile.type || 'image/jpeg',
-          name: imageFile.name || `profile-${Date.now()}.jpg`
-        });
-      }
-
-      console.log('Updating profile for customer:', customerId);
-      console.log('Profile data:', updatedProfileData);
-
-      const response = await customerApi.patch(
-        // `/customers/${customerId}`,
-        `/customers/${customerId}`,
-        formData,
-        {
-          headers: {
-            'Content-Type': 'multipart/form-data',
-          },
-          timeout: 30000,
-        }
-      );
-
-      console.log('Profile updated successfully');
-      return response;
-
-    } catch (error) {
-      console.error('Profile update failed:', error);
-
-      if (error.response) {
-        const status = error.response.status;
-        const message = error.response.data?.message || error.response.data?.error;
-
-        if (status === 401) {
-          throw new Error(t('sessionExpired'));
-        } else if (status === 404) {
-          throw new Error(t('customerNotFound'));
-        } else if (status >= 500) {
-          throw new Error(t('serverError'));
-        } else {
-          throw new Error(message || t('failedToUpdateProfile'));
-        }
-      } else if (error.request) {
-        throw new Error(t('networkError'));
-      } else {
-        throw new Error(error.message || t('unexpectedError'));
-      }
-    }
-  };
-
   const handleSave = async () => {
     try {
+      // Validate all required customer fields
       if (!firstName.trim()) {
-        showModal(t('error'), t('enterFirstName'), null, true);
+        showModal(t('error'), 'Please complete your profile before checking out', null, true);
+        return;
+      }
+
+      if (!lastName.trim()) {
+        showModal(t('error'), 'Please complete your profile before checking out', null, true);
         return;
       }
 
       if (!mobile.trim()) {
-        showModal(t('error'), t('enterMobileNumberError'), null, true);
+        showModal(t('error'), 'Please complete your profile before checking out', null, true);
         return;
       }
 
       if (!address) {
-        showModal(t('error'), t('provideAddress'), null, true);
+        showModal(t('error'), 'Please complete your profile before checking out', null, true);
         return;
       }
-      // Send the update to the server
-      await updateProfile({ address }, profilePhoto, userData);
 
-      // After a successful API call, manually update the local user data.
-      // This is more reliable than depending on the API response body.
+      // Validate address fields
+      if (!address.state || !address.state.trim()) {
+        showModal(t('error'), 'Please complete your profile before checking out', null, true);
+        return;
+      }
+
+      if (!address.city || !address.city.trim()) {
+        showModal(t('error'), 'Please complete your profile before checking out', null, true);
+        return;
+      }
+
+      if (!address.country || !address.country.trim()) {
+        showModal(t('error'), 'Please complete your profile before checking out', null, true);
+        return;
+      }
+
+      if (!address.postalCode || !address.postalCode.trim()) {
+        showModal(t('error'), 'Please complete your profile before checking out', null, true);
+        return;
+      }
+      // Prepare the updated user object
       const currentLocalUser = await getUserData();
       const updatedUser = {
         ...currentLocalUser,
         name: {
-          firstName,
-          lastName
+          firstName: firstName.trim(),
+          lastName: lastName.trim()
         },
-        contactNumber: mobile,
+        // Remove contactNumber because backend doesn't allow customers to update it
+        // contactNumber: mobile, 
         email: email,
-        address: address,
+        address: address, // This address object now includes state/country from constructs
         profilePhoto: profilePhoto || currentLocalUser.profilePhoto,
       };
 
-      // Save the merged user object back to storage AND update context
-      await updateProfileContext(updatedUser);
+      // Explicitly delete contactNumber to ensure it's not sent if it was in currentLocalUser
+      delete updatedUser.contactNumber;
+
+      // Send the update to the server and update context
+      const success = await updateProfileContext(updatedUser, profilePhoto ? { uri: profilePhoto } : null);
+
+      if (!success) {
+        throw new Error(t('failedToUpdateProfile'));
+      }
 
       // Sync address to LocationContext (local storage) for checkout consistency
       if (address) {
@@ -491,6 +457,8 @@ const EditProfileScreen = ({ navigation, route }) => {
           address: streetAddress,
           detailedAddress: city,
           city: city,
+          state: state || defaultAddress.state,
+          country: country || defaultAddress.country,
           postalCode: postalCode,
           label: label,
           coordinates: { latitude: lat, longitude: lng }
@@ -610,16 +578,29 @@ const EditProfileScreen = ({ navigation, route }) => {
 
         const updatedAddress = {
           street: detailedPlace.formatted_address || detailedPlace.name || '',
-          city: cityComponent?.long_name || 'Dhaka',
-          state: 'Badda',
-          country: 'Bangladesh',
-          postalCode: postalComponent?.long_name || '1212',
+          city: cityComponent?.long_name || '',
+          state: '', 
+          country: '', 
+          postalCode: postalComponent?.long_name || '',
           latitude: lat,
           longitude: lng,
-
           geoAccuracy: 5,
           label: label,
         };
+
+        if (detailedPlace.address_components) {
+          const stateComp = detailedPlace.address_components.find(c => c.types.includes('administrative_area_level_1'));
+          const countryComp = detailedPlace.address_components.find(c => c.types.includes('country'));
+
+          if (stateComp) updatedAddress.state = stateComp.long_name;
+          if (countryComp) updatedAddress.country = countryComp.long_name;
+        }
+
+        // Update local state variables
+        setState(updatedAddress.state);
+        setCountry(updatedAddress.country);
+        if (updatedAddress.city) setCity(updatedAddress.city);
+        if (updatedAddress.postalCode) setPostalCode(updatedAddress.postalCode);
 
         setAddress(updatedAddress);
         setSearchLocation('');
@@ -649,20 +630,24 @@ const EditProfileScreen = ({ navigation, route }) => {
         ].filter((val, index, self) => val && val.trim() !== '' && self.indexOf(val) === index);
 
         const newStreet = addressParts.join(', ');
-        const newCity = addr.city || addr.region || '';
+        const newCity = addr.city || addr.region || addr.subregion || '';
         const newPostal = addr.postalCode || '';
+        const newState = addr.region || addr.subregion || '';
+        const newCountry = addr.country || '';
 
         setStreetAddress(newStreet);
         setCity(newCity);
         setPostalCode(newPostal);
+        setState(newState);
+        setCountry(newCountry);
 
         setAddress(prev => ({
           ...prev,
           street: newStreet || prev?.street || '',
           city: newCity || prev?.city || '',
-          state: addr.region || prev?.state || '',
+          state: newState || prev?.state || '',
           postalCode: newPostal || prev?.postalCode || '',
-          country: addr.country || prev?.country || '',
+          country: newCountry || prev?.country || '',
           latitude,
           longitude,
           geoAccuracy: 5,
@@ -888,6 +873,10 @@ const EditProfileScreen = ({ navigation, route }) => {
                   setCity={setCityWithConstruct}
                   postalCode={postalCode}
                   setPostalCode={setPostalCodeWithConstruct}
+                  state={state}
+                  setState={setState}
+                  country={country}
+                  setCountry={setCountry}
                   fieldErrors={fieldErrors}
                   clearFieldError={clearFieldError}
                   getCurrentLocation={getCurrentLocation}

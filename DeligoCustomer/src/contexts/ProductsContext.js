@@ -14,7 +14,21 @@ export const useProducts = () => useContext(ProductsContext);
 
 export function normalizeProduct(p) {
   const raw = p._raw || p;
-  const vendor = raw.vendor || {};
+
+  // Handle nested vendorId object structure
+  // API now returns vendorId as an object with businessDetails
+  let vendorSource = raw.vendor || {};
+  if (raw.vendorId && typeof raw.vendorId === 'object') {
+    // If vendorId is an object, it contains the vendor details
+    vendorSource = { ...vendorSource, ...raw.vendorId };
+  } else if (raw.vendorId && typeof raw.vendorId === 'string') {
+    // If vendorId is just an ID string, keep it
+    vendorSource.vendorId = raw.vendorId;
+  }
+
+  // Extract Flattened props from vendorSource (which might be raw.vendor or raw.vendorId)
+  const businessDetails = vendorSource.businessDetails || {};
+  const businessLocation = vendorSource.businessLocation || {};
 
   // Robust ID extraction
   // Prioritize SKU-like IDs if available, else standard IDs
@@ -34,15 +48,25 @@ export function normalizeProduct(p) {
   let finalPrice = Number(finalPriceRaw);
   if (!Number.isFinite(finalPrice)) finalPrice = price;
 
+  // Extract Vendor Details
+  const vendorName = vendorSource.businessName || businessDetails.businessName || vendorSource.vendorName || raw.name || raw.productName || p.name || 'Unknown';
+  // Check both businessType (new) and vendorType (old)
+  const vendorType = vendorSource.businessType || businessDetails.businessType || vendorSource.vendorType || '';
+
+  const vendorRating = (vendorSource.rating && typeof vendorSource.rating === 'number') ? vendorSource.rating : 0;
+  const vendorLat = vendorSource.latitude || businessLocation.latitude;
+  const vendorLng = vendorSource.longitude || businessLocation.longitude;
+  const vendorStorePhoto = vendorSource.storePhoto || vendorSource.logo || null;
+
   return {
     _raw: raw,
     id: chosenId,
     // Fix: Prioritize product images over store photo, and do NOT fallback to storePhoto for product cards logic
     image: raw.image || (Array.isArray(raw.images) && raw.images[0]) || null,
-    name: vendor.vendorName || raw.name || raw.productName || p.name || 'Unknown',
+    name: raw.name || raw.productName || p.name || 'Unknown',
     categories: Array.isArray(raw.tags) ? raw.tags : (raw.category ? [raw.category] : []),
-    rating: (raw.rating && (typeof raw.rating === 'number' ? raw.rating : raw.rating.average)) || vendor.rating || 0,
-    deliveryTime: raw.deliveryTime || vendor.deliveryTime || '',
+    rating: (raw.rating && (typeof raw.rating === 'number' ? raw.rating : raw.rating.average)) || vendorRating || 0,
+    deliveryTime: raw.deliveryTime || vendorSource.deliveryTime || '',
     distance: raw.distance || '',
     // Use formatCurrency with the extracted currency
     deliveryFee: formatCurrency(pricing.currency || raw.currency || '', price),
@@ -51,7 +75,19 @@ export function normalizeProduct(p) {
     price: price,
     finalPrice: finalPrice,
     currency: pricing.currency || raw.currency || '',
-    vendor: vendor // expose normalized vendor object if needed
+
+    // Normalized vendor object
+    vendor: {
+      id: vendorSource._id || vendorSource.vendorId || vendorSource.id,
+      vendorName: vendorName,
+      vendorType: vendorType, // Important for classification
+      rating: vendorRating,
+      latitude: vendorLat,
+      longitude: vendorLng,
+      storePhoto: vendorStorePhoto,
+      isStoreOpen: businessDetails.isStoreOpen ?? vendorSource.isStoreOpen,
+      address: businessLocation.address // if available
+    }
   };
 }
 

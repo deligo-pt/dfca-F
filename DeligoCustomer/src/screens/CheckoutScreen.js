@@ -66,6 +66,7 @@ const CheckoutScreen = ({ route, navigation }) => {
   // Checkout response state (created on this screen, not passed from CartDetail)
   const [checkoutResponse, setCheckoutResponse] = useState(null);
   const [initializingCheckout, setInitializingCheckout] = useState(false);
+  const [profileIncomplete, setProfileIncomplete] = useState(false);
 
   const [selectedPayment, setSelectedPayment] = useState('card');
   const [isProcessing, setIsProcessing] = useState(false);
@@ -80,7 +81,7 @@ const CheckoutScreen = ({ route, navigation }) => {
   const cart = getVendorCart(vendorId);
 
   // Create checkout on mount (payment integration happens here, not in CartDetail)
-  const { address, detailedAddress, city, postalCode, currentLocation } = useLocation();
+  const { address, detailedAddress, city, postalCode, state, country, currentLocation } = useLocation();
 
   useEffect(() => {
     let canceled = false;
@@ -128,10 +129,88 @@ const CheckoutScreen = ({ route, navigation }) => {
         } : null,
         latitude: currentLocation?.latitude || null,
         longitude: currentLocation?.longitude || null,
+        // Backend required fields
+        state: state || 'Dhaka Division', // Use map state or default
+        country: country || 'Bangladesh', // Use map country or default
       };
 
       setInitializingCheckout(true);
       setStripeError(null);
+      setProfileIncomplete(false);
+
+      // 0. Pre-check: Validate Profile Completeness
+      try {
+        const currentUser = await getUserData();
+        const hasFirstName = currentUser?.name?.firstName || currentUser?.firstName;
+        const hasLastName = currentUser?.name?.lastName || currentUser?.lastName;
+        const hasContactNumber = currentUser?.contactNumber || currentUser?.phone || currentUser?.mobile;
+        // Note: Email is not required - users can authenticate with mobile only
+
+        // Validate customer.name.firstName
+        if (!hasFirstName || !hasFirstName.trim()) {
+          console.warn('[CheckoutScreen] Profile incomplete (missing first name)');
+          setProfileIncomplete(true);
+          setStripeError('Please complete your profile before checking out');
+          setInitializingCheckout(false);
+          return;
+        }
+
+        // Validate customer.name.lastName
+        if (!hasLastName || !hasLastName.trim()) {
+          console.warn('[CheckoutScreen] Profile incomplete (missing last name)');
+          setProfileIncomplete(true);
+          setStripeError('Please complete your profile before checking out');
+          setInitializingCheckout(false);
+          return;
+        }
+
+        // Validate customer.contactNumber
+        if (!hasContactNumber || !hasContactNumber.trim()) {
+          console.warn('[CheckoutScreen] Profile incomplete (missing contact number)');
+          setProfileIncomplete(true);
+          setStripeError('Please complete your profile before checking out');
+          setInitializingCheckout(false);
+          return;
+        }
+
+        // Validate customer.address.state
+        if (!state || !state.trim()) {
+          console.warn('[CheckoutScreen] Profile incomplete (missing address state)');
+          setProfileIncomplete(true);
+          setStripeError('Please complete your profile before checking out');
+          setInitializingCheckout(false);
+          return;
+        }
+
+        // Validate customer.address.city
+        if (!city || !city.trim()) {
+          console.warn('[CheckoutScreen] Profile incomplete (missing address city)');
+          setProfileIncomplete(true);
+          setStripeError('Please complete your profile before checking out');
+          setInitializingCheckout(false);
+          return;
+        }
+
+        // Validate customer.address.country
+        if (!country || !country.trim()) {
+          console.warn('[CheckoutScreen] Profile incomplete (missing address country)');
+          setProfileIncomplete(true);
+          setStripeError('Please complete your profile before checking out');
+          setInitializingCheckout(false);
+          return;
+        }
+
+        // Validate customer.address.postalCode
+        if (!postalCode || !postalCode.trim()) {
+          console.warn('[CheckoutScreen] Profile incomplete (missing address postalCode)');
+          setProfileIncomplete(true);
+          setStripeError('Please complete your profile before checking out');
+          setInitializingCheckout(false);
+          return;
+        }
+      } catch (err) {
+        console.warn('[CheckoutScreen] Failed to validate profile completeness', err);
+      }
 
       let backendAddressId = null;
 
@@ -159,9 +238,10 @@ const CheckoutScreen = ({ route, navigation }) => {
           if (customerId && currentUser) {
             const formData = new FormData();
 
-            // Build the same profile update structure used in EditProfileScreen
+            // Build profile update with only necessary fields
+            // Don't send contactNumber or email - they're immutable and may cause duplicate key errors
             const updatedProfileData = {
-              ...currentUser,
+              name: currentUser.name || { firstName: '', lastName: '' },
               address: addressData,
             };
 
@@ -219,6 +299,11 @@ const CheckoutScreen = ({ route, navigation }) => {
 
         if (!res.success) {
           const msg = typeof res.error === 'string' ? res.error : (res.error?.message || 'Failed to initialize checkout');
+
+          if (msg.toLowerCase().includes('complete your profile')) {
+            setProfileIncomplete(true);
+          }
+
           setStripeError(msg);
           setInitializingCheckout(false);
           return;
@@ -758,9 +843,19 @@ const CheckoutScreen = ({ route, navigation }) => {
         {!!stripeError && (
           <View style={{ backgroundColor: '#FFEBEE', padding: 12, borderRadius: 12, marginHorizontal: spacing.lg, marginBottom: 12, borderWidth: 1, borderColor: '#F44336' }}>
             <Text style={{ color: '#D32F2F', fontFamily: 'Poppins-Medium', fontSize: 13 }}>{typeof stripeError === 'string' ? stripeError : t('error')}</Text>
-            <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 8 }}>
-              <Text style={{ color: '#D32F2F', fontFamily: 'Poppins-Bold', textDecorationLine: 'underline' }}>{t('goBack')}</Text>
-            </TouchableOpacity>
+
+            {profileIncomplete ? (
+              <TouchableOpacity
+                onPress={() => navigation.navigate('EditProfile')}
+                style={{ marginTop: 12, backgroundColor: '#D32F2F', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, alignSelf: 'flex-start' }}
+              >
+                <Text style={{ color: '#fff', fontFamily: 'Poppins-Bold', fontSize: 13 }}>{t('editProfile') || 'Complete Profile'}</Text>
+              </TouchableOpacity>
+            ) : (
+              <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 8 }}>
+                <Text style={{ color: '#D32F2F', fontFamily: 'Poppins-Bold', textDecorationLine: 'underline' }}>{t('goBack')}</Text>
+              </TouchableOpacity>
+            )}
           </View>
         )}
 
