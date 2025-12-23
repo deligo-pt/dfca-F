@@ -224,6 +224,7 @@ const EditProfileScreen = ({ navigation, route }) => {
   const [address, setAddress] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState(null);
+  const [profilePhotoFile, setProfilePhotoFile] = useState(null); // Store the file object for upload
   const [userData, setUserDataState] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalConfig, setModalConfig] = useState({ title: '', message: '', onConfirm: null, onlyConfirm: false });
@@ -399,18 +400,24 @@ const EditProfileScreen = ({ navigation, route }) => {
       formData.append('data', JSON.stringify(updatedProfileData));
 
       if (imageFile && imageFile.uri) {
+        console.log('Adding image file to form data:', {
+          uri: imageFile.uri,
+          type: imageFile.type,
+          name: imageFile.name
+        });
         formData.append('file', {
           uri: imageFile.uri,
           type: imageFile.type || 'image/jpeg',
           name: imageFile.name || `profile-${Date.now()}.jpg`
         });
+      } else {
+        console.log('No image file to upload');
       }
 
       console.log('Updating profile for customer:', customerId);
       console.log('Profile data:', updatedProfileData);
 
       const response = await customerApi.patch(
-        // `/customers/${customerId}`,
         `/customers/${customerId}`,
         formData,
         {
@@ -422,7 +429,8 @@ const EditProfileScreen = ({ navigation, route }) => {
       );
 
       console.log('Profile updated successfully');
-      return response;
+      console.log('Response data:', response.data);
+      return response.data;
 
     } catch (error) {
       console.error('Profile update failed:', error);
@@ -490,12 +498,21 @@ const EditProfileScreen = ({ navigation, route }) => {
         label: label,
       };
 
-      // Send the update to the server
-      await updateProfile({ address: completeAddress }, profilePhoto, userData);
+      // Send the update to the server - pass the file object, not the URI
+      const updateResponse = await updateProfile({ address: completeAddress }, profilePhotoFile, userData);
 
       // After a successful API call, manually update the local user data.
       // This is more reliable than depending on the API response body.
       const currentLocalUser = await getUserData();
+
+      // Get the updated profile photo URL from server response if available
+      const updatedPhotoUrl = updateResponse?.customer?.profilePhoto ||
+                              updateResponse?.profilePhoto ||
+                              profilePhoto ||
+                              currentLocalUser.profilePhoto;
+
+      console.log('Updated photo URL:', updatedPhotoUrl);
+
       const updatedUser = {
         ...currentLocalUser,
         name: {
@@ -505,7 +522,7 @@ const EditProfileScreen = ({ navigation, route }) => {
         contactNumber: mobile,
         email: email,
         address: completeAddress,
-        profilePhoto: profilePhoto || currentLocalUser.profilePhoto,
+        profilePhoto: updatedPhotoUrl,
       };
 
       // Save the merged user object back to storage AND update context
@@ -812,6 +829,17 @@ const EditProfileScreen = ({ navigation, route }) => {
 
   const handleImageEditConfirm = (editedUri) => {
     setProfilePhoto(editedUri);
+
+    // Create file object for upload
+    const fileName = editedUri.split('/').pop();
+    const fileType = editedUri.endsWith('.png') ? 'image/png' : 'image/jpeg';
+
+    setProfilePhotoFile({
+      uri: editedUri,
+      type: fileType,
+      name: fileName || `profile-${Date.now()}.jpg`
+    });
+
     setSelectedImageUri(null);
     setImageEditorVisible(false);
   };
@@ -1027,7 +1055,11 @@ const EditProfileScreen = ({ navigation, route }) => {
             {profilePhoto && (
               <>
                 <View style={styles.separator} />
-                <TouchableOpacity style={styles.imagePickerOption} onPress={() => { setProfilePhoto(null); setImagePickerVisible(false); }}>
+                <TouchableOpacity style={styles.imagePickerOption} onPress={() => {
+                  setProfilePhoto(null);
+                  setProfilePhotoFile(null);
+                  setImagePickerVisible(false);
+                }}>
                   <Ionicons name="trash" size={24} color={colors.error || '#ff4444'} />
                   <Text style={styles.imagePickerText}>{t('removeCurrentPhoto')}</Text>
                 </TouchableOpacity>
