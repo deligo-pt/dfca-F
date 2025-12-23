@@ -231,7 +231,7 @@ const OrdersScreen = ({ navigation }) => {
   // Separate orders into ongoing and history based on the provided status list
   const getOngoingOrders = () => {
     return orders.filter(order =>
-      ['PENDING', 'ACCEPTED', 'ASSIGNED', 'PICKED_UP', 'ON_THE_WAY'].includes(order.orderStatus?.toUpperCase())
+      ['PENDING', 'ACCEPTED', 'AWAITING_PARTNER', 'DISPATCHING', 'ASSIGNED', 'REASSIGNMENT_NEEDED', 'PICKED_UP', 'ON_THE_WAY'].includes(order.orderStatus?.toUpperCase())
     );
   };
 
@@ -251,8 +251,14 @@ const OrdersScreen = ({ navigation }) => {
         return { name: 'time', library: 'Ionicons', color: colors.warning || '#FFA500' };
       case 'ACCEPTED':
         return { name: 'checkmark-circle', library: 'Ionicons', color: colors.success || '#4CAF50' };
+      case 'AWAITING_PARTNER':
+        return { name: 'time', library: 'Ionicons', color: colors.warning || '#FFA500' };
+      case 'DISPATCHING':
+        return { name: 'bicycle', library: 'Ionicons', color: colors.info || '#2196F3' };
       case 'ASSIGNED':
         return { name: 'person-outline', library: 'Ionicons', color: colors.info || '#2196F3' };
+      case 'REASSIGNMENT_NEEDED':
+        return { name: 'alert-circle', library: 'Ionicons', color: colors.error || '#F44336' };
       case 'PICKED_UP':
         return { name: 'bicycle', library: 'Ionicons', color: colors.info || '#2196F3' };
       case 'ON_THE_WAY':
@@ -274,8 +280,14 @@ const OrdersScreen = ({ navigation }) => {
         return t('pending') || 'Pending';
       case 'ACCEPTED':
         return t('accepted') || 'Accepted';
+      case 'AWAITING_PARTNER':
+        return t('awaitingPartner') || 'Looking for Driver';
+      case 'DISPATCHING':
+        return t('dispatching') || 'Dispatching';
       case 'ASSIGNED':
-        return t('assigned') || 'Assigned';
+        return t('assigned') || 'Driver Assigned';
+      case 'REASSIGNMENT_NEEDED':
+        return t('reassignmentNeeded') || 'Reassigning Driver';
       case 'PICKED_UP':
         return t('pickedUp') || 'Picked Up';
       case 'ON_THE_WAY':

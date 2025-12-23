@@ -53,7 +53,10 @@ const TrackOrderScreen = ({ route, navigation }) => {
     const statusMap = {
       'PENDING': 'preparing',
       'ACCEPTED': 'ready',
+      'AWAITING_PARTNER': 'ready',
+      'DISPATCHING': 'ready',
       'ASSIGNED': 'picked_up',
+      'REASSIGNMENT_NEEDED': 'ready',
       'PICKED_UP': 'picked_up',
       'ON_THE_WAY': 'on_the_way',
       'NEARBY': 'nearby',
