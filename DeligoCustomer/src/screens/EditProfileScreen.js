@@ -262,6 +262,8 @@ const EditProfileScreen = ({ navigation, route }) => {
   const [streetAddress, setStreetAddress] = useState(defaultAddress.street);
   const [city, setCity] = useState(defaultAddress.city);
   const [postalCode, setPostalCode] = useState(defaultAddress.postalCode);
+  const [stateField, setStateField] = useState(defaultAddress.state);
+  const [countryField, setCountryField] = useState(defaultAddress.country);
 
   const [label, setLabel] = useState(t('home'));
   const [fieldErrors, setFieldErrors] = useState({});
@@ -270,8 +272,8 @@ const EditProfileScreen = ({ navigation, route }) => {
     const newAddress = {
       street: streetAddress || '',
       city: city || '',
-      state: defaultAddress.state,
-      country: defaultAddress.country,
+      state: stateField || 'Dhaka Division',
+      country: countryField || 'Bangladesh',
       postalCode: postalCode || '',
       latitude: markerCoordinate.latitude,
       longitude: markerCoordinate.longitude,
@@ -331,7 +333,8 @@ const EditProfileScreen = ({ navigation, route }) => {
         });
         setStreetAddress(addr.street || defaultAddress.street);
         setCity(addr.city || defaultAddress.city);
-
+        setStateField(addr.state || defaultAddress.state);
+        setCountryField(addr.country || defaultAddress.country);
         setPostalCode(addr.postalCode || defaultAddress.postalCode);
         setLabel(addr.label || t('home'));
         return;
@@ -360,7 +363,8 @@ const EditProfileScreen = ({ navigation, route }) => {
       });
       setStreetAddress(addr.street || defaultAddress.street);
       setCity(addr.city || defaultAddress.city);
-
+      setStateField(addr.state || defaultAddress.state);
+      setCountryField(addr.country || defaultAddress.country);
       setPostalCode(addr.postalCode || defaultAddress.postalCode);
       setLabel(addr.label || 'Home');
     } catch (err) {
@@ -472,8 +476,22 @@ const EditProfileScreen = ({ navigation, route }) => {
         showModal(t('error'), t('provideAddress'), null, true);
         return;
       }
+
+      // Ensure address has all required fields for checkout validation
+      const completeAddress = {
+        ...address,
+        street: streetAddress,
+        city: city,
+        state: stateField || address.state || 'Dhaka Division',
+        country: countryField || address.country || 'Bangladesh',
+        postalCode: postalCode,
+        latitude: markerCoordinate?.latitude || address.latitude,
+        longitude: markerCoordinate?.longitude || address.longitude,
+        label: label,
+      };
+
       // Send the update to the server
-      await updateProfile({ address }, profilePhoto, userData);
+      await updateProfile({ address: completeAddress }, profilePhoto, userData);
 
       // After a successful API call, manually update the local user data.
       // This is more reliable than depending on the API response body.
@@ -486,7 +504,7 @@ const EditProfileScreen = ({ navigation, route }) => {
         },
         contactNumber: mobile,
         email: email,
-        address: address,
+        address: completeAddress,
         profilePhoto: profilePhoto || currentLocalUser.profilePhoto,
       };
 
@@ -494,16 +512,18 @@ const EditProfileScreen = ({ navigation, route }) => {
       await updateProfileContext(updatedUser);
 
       // Sync address to LocationContext (local storage) for checkout consistency
-      if (address) {
+      if (completeAddress) {
         // Ensure lat/lng are present in correct structure
-        const lat = markerCoordinate?.latitude || address.latitude;
-        const lng = markerCoordinate?.longitude || address.longitude;
+        const lat = markerCoordinate?.latitude || completeAddress.latitude;
+        const lng = markerCoordinate?.longitude || completeAddress.longitude;
 
         await saveAddress({
           address: streetAddress,
           detailedAddress: city,
           city: city,
           postalCode: postalCode,
+          state: completeAddress.state || 'Dhaka Division',
+          country: completeAddress.country || 'Bangladesh',
           label: label,
           coordinates: { latitude: lat, longitude: lng }
         });
@@ -603,6 +623,8 @@ const EditProfileScreen = ({ navigation, route }) => {
 
         let cityComponent = null;
         let postalComponent = null;
+        let stateComponent = null;
+        let countryComponent = null;
 
         if (detailedPlace.address_components) {
           cityComponent = detailedPlace.address_components.find(component =>
@@ -611,6 +633,12 @@ const EditProfileScreen = ({ navigation, route }) => {
           postalComponent = detailedPlace.address_components.find(component =>
             component.types.includes('postal_code')
           );
+          stateComponent = detailedPlace.address_components.find(component =>
+            component.types.includes('administrative_area_level_1')
+          );
+          countryComponent = detailedPlace.address_components.find(component =>
+            component.types.includes('country')
+          );
 
           if (cityComponent) {
             setCity(cityComponent.long_name);
@@ -618,13 +646,19 @@ const EditProfileScreen = ({ navigation, route }) => {
           if (postalComponent) {
             setPostalCode(postalComponent.long_name);
           }
+          if (stateComponent) {
+            setStateField(stateComponent.long_name);
+          }
+          if (countryComponent) {
+            setCountryField(countryComponent.long_name);
+          }
         }
 
         const updatedAddress = {
           street: detailedPlace.formatted_address || detailedPlace.name || '',
           city: cityComponent?.long_name || 'Dhaka',
-          state: 'Badda',
-          country: 'Bangladesh',
+          state: stateComponent?.long_name || 'Dhaka Division',
+          country: countryComponent?.long_name || 'Bangladesh',
           postalCode: postalComponent?.long_name || '1212',
           latitude: lat,
           longitude: lng,
@@ -663,18 +697,22 @@ const EditProfileScreen = ({ navigation, route }) => {
         const newStreet = addressParts.join(', ');
         const newCity = addr.city || addr.region || '';
         const newPostal = addr.postalCode || '';
+        const newState = addr.region || addr.subregion || 'Dhaka Division';
+        const newCountry = addr.country || 'Bangladesh';
 
         setStreetAddress(newStreet);
         setCity(newCity);
         setPostalCode(newPostal);
+        setStateField(newState);
+        setCountryField(newCountry);
 
         setAddress(prev => ({
           ...prev,
           street: newStreet || prev?.street || '',
           city: newCity || prev?.city || '',
-          state: addr.region || prev?.state || '',
+          state: newState || prev?.state || 'Dhaka Division',
           postalCode: newPostal || prev?.postalCode || '',
-          country: addr.country || prev?.country || '',
+          country: newCountry || prev?.country || 'Bangladesh',
           latitude,
           longitude,
           geoAccuracy: 5,
@@ -698,6 +736,16 @@ const EditProfileScreen = ({ navigation, route }) => {
 
   const setPostalCodeWithConstruct = (value) => {
     setPostalCode(value);
+    setTimeout(constructAddressFromFields, 0);
+  };
+
+  const setStateFieldWithConstruct = (value) => {
+    setStateField(value);
+    setTimeout(constructAddressFromFields, 0);
+  };
+
+  const setCountryFieldWithConstruct = (value) => {
+    setCountryField(value);
     setTimeout(constructAddressFromFields, 0);
   };
 
