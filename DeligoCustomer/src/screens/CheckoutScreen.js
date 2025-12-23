@@ -407,10 +407,8 @@ const CheckoutScreen = ({ route, navigation }) => {
   // Debug: Log checkoutResponse to verify it's being populated
   console.debug('[CheckoutScreen] Render - checkoutResponse:', checkoutResponse, 'local total:', total);
 
-  // Use server's finalAmount when available, fallback to local calculation
-  // Note: checkoutResponse stores {success, message, data: {finalAmount}}
-  const serverFinalAmount = checkoutResponse?.data?.finalAmount;
-  const displayTotal = (typeof serverFinalAmount === 'number') ? serverFinalAmount : total;
+  // Use server's subTotal as the total
+  const displayTotal = checkoutResponse?.data?.subTotal;
 
   // Set initial notes from cart delivery instructions
   useEffect(() => {
@@ -828,7 +826,7 @@ const CheckoutScreen = ({ route, navigation }) => {
             <View style={styles(colors).summaryRow}>
               <Text style={styles(colors).summaryLabel}>{t('deliveryFee')}</Text>
               <Text style={styles(colors).summaryValue}>
-                {formatCurrency(currency, (checkoutResponse?.data?.subTotal || displayTotal) - baseSubtotal + discountTotal)}
+                {formatCurrency(currency, checkoutResponse?.data?.subTotal - baseSubtotal + discountTotal)}
               </Text>
             </View>
 
