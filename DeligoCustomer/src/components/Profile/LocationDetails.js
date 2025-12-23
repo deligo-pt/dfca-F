@@ -25,6 +25,10 @@ const LocationDetails = ({
   setCity,
   postalCode,
   setPostalCode,
+  state,
+  setState,
+  country,
+  setCountry,
   fieldErrors,
   clearFieldError,
   getCurrentLocation,
@@ -1030,6 +1034,60 @@ const LocationDetails = ({
                 <View style={styles.internationalErrorRow}>
                   <Ionicons name="alert-circle" size={14} color={colors.error} />
                   <Text style={styles.internationalErrorText}>{fieldErrors.postalCode}</Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.internationalFieldGroup}>
+              <Text style={[styles.internationalFieldLabel, { color: colors.text.primary }]}>
+                {t('state')} <Text style={styles.requiredMark}>*</Text>
+              </Text>
+              <View style={[styles.internationalInput, {
+                borderColor: fieldErrors.state ? colors.error : colors.border,
+              }]}>
+                <Ionicons name="map-outline" size={20} color={colors.text.secondary} />
+                <TextInput
+                  style={[styles.internationalInputText, { color: colors.text.primary }]}
+                  placeholder="Dhaka Division"
+                  placeholderTextColor={colors.text.light}
+                  value={state}
+                  onChangeText={(text) => {
+                    setState(text);
+                    clearFieldError('state');
+                  }}
+                />
+              </View>
+              {fieldErrors.state && (
+                <View style={styles.internationalErrorRow}>
+                  <Ionicons name="alert-circle" size={14} color={colors.error} />
+                  <Text style={styles.internationalErrorText}>{fieldErrors.state}</Text>
+                </View>
+              )}
+            </View>
+
+            <View style={styles.internationalFieldGroup}>
+              <Text style={[styles.internationalFieldLabel, { color: colors.text.primary }]}>
+                {t('country')} <Text style={styles.requiredMark}>*</Text>
+              </Text>
+              <View style={[styles.internationalInput, {
+                borderColor: fieldErrors.country ? colors.error : colors.border,
+              }]}>
+                <Ionicons name="globe-outline" size={20} color={colors.text.secondary} />
+                <TextInput
+                  style={[styles.internationalInputText, { color: colors.text.primary }]}
+                  placeholder="Bangladesh"
+                  placeholderTextColor={colors.text.light}
+                  value={country}
+                  onChangeText={(text) => {
+                    setCountry(text);
+                    clearFieldError('country');
+                  }}
+                />
+              </View>
+              {fieldErrors.country && (
+                <View style={styles.internationalErrorRow}>
+                  <Ionicons name="alert-circle" size={14} color={colors.error} />
+                  <Text style={styles.internationalErrorText}>{fieldErrors.country}</Text>
                 </View>
               )}
             </View>

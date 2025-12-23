@@ -948,6 +948,10 @@ const EditProfileScreen = ({ navigation, route }) => {
                   setCity={setCityWithConstruct}
                   postalCode={postalCode}
                   setPostalCode={setPostalCodeWithConstruct}
+                  state={stateField}
+                  setState={setStateFieldWithConstruct}
+                  country={countryField}
+                  setCountry={setCountryFieldWithConstruct}
                   fieldErrors={fieldErrors}
                   clearFieldError={clearFieldError}
                   getCurrentLocation={getCurrentLocation}
