@@ -4,6 +4,7 @@ import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
 import { useTheme } from '../utils/ThemeContext';
+import { useLanguage } from '../utils/LanguageContext';
 import { useLocation } from '../contexts/LocationContext';
 import { useProfile } from '../contexts/ProfileContext';
 import LocationDetails from '../components/Profile/LocationDetails';
@@ -13,6 +14,7 @@ import { getUserId, getUserData } from '../utils/auth';
 
 const LocationAddressScreen = ({ navigation, route }) => {
   const { colors, isDarkMode } = useTheme();
+  const { t } = useLanguage();
   const {
     saveAddress,
     address: contextAddress,
