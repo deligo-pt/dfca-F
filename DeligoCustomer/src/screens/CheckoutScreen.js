@@ -16,6 +16,7 @@ import { useTheme } from '../utils/ThemeContext';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLanguage } from '../utils/LanguageContext';
 import { useCart } from '../contexts/CartContext';
+import { useProducts } from '../contexts/ProductsContext';
 import { useLocation } from '../contexts/LocationContext';
 import { useProfile } from '../contexts/ProfileContext';
 import formatCurrency from '../utils/currency';
@@ -78,6 +79,7 @@ const CheckoutScreen = ({ route, navigation }) => {
 
   // Get real cart data from CartContext
   const { getVendorCart } = useCart();
+  const { products } = useProducts();
   const vendorId = cartData?.vendorId;
   const cart = getVendorCart(vendorId);
 
@@ -367,9 +369,52 @@ const CheckoutScreen = ({ route, navigation }) => {
     };
   }, [address, detailedAddress, city, postalCode]); // Re-run if any address field changes
 
-  // Calculate real cart values
+  // Calculate real cart values with ProductsContext enrichment
   const cartItems = cart?.items ? Object.keys(cart.items).map(id => {
-    const p = cart.items[id].product;
+    let p = cart.items[id].product;
+
+    // Enrich product data from ProductsContext (same logic as CartDetail)
+    let contextProduct = null;
+    if (products && products.length > 0) {
+      const rawId = p.id || p._id || p.productId || id;
+      if (rawId) {
+        contextProduct = products.find(prod =>
+          prod.id === rawId ||
+          prod._id === rawId ||
+          prod._raw?._id === rawId ||
+          prod._raw?.productId === rawId ||
+          prod._raw?.id === rawId ||
+          (prod._raw && (prod._raw.productId === rawId || prod._raw.id === rawId))
+        );
+      }
+
+      // Debug logging
+      if (!contextProduct && rawId) {
+        console.debug('[CheckoutScreen] Product lookup failed for ID:', rawId);
+      } else if (contextProduct) {
+        console.debug('[CheckoutScreen] Product matched:', contextProduct.name, 'for ID:', rawId);
+      }
+    }
+
+    // Merge: Prefer Context data for static fields (image, name) AND pricing if cart data is incomplete
+    if (contextProduct) {
+      p = {
+        ...p,
+        image: contextProduct.image || p.image,
+        name: contextProduct.name || p.name,
+        _raw: {
+          ...(contextProduct._raw || {}),
+          ...(p._raw || {}),
+          // Merge pricing: use context pricing if cart pricing is missing
+          pricing: {
+            ...(contextProduct._raw?.pricing || {}),
+            ...(p._raw?.pricing || {}),
+            ...(p.pricing || {})
+          }
+        }
+      };
+    }
+
     const rawPricing = p?._raw?.pricing || p?.pricing || null;
     const basePrice = Number((rawPricing && rawPricing.price) ?? p.price ?? 0) || 0;
     const discountRaw = rawPricing?.discount;
@@ -742,12 +787,9 @@ const CheckoutScreen = ({ route, navigation }) => {
                     <Text style={styles(colors).itemNameText} numberOfLines={2}>
                       {item.name}
                     </Text>
-                    {/* Pricing breakdown */}
+                    {/* Simple unit price - detailed breakdown shown in CartDetail */}
                     <Text style={{ fontSize: 12, fontFamily: 'Poppins-Regular', color: colors.text.secondary, marginTop: 4 }}>
-                      {formatCurrency(currency, item.price)}
-                      {item.discountPercent > 0 ? ` • -${Math.round(item.discountPercent)}%` : ''}
-                      {item.taxPercent > 0 ? ` • +${Math.round(item.taxPercent)}%` : ''}
-                      {` • = ${formatCurrency(currency, item.finalPrice || item.price)}`}
+                      {formatCurrency(currency, item.finalPrice || item.price)} {t('each')}
                     </Text>
                   </View>
                 </View>
