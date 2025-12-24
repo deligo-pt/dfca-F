@@ -240,9 +240,11 @@ const LocationAddressScreen = ({ navigation, route }) => {
           if (apiErr.response && (apiErr.response.status === 409 || apiErr.response?.data?.status === 409)) {
             console.warn('[LocationAddressScreen] Address already exists (409). Fetching profile to retrieve existing ID...');
             try {
-              // Fetch fresh profile to find the existing address
-              const userData = await getUserData();
-              const profileRes = await customerApi.get(`/customers/${userData._id || userData.id}`);
+              // Fetch fresh profile to find the existing address using ID from token (more reliable)
+              const userId = await getUserId();
+              if (!userId) throw new Error('No user ID found');
+
+              const profileRes = await customerApi.get(`/customers/${userId}`);
               const freshAddresses = profileRes.data?.data?.deliveryAddresses || profileRes.data?.deliveryAddresses || [];
 
               // Helper to find address
@@ -287,6 +289,14 @@ const LocationAddressScreen = ({ navigation, route }) => {
             } catch (lookupErr) {
               console.warn('[LocationAddressScreen] Failed to lookup existing address:', lookupErr);
             }
+          }
+
+          // Check for 401 Unauthorized
+          if (apiErr.response && apiErr.response.status === 401) {
+            console.error('[LocationAddressScreen] Unauthorized (401). Redirecting to login or showing error.');
+            Alert.alert(t('error'), t('sessionExpired')); // Make sure 'sessionExpired' key exists or use a generic one
+            // Optionally trigger logout if not handled by interceptor
+            return;
           }
 
           console.error('[LocationAddressScreen] add-delivery-address error:', apiErr);
