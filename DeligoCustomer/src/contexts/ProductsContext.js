@@ -43,6 +43,7 @@ export function normalizeProduct(p) {
   const pricing = raw.pricing || {};
   const price = Number(pricing.price ?? raw.price ?? p.price ?? 0) || 0;
   const discountRaw = pricing.discount ?? raw.discount ?? 0;
+  const taxRaw = pricing.tax ?? raw.tax ?? 0;
   const finalPriceRaw = pricing.finalPrice ?? raw.finalPrice;
   // Trust backend finalPrice if present, else calc
   let finalPrice = Number(finalPriceRaw);

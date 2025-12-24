@@ -29,7 +29,7 @@ export default function CartDetail({ vendorId, navigation }) {
     // 1. Existing cart product data
     let p = it.product || {};
 
-    // 2. Lookup in ProductsContext for better data (images, names)
+    // 2. Lookup in ProductsContext for better data (images, names, pricing)
     let contextProduct = null;
     if (products && products.length > 0) {
       const rawId = p.id || p._id || p.productId || it.productId || it.id; // it.id might be cart item key, checking all
@@ -37,19 +37,45 @@ export default function CartDetail({ vendorId, navigation }) {
         contextProduct = products.find(prod =>
           prod.id === rawId ||
           prod._id === rawId ||
+          prod._raw?._id === rawId ||
+          prod._raw?.productId === rawId ||
+          prod._raw?.id === rawId ||
           (prod._raw && (prod._raw.productId === rawId || prod._raw.id === rawId))
         );
       }
+
+      // Debug: Log lookup result
+      if (!contextProduct && rawId) {
+        console.debug('[CartDetail] Product lookup failed for ID:', rawId, 'Available products:', products.length);
+      } else if (contextProduct) {
+        console.debug('[CartDetail] Product matched:', contextProduct.name, 'for ID:', rawId);
+      }
     }
 
-    // Merge: Prefer Context data for static fields (image, name), keep Cart data for pricing?
+    // Merge: Prefer Context data for static fields (image, name) AND pricing if cart data is incomplete
     if (contextProduct) {
       p = {
         ...p,
         image: contextProduct.image || p.image,
         name: contextProduct.name || p.name,
-        _raw: { ...p._raw, ...contextProduct._raw }
+        _raw: {
+          ...(contextProduct._raw || {}),
+          ...(p._raw || {}),
+          // Merge pricing: use context pricing if cart pricing is missing
+          pricing: {
+            ...(contextProduct._raw?.pricing || {}),
+            ...(p._raw?.pricing || {}),
+            ...(p.pricing || {})
+          }
+        }
       };
+
+      console.debug('[CartDetail] Merged product data:', {
+        name: p.name,
+        hasImage: !!p.image,
+        hasPricing: !!(p._raw?.pricing || p.pricing),
+        pricing: p._raw?.pricing || p.pricing
+      });
     }
 
     const pricing = p?._raw?.pricing || p?.pricing || {};
@@ -229,6 +255,7 @@ export default function CartDetail({ vendorId, navigation }) {
                   <Text style={{ color: colors.text.secondary, fontSize: 12, marginTop: 6, fontFamily: 'Poppins-Regular' }}>
                     {formatCurrency(it.currency, it.basePrice)}
                     {it.discountPercent > 0 ? ` • -${Math.round(it.discountPercent)}%` : ''}
+                    {it.taxPercent > 0 ? ` • +${Math.round(it.taxPercent)}% tax` : ''}
                     {` • = ${formatCurrency(it.currency, it.finalUnit)}`}
                   </Text>
                 </View>
