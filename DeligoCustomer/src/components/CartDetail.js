@@ -156,11 +156,14 @@ export default function CartDetail({ vendorId, navigation }) {
 
   const handleUpdateQuantity = async (itemId, delta) => {
     const action = delta > 0 ? 'add' : 'remove';
+    console.log('[CartDetail] handleUpdateQuantity called:', { itemId, delta, vendorId, action });
     setUpdatingItem({ id: itemId, action });
     try {
+      console.log('[CartDetail] Calling updateQuantity...');
       await updateQuantity(itemId, delta, vendorId);
+      console.log('[CartDetail] updateQuantity completed successfully');
     } catch (err) {
-      console.error("Failed to update quantity", err);
+      console.error("[CartDetail] Failed to update quantity", err);
     } finally {
       setUpdatingItem(null);
     }

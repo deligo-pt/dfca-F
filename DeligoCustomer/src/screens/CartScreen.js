@@ -22,19 +22,20 @@ const CartScreen = ({ navigation }) => {
   useEffect(() => { fetchCartRef.current = fetchCart; }, [fetchCart]);
 
   // Fetch cart data when screen comes into focus (call the ref, no dependency on function identity)
+  // IMPORTANT: Use force:true to bypass throttling and ensure cart is always fresh when user returns
   useFocusEffect(
     useCallback(() => {
       let active = true;
       const loadCart = async () => {
         const fn = fetchCartRef.current;
         if (fn && active) {
-          const result = await fn({ silent: true });
+          const result = await fn({ silent: true, force: true });
           if (result?.skipped) {
             console.debug('[CartScreen] fetch skipped:', result.reason);
           } else if (!result?.success) {
             console.warn('[CartScreen] Failed to fetch cart:', result?.error);
           } else {
-            console.debug('[CartScreen] cart fetched');
+            console.debug('[CartScreen] cart fetched and refreshed');
           }
         }
       };
