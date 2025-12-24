@@ -1,6 +1,7 @@
-import React, { createContext, useContext, useEffect, useState, useCallback, useMemo } from 'react';
+import React, { createContext, useContext, useEffect, useState, useCallback, useMemo, useRef } from 'react';
 import StorageService from '../utils/storage';
 import { BASE_API_URL, API_ENDPOINTS } from '../constants/config';
+import { useProfile } from './ProfileContext';
 
 const OrdersContext = createContext(null);
 export const useOrders = () => useContext(OrdersContext);
@@ -9,6 +10,14 @@ export const OrdersProvider = ({ children }) => {
   const [orders, setOrders] = useState([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
+
+  const { isAuthenticated } = useProfile();
+  const prevAuthRef = useRef(isAuthenticated);
+
+  const clearOrders = useCallback(() => {
+    setOrders([]);
+    setError(null);
+  }, []);
 
   const fetchOrders = useCallback(async () => {
     setLoading(true);
@@ -42,8 +51,19 @@ export const OrdersProvider = ({ children }) => {
   }, []);
 
   useEffect(() => {
-    fetchOrders();
-  }, []); // eslint-disable-line react-hooks/exhaustive-deps
+    if (isAuthenticated) {
+      fetchOrders();
+    }
+  }, [fetchOrders, isAuthenticated]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Clear orders on logout
+  useEffect(() => {
+    if (prevAuthRef.current && !isAuthenticated) {
+      console.log('[OrdersContext] User logged out, clearing orders');
+      clearOrders();
+    }
+    prevAuthRef.current = isAuthenticated;
+  }, [isAuthenticated, clearOrders]);
 
   const ongoingOrders = useMemo(() =>
     orders.filter(order =>
@@ -64,8 +84,9 @@ export const OrdersProvider = ({ children }) => {
     loading,
     error,
     fetchOrders,
+    clearOrders,
     ordersCount: orders.length
-  }), [orders, ongoingOrders, pastOrders, loading, error, fetchOrders]);
+  }), [orders, ongoingOrders, pastOrders, loading, error, fetchOrders, clearOrders]);
 
   return (
     <OrdersContext.Provider value={contextValue}>

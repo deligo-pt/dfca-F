@@ -319,42 +319,60 @@ const CheckoutScreen = ({ route, navigation }) => {
         currentUser = await getUserData();
       }
 
-      // Extract items from cart to ensure they are passed to checkout
-      const checkoutItems = cart?.items ? Object.values(cart.items).map(it => ({
-        product: it.product.id,
-        productId: it.product.id,
-        quantity: it.quantity
-      })) : [];
+      // Determine Purchase Type: Cart vs Direct
+      // The `cart` variable comes from `getVendorCart(vendorId)`.
+      // If we are checking out a Vendor Cart, `cart` will be defined and `useCart` should be true.
+      // If `cartData` was passed (e.g. "Buy Now") but it's not in the context cart, we send items directly.
 
-      const finalPayload = {
+      // Heuristic: If we have a valid vendorId and that vendor cart exists in context, prefer `useCart: true`.
+      // Otherwise, assume it's a direct purchase of the items in `route.params.cartData`.
+
+      const isCartPurchase = !!(vendorId && cart);
+
+      let checkoutPayload = {
         ...addressData,
         label: addressData.label || 'Home',
         customerName: `${currentUser?.name?.firstName || ''} ${currentUser?.name?.lastName || ''}`.trim(),
         customerEmail: currentUser?.email || '',
         customerPhone: currentUser?.contactNumber || currentUser?.phone || currentUser?.mobile || '',
-        items: checkoutItems,
-        vendorId: vendorId
+        vendorId: vendorId,
+        // Optional fields from original req
+        estimatedDeliveryTime: "25-35 min",
+        discount: 0 // Placeholder
       };
 
+      if (isCartPurchase) {
+        // CART PURCHASE
+        checkoutPayload.useCart = true;
+        // Don't send items for cart purchase as per requirement
+      } else {
+        // DIRECT PURCHASE (Buy Now / Reorder / etc)
+        // Extract items from cartData params
+        const directItems = (cartData?.items || []).map(it => ({
+          productId: it.productId || it.product?.id || it.id, // Ensure productId is set
+          quantity: it.quantity || 1
+        }));
+        checkoutPayload.items = directItems;
+        // Don't send useCart
+      }
+
       // Aggressive Cleanup: Ensure no nested address objects confuse the backend
-      // The backend likely expects 'deliveryAddressId' OR 'addressId' OR 'deliveryAddress' as an ID string.
-      // It definitely does NOT want a nested object if it expects an ID.
-      if (typeof finalPayload.deliveryAddress === 'object') {
-        delete finalPayload.deliveryAddress;
+      if (typeof checkoutPayload.deliveryAddress === 'object') {
+        delete checkoutPayload.deliveryAddress;
       }
 
       if (backendAddressId) {
         // Shotgun approach: send ID in all likely fields
-        finalPayload.deliveryAddressId = backendAddressId;
-        finalPayload.addressId = backendAddressId;
-        finalPayload.deliveryAddress = backendAddressId;
+        checkoutPayload.deliveryAddressId = backendAddressId;
+        checkoutPayload.addressId = backendAddressId;
+        checkoutPayload.deliveryAddress = backendAddressId;
       }
 
       try {
-        console.debug('[CheckoutScreen] Creating checkout via API with payload keys:', Object.keys(finalPayload));
+        console.debug('[CheckoutScreen] Creating checkout via API with payload type:', isCartPurchase ? 'CART' : 'DIRECT');
 
-        // Pass finalPayload to API
-        let res = await CheckoutAPI.createCheckout(false, finalPayload);
+        // Pass checkoutPayload to API
+        let res = await CheckoutAPI.createCheckout(checkoutPayload);
 
         // Fallback Strategy: If still 400 "Delivery address not found"
         // Try sending WITHOUT the IDs, forcing the backend to use the raw address fields (which are spread in root)        
@@ -364,17 +382,12 @@ const CheckoutScreen = ({ route, navigation }) => {
             console.warn('[CheckoutScreen] ID-based checkout failed. Retrying with Raw Address Object (no ID)...');
 
             // Construct payload that relies on embedded address data, NOT ID lookups
-            const fallbackPayload = { ...finalPayload };
+            const fallbackPayload = { ...checkoutPayload };
             delete fallbackPayload.deliveryAddressId;
             delete fallbackPayload.addressId;
             delete fallbackPayload.deliveryAddress;
 
-            // Add back the object structure if the backend needs it for raw creation?
-            // Based on logs, we had 'address' etc in root. 
-            // Let's ensure we send raw address fields clearly.
-            // We already have ...addressData in root.
-
-            res = await CheckoutAPI.createCheckout(false, fallbackPayload);
+            res = await CheckoutAPI.createCheckout(fallbackPayload);
             console.debug('[CheckoutScreen] Retry createCheckout result:', res);
           }
         }

@@ -1,7 +1,8 @@
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import * as Location from 'expo-location';
 import StorageService from '../utils/storage';
+import { useProfile } from './ProfileContext';
 
 const STORAGE_KEY_LOCATION = 'deligo_user_location';
 const STORAGE_KEY_SAVED_ADDRESSES = 'deligo_saved_addresses';
@@ -22,6 +23,9 @@ export const LocationProvider = ({ children }) => {
     const [label, setLabel] = useState('Home');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
+
+    const { isAuthenticated } = useProfile();
+    const prevAuthRef = useRef(isAuthenticated);
 
     // Load saved addresses and last known location on mount
     useEffect(() => {
@@ -172,6 +176,24 @@ export const LocationProvider = ({ children }) => {
         await StorageService.setItem(STORAGE_KEY_SAVED_ADDRESSES, updatedAddresses);
     };
 
+    const clearUserData = async () => {
+        setSavedAddresses([]);
+        setLabel('Home');
+        try {
+            await StorageService.removeItem(STORAGE_KEY_SAVED_ADDRESSES);
+        } catch (e) {
+            console.warn('Failed to clear saved addresses:', e);
+        }
+    };
+
+    useEffect(() => {
+        if (prevAuthRef.current && !isAuthenticated) {
+            console.log('[LocationContext] User logged out, clearing user data');
+            clearUserData();
+        }
+        prevAuthRef.current = isAuthenticated;
+    }, [isAuthenticated]);
+
     return (
         <LocationContext.Provider value={{
             currentLocation,
@@ -195,7 +217,8 @@ export const LocationProvider = ({ children }) => {
             setPostalCode,
             setState,
             setCountry,
-            setLabel
+            setLabel,
+            clearUserData
         }}>
             {children}
         </LocationContext.Provider>

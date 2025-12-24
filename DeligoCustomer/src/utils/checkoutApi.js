@@ -47,27 +47,15 @@ class CheckoutAPI {
   }
 
   /**
-   * Create checkout with useCart flag
-   * @param {boolean} useCart - Whether to use cart items for checkout
+   * Create checkout
+   * @param {object} payload - The full payload body for checkout creation. 
+   *                           Can be { useCart: true, ... } or { items: [...], ... }
    * @returns {Promise}
    */
-  static async createCheckout(useCart = true, addressData = null) {
+  static async createCheckout(payload = {}) {
     try {
       const url = `${BASE_API_URL}${API_ENDPOINTS.CHECKOUT.CREATE}`;
       const headers = await this.getHeaders();
-
-      const payload = { useCart, ...addressData };
-
-
-
-      // Cleanup: checkoutApi blindly assigning addressData to deliveryAddress causes recursion/bloat
-      // if addressData contains items/vendorId.
-      // better to rely on caller to structure it, or just refrain from overwriting if it looks like a full payload.
-      if (addressData && !payload.deliveryAddress) {
-        // Only create deliveryAddress if it's clearly missing and addressData looks like just an address
-        // But safest is to remove this auto-nesting as it caused the 400 error.
-        // payload.deliveryAddress = addressData; 
-      }
 
       console.debug('[CheckoutAPI] POST', url, payload);
 

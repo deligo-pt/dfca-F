@@ -2,6 +2,7 @@ import React, { createContext, useContext, useEffect, useMemo, useState, useCall
 import StorageService from '../utils/storage';
 import CartAPI from '../utils/cartApi';
 import { isValidObjectId } from '../utils/objectId';
+import { useProfile } from './ProfileContext';
 
 const STORAGE_KEY = 'cart:v1';
 
@@ -123,6 +124,9 @@ export const CartProvider = ({ children }) => {
   const fetchInFlightRef = useRef(false);
   const lastFetchAtRef = useRef(0);
 
+  const { isAuthenticated } = useProfile();
+  const prevAuthRef = useRef(isAuthenticated);
+
   // Load persisted carts
   useEffect(() => {
     let mounted = true;
@@ -141,6 +145,15 @@ export const CartProvider = ({ children }) => {
     })();
     return () => { mounted = false; };
   }, []);
+
+  // Clear carts on logout (when isAuthenticated changes from true to false)
+  useEffect(() => {
+    if (prevAuthRef.current && !isAuthenticated) {
+      console.log('[CartContext] User logged out, clearing carts');
+      clearAllCarts();
+    }
+    prevAuthRef.current = isAuthenticated;
+  }, [isAuthenticated, clearAllCarts]);
 
   // Persist on change
   useEffect(() => {
