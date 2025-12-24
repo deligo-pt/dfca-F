@@ -70,9 +70,25 @@ function normalizeProductForCart(p) {
   // Extract vendor info more robustly
   const vendor = raw.vendor || {};
   let vendorId = vendor.vendorId || raw.vendorId || null;
+  let vendorName = vendor.vendorName || raw.vendorName || null;
 
-  // Handle populated vendorId object
+  // Handle populated vendorId object (User schema usually)
   if (vendorId && typeof vendorId === 'object') {
+    // If we don't have a name yet, try to get it from the populated vendorId object
+    if (!vendorName) {
+      const vName = vendorId.name;
+      if (typeof vName === 'string') {
+        vendorName = vName;
+      } else if (vName && typeof vName === 'object') {
+        // Construct from first/last
+        const parts = [vName.firstName, vName.lastName].filter(Boolean);
+        if (parts.length > 0) vendorName = parts.join(' ');
+      } else if (vendorId.vendorName) {
+        // Sometimes it might still be a vendor object
+        vendorName = vendorId.vendorName;
+      }
+    }
+    // Extract actual ID
     vendorId = vendorId._id || vendorId.id || null;
   }
 
@@ -108,7 +124,7 @@ function normalizeProductForCart(p) {
     currency: pricing.currency ?? raw.currency ?? raw.pricing?.currency ?? '',
     image: primaryImage,
     vendorId,
-    vendorName: vendor.vendorName || raw.vendorName || null,
+    vendorName: vendorName || null,
     vendorImage: vendor.storePhoto || vendor.logo || vendor.image || raw.vendorImage || raw.storePhoto || null,
     vendorRating: vendor.rating,
     vendorDeliveryTime: vendor.deliveryTime,

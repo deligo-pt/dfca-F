@@ -22,13 +22,16 @@ const SearchScreen = ({ navigation }) => {
     const [sortBy, setSortBy] = useState('relevance'); // 'relevance', 'distance', 'rating'
     const inputRef = useRef(null);
 
-    // Initial Load: Focus input & load history
+    // Initial Load: Focus input & load history & load ALL products for client-side search
     useEffect(() => {
-        const loadRecents = async () => {
+        const init = async () => {
+            // Load all products (limit 2000) so we can filter locally
+            await fetchProducts({ limit: 2000, page: 1 });
+
             const recents = await StorageService.getItem('recentSearches');
             if (recents && Array.isArray(recents)) setRecentSearches(recents);
         };
-        loadRecents();
+        init();
 
         // Auto-focus after small delay
         setTimeout(() => inputRef.current?.focus(), 100);
@@ -43,39 +46,53 @@ const SearchScreen = ({ navigation }) => {
         await StorageService.setItem('recentSearches', updated);
     };
 
-    // Debounce Search
+    // Debounce Search UI Feedback (No API call)
     useEffect(() => {
+        if (!searchQuery.trim()) {
+            setIsTyping(false);
+            return;
+        }
+
         setIsTyping(true);
-        const tId = setTimeout(async () => {
-            if (searchQuery.trim()) {
-                // Fetch Products (via Context)
-                // The API doesn't have a working restaurant endpoint, so we derive restaurants from product data
-                await fetchProducts({ search: searchQuery, page: 1, force: false });
-                setIsTyping(false);
-            } else {
-                setIsTyping(false);
-            }
-        }, 500);
+        const tId = setTimeout(() => {
+            // We rely on useMemo (client-side filtering) now, so no API call here.
+            // Just clear the typing indicator.
+            setIsTyping(false);
+        }, 300); // 300ms visual delay for better UX
+
         return () => clearTimeout(tId);
     }, [searchQuery]);
 
-    // Client-side filtering with fuzzy matching
+    // Client-side filtering with enhanced deep search matches (Description, Tags, etc.)
     const filterBySearchQuery = (items, query) => {
         if (!query || !query.trim()) return items;
         const q = query.toLowerCase().trim();
 
         return items.filter(item => {
-            // Match in product name
+            // Normalized data
             const name = (item.name || '').toLowerCase();
-            // Match in vendor name
-            const vendorName = (item._raw?.vendor?.vendorName || item.vendor?.vendorName || '').toLowerCase();
-            // Match in tags/category
-            const tags = (item.categories || []).join(' ').toLowerCase();
-            const category = (item._raw?.category || item.category || '').toLowerCase();
+            const vendorName = (item.vendor?.vendorName || '').toLowerCase();
 
-            return name.includes(q) || vendorName.includes(q) || tags.includes(q) || category.includes(q);
+            // Raw data for deeper fields from MongoDB structure
+            const raw = item._raw || {};
+            const description = (raw.description || '').toLowerCase();
+            const category = (raw.category || item.category || '').toLowerCase();
+            const subCategory = (raw.subCategory || '').toLowerCase();
+            const brand = (raw.brand || '').toLowerCase();
+
+            // Check tags array
+            const tags = Array.isArray(raw.tags) ? raw.tags.join(' ').toLowerCase() : (Array.isArray(item.categories) ? item.categories.join(' ').toLowerCase() : '');
+
+            return name.includes(q) ||
+                vendorName.includes(q) ||
+                description.includes(q) ||
+                tags.includes(q) ||
+                category.includes(q) ||
+                subCategory.includes(q) ||
+                brand.includes(q);
         });
     };
+
 
     // Filter by vendor type
     const filterByVendorType = (items, vendorType) => {
@@ -115,6 +132,7 @@ const SearchScreen = ({ navigation }) => {
 
         // Apply search query filter
         filtered = filterBySearchQuery(filtered, searchQuery);
+
 
         // Apply vendor type filter
         filtered = filterByVendorType(filtered, selectedVendorType);

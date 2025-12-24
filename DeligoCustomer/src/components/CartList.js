@@ -149,9 +149,6 @@ export default function CartList({ navigation }) {
 
         // Fallback: If no product match, try to find ANY product from this vendor to get vendor details
         if (!productContextMatch && products && products.length > 0 && cart.vendorId) {
-          // DEBUG: Inspect what we have in products
-          if (products.length > 0) console.debug('[CartList] fallback inspect', { cartVid: cart.vendorId, sampleVendor: products[0].vendor, sampleRawVendor: products[0]._raw?.vendor });
-
           productContextMatch = products.find(p => {
             const v = p.vendor || {};
             const r = p._raw || {};

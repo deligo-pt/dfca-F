@@ -42,11 +42,16 @@ const GlovoBubbles = ({ categories, onPress, selectedId }) => {
                 ]}>
                     <Text style={styles.bubbleIcon}>{category.icon}</Text>
                 </View>
-                <Text style={[
-                    styles.bubbleLabel,
-                    { color: isDarkMode ? colors.text.primary : '#333' },
-                    isSelected && { color: colors.primary, fontFamily: 'Poppins-Bold' }
-                ]}>
+                <Text
+                    style={[
+                        styles.bubbleLabel,
+                        { color: isDarkMode ? colors.text.primary : '#333' },
+                        isSelected && { color: colors.primary, fontFamily: 'Poppins-Bold' }
+                    ]}
+                    numberOfLines={1}
+                    adjustsFontSizeToFit={true}
+                    minimumFontScale={0.8}
+                >
                     {category.name}
                 </Text>
             </TouchableOpacity>

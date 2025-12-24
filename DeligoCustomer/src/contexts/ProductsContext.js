@@ -52,7 +52,12 @@ export function normalizeProduct(p) {
   // Extract Vendor Details
   const vendorName = vendorSource.businessName || businessDetails.businessName || vendorSource.vendorName || raw.name || raw.productName || p.name || 'Unknown';
   // Check both businessType (new) and vendorType (old)
-  const vendorType = vendorSource.businessType || businessDetails.businessType || vendorSource.vendorType || '';
+  let vendorType = vendorSource.businessType || businessDetails.businessType || vendorSource.vendorType || '';
+
+  // Just trim and uppercase, do NOT merge different spellings as per user request
+  if (vendorType) {
+    vendorType = String(vendorType).toUpperCase().trim();
+  }
 
   const vendorRating = (vendorSource.rating && typeof vendorSource.rating === 'number') ? vendorSource.rating : 0;
   const vendorLat = vendorSource.latitude || businessLocation.latitude;
