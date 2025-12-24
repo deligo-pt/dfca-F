@@ -17,6 +17,7 @@ import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLanguage } from '../utils/LanguageContext';
 import { useCart } from '../contexts/CartContext';
 import { useLocation } from '../contexts/LocationContext';
+import { useProfile } from '../contexts/ProfileContext';
 import formatCurrency from '../utils/currency';
 import { setupPaymentSheet, openPaymentSheet } from '../utils/stripeService';
 import CheckoutAPI from '../utils/checkoutApi';
@@ -81,7 +82,8 @@ const CheckoutScreen = ({ route, navigation }) => {
   const cart = getVendorCart(vendorId);
 
   // Create checkout on mount (payment integration happens here, not in CartDetail)
-  const { address, detailedAddress, city, postalCode, state, country, currentLocation } = useLocation();
+  const { address, detailedAddress, city, postalCode, state, country, currentLocation, selectAddress } = useLocation();
+  const { user } = useProfile();
 
   useEffect(() => {
     let canceled = false;
@@ -217,6 +219,18 @@ const CheckoutScreen = ({ route, navigation }) => {
 
       try {
         currentUser = await getUserData();
+
+        // Try to match current location with one of the delivery addresses to get ID
+        if (user?.deliveryAddresses) {
+          const match = user.deliveryAddresses.find(a =>
+            (a.latitude === addressData.latitude && a.longitude === addressData.longitude) ||
+            (a.street === addressData.street)
+          );
+          if (match) {
+            console.debug('[CheckoutScreen] Found matching delivery address ID:', match._id);
+            backendAddressId = match._id;
+          }
+        }
         console.debug('[CheckoutScreen] Fetching existing backend addresses...');
 
         // 1. Try to get existing addresses
@@ -290,12 +304,21 @@ const CheckoutScreen = ({ route, navigation }) => {
         currentUser = await getUserData();
       }
 
+      // Extract items from cart to ensure they are passed to checkout
+      const checkoutItems = cart?.items ? Object.values(cart.items).map(it => ({
+        product: it.product.id,
+        productId: it.product.id,
+        quantity: it.quantity
+      })) : [];
+
       const finalPayload = {
         ...addressData,
         label: addressData.label || 'Home',
         customerName: `${currentUser?.name?.firstName || ''} ${currentUser?.name?.lastName || ''}`.trim(),
         customerEmail: currentUser?.email || '',
         customerPhone: currentUser?.contactNumber || currentUser?.phone || currentUser?.mobile || '',
+        items: checkoutItems,
+        vendorId: vendorId
       };
       if (backendAddressId) {
         finalPayload.deliveryAddressId = backendAddressId;
@@ -305,8 +328,8 @@ const CheckoutScreen = ({ route, navigation }) => {
       try {
         console.debug('[CheckoutScreen] Creating checkout via API with payload:', JSON.stringify(finalPayload));
 
-        // Pass finalPayload to API
-        const res = await CheckoutAPI.createCheckout(true, finalPayload);
+        // Pass finalPayload to API, setting useCart=false to force using 'items' payload
+        const res = await CheckoutAPI.createCheckout(false, finalPayload);
         console.debug('[CheckoutScreen] createCheckout result:', res);
 
         if (canceled) return;
@@ -660,7 +683,29 @@ const CheckoutScreen = ({ route, navigation }) => {
             <Text style={styles(colors).sectionTitle}>{t('deliveryTo')}</Text>
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={() => navigation.navigate('LocationAddress')}
+              onPress={() => navigation.navigate('SavedAddresses', {
+                onSelect: (selectedAddr) => {
+                  // Map API address to LocationContext format
+                  const locAddr = {
+                    address: selectedAddr.street,
+                    detailedAddress: selectedAddr.detailedAddress || '',
+                    city: selectedAddr.city,
+                    postalCode: selectedAddr.postalCode,
+                    state: selectedAddr.state,
+                    country: selectedAddr.country,
+                    coordinates: {
+                      latitude: selectedAddr.latitude,
+                      longitude: selectedAddr.longitude
+                    },
+                    label: selectedAddr.addressType === 'OFFICE' ? 'Work' : selectedAddr.addressType === 'OTHER' ? 'Other' : 'Home'
+                  };
+                  selectAddress(locAddr);
+                },
+                selectedId: user?.deliveryAddresses?.find(a =>
+                  (a.latitude === currentLocation?.latitude && a.longitude === currentLocation?.longitude) ||
+                  (a.street === address)
+                )?._id
+              })}
             >
               <Text style={styles(colors).changeButton}>{t('change')}</Text>
             </TouchableOpacity>

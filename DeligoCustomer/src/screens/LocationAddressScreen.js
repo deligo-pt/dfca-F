@@ -194,7 +194,6 @@ const LocationAddressScreen = ({ navigation, route }) => {
     if (!validate()) return;
 
     try {
-      // 1. Save to local LocationContext (storage)
       const addressData = {
         address: streetAddress,
         detailedAddress: detailedAddress,
@@ -206,6 +205,44 @@ const LocationAddressScreen = ({ navigation, route }) => {
         coordinates: markerCoordinate
       };
 
+      // Custom mode for adding delivery addresses directly to the list via API
+      if (route.params?.mode === 'add_delivery_address') {
+        try {
+          const payload = {
+            deliveryAddress: {
+              street: detailedAddress ? `${detailedAddress}, ${streetAddress}` : streetAddress,
+              city: city,
+              state: state,
+              country: country,
+              postalCode: postalCode,
+              latitude: markerCoordinate?.latitude,
+              longitude: markerCoordinate?.longitude,
+              // Map friendly labels to backend enums if possible
+              addressType: label === 'Work' ? 'OFFICE' : label === 'Other' ? 'OTHER' : 'HOME',
+              isActive: true
+            }
+          };
+
+          console.debug('[LocationAddressScreen] Adding delivery address:', payload);
+          const res = await customerApi.post('/customers/add-delivery-address', payload);
+
+          if (res.data && res.data.success === false) {
+            throw new Error(res.data.message || 'Failed');
+          }
+
+          if (route.params?.onSave) {
+            route.params.onSave(addressData);
+          }
+          navigation.goBack();
+          return;
+        } catch (apiErr) {
+          console.error('[LocationAddressScreen] add-delivery-address error:', apiErr);
+          Alert.alert(t('error'), t('saveFailed'));
+          return;
+        }
+      }
+
+      // Default behavior: Save to local LocationContext (storage)
       const success = await saveAddress(addressData);
 
       if (success) {
