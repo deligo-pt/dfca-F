@@ -219,85 +219,98 @@ const CheckoutScreen = ({ route, navigation }) => {
       let backendAddressId = null;
       let currentUser = null;
 
-      try {
-        currentUser = await getUserData();
+      // Helper to find address in a list
+      const findMatchingAddress = (list, target) => {
+        if (!Array.isArray(list) || !list.length) return null;
+        return list.find(a =>
+          (a.latitude === target.latitude && a.longitude === target.longitude) ||
+          (a.street === target.street) ||
+          (a.address === target.address)
+        );
+      };
 
-        // Try to match current location with one of the delivery addresses to get ID
-        if (user?.deliveryAddresses) {
-          const match = user.deliveryAddresses.find(a =>
-            (a.latitude === addressData.latitude && a.longitude === addressData.longitude) ||
-            (a.street === addressData.street)
-          );
+      try {
+        // Step 1: ALWAYS Fetch fresh profile from API to ensure we have the latest address IDs
+        // Local storage (getUserData) might be stale specific for checkout flow
+        console.debug('[CheckoutScreen] Fetching fresh profile for address resolution...');
+        let freshProfile = null;
+        try {
+          const profileRes = await customerApi.get(API_ENDPOINTS.PROFILE.GET);
+          if (profileRes.data && profileRes.data.data) {
+            freshProfile = profileRes.data.data;
+          } else if (profileRes.data) {
+            freshProfile = profileRes.data;
+          }
+        } catch (fetchErr) {
+          console.warn('[CheckoutScreen] Failed to fetch fresh profile', fetchErr);
+          // Fallback to local data if network fails
+          freshProfile = await getUserData();
+        }
+
+        currentUser = freshProfile; // Update currentUser reference to use the fresh one
+        const serverAddresses = freshProfile?.deliveryAddresses || [];
+        console.debug('[CheckoutScreen] Server addresses count:', serverAddresses.length);
+
+        // Strategy 1: Check fresh server list for match
+        if (serverAddresses.length > 0) {
+          const match = findMatchingAddress(serverAddresses, addressData);
           if (match) {
-            console.debug('[CheckoutScreen] Found matching delivery address ID:', match._id);
+            console.debug('[CheckoutScreen] Found matching delivery address in SERVER data:', match._id);
             backendAddressId = match._id;
           }
         }
-        console.debug('[CheckoutScreen] Fetching existing backend addresses...');
 
-        // 1. Try to get existing addresses
-        let existingResponse = null;
-        try {
-          existingResponse = await customerApi.get(API_ENDPOINTS.PROFILE.GET);
-        } catch (fetchErr) {
-          console.debug('[CheckoutScreen] Failed to fetch profile addresses, will try adding.', fetchErr.message);
-        }
+        // Strategy 2: If not found, try to add it as a NEW delivery address
+        if (!backendAddressId) {
+          console.debug('[CheckoutScreen] Address ID not found on server. Attempting to add...');
 
-        const profileData = existingResponse?.data || existingResponse;
-        const addresses = profileData?.addresses || [];
-        console.debug('[CheckoutScreen] Fetched profile addresses count:', addresses.length);
-
-        // 2. Always sync current address to backend (Update Profile Address)
-        // Using the same logic as EditProfileScreen to ensure persistence
-        try {
-          // Prefer userId (e.g., C-xxxx) for the /customers/:id endpoint
-          const customerId = currentUser?.userId || currentUser?._id || currentUser?.id;
-
-          if (customerId && currentUser) {
-            const formData = new FormData();
-
-            // Build profile update with only necessary fields
-            // Don't send contactNumber or email - they're immutable and may cause duplicate key errors
-            const updatedProfileData = {
-              name: currentUser.name || { firstName: '', lastName: '' },
-              address: addressData,
+          try {
+            const payload = {
+              deliveryAddress: {
+                street: addressData.street || addressData.address,
+                city: addressData.city,
+                state: addressData.state,
+                country: addressData.country,
+                postalCode: addressData.postalCode,
+                latitude: addressData.latitude,
+                longitude: addressData.longitude,
+                addressType: (addressData.label === 'Work' ? 'OFFICE' : addressData.label === 'Other' ? 'OTHER' : 'HOME').toUpperCase(),
+                isActive: true
+              }
             };
 
-            formData.append('data', JSON.stringify(updatedProfileData));
+            const addRes = await customerApi.post('/customers/add-delivery-address', payload);
 
-            console.debug('[CheckoutScreen] Syncing address via main profile update:', customerId);
-            const updateUrl = API_ENDPOINTS.PROFILE.UPDATE.replace(':id', customerId);
-            const syncRes = await customerApi.patch(
-              updateUrl,
-              formData,
-              {
-                headers: {
-                  'Content-Type': 'multipart/form-data',
-                },
-                timeout: 30000,
+            if (addRes.data && addRes.data.success) {
+              // Extract ID from response (structure depends on backend)
+              const addedAddr = addRes.data.data || addRes.data.address;
+              if (addedAddr && addedAddr._id) {
+                backendAddressId = addedAddr._id;
+              } else if (addRes.data.user && addRes.data.user.deliveryAddresses) {
+                const match = findMatchingAddress(addRes.data.user.deliveryAddresses, addressData);
+                if (match) backendAddressId = match._id;
               }
-            );
-            console.debug('[CheckoutScreen] Profile address updated result:', syncRes);
-
-            const data = syncRes?.data || syncRes;
-            // The patch returns the updated user object; extract address ID if available
-            const updatedAddr = data?.address || data?.location;
-            backendAddressId = updatedAddr?._id || updatedAddr?.id || updatedAddr?.addressId;
-          }
-        } catch (syncErr) {
-          console.warn('[CheckoutScreen] Failed to sync address via profile update, checking existing...', syncErr.message);
-          // Fallback to existing address if sync fails
-          if (Array.isArray(addresses) && addresses.length > 0) {
-            // Find an address with similar coordinates or use default
-            const match = addresses.find(a =>
-              a.latitude === addressData.latitude &&
-              a.longitude === addressData.longitude
-            ) || addresses.find(a => a.isDefault) || addresses[0];
-            backendAddressId = match._id || match.id;
+              console.debug('[CheckoutScreen] Address added successfully, new ID:', backendAddressId);
+            }
+          } catch (addErr) {
+            // Strategy 3: Handle 409 Conflict (Address already exists)
+            if (addErr.response && addErr.response.status === 409) {
+              console.warn('[CheckoutScreen] Address already exists (409) but was not matched initially.');
+              // Try fuzzy match on street alone if strict match failed
+              const looseMatch = serverAddresses.find(a => a.street === addressData.street);
+              if (looseMatch) {
+                backendAddressId = looseMatch._id;
+                console.debug('[CheckoutScreen] Resolved ID via loose street match after 409:', backendAddressId);
+              } else {
+                console.warn('[CheckoutScreen] Could not resolve ID even after 409 conflict.');
+              }
+            } else {
+              console.warn('[CheckoutScreen] Failed to add address', addErr.message);
+            }
           }
         }
       } catch (e) {
-        console.warn('[CheckoutScreen] Address sync/fetch process failed', e);
+        console.warn('[CheckoutScreen] Address resolution logic failed', e);
       }
 
       // Prepare Final Payload
@@ -322,17 +335,51 @@ const CheckoutScreen = ({ route, navigation }) => {
         items: checkoutItems,
         vendorId: vendorId
       };
+
+      // Aggressive Cleanup: Ensure no nested address objects confuse the backend
+      // The backend likely expects 'deliveryAddressId' OR 'addressId' OR 'deliveryAddress' as an ID string.
+      // It definitely does NOT want a nested object if it expects an ID.
+      if (typeof finalPayload.deliveryAddress === 'object') {
+        delete finalPayload.deliveryAddress;
+      }
+
       if (backendAddressId) {
+        // Shotgun approach: send ID in all likely fields
         finalPayload.deliveryAddressId = backendAddressId;
         finalPayload.addressId = backendAddressId;
+        finalPayload.deliveryAddress = backendAddressId;
       }
 
       try {
-        console.debug('[CheckoutScreen] Creating checkout via API with payload:', JSON.stringify(finalPayload));
+        console.debug('[CheckoutScreen] Creating checkout via API with payload keys:', Object.keys(finalPayload));
 
-        // Pass finalPayload to API, setting useCart=false to force using 'items' payload
-        const res = await CheckoutAPI.createCheckout(false, finalPayload);
-        console.debug('[CheckoutScreen] createCheckout result:', res);
+        // Pass finalPayload to API
+        let res = await CheckoutAPI.createCheckout(false, finalPayload);
+
+        // Fallback Strategy: If still 400 "Delivery address not found"
+        // Try sending WITHOUT the IDs, forcing the backend to use the raw address fields (which are spread in root)        
+        if (!res.success && res.status === 400 && backendAddressId) {
+          const errorMsg = typeof res.error === 'string' ? res.error : (res.error?.message || '');
+          if (errorMsg.includes('Delivery address not found')) {
+            console.warn('[CheckoutScreen] ID-based checkout failed. Retrying with Raw Address Object (no ID)...');
+
+            // Construct payload that relies on embedded address data, NOT ID lookups
+            const fallbackPayload = { ...finalPayload };
+            delete fallbackPayload.deliveryAddressId;
+            delete fallbackPayload.addressId;
+            delete fallbackPayload.deliveryAddress;
+
+            // Add back the object structure if the backend needs it for raw creation?
+            // Based on logs, we had 'address' etc in root. 
+            // Let's ensure we send raw address fields clearly.
+            // We already have ...addressData in root.
+
+            res = await CheckoutAPI.createCheckout(false, fallbackPayload);
+            console.debug('[CheckoutScreen] Retry createCheckout result:', res);
+          }
+        }
+
+        console.debug('[CheckoutScreen] createCheckout final result:', res);
 
         if (canceled) return;
 

@@ -236,6 +236,59 @@ const LocationAddressScreen = ({ navigation, route }) => {
           navigation.goBack();
           return;
         } catch (apiErr) {
+          // Robust Exception Handling: Check for 409 (Duplicate Address)
+          if (apiErr.response && (apiErr.response.status === 409 || apiErr.response?.data?.status === 409)) {
+            console.warn('[LocationAddressScreen] Address already exists (409). Fetching profile to retrieve existing ID...');
+            try {
+              // Fetch fresh profile to find the existing address
+              const userData = await getUserData();
+              const profileRes = await customerApi.get(`/customers/${userData._id || userData.id}`);
+              const freshAddresses = profileRes.data?.data?.deliveryAddresses || profileRes.data?.deliveryAddresses || [];
+
+              // Helper to find address
+              const findMatchingAddress = (list, target) => {
+                if (!Array.isArray(list) || !list.length) return null;
+                return list.find(a =>
+                  (a.latitude === target.latitude && a.longitude === target.longitude) ||
+                  (a.street === target.street) ||
+                  (a.address === target.address)
+                );
+              };
+
+              // Try to find the address we just failed to add
+              const targetAddr = {
+                latitude: markerCoordinate?.latitude,
+                longitude: markerCoordinate?.longitude,
+                street: detailedAddress ? `${detailedAddress}, ${streetAddress}` : streetAddress,
+                address: streetAddress
+              };
+
+              let match = findMatchingAddress(freshAddresses, targetAddr);
+
+              // Fallback loose match
+              if (!match) {
+                match = freshAddresses.find(a => a.street === targetAddr.street);
+              }
+
+              if (match) {
+                console.debug('[LocationAddressScreen] Found existing address ID:', match._id);
+                const existingAddressData = { ...addressData, _id: match._id, id: match._id };
+
+                if (route.params?.onSave) {
+                  route.params.onSave(existingAddressData);
+                }
+                navigation.goBack();
+                return;
+              } else {
+                console.warn('[LocationAddressScreen] Could not look up existing address despite 409.');
+                // proceed to show error
+              }
+
+            } catch (lookupErr) {
+              console.warn('[LocationAddressScreen] Failed to lookup existing address:', lookupErr);
+            }
+          }
+
           console.error('[LocationAddressScreen] add-delivery-address error:', apiErr);
           Alert.alert(t('error'), t('saveFailed'));
           return;

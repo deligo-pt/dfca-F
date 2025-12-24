@@ -123,7 +123,11 @@ export const ProductsProvider = ({ children }) => {
         console.debug('[ProductsContext] stored access token:', token ? `${String(token).slice(0, 8)}...` : null);
       } catch (e) { }
       const headers = { Accept: 'application/json' };
-      if (token) headers.Authorization = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+      if (token) {
+        // Backend expects raw token without Bearer prefix
+        const rawToken = token.startsWith('Bearer ') ? token.substring(7) : token;
+        headers.Authorization = rawToken;
+      }
 
       const qs = new URLSearchParams();
       if (final.search) qs.set('search', final.search);
@@ -230,10 +234,10 @@ export const ProductsProvider = ({ children }) => {
                 if (newRefresh) await setRefreshToken(newRefresh);
                 // Try several header formats for the retried GET in case backend expects raw token or custom header
                 const candidates = [];
-                // Prefer Bearer form
+                // Raw token (no Bearer) - PRIMARY strategy matching api.js
+                candidates.push(newAccess.startsWith('Bearer ') ? newAccess.substring(7) : newAccess);
+                // Bearer form as fallback (though likely not needed if backend expects raw)
                 candidates.push(newAccess.startsWith('Bearer ') ? newAccess : `Bearer ${newAccess}`);
-                // Raw token (no Bearer)
-                candidates.push(newAccess);
                 // Also try x-access-token as a fallback header
                 // We'll attempt Authorization header variants first, then x-access-token
 
@@ -392,7 +396,11 @@ export const ProductsProvider = ({ children }) => {
       if (token && typeof token === 'object') token = token.accessToken || token.token || null;
 
       const headers = { Accept: 'application/json' };
-      if (token) headers.Authorization = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+      if (token) {
+        // Backend expects raw token without Bearer prefix
+        const rawToken = token.startsWith('Bearer ') ? token.substring(7) : token;
+        headers.Authorization = rawToken;
+      }
 
       // Use the generic products endpoint with a vendor filter
       const endpoint = API_ENDPOINTS.PRODUCTS.GET_ALL;
@@ -433,10 +441,10 @@ export const ProductsProvider = ({ children }) => {
                 console.log('[ProductsContext] Token refreshed, retrying menu fetch');
 
                 const candidates = [];
-                // Prefer Bearer form
+                // Raw token (no Bearer) - PRIMARY strategy matching api.js
+                candidates.push(newAccess.startsWith('Bearer ') ? newAccess.substring(7) : newAccess);
+                // Bearer form as fallback
                 candidates.push(newAccess.startsWith('Bearer ') ? newAccess : `Bearer ${newAccess}`);
-                // Raw token (no Bearer)
-                candidates.push(newAccess);
 
                 let retryRes = null;
                 // Try Authorization header variants
@@ -478,6 +486,10 @@ export const ProductsProvider = ({ children }) => {
       }
 
       if (!res.ok) {
+        if (res.status === 401) {
+          console.warn('[ProductsContext] Menu fetch failed with 401 (Unauthorized) - returning empty menu');
+          return [];
+        }
         console.warn('[ProductsContext] Menu fetch failed:', res.status);
         throw new Error(`Menu fetch failed: ${res.status}`);
       }

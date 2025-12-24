@@ -597,6 +597,18 @@ export const CartProvider = ({ children }) => {
     return incomingId;
   };
 
+  // Clear all carts (for logout)
+  const clearAllCarts = useCallback(async () => {
+    console.log('[CartContext] Clearing all carts (logout)');
+    setState({ carts: {} });
+    try {
+      await StorageService.removeItem(STORAGE_KEY);
+      console.log('[CartContext] Cart storage cleared');
+    } catch (e) {
+      console.warn('[CartContext] Failed to clear cart storage:', e);
+    }
+  }, []);
+
   // Fetch cart from backend API (memoized to avoid changing identity)
   const fetchCart = useCallback(async (options = {}) => {
     const force = !!options.force;
@@ -749,6 +761,7 @@ export const CartProvider = ({ children }) => {
       removeAppliedPromoFromVendor,
       setDeliveryInstructionsForVendor,
       fetchCart,
+      clearAllCarts,
       // backward-compat aliases
       applyPromoCode: applyPromoCodeToVendor,
       removeAppliedPromo: removeAppliedPromoFromVendor,

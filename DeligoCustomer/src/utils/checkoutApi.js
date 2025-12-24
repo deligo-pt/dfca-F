@@ -58,9 +58,15 @@ class CheckoutAPI {
 
       const payload = { useCart, ...addressData };
 
-      // Also include as deliveryAddress for safety if backend supports both
-      if (addressData) {
-        payload.deliveryAddress = addressData;
+
+
+      // Cleanup: checkoutApi blindly assigning addressData to deliveryAddress causes recursion/bloat
+      // if addressData contains items/vendorId.
+      // better to rely on caller to structure it, or just refrain from overwriting if it looks like a full payload.
+      if (addressData && !payload.deliveryAddress) {
+        // Only create deliveryAddress if it's clearly missing and addressData looks like just an address
+        // But safest is to remove this auto-nesting as it caused the 400 error.
+        // payload.deliveryAddress = addressData; 
       }
 
       console.debug('[CheckoutAPI] POST', url, payload);

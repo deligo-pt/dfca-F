@@ -114,7 +114,7 @@ class CartAPI {
   }
 
   /**
-   * Activate or deactivate item (increment/decrement quantity)
+   * Update item quantity (increment/decrement)
    * @param {string} productId - Product ID
    * @param {number} quantity - Quantity to change
    * @param {string} action - 'increment' or 'decrement'
@@ -122,8 +122,9 @@ class CartAPI {
    */
   static async activateItem(productId, quantity, action = 'increment') {
     try {
-      const endpoint = API_ENDPOINTS.CART.ACTIVATE_ITEM.replace(':productId', productId);
-      const url = `${BASE_API_URL}${endpoint}`;
+      // IMPORTANT: Use UPDATE_QUANTITY endpoint, not ACTIVATE_ITEM
+      // ACTIVATE_ITEM is for toggling active/inactive (Boolean), not for quantity updates
+      const url = `${BASE_API_URL}${API_ENDPOINTS.CART.UPDATE_QUANTITY}`;
       const headers = await this.getHeaders();
 
       console.debug('[CartAPI] PATCH', url, { productId, quantity, action });
@@ -138,7 +139,7 @@ class CartAPI {
 
       if (!response.ok) {
         const errorMessage = responseData?.message || responseData?.error || 'Failed to update item';
-        console.error('Cart API - Activate item error:', {
+        console.error('Cart API - Update quantity error:', {
           status: response.status,
           data: responseData
         });
@@ -147,7 +148,7 @@ class CartAPI {
 
       return { success: true, data: responseData };
     } catch (error) {
-      console.error('Cart API - Activate item network error:', error);
+      console.error('Cart API - Update quantity network error:', error);
       return { success: false, error: error?.message || 'Network error' };
     }
   }
