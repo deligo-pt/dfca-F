@@ -29,7 +29,16 @@ export const LocationProvider = ({ children }) => {
 
     // Load saved addresses and last known location on mount
     useEffect(() => {
-        loadStoredLocationData();
+        const init = async () => {
+            loadStoredLocationData();
+            // Request permissions on start
+            try {
+                await Location.requestForegroundPermissionsAsync();
+            } catch (e) {
+                console.warn('Error requesting location permission on mount:', e);
+            }
+        };
+        init();
     }, []);
 
     const loadStoredLocationData = async () => {

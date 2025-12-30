@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, Alert, StatusBar } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, Alert, StatusBar, Modal } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
@@ -10,6 +10,7 @@ import { useProfile } from '../contexts/ProfileContext';
 import LocationDetails from '../components/Profile/LocationDetails';
 import { spacing, borderRadius, fontSize } from '../theme';
 import { customerApi } from '../utils/api';
+import AddressApi from '../utils/addressApi';
 import { getUserId, getUserData } from '../utils/auth';
 
 const LocationAddressScreen = ({ navigation, route }) => {
@@ -18,6 +19,7 @@ const LocationAddressScreen = ({ navigation, route }) => {
   const {
     saveAddress,
     address: contextAddress,
+    detailedAddress: contextDetailedAddress,
     city: contextCity,
     postalCode: contextPostalCode,
     state: contextState,
@@ -45,11 +47,34 @@ const LocationAddressScreen = ({ navigation, route }) => {
   const [detailedAddress, setDetailedAddress] = useState('');
   const [city, setCity] = useState(contextCity || '');
   const [postalCode, setPostalCode] = useState(contextPostalCode || '');
-  const [state, setState] = useState(contextState || 'Dhaka Division');
-  const [country, setCountry] = useState(contextCountry || 'Bangladesh');
+  const [state, setState] = useState(contextState || '');
+  const [country, setCountry] = useState(contextCountry || '');
   const [label, setLabel] = useState('Home');
   const [fieldErrors, setFieldErrors] = useState({});
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
+  const [modalConfig, setModalConfig] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    type: 'error', // 'error', 'success', 'info'
+    onOk: null
+  });
+
+  const showModal = (title, message, onOk = null) => {
+    setModalConfig({
+      visible: true,
+      title,
+      message,
+      type: 'error',
+      onOk
+    });
+  };
+
+  const hideModal = () => {
+    const callback = modalConfig.onOk;
+    setModalConfig(prev => ({ ...prev, visible: false }));
+    if (callback) callback();
+  };
 
   useEffect(() => {
     (async () => {
@@ -74,6 +99,16 @@ const LocationAddressScreen = ({ navigation, route }) => {
     }
   }, [contextLocation]);
 
+  // Fallback: Sync form with context address if fields are empty (handles async storage load)
+  useEffect(() => {
+    if (!streetAddress && contextAddress) setStreetAddress(contextAddress);
+    if (!detailedAddress && contextDetailedAddress) setDetailedAddress(contextDetailedAddress);
+    if (!city && contextCity) setCity(contextCity);
+    if (!postalCode && contextPostalCode) setPostalCode(contextPostalCode);
+    if (!state && contextState) setState(contextState);
+    if (!country && contextCountry) setCountry(contextCountry);
+  }, [contextAddress, contextDetailedAddress, contextCity, contextPostalCode, contextState, contextCountry]);
+
   const getCurrentLocation = async () => {
     setIsLoadingLocation(true);
     try {
@@ -95,7 +130,7 @@ const LocationAddressScreen = ({ navigation, route }) => {
       }
     } catch (error) {
       console.error(error);
-      Alert.alert(t('error'), t('failedToGetLocation'));
+      showModal(t('error'), t('failedToGetLocation'));
     } finally {
       setIsLoadingLocation(false);
     }
@@ -117,11 +152,11 @@ const LocationAddressScreen = ({ navigation, route }) => {
         });
         await reverseGeocode(latitude, longitude);
       } else {
-        Alert.alert(t('error'), t('locationNotFound'));
+        showModal(t('error'), t('locationNotFound'));
       }
     } catch (error) {
       console.error(error);
-      Alert.alert(t('error'), t('addressSearchFailed'));
+      showModal(t('error'), t('addressSearchFailed'));
     } finally {
       setIsLoadingLocation(false);
     }
@@ -224,7 +259,7 @@ const LocationAddressScreen = ({ navigation, route }) => {
           };
 
           console.debug('[LocationAddressScreen] Adding delivery address:', payload);
-          const res = await customerApi.post('/customers/add-delivery-address', payload);
+          const res = await AddressApi.addDeliveryAddress(payload);
 
           if (res.data && res.data.success === false) {
             throw new Error(res.data.message || 'Failed');
@@ -240,11 +275,8 @@ const LocationAddressScreen = ({ navigation, route }) => {
           if (apiErr.response && (apiErr.response.status === 409 || apiErr.response?.data?.status === 409)) {
             console.warn('[LocationAddressScreen] Address already exists (409). Fetching profile to retrieve existing ID...');
             try {
-              // Fetch fresh profile to find the existing address using ID from token (more reliable)
-              const userId = await getUserId();
-              if (!userId) throw new Error('No user ID found');
-
-              const profileRes = await customerApi.get(`/customers/${userId}`);
+              // Fetch fresh profile using the /profile endpoint which works with the current user's token
+              const profileRes = await customerApi.get('/profile');
               const freshAddresses = profileRes.data?.data?.deliveryAddresses || profileRes.data?.deliveryAddresses || [];
 
               // Helper to find address
@@ -276,14 +308,27 @@ const LocationAddressScreen = ({ navigation, route }) => {
                 console.debug('[LocationAddressScreen] Found existing address ID:', match._id);
                 const existingAddressData = { ...addressData, _id: match._id, id: match._id };
 
+                // Ensure this existing address is selected so Checkout can see it
+                await selectAddress({
+                  ...match,
+                  address: match.street || match.address,
+                  detailedAddress: match.detailedAddress || '',
+                  coordinates: {
+                    latitude: match.latitude,
+                    longitude: match.longitude
+                  },
+                  label: match.addressType || label
+                });
+
                 if (route.params?.onSave) {
                   route.params.onSave(existingAddressData);
                 }
-                navigation.goBack();
+                // User requested to show error even if found
+                showModal(t('error'), t('addressAlreadyExists'), () => navigation.goBack());
                 return;
               } else {
                 console.warn('[LocationAddressScreen] Could not look up existing address despite 409.');
-                // proceed to show error
+                showModal(t('error'), t('addressAlreadyExists'));
               }
 
             } catch (lookupErr) {
@@ -291,16 +336,25 @@ const LocationAddressScreen = ({ navigation, route }) => {
             }
           }
 
+          // Check for 400 Bad Request (Max Limit Reached)
+          if (apiErr.response && apiErr.response.status === 400) {
+            const errorMsg = apiErr.response.data?.message || '';
+            if (errorMsg.includes('maximum number of delivery addresses')) {
+              showModal(t('limitReached'), t('maxAddressesReached'));
+              return;
+            }
+          }
+
           // Check for 401 Unauthorized
           if (apiErr.response && apiErr.response.status === 401) {
             console.error('[LocationAddressScreen] Unauthorized (401). Redirecting to login or showing error.');
-            Alert.alert(t('error'), t('sessionExpired')); // Make sure 'sessionExpired' key exists or use a generic one
+            showModal(t('error'), t('sessionExpired') || 'Session Expired');
             // Optionally trigger logout if not handled by interceptor
             return;
           }
 
           console.error('[LocationAddressScreen] add-delivery-address error:', apiErr);
-          Alert.alert(t('error'), t('saveFailed'));
+          showModal(t('error'), t('saveFailed'));
           return;
         }
       }
@@ -352,11 +406,11 @@ const LocationAddressScreen = ({ navigation, route }) => {
         }
         navigation.goBack();
       } else {
-        Alert.alert(t('error'), t('saveFailed'));
+        showModal(t('error'), t('saveFailed'));
       }
     } catch (err) {
       console.error('[LocationAddressScreen] handleSave error:', err);
-      Alert.alert(t('error'), t('unexpectedError'));
+      showModal(t('error'), t('unexpectedError'));
     }
   };
 
@@ -429,6 +483,30 @@ const LocationAddressScreen = ({ navigation, route }) => {
           </TouchableOpacity>
         </View>
       )}
+      <Modal
+        visible={modalConfig.visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={hideModal}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: colors.surface }]}>
+            <View style={styles.modalIconContainer}>
+              <Ionicons name="alert-circle" size={48} color={colors.error} />
+            </View>
+            <Text style={[styles.modalTitle, { color: colors.text.primary }]}>{modalConfig.title}</Text>
+            <Text style={[styles.modalMessage, { color: colors.text.secondary }]}>
+              {modalConfig.message}
+            </Text>
+            <TouchableOpacity
+              style={[styles.modalButton, { backgroundColor: colors.primary }]}
+              onPress={hideModal}
+            >
+              <Text style={styles.modalButtonText}>{t('ok')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -482,7 +560,61 @@ const styles = StyleSheet.create({
     fontWeight: '700',
     fontFamily: 'Poppins-Bold',
     color: '#fff',
-  }
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 340,
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  modalIconContainer: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#FFF5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    fontFamily: 'Poppins-Bold',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  modalButton: {
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Poppins-SemiBold',
+  },
 });
 
 export default LocationAddressScreen;

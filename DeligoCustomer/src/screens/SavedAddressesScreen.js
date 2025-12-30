@@ -1,20 +1,31 @@
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, Alert, ActivityIndicator, RefreshControl } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator, RefreshControl, Modal } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
 import { useProfile } from '../contexts/ProfileContext';
+import { useLocation } from '../contexts/LocationContext';
 import { customerApi } from '../utils/api';
+import AddressApi from '../utils/addressApi';
 import { API_ENDPOINTS } from '../constants/config';
 
 const SavedAddressesScreen = ({ navigation, route }) => {
   const { colors, isDarkMode } = useTheme();
   const { t } = useLanguage();
   const { user, fetchUserProfile } = useProfile();
+  const { selectAddress } = useLocation(); // Import selectAddress
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [localAddresses, setLocalAddresses] = useState([]);
+  const [modalConfig, setModalConfig] = useState({ visible: false, title: '', message: '' });
+  const [confirmConfig, setConfirmConfig] = useState({ visible: false, title: '', message: '', onConfirm: null });
+
+  const showModal = (title, message) => setModalConfig({ visible: true, title, message });
+  const hideModal = () => setModalConfig(prev => ({ ...prev, visible: false }));
+
+  const showConfirm = (title, message, onConfirm) => setConfirmConfig({ visible: true, title, message, onConfirm });
+  const hideConfirm = () => setConfirmConfig(prev => ({ ...prev, visible: false }));
 
   // Check if we are in selection mode
   const { onSelect, selectedId } = route.params || {};
@@ -22,6 +33,21 @@ const SavedAddressesScreen = ({ navigation, route }) => {
   useEffect(() => {
     if (user?.deliveryAddresses) {
       setLocalAddresses(user.deliveryAddresses);
+
+      // Auto-sync active address to LocationContext so Checkout uses it
+      const activeAddr = user.deliveryAddresses.find(a => a.isActive);
+      if (activeAddr) {
+        selectAddress({
+          ...activeAddr,
+          address: activeAddr.street || activeAddr.address, // API uses street
+          detailedAddress: activeAddr.detailedAddress || '',
+          coordinates: {
+            latitude: activeAddr.latitude,
+            longitude: activeAddr.longitude
+          },
+          label: activeAddr.addressType
+        });
+      }
     }
   }, [user]);
 
@@ -38,60 +64,100 @@ const SavedAddressesScreen = ({ navigation, route }) => {
 
   const handleToggleStatus = async (addressId, isActive) => {
     try {
-      // Optimistic update
-      const updatedLocal = localAddresses.map(addr =>
-        addr._id === addressId ? { ...addr, isActive: !isActive } : addr
-      );
+      // Optimistic update: If activating, deactivate all others. If deactivating, just deactivate self.
+      const updatedLocal = localAddresses.map(addr => {
+        if (addressId === addr._id) return { ...addr, isActive: !isActive }; // Toggle target
+        if (!isActive) return { ...addr, isActive: false }; // If target is becoming active, force others inactive
+        return addr;
+      });
       setLocalAddresses(updatedLocal);
 
-      const response = await customerApi.patch(`/customers/toggle-delivery-address-status/${addressId}`);
+      const response = await AddressApi.toggleDeliveryAddressStatus(addressId);
 
       if (response.data && response.data.success) {
         // Ideally refetch or just rely on optimistic
         fetchUserProfile();
+
+        // If turning ON, select this address as current/header address
+        if (!isActive) {
+          const selected = localAddresses.find(a => a._id === addressId);
+          if (selected) {
+            // Map to LocationContext format (needs consistency)
+            selectAddress({
+              ...selected,
+              address: selected.street, // Mapping 'street' to 'address' for context
+              detailedAddress: selected.detailedAddress || '',
+              coordinates: {
+                latitude: selected.latitude,
+                longitude: selected.longitude
+              }
+            });
+            // Also force refresh to align backend state if needed
+            fetchUserProfile();
+          }
+        } else {
+          fetchUserProfile();
+        }
       } else {
         // Revert if failed
-        Alert.alert(t('error'), t('failedToUpdateStatus'));
+        showModal(t('error'), t('failedToUpdateStatus'));
         setLocalAddresses(user.deliveryAddresses || []);
       }
     } catch (error) {
       console.error('Toggle status error:', error);
-      Alert.alert(t('error'), t('failedToUpdateStatus'));
+      showModal(t('error'), t('failedToUpdateStatus'));
       setLocalAddresses(user.deliveryAddresses || []);
     }
   };
 
   const handleDelete = (addressId) => {
-    Alert.alert(
+    showConfirm(
       t('deleteAddress'),
       t('areYouSureDeleteAddress'),
-      [
-        { text: t('cancel'), style: 'cancel' },
-        {
-          text: t('delete'),
-          style: 'destructive',
-          onPress: async () => {
-            setLoading(true);
-            try {
-              await customerApi.delete(`/customers/delete-delivery-address/${addressId}`);
-              await fetchUserProfile();
-            } catch (error) {
-              console.error('Delete address error:', error);
-              const errMsg = error?.response?.data?.message || error?.message || t('failedToDeleteAddress');
-              Alert.alert(t('error'), errMsg);
-            } finally {
-              setLoading(false);
-            }
-          }
+      async () => {
+        setLoading(true);
+        try {
+          await AddressApi.deleteDeliveryAddress(addressId);
+          await fetchUserProfile();
+        } catch (error) {
+          console.error('Delete address error:', error);
+          const errMsg = error?.response?.data?.message || error?.message || t('failedToDeleteAddress');
+          showModal(t('error'), errMsg);
+        } finally {
+          setLoading(false);
         }
-      ]
+      }
     );
   };
 
-  const handleSelect = (address) => {
+  const handleSelect = async (address) => {
     if (onSelect) {
-      onSelect(address);
-      navigation.goBack();
+      // If selecting a non-active address, make it active globally first
+      // This ensures that "Selected" for checkout == "Active" in backend context
+      if (!address.isActive) {
+        setLoading(true);
+        try {
+          // Re-use logic: 'current status is false' -> toggle to true
+          await AddressApi.toggleDeliveryAddressStatus(address._id);
+          // Refresh local state to ensure consistency before returning
+          await fetchUserProfile();
+
+          // Update the address object to be returned with active status
+          const updatedAddress = { ...address, isActive: true };
+          onSelect(updatedAddress);
+        } catch (err) {
+          console.error('Failed to toggle active status on selection:', err);
+          // Fallback: still select it locally even if backend toggle failed
+          onSelect(address);
+        } finally {
+          setLoading(false);
+          navigation.goBack();
+        }
+      } else {
+        // Already active, just select
+        onSelect(address);
+        navigation.goBack();
+      }
     }
   };
 
@@ -127,24 +193,24 @@ const SavedAddressesScreen = ({ navigation, route }) => {
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            {/* Toggle Switch Placeholder - using opacity for now or simple touch */}
-            <TouchableOpacity onPress={() => handleToggleStatus(address._id, address.isActive)} style={{ padding: 4 }}>
-              <MaterialCommunityIcons
-                name={address.isActive ? "toggle-switch" : "toggle-switch-off-outline"}
-                size={36}
-                color={address.isActive ? colors.primary : colors.text.light}
-              />
-            </TouchableOpacity>
+            {/* Toggle Switch - Only show if NOT in selection mode */}
+            {!onSelect && (
+              <TouchableOpacity onPress={() => handleToggleStatus(address._id, address.isActive)} style={{ padding: 4 }}>
+                <MaterialCommunityIcons
+                  name={address.isActive ? "toggle-switch" : "toggle-switch-off-outline"}
+                  size={36}
+                  color={address.isActive ? colors.primary : colors.text.light}
+                />
+              </TouchableOpacity>
+            )}
 
             {!onSelect && (
-              (address.addressType !== 'PRIMARY' && address.addressType !== 'HOME') ? (
-                <TouchableOpacity
-                  style={styles(colors).moreButton}
-                  onPress={() => handleDelete(address._id)}
-                >
-                  <Ionicons name="trash-outline" size={20} color={colors.error} />
-                </TouchableOpacity>
-              ) : null
+              <TouchableOpacity
+                style={styles(colors).moreButton}
+                onPress={() => handleDelete(address._id)}
+              >
+                <Ionicons name="trash-outline" size={20} color={colors.error} />
+              </TouchableOpacity>
             )}
           </View>
         </View>
@@ -214,11 +280,127 @@ const SavedAddressesScreen = ({ navigation, route }) => {
           <Ionicons name="chevron-forward" size={20} color={colors.text.light} />
         </TouchableOpacity>
       </ScrollView>
-    </SafeAreaView>
+
+      <Modal
+        visible={modalConfig.visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={hideModal}
+      >
+        <View style={styles(colors).modalOverlay}>
+          <View style={styles(colors).modalContent}>
+            <View style={styles(colors).modalIconContainer}>
+              <Ionicons name="alert-circle" size={48} color={colors.error} />
+            </View>
+            <Text style={styles(colors).modalTitle}>{modalConfig.title}</Text>
+            <Text style={styles(colors).modalMessage}>{modalConfig.message}</Text>
+            <TouchableOpacity
+              style={[styles(colors).modalButton, { backgroundColor: colors.primary }]}
+              onPress={hideModal}
+            >
+              <Text style={styles(colors).modalButtonText}>{t('ok')}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
+
+      <Modal
+        visible={confirmConfig.visible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={hideConfirm}
+      >
+        <View style={styles(colors).modalOverlay}>
+          <View style={styles(colors).modalContent}>
+            <View style={[styles(colors).modalIconContainer, { backgroundColor: '#FFF5F5' }]}>
+              <Ionicons name="trash-outline" size={48} color={colors.error} />
+            </View>
+            <Text style={styles(colors).modalTitle}>{confirmConfig.title}</Text>
+            <Text style={styles(colors).modalMessage}>{confirmConfig.message}</Text>
+            <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
+              <TouchableOpacity
+                style={[styles(colors).modalButton, { backgroundColor: colors.border, flex: 1 }]}
+                onPress={hideConfirm}
+              >
+                <Text style={[styles(colors).modalButtonText, { color: colors.text.primary }]}>{t('cancel')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles(colors).modalButton, { backgroundColor: colors.error, flex: 1 }]}
+                onPress={() => {
+                  hideConfirm();
+                  if (confirmConfig.onConfirm) confirmConfig.onConfirm();
+                }}
+              >
+                <Text style={styles(colors).modalButtonText}>{t('delete')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+    </SafeAreaView >
   );
 };
 
 const styles = (colors) => StyleSheet.create({
+  // ... existing styles ...
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 20,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 340,
+    backgroundColor: colors.surface,
+    borderRadius: 24,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 8,
+  },
+  modalIconContainer: {
+    width: 72,
+    height: 72,
+    borderRadius: 36,
+    backgroundColor: '#FFF5F5',
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 16,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '700',
+    color: colors.text.primary,
+    fontFamily: 'Poppins-Bold',
+    marginBottom: 8,
+    textAlign: 'center',
+  },
+  modalMessage: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    fontFamily: 'Poppins-Regular',
+    textAlign: 'center',
+    marginBottom: 24,
+    lineHeight: 22,
+  },
+  modalButton: {
+    width: '100%',
+    paddingVertical: 14,
+    borderRadius: 12,
+    alignItems: 'center',
+  },
+  modalButtonText: {
+    color: '#fff',
+    fontSize: 16,
+    fontWeight: '600',
+    fontFamily: 'Poppins-SemiBold',
+  },
+
   container: {
     flex: 1,
     backgroundColor: colors.background,
