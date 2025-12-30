@@ -24,6 +24,7 @@ import { setupPaymentSheet, openPaymentSheet } from '../utils/stripeService';
 import CheckoutAPI from '../utils/checkoutApi';
 import OrderAPI from '../utils/orderApi';
 import { customerApi } from '../utils/api';
+import AddressApi from '../utils/addressApi';
 import { API_ENDPOINTS } from '../constants/config';
 import { getUserId, getUserData } from '../utils/auth';
 
@@ -279,7 +280,7 @@ const CheckoutScreen = ({ route, navigation }) => {
               }
             };
 
-            const addRes = await customerApi.post('/customers/add-delivery-address', payload);
+            const addRes = await AddressApi.addDeliveryAddress(payload);
 
             if (addRes.data && addRes.data.success) {
               // Extract ID from response (structure depends on backend)
@@ -294,7 +295,7 @@ const CheckoutScreen = ({ route, navigation }) => {
             }
           } catch (addErr) {
             // Strategy 3: Handle 409 Conflict (Address already exists)
-            if (addErr.response && addErr.response.status === 409) {
+            if (addErr.response && (addErr.response.status === 409)) {
               console.warn('[CheckoutScreen] Address already exists (409) but was not matched initially.');
               // Try fuzzy match on street alone if strict match failed
               const looseMatch = serverAddresses.find(a => a.street === addressData.street);
@@ -303,6 +304,14 @@ const CheckoutScreen = ({ route, navigation }) => {
                 console.debug('[CheckoutScreen] Resolved ID via loose street match after 409:', backendAddressId);
               } else {
                 console.warn('[CheckoutScreen] Could not resolve ID even after 409 conflict.');
+              }
+            } else if (addErr.response && addErr.response.status === 400) {
+              const errorMsg = addErr.response.data?.message || '';
+              if (errorMsg.includes('maximum number of delivery addresses')) {
+                console.warn('[CheckoutScreen] Max addresses reached. Ideally prompt user to select existing.');
+                setStripeError(t('maxAddressesReached') || 'You have reached the maximum number of delivery addresses. Please select or delete an existing address.');
+                setInitializingCheckout(false);
+                return;
               }
             } else {
               console.warn('[CheckoutScreen] Failed to add address', addErr.message);
@@ -531,6 +540,9 @@ const CheckoutScreen = ({ route, navigation }) => {
     return sum + unitTax * (it.quantity || 0);
   }, 0);
   const total = subtotalAfterDiscount + taxAmount;
+
+  // Calculate display subtotal using finalPrice (price after tax and discount)
+  const displaySubtotal = cartItems.reduce((sum, it) => sum + (it.finalPrice || it.price || 0) * (it.quantity || 0), 0);
 
   // Debug: Log checkoutResponse to verify it's being populated
   console.debug('[CheckoutScreen] Render - checkoutResponse:', checkoutResponse, 'local total:', total);
@@ -966,26 +978,16 @@ const CheckoutScreen = ({ route, navigation }) => {
             <View style={styles(colors).summaryRow}>
               <Text style={styles(colors).summaryLabel}>{t('subtotal')}</Text>
               <Text style={styles(colors).summaryValue}>
-                {formatCurrency(currency, baseSubtotal)}
+                {formatCurrency(currency, displaySubtotal)}
               </Text>
             </View>
 
             <View style={styles(colors).summaryRow}>
               <Text style={styles(colors).summaryLabel}>{t('deliveryFee')}</Text>
               <Text style={styles(colors).summaryValue}>
-                {formatCurrency(currency, checkoutResponse?.data?.subTotal - baseSubtotal + discountTotal)}
+                {formatCurrency(currency, checkoutResponse?.data?.subTotal - displaySubtotal)}
               </Text>
             </View>
-
-            {discountTotal > 0 && (
-              <View style={styles(colors).summaryRow}>
-                <View style={styles(colors).discountRow}>
-                  <MaterialCommunityIcons name="ticket-percent" size={16} color={colors.success} />
-                  <Text style={styles(colors).summaryLabelDiscount}>{t('discount')}</Text>
-                </View>
-                <Text style={styles(colors).summaryValueDiscount}>-{formatCurrency(currency, discountTotal)}</Text>
-              </View>
-            )}
 
             <View style={styles(colors).divider} />
 
@@ -1066,7 +1068,7 @@ const CheckoutScreen = ({ route, navigation }) => {
 
       {renderProcessingModal()}
       {renderSuccessModal()}
-    </SafeAreaView >
+    </SafeAreaView>
   );
 };
 
