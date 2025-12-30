@@ -3,6 +3,7 @@ import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBarStyle } from 'expo-status-bar';
 import { useProfile } from '../contexts/ProfileContext';
 import { useLocation } from '../contexts/LocationContext';
+import NotificationOverlay from '../components/NotificationOverlay';
 import {
     OnboardingScreen,
     LoginScreen,
@@ -40,36 +41,41 @@ export default function RootNavigator() {
     }
 
     return (
-        <Stack.Navigator screenOptions={{ headerShown: false }}>
-            {!isOnboardingCompleted ? (
-                <Stack.Screen name="Onboarding" component={OnboardingScreen} />
-            ) : !isAuthenticated ? (
-                <Stack.Screen name="Login" component={LoginScreen} />
-            ) : (
-                <Stack.Screen name="Main" component={BottomTabNavigator} />
-            )}
+        <>
+            <Stack.Navigator screenOptions={{ headerShown: false }}>
+                {!isOnboardingCompleted ? (
+                    <Stack.Screen name="Onboarding" component={OnboardingScreen} />
+                ) : !isAuthenticated ? (
+                    <Stack.Screen name="Login" component={LoginScreen} />
+                ) : (
+                    <Stack.Screen name="Main" component={BottomTabNavigator} />
+                )}
 
-            {/* Common Screens accessible from various places */}
-            <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
-            <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
-            <Stack.Screen name="LocationAddress" component={LocationAddressScreen} />
-            <Stack.Screen name="RestaurantDetails" component={RestaurantDetailsScreen} />
-            <Stack.Screen name="CartDetail" component={CartDetailScreen} />
-            <Stack.Screen name="SeeAll" component={SeeAllScreen} />
-            <Stack.Screen name="Search" component={SearchScreen} />
-            <Stack.Screen name="TrackOrder" component={TrackOrderScreen} />
-            <Stack.Screen name="Checkout" component={CheckoutScreen} />
+                {/* Common Screens accessible from various places */}
+                <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
+                <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
+                <Stack.Screen name="LocationAddress" component={LocationAddressScreen} />
+                <Stack.Screen name="RestaurantDetails" component={RestaurantDetailsScreen} />
+                <Stack.Screen name="CartDetail" component={CartDetailScreen} />
+                <Stack.Screen name="SeeAll" component={SeeAllScreen} />
+                <Stack.Screen name="Search" component={SearchScreen} />
+                <Stack.Screen name="TrackOrder" component={TrackOrderScreen} />
+                <Stack.Screen name="Checkout" component={CheckoutScreen} />
 
-            {/* Account Related Screens */}
-            <Stack.Screen name="EditProfile" component={EditProfileScreen} />
-            <Stack.Screen name="Vouchers" component={VouchersScreen} />
-            <Stack.Screen name="SavedAddresses" component={SavedAddressesScreen} />
-            <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
-            <Stack.Screen name="Referrals" component={ReferralsScreen} />
-            <Stack.Screen name="Notifications" component={NotificationsScreen} />
-            <Stack.Screen name="Settings" component={SettingsScreen} />
-            <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
-            <Stack.Screen name="Chat" component={ChatScreen} />
-        </Stack.Navigator>
+                {/* Account Related Screens */}
+                <Stack.Screen name="EditProfile" component={EditProfileScreen} />
+                <Stack.Screen name="Vouchers" component={VouchersScreen} />
+                <Stack.Screen name="SavedAddresses" component={SavedAddressesScreen} />
+                <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
+                <Stack.Screen name="Referrals" component={ReferralsScreen} />
+                <Stack.Screen name="Notifications" component={NotificationsScreen} />
+                <Stack.Screen name="Settings" component={SettingsScreen} />
+                <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
+                <Stack.Screen name="Chat" component={ChatScreen} />
+            </Stack.Navigator>
+
+            {/* Global Notification Overlay */}
+            {isAuthenticated && <NotificationOverlay />}
+        </>
     );
 }

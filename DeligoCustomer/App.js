@@ -13,6 +13,7 @@ import { CartProvider } from './src/contexts/CartContext';
 import { OrdersProvider } from './src/contexts/OrdersContext';
 import { LocationProvider } from './src/contexts/LocationContext';
 import { ProfileProvider } from './src/contexts/ProfileContext';
+import { NotificationProvider } from './src/contexts/NotificationContext';
 import * as SystemUI from 'expo-system-ui';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import RootNavigator from './src/navigation/RootNavigator';
@@ -99,18 +100,20 @@ export default function App() {
         <ThemeProvider>
           <LanguageProvider>
             <ProfileProvider>
-              <LocationProvider>
-                <ProductsProvider>
-                  <CartProvider>
-                    <OrdersProvider>
-                      <NavigationContainer>
-                        <RootNavigator />
-                        <StatusBar style="light" backgroundColor={colors.primary} />
-                      </NavigationContainer>
-                    </OrdersProvider>
-                  </CartProvider>
-                </ProductsProvider>
-              </LocationProvider>
+              <NotificationProvider>
+                <LocationProvider>
+                  <ProductsProvider>
+                    <CartProvider>
+                      <OrdersProvider>
+                        <NavigationContainer>
+                          <RootNavigator />
+                          <StatusBar style="light" backgroundColor={colors.primary} />
+                        </NavigationContainer>
+                      </OrdersProvider>
+                    </CartProvider>
+                  </ProductsProvider>
+                </LocationProvider>
+              </NotificationProvider>
             </ProfileProvider>
           </LanguageProvider>
         </ThemeProvider>

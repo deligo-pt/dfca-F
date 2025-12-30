@@ -35,8 +35,8 @@ const maskToken = (t) => {
   try {
     if (!t) return null;
     const s = t.toString();
-    if (s.length <= 12) return `${s.slice(0,4)}...`;
-    return `${s.slice(0,8)}...${s.slice(-4)}`;
+    if (s.length <= 12) return `${s.slice(0, 4)}...`;
+    return `${s.slice(0, 8)}...${s.slice(-4)}`;
   } catch (e) { return null; }
 };
 
@@ -127,12 +127,26 @@ customerApi.interceptors.response.use(
 
           try { await StorageService.setAccessToken(finalToken); } catch (e) { console.warn('[api] persist token failed', e); }
 
+          // Check for refresh token rotation
+          const newRefreshToken = resp?.data?.data?.refreshToken || resp?.data?.refreshToken || null;
+          if (newRefreshToken) {
+            try { await StorageService.setRefreshToken(newRefreshToken); } catch (e) { console.warn('[api] persist new refresh token failed', e); }
+          }
+
           processQueue(null, finalToken);
 
           originalRequest.headers = originalRequest.headers || {};
           // Backend expects raw token without Bearer prefix
           const rawToken = finalToken.startsWith('Bearer ') ? finalToken.substring(7) : finalToken;
-          originalRequest.headers.Authorization = rawToken;
+
+          // Handle Axios 1.x headers class
+          if (originalRequest.headers.set && typeof originalRequest.headers.set === 'function') {
+            originalRequest.headers.set('Authorization', rawToken);
+          } else {
+            originalRequest.headers.Authorization = rawToken;
+            originalRequest.headers['Authorization'] = rawToken;
+          }
+
           console.debug('[api] retry original with new token mask:', maskToken(rawToken));
           return customerApi(originalRequest);
         } catch (refreshError) {

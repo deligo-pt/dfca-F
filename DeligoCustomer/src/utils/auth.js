@@ -192,13 +192,44 @@ export const getUserId = async () => {
   try {
     const token = await AuthService.getAccessToken();
     if (!token) return null;
-    const payload = JSON.parse(atob(token.split('.')[1]));
+
+    // Simple JWT decode without external library
+    const base64Url = token.split('.')[1];
+    if (!base64Url) return null;
+
+    const base64 = base64Url.replace(/-/g, '+').replace(/_/g, '/');
+    const jsonPayload = decodeURIComponent(atob(base64).split('').map(function (c) {
+      return '%' + ('00' + c.charCodeAt(0).toString(16)).slice(-2);
+    }).join(''));
+
+    const payload = JSON.parse(jsonPayload);
     // backend expects userId (prefixed with 'C-') for customer endpoints
     return payload.userId || payload.id || payload.sub || payload.customerId || null;
   } catch (err) {
     console.warn('getUserId error', err);
     return null;
   }
+};
+
+// Polyfill atob for RN environment if not present
+const atob = (input) => {
+  const chars = 'ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/=';
+  let str = input.replace(/=+$/, '');
+  let output = '';
+
+  if (str.length % 4 == 1) {
+    throw new Error("'atob' failed: The string to be decoded is not correctly encoded.");
+  }
+  for (let bc = 0, bs = 0, buffer, i = 0;
+    buffer = str.charAt(i++);
+
+    ~buffer && (bs = bc % 4 ? bs * 64 + buffer : buffer,
+      bc++ % 4) ? output += String.fromCharCode(255 & bs >> (-2 * bc & 6)) : 0
+  ) {
+    buffer = chars.indexOf(buffer);
+  }
+
+  return output;
 };
 
 /**

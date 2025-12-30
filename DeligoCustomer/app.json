@@ -22,7 +22,6 @@
     ],
     "extra": {
       "eas": {
-        "projectId": "ca0fe010-d9c5-4bd5-9c95-ca726a09506b"
       }
     },
     "ios": {
@@ -68,7 +67,8 @@
         "googleMaps": {
           "apiKey": "AIzaSyCZ1jixNYbSRM21Uq82a6KXNO_FSpLUwaQ"
         }
-      }
+      },
+      "googleServicesFile": "./google-services.json"
     },
     "web": {
       "favicon": "./src/assets/favicon.png"
@@ -103,7 +103,16 @@
             "allowBackup": false
           }
         }
-      ]
+      ],
+      [
+        "@react-native-firebase/app",
+        {
+          "android": {
+            "googleServicesFile": "./google-services.json"
+          }
+        }
+      ],
+      "@react-native-firebase/messaging"
     ]
   }
 }
