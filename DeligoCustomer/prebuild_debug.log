@@ -1,0 +1,5 @@
+The android project is malformed, project files will be cleared and reinitialized.
+- Clearing android
+× Failed to delete android code: EBUSY: resource busy or locked, rmdir 'J:\deligo-food-customer-application-frontend\DeligoCustomer\android'
+Error: EBUSY: resource busy or locked, rmdir 'J:\deligo-food-customer-application-frontend\DeligoCustomer\android'
+Error: EBUSY: resource busy or locked, rmdir 'J:\deligo-food-customer-application-frontend\DeligoCustomer\android'

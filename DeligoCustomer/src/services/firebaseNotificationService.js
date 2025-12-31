@@ -16,14 +16,16 @@ class FirebaseNotificationService {
      */
     async initialize() {
         try {
-            // Request permission
-            const authStatus = await messaging().requestPermission();
+            // Check permission status (handled in PermissionsScreen)
+            const authStatus = await messaging().hasPermission();
             const enabled =
                 authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
                 authStatus === messaging.AuthorizationStatus.PROVISIONAL;
 
             if (!enabled) {
-                console.warn('Firebase messaging permission not granted');
+                console.log('Firebase messaging permission not enabled yet');
+                // We don't return false here, we just skip token registration for now.
+                // Or we can return false effectively telling the app notifications aren't ready.
                 return false;
             }
 

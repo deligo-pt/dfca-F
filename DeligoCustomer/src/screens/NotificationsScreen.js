@@ -61,7 +61,7 @@ const NotificationsScreen = ({ navigation }) => {
         case 'PREPARING':
           return { icon: 'restaurant', color: '#FF9800', gradient: ['#FF9800', '#F57C00'] };
         case 'READY_FOR_PICKUP':
-          return { icon: 'bag-check', color: '#2196F3', gradient: ['#2196F3', '#1976D2'], library: 'MaterialCommunityIcons' };
+          return { icon: 'bag-checked', color: '#2196F3', gradient: ['#2196F3', '#1976D2'], library: 'MaterialCommunityIcons' };
         case 'PICKED_UP':
           return { icon: 'bicycle', color: '#9C27B0', gradient: ['#9C27B0', '#7B1FA2'], library: 'MaterialCommunityIcons' };
         case 'ON_THE_WAY':
@@ -84,7 +84,7 @@ const NotificationsScreen = ({ navigation }) => {
       return { icon: 'restaurant', color: '#FF9800', gradient: ['#FF9800', '#F57C00'] };
     }
     if (title.includes('ready')) {
-      return { icon: 'bag-check', color: '#2196F3', gradient: ['#2196F3', '#1976D2'], library: 'MaterialCommunityIcons' };
+      return { icon: 'bag-checked', color: '#2196F3', gradient: ['#2196F3', '#1976D2'], library: 'MaterialCommunityIcons' };
     }
     if (title.includes('delivered')) {
       return { icon: 'package-variant-closed-check', color: '#4CAF50', gradient: ['#4CAF50', '#388E3C'], library: 'MaterialCommunityIcons' };

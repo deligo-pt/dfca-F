@@ -1,5 +1,6 @@
 export { default as OnboardingScreen } from './OnboardingScreen';
 export { default as CategoriesScreen } from './CategoriesScreen';
+export { default as PermissionsScreen } from './PermissionsScreen';
 export { default as OrdersScreen } from './OrdersScreen';
 export { default as CartScreen } from './CartScreen';
 export { default as ProfileScreen } from './ProfileScreen';

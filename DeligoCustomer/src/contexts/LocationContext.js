@@ -31,12 +31,7 @@ export const LocationProvider = ({ children }) => {
     useEffect(() => {
         const init = async () => {
             loadStoredLocationData();
-            // Request permissions on start
-            try {
-                await Location.requestForegroundPermissionsAsync();
-            } catch (e) {
-                console.warn('Error requesting location permission on mount:', e);
-            }
+            // Permissions are now handled in PermissionsScreen
         };
         init();
     }, []);

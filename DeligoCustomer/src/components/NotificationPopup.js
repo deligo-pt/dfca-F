@@ -148,7 +148,7 @@ const NotificationPopup = ({
           };
         case 'READY_FOR_PICKUP':
           return {
-            icon: 'bag-check',
+            icon: 'bag-checked',
             color: '#2196F3',
             gradient: ['#2196F3', '#1976D2'],
             label: 'Ready',
@@ -211,7 +211,7 @@ const NotificationPopup = ({
     }
     if (title.includes('ready')) {
       return {
-        icon: 'bag-check',
+        icon: 'bag-checked',
         color: '#2196F3',
         gradient: ['#2196F3', '#1976D2'],
         label: 'Ready',

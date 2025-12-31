@@ -1,4 +1,5 @@
-import React from 'react';
+import React, { useState, useEffect } from 'react';
+import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createStackNavigator } from '@react-navigation/stack';
 import { StatusBarStyle } from 'expo-status-bar';
 import { useProfile } from '../contexts/ProfileContext';
@@ -24,7 +25,8 @@ import {
     ChatScreen,
     CartDetailScreen,
     SeeAllScreen,
-    SearchScreen
+    SearchScreen,
+    PermissionsScreen
 } from '../screens';
 import { BottomTabNavigator } from './index'; // assuming index.js exports BottomTabNavigator or directly from './BottomTabNavigator'
 
@@ -36,14 +38,34 @@ export default function RootNavigator() {
     // Note: we might want to show a splash/loading screen here if isLoading is true, 
     // but App.js handles the native splash screen. 
     // If we need a js-rendering loading state, we can return null or a specific component.
-    if (isLoading) {
+    const [hasViewedPermissions, setHasViewedPermissions] = useState(null);
+
+    useEffect(() => {
+        checkPermissionsViewed();
+    }, []);
+
+    const checkPermissionsViewed = async () => {
+        try {
+            const viewed = await AsyncStorage.getItem('HAS_VIEWED_PERMISSIONS');
+            setHasViewedPermissions(viewed === 'true');
+        } catch (e) {
+            console.warn(e);
+            setHasViewedPermissions(false);
+        }
+    };
+
+    if (isLoading || hasViewedPermissions === null) {
         return null;
     }
 
     return (
         <>
             <Stack.Navigator screenOptions={{ headerShown: false }}>
-                {!isOnboardingCompleted ? (
+                {!hasViewedPermissions ? (
+                    <Stack.Screen name="Permissions">
+                        {(props) => <PermissionsScreen {...props} onComplete={() => setHasViewedPermissions(true)} />}
+                    </Stack.Screen>
+                ) : !isOnboardingCompleted ? (
                     <Stack.Screen name="Onboarding" component={OnboardingScreen} />
                 ) : !isAuthenticated ? (
                     <Stack.Screen name="Login" component={LoginScreen} />
