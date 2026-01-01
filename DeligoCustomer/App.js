@@ -17,6 +17,27 @@ import { NotificationProvider } from './src/contexts/NotificationContext';
 import * as SystemUI from 'expo-system-ui';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import RootNavigator from './src/navigation/RootNavigator';
+import NotificationPopup from './src/components/NotificationPopup';
+import { useNotifications } from './src/contexts/NotificationContext';
+import { useTheme } from './src/utils/ThemeContext';
+
+const AppContent = () => {
+  const { latestNotification, showPopup, dismissPopup } = useNotifications();
+  const { colors } = useTheme();
+
+  return (
+    <NavigationContainer>
+      <RootNavigator />
+      <NotificationPopup
+        visible={showPopup}
+        notification={latestNotification}
+        onDismiss={dismissPopup}
+        colors={colors}
+      />
+      <StatusBar style="light" backgroundColor={colors.primary} />
+    </NavigationContainer>
+  );
+};
 
 // Minimal publishable key fallback (use env in production)
 const STRIPE_PUBLISHABLE_KEY = process.env.STRIPE_PUBLISHABLE_KEY || 'pk_test_51PT3CjP0xY0uRyP02HGOUxxzweu1yv7l8GMyECLggN1LJrLsbLfGb1lgMuqQHoADgb1LFYC9tDgRcmkaCLGvNFJR00CgHAWWNK';
@@ -105,10 +126,7 @@ export default function App() {
                   <ProductsProvider>
                     <CartProvider>
                       <OrdersProvider>
-                        <NavigationContainer>
-                          <RootNavigator />
-                          <StatusBar style="light" backgroundColor={colors.primary} />
-                        </NavigationContainer>
+                        <AppContent />
                       </OrdersProvider>
                     </CartProvider>
                   </ProductsProvider>

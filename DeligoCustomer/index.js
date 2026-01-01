@@ -1,5 +1,6 @@
 import { registerRootComponent } from 'expo';
 import messaging from '@react-native-firebase/messaging';
+import * as Notifications from 'expo-notifications';
 
 import App from './App';
 
@@ -7,8 +8,24 @@ import App from './App';
 // This must be done before registerRootComponent
 messaging().setBackgroundMessageHandler(async (remoteMessage) => {
     console.log('Background message received:', remoteMessage);
-    // Background notification handling is done by FCM automatically
-    // Custom logic can be added here if needed
+
+    // If the message is data-only (no notification payload), schedule a local notification
+    if (!remoteMessage.notification) {
+        const { title, body, message } = remoteMessage.data || {};
+
+        if (title && (body || message)) {
+            await Notifications.scheduleNotificationAsync({
+                content: {
+                    title: title,
+                    body: body || message,
+                    data: remoteMessage.data,
+                    sound: true,
+                    vibrate: [0, 250, 250, 250],
+                },
+                trigger: null, // Show immediately
+            });
+        }
+    }
 });
 
 // registerRootComponent calls AppRegistry.registerComponent('main', () => App);

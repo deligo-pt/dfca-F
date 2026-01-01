@@ -1,4 +1,5 @@
 import messaging from '@react-native-firebase/messaging';
+import * as Notifications from 'expo-notifications';
 import { Audio } from 'expo-av';
 import { Platform, Vibration } from 'react-native';
 import { customerApi } from '../utils/api';
@@ -24,6 +25,20 @@ class FirebaseNotificationService {
 
             // Load notification sound regardless of permission (prepare for later)
             await this.loadNotificationSound();
+
+            // Set up Expo Notifications handler
+            Notifications.setNotificationHandler({
+                handleNotification: async () => ({
+                    shouldShowAlert: true,
+                    shouldPlaySound: true,
+                    shouldSetBadge: true,
+                }),
+            });
+
+            // Create notification channel for Android
+            if (Platform.OS === 'android') {
+                await this.createNotificationChannel();
+            }
 
             // Set up message handlers regardless of permission (they'll work once permission is granted)
             this.setupMessageHandlers();
@@ -111,21 +126,27 @@ class FirebaseNotificationService {
     }
 
     /**
+     * Create notification channel for Android
+     */
+    async createNotificationChannel() {
+        try {
+            await Notifications.setNotificationChannelAsync('default', {
+                name: 'Default',
+                importance: Notifications.AndroidImportance.MAX,
+                vibrationPattern: [0, 250, 250, 250],
+                lightColor: '#FF231F7C',
+            });
+            console.log('Notification channel created');
+        } catch (error) {
+            console.error('Error creating notification channel:', error);
+        }
+    }
+
+    /**
      * Load custom notification sound
      */
     async loadNotificationSound() {
-        try {
-            // Load custom sound if available
-            const { sound } = await Audio.Sound.createAsync(
-                require('../assets/sounds/notification-sound.wav'),
-                { shouldPlay: false }
-            );
-            this.sound = sound;
-            console.log('Custom notification sound loaded');
-        } catch (error) {
-            console.log('Custom sound not found, will use system default:', error.message);
-            this.sound = null;
-        }
+        // Deprecated: We create sound on demand to avoid threading issues
     }
 
     /**
@@ -136,9 +157,18 @@ class FirebaseNotificationService {
             // Vibrate
             Vibration.vibrate();
 
-            if (this.sound) {
-                await this.sound.replayAsync();
-            }
+            // Play sound on demand to ensure thread safety
+            const { sound } = await Audio.Sound.createAsync(
+                require('../assets/sounds/notification-sound.wav'),
+                { shouldPlay: true }
+            );
+
+            // Unload sound from memory when playback finishes
+            sound.setOnPlaybackStatusUpdate(async (status) => {
+                if (status.didJustFinish) {
+                    await sound.unloadAsync();
+                }
+            });
         } catch (error) {
             console.error('Error playing notification sound:', error);
         }
