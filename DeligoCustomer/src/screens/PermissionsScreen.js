@@ -1,5 +1,5 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, Alert, Linking } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Platform, Alert, Linking, AppState } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -9,6 +9,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import { spacing, fontSize } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
+import firebaseNotificationService from '../services/firebaseNotificationService';
 
 const PermissionsScreen = (props) => {
     const { navigation } = props;
@@ -20,9 +21,26 @@ const PermissionsScreen = (props) => {
     // Permission states
     const [locationStatus, setLocationStatus] = useState('undetermined');
     const [notificationStatus, setNotificationStatus] = useState('undetermined');
+    const appState = useRef(AppState.currentState);
 
     useEffect(() => {
         checkCurrentPermissions();
+
+        // Add AppState listener to re-check permissions when app comes to foreground
+        const subscription = AppState.addEventListener('change', nextAppState => {
+            if (
+                appState.current.match(/inactive|background/) &&
+                nextAppState === 'active'
+            ) {
+                console.log('App returned to foreground, checking permissions...');
+                checkCurrentPermissions();
+            }
+            appState.current = nextAppState;
+        });
+
+        return () => {
+            subscription.remove();
+        };
     }, []);
 
     const checkCurrentPermissions = async () => {
@@ -33,9 +51,21 @@ const PermissionsScreen = (props) => {
 
             // Check Notifications
             const authStatus = await messaging().hasPermission();
+            console.log('Current notification permission status:', authStatus);
+
             const notifEnabled =
                 authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
                 authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+            // If newly granted, ensure we register the token
+            if (notifEnabled && notificationStatus !== 'granted') {
+                // Only register if we're moving from non-granted to granted state
+                if (notificationStatus !== 'undetermined') {
+                    console.log('Permission changed to granted in background, registering token...');
+                    await firebaseNotificationService.reinitializeAfterPermission();
+                }
+            }
+
             setNotificationStatus(notifEnabled ? 'granted' : 'undetermined');
         } catch (error) {
             console.warn('Error checking permissions:', error);
@@ -69,7 +99,10 @@ const PermissionsScreen = (props) => {
     const handleNotificationPermission = async () => {
         setLoading(true);
         try {
+            console.log('Requesting notification permission...');
             const authStatus = await messaging().requestPermission();
+            console.log('Permission request result:', authStatus);
+
             const enabled =
                 authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
                 authStatus === messaging.AuthorizationStatus.PROVISIONAL;
@@ -77,14 +110,22 @@ const PermissionsScreen = (props) => {
             setNotificationStatus(enabled ? 'granted' : 'denied');
 
             if (enabled) {
+                // Immediately register FCM token with backend after permission is granted
+                console.log('Notification permission granted, registering FCM token...');
+                await firebaseNotificationService.reinitializeAfterPermission();
                 completePermissions();
             } else {
+                // If denied, it might be permanently denied or user just said no.
+                // We should guide them to settings if they want to enable it.
                 Alert.alert(
-                    'Notifications Optional',
-                    'Enable notifications to get real-time updates on your order status.',
+                    'Permission Required',
+                    'Notification permission was denied. Please enable it in system settings to receive order updates.',
                     [
-                        { text: 'Skip', style: 'cancel', onPress: () => completePermissions() },
-                        { text: 'Settings', onPress: () => Linking.openSettings() }
+                        { text: 'Later', style: 'cancel', onPress: () => completePermissions() },
+                        {
+                            text: 'Open Settings',
+                            onPress: () => Linking.openSettings()
+                        }
                     ]
                 );
             }

@@ -22,26 +22,50 @@ class FirebaseNotificationService {
                 authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
                 authStatus === messaging.AuthorizationStatus.PROVISIONAL;
 
-            if (!enabled) {
-                console.log('Firebase messaging permission not enabled yet');
-                // We don't return false here, we just skip token registration for now.
-                // Or we can return false effectively telling the app notifications aren't ready.
-                return false;
-            }
-
-            // Get FCM token
-            await this.getFCMToken();
-
-            // Load notification sound
+            // Load notification sound regardless of permission (prepare for later)
             await this.loadNotificationSound();
 
-            // Set up message handlers
+            // Set up message handlers regardless of permission (they'll work once permission is granted)
             this.setupMessageHandlers();
 
-            console.log('Firebase notification service initialized successfully');
+            if (!enabled) {
+                console.log('Firebase messaging permission not enabled yet - handlers set up, waiting for permission');
+                // Return true to indicate partial initialization is done
+                // Token registration will happen via reinitializeAfterPermission()
+                return true;
+            }
+
+            // Get FCM token only if permission is already granted
+            await this.getFCMToken();
+
+            console.log('Firebase notification service initialized successfully with token');
             return true;
         } catch (error) {
             console.error('Error initializing Firebase notification service:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Reinitialize after permission is granted - call this from PermissionsScreen
+     */
+    async reinitializeAfterPermission() {
+        try {
+            console.log('Reinitializing Firebase notification service after permission grant...');
+
+            // Get FCM token now that permission is granted
+            const token = await this.getFCMToken();
+
+            if (token) {
+                // Register token with backend immediately
+                await this.registerTokenWithBackend(token);
+                console.log('FCM token registered after permission grant');
+                return true;
+            }
+
+            return false;
+        } catch (error) {
+            console.error('Error reinitializing after permission:', error);
             return false;
         }
     }
