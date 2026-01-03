@@ -1,5 +1,5 @@
 # Ignore unnecessary files during EAS build
-node_modules/
+# IMPORTANT: Do NOT ignore node_modules - EAS needs it for prebuild/autolinking
 .expo/
 .expo-shared/
 *.md
@@ -10,4 +10,3 @@ node_modules/
 .idea/
 *.bak
 *.tmp
-

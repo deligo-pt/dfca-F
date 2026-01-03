@@ -21,6 +21,9 @@ messaging().setBackgroundMessageHandler(async (remoteMessage) => {
                     data: remoteMessage.data,
                     sound: true,
                     vibrate: [0, 250, 250, 250],
+                    priority: Notifications.AndroidNotificationPriority.MAX,
+                    color: '#DC3173',
+                    channelId: 'default',
                 },
                 trigger: null, // Show immediately
             });

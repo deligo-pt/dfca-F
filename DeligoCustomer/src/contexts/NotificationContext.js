@@ -91,8 +91,8 @@ export const NotificationProvider = ({ children }) => {
     // Parse notification data
     const notification = {
       _id: remoteMessage.messageId,
-      title: remoteMessage.notification?.title || 'New Notification',
-      message: remoteMessage.notification?.body || '',
+      title: remoteMessage.notification?.title || remoteMessage.data?.title || 'New Notification',
+      message: remoteMessage.notification?.body || remoteMessage.data?.body || remoteMessage.data?.message || '',
       data: remoteMessage.data,
       isRead: false,
       createdAt: new Date().toISOString(),

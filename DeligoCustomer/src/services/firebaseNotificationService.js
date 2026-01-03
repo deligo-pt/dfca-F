@@ -159,7 +159,7 @@ class FirebaseNotificationService {
 
             // Play sound on demand to ensure thread safety
             const { sound } = await Audio.Sound.createAsync(
-                require('../assets/sounds/notification-sound.wav'),
+                require('../assets/sounds/notification_sound.wav'),
                 { shouldPlay: true }
             );
 
