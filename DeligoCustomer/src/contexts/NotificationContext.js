@@ -1,6 +1,8 @@
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import { AppState } from 'react-native';
 import firebaseNotificationService from '../services/firebaseNotificationService';
 import { useProfile } from './ProfileContext';
+import { navigateToOrder, navigateToNotifications } from '../navigation/navigationRef';
 
 const NotificationContext = createContext();
 
@@ -21,19 +23,99 @@ export const NotificationProvider = ({ children }) => {
 
   const { isAuthenticated } = useProfile();
 
+  // Handle foreground notification received
+  const handleNotificationReceived = useCallback((remoteMessage) => {
+    console.log('New notification received in Context:', remoteMessage);
+
+    // Parse notification data with robust fallbacks
+    const data = remoteMessage.data || {};
+
+    // Determine title
+    let title = remoteMessage.notification?.title || data.title;
+    if (!title) {
+      if (data.type === 'ORDER') {
+        title = 'Order Update';
+        if (data.status) {
+          title = data.status.split('_').map(word =>
+            word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+          ).join(' ');
+        }
+      } else if (data.orderId) {
+        title = 'Order Update';
+      } else {
+        title = 'New Notification';
+      }
+    }
+
+    // Determine message/body
+    let message = remoteMessage.notification?.body || data.body || data.message;
+    if (!message) {
+      if (data.orderId) {
+        message = `Update for order #${data.orderId.slice(-6)}`;
+      } else {
+        message = 'You have a new update';
+      }
+    }
+
+    const notification = {
+      _id: remoteMessage.messageId || Date.now().toString(),
+      title: title,
+      message: message,
+      type: data.type || 'SYSTEM',
+      data: data,
+      isRead: false,
+      createdAt: new Date().toISOString(),
+    };
+
+    // Update state immediately
+    setNotifications(prev => {
+      // Check if notification already exists to avoid duplicates
+      if (prev.some(n => n._id === notification._id)) {
+        return prev;
+      }
+      return [notification, ...prev];
+    });
+    
+    setLatestNotification(notification);
+    setUnreadCount(prev => prev + 1);
+    
+    // We rely on Toast in firebaseNotificationService for the visual popup
+    // so we don't set showPopup(true) here to avoid double notifications.
+    // setShowPopup(true); 
+  }, []);
+
+  // Handle notification opened (tapped)
+  const handleNotificationOpened = useCallback((remoteMessage) => {
+    console.log('Notification opened:', remoteMessage);
+
+    // Navigate based on notification data
+    const data = remoteMessage.data || {};
+    const type = data.type || '';
+
+    if ((type === 'ORDER' || data.orderId) && data.orderId) {
+      console.log('Navigating to order:', data.orderId);
+      // Navigate to order tracking screen
+      navigateToOrder(data.orderId);
+    } else {
+      // For other notification types, go to notifications screen
+      console.log('Navigating to notifications screen');
+      navigateToNotifications();
+    }
+  }, []);
+
   // Initialize Firebase notification service
   useEffect(() => {
     const init = async () => {
       try {
+        // Set callbacks BEFORE initializing to ensure we don't miss any messages
+        firebaseNotificationService.setNotificationCallbacks(
+            handleNotificationReceived,
+            handleNotificationOpened
+        );
+
         const success = await firebaseNotificationService.initialize();
         if (success) {
           setIsInitialized(true);
-
-          // Set up notification callbacks
-          firebaseNotificationService.setNotificationCallbacks(
-            handleNotificationReceived,
-            handleNotificationOpened
-          );
         }
       } catch (error) {
         console.error('Error initializing notification service:', error);
@@ -46,7 +128,7 @@ export const NotificationProvider = ({ children }) => {
     return () => {
       firebaseNotificationService.cleanup();
     };
-  }, []);
+  }, [handleNotificationReceived, handleNotificationOpened]);
 
   // Fetch notifications and register token when authenticated
   useEffect(() => {
@@ -67,6 +149,20 @@ export const NotificationProvider = ({ children }) => {
     }
   }, [isAuthenticated, isInitialized]);
 
+  // Refetch notifications when app comes to foreground
+  useEffect(() => {
+    const subscription = AppState.addEventListener('change', nextAppState => {
+      if (nextAppState === 'active' && isAuthenticated) {
+        console.log('App became active, fetching notifications...');
+        fetchNotifications();
+      }
+    });
+
+    return () => {
+      subscription.remove();
+    };
+  }, [isAuthenticated, fetchNotifications]);
+
   // Fetch notifications from API
   const fetchNotifications = useCallback(async () => {
     try {
@@ -81,39 +177,6 @@ export const NotificationProvider = ({ children }) => {
     } catch (error) {
       console.error('Error fetching notifications:', error);
       return [];
-    }
-  }, []);
-
-  // Handle foreground notification received
-  const handleNotificationReceived = useCallback((remoteMessage) => {
-    console.log('New notification received:', remoteMessage);
-
-    // Parse notification data
-    const notification = {
-      _id: remoteMessage.messageId,
-      title: remoteMessage.notification?.title || remoteMessage.data?.title || 'New Notification',
-      message: remoteMessage.notification?.body || remoteMessage.data?.body || remoteMessage.data?.message || '',
-      data: remoteMessage.data,
-      isRead: false,
-      createdAt: new Date().toISOString(),
-    };
-
-    // Update state
-    setNotifications(prev => [notification, ...prev]);
-    setLatestNotification(notification);
-    setShowPopup(true);
-    setUnreadCount(prev => prev + 1);
-  }, []);
-
-  // Handle notification opened (tapped)
-  const handleNotificationOpened = useCallback((remoteMessage) => {
-    console.log('Notification opened:', remoteMessage);
-
-    // Navigate based on notification data if needed
-    const data = remoteMessage.data;
-    if (data?.orderId) {
-      // TODO: Navigate to order details
-      console.log('Should navigate to order:', data.orderId);
     }
   }, []);
 

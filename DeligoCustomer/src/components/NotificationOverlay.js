@@ -9,6 +9,11 @@ const NotificationOverlay = () => {
   const { colors } = useTheme();
   const navigation = useNavigation();
 
+  // We are now using Toast for notifications, so this component is effectively disabled
+  // but kept for backward compatibility or if we want to switch back to custom popups
+  // Returning null effectively disables the overlay
+  // if (true) return null;
+
   const handleNotificationPress = async (notification) => {
     // Mark as read
     if (notification._id && !notification.isRead) {
@@ -38,4 +43,3 @@ const NotificationOverlay = () => {
 };
 
 export default NotificationOverlay;
-

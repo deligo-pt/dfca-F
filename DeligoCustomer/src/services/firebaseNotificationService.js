@@ -3,6 +3,7 @@ import * as Notifications from 'expo-notifications';
 import { Audio } from 'expo-av';
 import { Platform, Vibration } from 'react-native';
 import { customerApi } from '../utils/api';
+import Toast from 'react-native-toast-message';
 
 class FirebaseNotificationService {
     constructor() {
@@ -10,6 +11,9 @@ class FirebaseNotificationService {
         this.unsubscribeOnMessage = null;
         this.unsubscribeOnNotificationOpened = null;
         this.fcmToken = null;
+        this.onNotificationReceived = null;
+        this.onNotificationOpened = null;
+        this.channelId = 'deligo_notifications_channel'; // Use consistent channel ID
     }
 
     /**
@@ -45,8 +49,6 @@ class FirebaseNotificationService {
 
             if (!enabled) {
                 console.log('Firebase messaging permission not enabled yet - handlers set up, waiting for permission');
-                // Return true to indicate partial initialization is done
-                // Token registration will happen via reinitializeAfterPermission()
                 return true;
             }
 
@@ -130,13 +132,22 @@ class FirebaseNotificationService {
      */
     async createNotificationChannel() {
         try {
+            // Create 'default' channel (legacy)
             await Notifications.setNotificationChannelAsync('default', {
                 name: 'Default',
                 importance: Notifications.AndroidImportance.MAX,
                 vibrationPattern: [0, 250, 250, 250],
                 lightColor: '#FF231F7C',
             });
-            console.log('Notification channel created');
+
+            // Create 'default_channel' (new standard from backend)
+            await Notifications.setNotificationChannelAsync('default_channel', {
+                name: 'Default Channel',
+                importance: Notifications.AndroidImportance.MAX,
+                vibrationPattern: [0, 250, 250, 250],
+                lightColor: '#DC3173', // Using the app's primary pink color
+            });
+            console.log('Notification channels created');
         } catch (error) {
             console.error('Error creating notification channel:', error);
         }
@@ -182,12 +193,49 @@ class FirebaseNotificationService {
         this.unsubscribeOnMessage = messaging().onMessage(async (remoteMessage) => {
             console.log('Foreground notification received:', remoteMessage);
 
+            // Extract notification data
+            const notification = remoteMessage.notification || {};
+            const data = remoteMessage.data || {};
+
+            const title = notification.title || data.title || 'New Notification';
+            const body = notification.body || data.body || data.message || '';
+
             // Play custom sound for foreground notifications
             await this.playNotificationSound();
 
-            // Notify the app about the new notification
+            // Show Toast notification (professional in-app notification like Pathao/Uber)
+            const toastType = data.type === 'ORDER' || data.orderId ? 'orderToast' : 'deligoToast';
+
+            // Show toast immediately using setTimeout to ensure it runs on the next tick
+            // This helps avoid issues where the UI thread might be busy or the component not ready
+            setTimeout(() => {
+                Toast.show({
+                    type: toastType,
+                    text1: title,
+                    text2: body,
+                    visibilityTime: 5000,
+                    autoHide: true,
+                    topOffset: 50,
+                    onPress: () => {
+                        // Handle tap on notification - can navigate to order details
+                        if (this.onNotificationOpened) {
+                            this.onNotificationOpened(remoteMessage);
+                        }
+                        Toast.hide();
+                    },
+                });
+            }, 100);
+
+            // Notify the app about the new notification (for state updates)
+            // We do this immediately to ensure UI updates
             if (this.onNotificationReceived) {
-                this.onNotificationReceived(remoteMessage);
+                console.log('Calling onNotificationReceived callback');
+                // Wrap in setTimeout to ensure it runs in the next tick, potentially helping with state updates
+                setTimeout(() => {
+                    this.onNotificationReceived(remoteMessage);
+                }, 100);
+            } else {
+                console.warn('onNotificationReceived callback not set');
             }
         });
 
@@ -216,6 +264,7 @@ class FirebaseNotificationService {
      * Set notification callbacks
      */
     setNotificationCallbacks(onReceived, onOpened) {
+        console.log('Setting notification callbacks');
         this.onNotificationReceived = onReceived;
         this.onNotificationOpened = onOpened;
     }
@@ -227,7 +276,7 @@ class FirebaseNotificationService {
         try {
             const response = await customerApi.get('/notifications/my-notifications');
             // Interceptor returns res.data, so response IS the data object
-            console.log('Fetched notifications response:', response);
+            // console.log('Fetched notifications response:', response);
 
             if (response?.success && Array.isArray(response?.data)) {
                 return response.data;

@@ -1,4 +1,4 @@
-import React, { useState, useCallback } from 'react';
+import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,
   Text,
@@ -41,6 +41,15 @@ const NotificationsScreen = ({ navigation }) => {
   const [activeFilter, setActiveFilter] = useState('all');
   const [selectedNotification, setSelectedNotification] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
+
+  // Refresh notifications when screen comes into focus
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      refreshNotifications();
+    });
+
+    return unsubscribe;
+  }, [navigation, refreshNotifications]);
 
   const onRefresh = async () => {
     setRefreshing(true);

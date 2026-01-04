@@ -297,6 +297,7 @@ const NotificationPopup = ({
           opacity: opacityAnim,
         },
       ]}
+      pointerEvents={visible ? 'auto' : 'none'}
     >
       <TouchableOpacity
         activeOpacity={0.95}
