@@ -17,23 +17,17 @@ import { NotificationProvider } from './src/contexts/NotificationContext';
 import * as SystemUI from 'expo-system-ui';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import RootNavigator from './src/navigation/RootNavigator';
-import NotificationPopup from './src/components/NotificationPopup';
-import { useNotifications } from './src/contexts/NotificationContext';
 import { useTheme } from './src/utils/ThemeContext';
+import Toast from 'react-native-toast-message';
+import { toastConfig } from './src/components/ToastConfig';
+import { navigationRef } from './src/navigation/navigationRef';
 
 const AppContent = () => {
-  const { latestNotification, showPopup, dismissPopup } = useNotifications();
   const { colors } = useTheme();
 
   return (
-    <NavigationContainer>
+    <NavigationContainer ref={navigationRef}>
       <RootNavigator />
-      <NotificationPopup
-        visible={showPopup}
-        notification={latestNotification}
-        onDismiss={dismissPopup}
-        colors={colors}
-      />
       <StatusBar style="light" backgroundColor={colors.primary} />
     </NavigationContainer>
   );
@@ -136,6 +130,7 @@ export default function App() {
           </LanguageProvider>
         </ThemeProvider>
       </SafeAreaProvider>
+      <Toast config={toastConfig} />
     </StripeProvider>
   );
 }

@@ -71,7 +71,11 @@
           "apiKey": "AIzaSyCZ1jixNYbSRM21Uq82a6KXNO_FSpLUwaQ"
         }
       },
-      "googleServicesFile": "./google-services.json"
+      "googleServicesFile": "./google-services.json",
+      "metaData": {
+        "com.google.firebase.messaging.default_notification_channel_id": "deligo_notifications_channel",
+        "com.google.firebase.messaging.default_notification_color": "@color/notification_icon_color"
+      }
     },
     "web": {
       "favicon": "./src/assets/favicon.png"
