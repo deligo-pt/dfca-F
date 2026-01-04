@@ -1,10 +1,13 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
+
+// Import the app logo for branded notifications
+const AppLogo = require('../assets/images/logo.png');
 
 /**
  * Custom Toast Configuration for Deligo Customer App
- * Provides professional notification toasts like Pathao/Uber
+ * Provides professional notification toasts like Pathao/Uber with app branding
  */
 
 const DeligoToast = ({ text1, text2, onPress, hide }) => {
@@ -17,8 +20,8 @@ const DeligoToast = ({ text1, text2, onPress, hide }) => {
             }}
             activeOpacity={0.9}
         >
-            <View style={styles.iconContainer}>
-                <Ionicons name="notifications" size={24} color="#FFFFFF" />
+            <View style={styles.logoContainer}>
+                <Image source={AppLogo} style={styles.logoImage} resizeMode="contain" />
             </View>
             <View style={styles.textContainer}>
                 <Text style={styles.title} numberOfLines={1}>
@@ -49,8 +52,8 @@ const OrderToast = ({ text1, text2, onPress, hide }) => {
             }}
             activeOpacity={0.9}
         >
-            <View style={[styles.iconContainer, styles.orderIconContainer]}>
-                <Ionicons name="bag-check" size={24} color="#FFFFFF" />
+            <View style={styles.logoContainer}>
+                <Image source={AppLogo} style={styles.logoImage} resizeMode="contain" />
             </View>
             <View style={styles.textContainer}>
                 <Text style={styles.title} numberOfLines={1}>
@@ -67,6 +70,7 @@ const OrderToast = ({ text1, text2, onPress, hide }) => {
         </TouchableOpacity>
     );
 };
+
 
 const SuccessToast = ({ text1, text2, hide }) => {
     return (
@@ -152,6 +156,22 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginRight: 12,
+    },
+    logoContainer: {
+        width: 44,
+        height: 44,
+        borderRadius: 22,
+        backgroundColor: '#FFFFFF',
+        justifyContent: 'center',
+        alignItems: 'center',
+        marginRight: 12,
+        borderWidth: 1,
+        borderColor: '#E0E0E0',
+        overflow: 'hidden',
+    },
+    logoImage: {
+        width: 36,
+        height: 36,
     },
     orderIconContainer: {
         backgroundColor: '#4CAF50',

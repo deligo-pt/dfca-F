@@ -129,25 +129,38 @@ class FirebaseNotificationService {
 
     /**
      * Create notification channel for Android
+     * IMPORTANT: Channel ID must match backend's channelId: 'default_channel'
      */
     async createNotificationChannel() {
         try {
-            // Create 'default' channel (legacy)
+            // Create 'default_channel' with HEADS-UP settings (matches backend channelId)
+            await Notifications.setNotificationChannelAsync('default_channel', {
+                name: 'Deligo Notifications',
+                description: 'Order updates and important alerts',
+                importance: Notifications.AndroidImportance.MAX,
+                vibrationPattern: [0, 500, 200, 500],
+                lightColor: '#DC3173',
+                sound: 'default',
+                enableLights: true,
+                enableVibrate: true,
+                showBadge: true,
+                lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
+                bypassDnd: true,
+            });
+
+            // Create 'default' channel (legacy fallback)
             await Notifications.setNotificationChannelAsync('default', {
                 name: 'Default',
                 importance: Notifications.AndroidImportance.MAX,
-                vibrationPattern: [0, 250, 250, 250],
-                lightColor: '#FF231F7C',
+                vibrationPattern: [0, 500, 200, 500],
+                lightColor: '#DC3173',
+                sound: 'default',
+                enableLights: true,
+                enableVibrate: true,
+                showBadge: true,
             });
 
-            // Create 'default_channel' (new standard from backend)
-            await Notifications.setNotificationChannelAsync('default_channel', {
-                name: 'Default Channel',
-                importance: Notifications.AndroidImportance.MAX,
-                vibrationPattern: [0, 250, 250, 250],
-                lightColor: '#DC3173', // Using the app's primary pink color
-            });
-            console.log('Notification channels created');
+            console.log('Notification channels created with heads-up settings');
         } catch (error) {
             console.error('Error creating notification channel:', error);
         }
