@@ -1,285 +1,336 @@
+/**
+ * Firebase Notification Service
+ * Handles all native Firebase Cloud Messaging operations for DeliGo Customer
+ * Implements foreground (toast + custom sound) and background/killed (native sound) notifications
+ */
+
 import messaging from '@react-native-firebase/messaging';
-import * as Notifications from 'expo-notifications';
-import { Audio } from 'expo-av';
-import { Platform, Vibration } from 'react-native';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform, PermissionsAndroid } from 'react-native';
+import notifee, { AndroidImportance } from '@notifee/react-native';
+import { navigate } from '../navigation/navigationRef';
 import { customerApi } from '../utils/api';
-import Toast from 'react-native-toast-message';
+
+const FCM_TOKEN_KEY = '@deligo_customer_fcm_token';
+const NOTIFICATION_CHANNEL_ID = 'default_channel'; // Match backend
 
 class FirebaseNotificationService {
     constructor() {
-        this.sound = null;
+        this.fcmToken = null;
         this.unsubscribeOnMessage = null;
         this.unsubscribeOnNotificationOpened = null;
-        this.fcmToken = null;
-        this.onNotificationReceived = null;
-        this.onNotificationOpened = null;
-        this.channelId = 'deligo_notifications_channel'; // Use consistent channel ID
+        this.onNotificationReceivedCallback = null;
+        this.onNotificationOpenedCallback = null;
     }
 
     /**
-     * Initialize Firebase messaging service
+     * Set callbacks for notification events
+     */
+    setNotificationCallbacks(onNotificationReceived, onNotificationOpened) {
+        this.onNotificationReceivedCallback = onNotificationReceived;
+        this.onNotificationOpenedCallback = onNotificationOpened;
+        console.log('[Firebase] Notification callbacks set');
+    }
+
+    /**
+     * Create notification channel with custom sound for Android
+     */
+    async createNotificationChannel() {
+        if (Platform.OS === 'android') {
+            try {
+                await notifee.createChannel({
+                    id: NOTIFICATION_CHANNEL_ID,
+                    name: 'DeliGo Order Notifications',
+                    importance: AndroidImportance.HIGH,
+                    sound: 'notification_sound', // Links to res/raw/notification_sound.wav
+                    vibration: true,
+                    vibrationPattern: [300, 500],
+                });
+                console.log('[Firebase] ✅ Notification channel created with custom sound');
+            } catch (error) {
+                console.error('[Firebase] ❌ Create channel error:', error);
+            }
+        }
+    }
+
+    /**
+     * Initialize Firebase Messaging
+     * Should be called once on app startup
      */
     async initialize() {
         try {
-            // Check permission status (handled in PermissionsScreen)
+            console.log('[Firebase] Initializing...');
+
+            if (!messaging) {
+                console.warn('[Firebase] Firebase messaging not available');
+                return null;
+            }
+
+            // Create notification channel with custom sound
+            await this.createNotificationChannel();
+
+            // Note: Background handler is registered in index.js (must be outside React lifecycle)
+
+            // Set up foreground message handler
+            this.setupForegroundHandler();
+
+            // Set up notification opened handler
+            this.setupNotificationOpenedHandler();
+
+            // Check initial notification
+            await this.checkInitialNotification();
+
+            console.log('[Firebase] ✅ Initialized successfully');
+            return true;
+        } catch (error) {
+            console.error('[Firebase] ❌ Initialization error:', error);
+            return false;
+        }
+    }
+
+    /**
+     * Check notification permission status
+     */
+    async checkPermission() {
+        try {
             const authStatus = await messaging().hasPermission();
+
+            if (authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+                authStatus === messaging.AuthorizationStatus.PROVISIONAL) {
+                return 'granted';
+            }
+
+            if (authStatus === messaging.AuthorizationStatus.DENIED) {
+                return 'denied';
+            }
+
+            return 'undetermined';
+        } catch (error) {
+            console.error('[Firebase] Check permission error:', error);
+            return 'undetermined';
+        }
+    }
+
+    /**
+     * Request notification permission
+     */
+    async requestPermission() {
+        try {
+            console.log('[Firebase] Requesting permission...');
+
+            // For Android 13+
+            if (Platform.OS === 'android' && Platform.Version >= 33) {
+                const result = await PermissionsAndroid.request(
+                    PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS
+                );
+                if (result !== PermissionsAndroid.RESULTS.GRANTED) {
+                    console.log('[Firebase] Android 13+ permission denied');
+                    return false;
+                }
+            }
+
+            const authStatus = await messaging().requestPermission();
             const enabled =
                 authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
                 authStatus === messaging.AuthorizationStatus.PROVISIONAL;
 
-            // Load notification sound regardless of permission (prepare for later)
-            await this.loadNotificationSound();
-
-            // Set up Expo Notifications handler
-            Notifications.setNotificationHandler({
-                handleNotification: async () => ({
-                    shouldShowAlert: true,
-                    shouldPlaySound: true,
-                    shouldSetBadge: true,
-                }),
-            });
-
-            // Create notification channel for Android
-            if (Platform.OS === 'android') {
-                await this.createNotificationChannel();
-            }
-
-            // Set up message handlers regardless of permission (they'll work once permission is granted)
-            this.setupMessageHandlers();
-
-            if (!enabled) {
-                console.log('Firebase messaging permission not enabled yet - handlers set up, waiting for permission');
-                return true;
-            }
-
-            // Get FCM token only if permission is already granted
-            await this.getFCMToken();
-
-            console.log('Firebase notification service initialized successfully with token');
-            return true;
+            console.log('[Firebase] Permission:', enabled ? '✅ granted' : '❌ denied');
+            return enabled;
         } catch (error) {
-            console.error('Error initializing Firebase notification service:', error);
+            console.error('[Firebase] Request permission error:', error);
             return false;
         }
     }
 
     /**
-     * Reinitialize after permission is granted - call this from PermissionsScreen
+     * Get FCM token
      */
-    async reinitializeAfterPermission() {
+    async getToken() {
         try {
-            console.log('Reinitializing Firebase notification service after permission grant...');
+            const permissionStatus = await this.checkPermission();
+            if (permissionStatus !== 'granted') {
+                console.log('[Firebase] Cannot get token - no permission');
+                return null;
+            }
 
-            // Get FCM token now that permission is granted
-            const token = await this.getFCMToken();
+            const token = await messaging().getToken();
 
             if (token) {
-                // Register token with backend immediately
-                await this.registerTokenWithBackend(token);
-                console.log('FCM token registered after permission grant');
-                return true;
+                this.fcmToken = token;
+                await AsyncStorage.setItem(FCM_TOKEN_KEY, token);
+                console.log('[Firebase] 🔑 FCM Token:', token.substring(0, 20) + '...');
             }
 
-            return false;
+            return token;
         } catch (error) {
-            console.error('Error reinitializing after permission:', error);
-            return false;
-        }
-    }
-
-    /**
-     * Get FCM token and register with backend
-     */
-    async getFCMToken() {
-        try {
-            // Check if we already have a token
-            this.fcmToken = await messaging().getToken();
-            console.log('FCM Token:', this.fcmToken);
-
-            // Listen for token refresh
-            messaging().onTokenRefresh(async (newToken) => {
-                console.log('FCM Token refreshed:', newToken);
-                this.fcmToken = newToken;
-                await this.registerTokenWithBackend(newToken);
-            });
-
-            return this.fcmToken;
-        } catch (error) {
-            console.error('Error getting FCM token:', error);
+            console.error('[Firebase] Get token error:', error);
             return null;
         }
     }
 
+    /**
+     * Get stored FCM token
+     */
+    async getStoredToken() {
+        try {
+            const token = await AsyncStorage.getItem(FCM_TOKEN_KEY);
+            return token;
+        } catch (error) {
+            console.error('[Firebase] Get stored token error:', error);
+            return null;
+        }
+    }
+
+    /**
+     * Register FCM token with backend
+     */
     async registerTokenWithBackend(token) {
         try {
             const payload = {
                 fcmToken: token,
-                token: token, // Fallback key
-                deviceToken: token, // Another common fallback
+                token: token,
+                deviceToken: token,
                 platform: Platform.OS,
             };
-            console.log('Registering FCM token with backend:', payload);
+            console.log('[Firebase] Registering token with backend...');
+            console.log('[Firebase] Payload:', JSON.stringify(payload, null, 2));
 
-            await customerApi.post('/auth/save-fcm-token', payload);
-            console.log('FCM token registered with backend');
+            const response = await customerApi.post('/auth/save-fcm-token', payload);
+
+            console.log('[Firebase] ✅ Token registered with backend');
+            console.log('[Firebase] Backend response:', JSON.stringify(response.data, null, 2));
+
+            return response.data;
         } catch (error) {
-            console.error('Error registering FCM token with backend:', error);
+            console.error('[Firebase] ❌ Register token error:', error);
+            console.error('[Firebase] Error details:', {
+                message: error.message,
+                response: error.response?.data,
+                status: error.response?.status
+            });
+            return null;
         }
     }
 
     /**
-     * Create notification channel for Android
-     * IMPORTANT: Channel ID must match backend's channelId: 'default_channel'
+     * Setup foreground message handler (plays custom sound from assets)
      */
-    async createNotificationChannel() {
-        try {
-            // Create 'default_channel' with HEADS-UP settings (matches backend channelId)
-            await Notifications.setNotificationChannelAsync('default_channel', {
-                name: 'Deligo Notifications',
-                description: 'Order updates and important alerts',
-                importance: Notifications.AndroidImportance.MAX,
-                vibrationPattern: [0, 500, 200, 500],
-                lightColor: '#DC3173',
-                sound: 'default',
-                enableLights: true,
-                enableVibrate: true,
-                showBadge: true,
-                lockscreenVisibility: Notifications.AndroidNotificationVisibility.PUBLIC,
-                bypassDnd: true,
-            });
-
-            // Create 'default' channel (legacy fallback)
-            await Notifications.setNotificationChannelAsync('default', {
-                name: 'Default',
-                importance: Notifications.AndroidImportance.MAX,
-                vibrationPattern: [0, 500, 200, 500],
-                lightColor: '#DC3173',
-                sound: 'default',
-                enableLights: true,
-                enableVibrate: true,
-                showBadge: true,
-            });
-
-            console.log('Notification channels created with heads-up settings');
-        } catch (error) {
-            console.error('Error creating notification channel:', error);
-        }
-    }
-
-    /**
-     * Load custom notification sound
-     */
-    async loadNotificationSound() {
-        // Deprecated: We create sound on demand to avoid threading issues
-    }
-
-    /**
-     * Play notification sound and vibrate
-     */
-    async playNotificationSound() {
-        try {
-            // Vibrate
-            Vibration.vibrate();
-
-            // Play sound on demand to ensure thread safety
-            const { sound } = await Audio.Sound.createAsync(
-                require('../assets/sounds/notification_sound.wav'),
-                { shouldPlay: true }
-            );
-
-            // Unload sound from memory when playback finishes
-            sound.setOnPlaybackStatusUpdate(async (status) => {
-                if (status.didJustFinish) {
-                    await sound.unloadAsync();
-                }
-            });
-        } catch (error) {
-            console.error('Error playing notification sound:', error);
-        }
-    }
-
-    /**
-     * Setup Firebase message handlers
-     */
-    setupMessageHandlers() {
-        // Handle foreground messages
+    setupForegroundHandler() {
+        console.log('[Firebase] Setting up foreground message handler...');
         this.unsubscribeOnMessage = messaging().onMessage(async (remoteMessage) => {
-            console.log('Foreground notification received:', remoteMessage);
+            console.log('[Firebase] 📬 Foreground Message:', remoteMessage);
 
-            // Extract notification data
             const notification = remoteMessage.notification || {};
             const data = remoteMessage.data || {};
 
             const title = notification.title || data.title || 'New Notification';
             const body = notification.body || data.body || data.message || '';
 
-            // Play custom sound for foreground notifications
-            await this.playNotificationSound();
+            // Play custom sound from assets (expo-av)
+            try {
+                const SoundService = (await import('../utils/SoundService')).default;
+                await SoundService.playNotificationSound();
+            } catch (e) {
+                console.warn('[Firebase] Sound play error:', e);
+            }
 
-            // Show Toast notification (professional in-app notification like Pathao/Uber)
-            const toastType = data.type === 'ORDER' || data.orderId ? 'orderToast' : 'deligoToast';
+            // Call external callback
+            if (this.onNotificationReceivedCallback) {
+                try {
+                    this.onNotificationReceivedCallback(remoteMessage);
+                } catch (e) {
+                    console.warn('[Firebase] Callback error:', e);
+                }
+            }
 
-            // Show toast immediately using setTimeout to ensure it runs on the next tick
-            // This helps avoid issues where the UI thread might be busy or the component not ready
-            setTimeout(() => {
+            // Show custom toast notification
+            try {
+                const Toast = (await import('react-native-toast-message')).default;
                 Toast.show({
-                    type: toastType,
+                    type: 'deligoToast',
                     text1: title,
                     text2: body,
-                    visibilityTime: 5000,
-                    autoHide: true,
-                    topOffset: 50,
+                    visibilityTime: 4000,
                     onPress: () => {
-                        // Handle tap on notification - can navigate to order details
-                        if (this.onNotificationOpened) {
-                            this.onNotificationOpened(remoteMessage);
-                        }
+                        this.handleNotificationNavigation(data);
                         Toast.hide();
-                    },
-                });
-            }, 100);
-
-            // Notify the app about the new notification (for state updates)
-            // We do this immediately to ensure UI updates
-            if (this.onNotificationReceived) {
-                console.log('Calling onNotificationReceived callback');
-                // Wrap in setTimeout to ensure it runs in the next tick, potentially helping with state updates
-                setTimeout(() => {
-                    this.onNotificationReceived(remoteMessage);
-                }, 100);
-            } else {
-                console.warn('onNotificationReceived callback not set');
-            }
-        });
-
-        // Handle notification opened from background/quit state
-        messaging().onNotificationOpenedApp((remoteMessage) => {
-            console.log('Notification opened from background:', remoteMessage);
-            if (this.onNotificationOpened) {
-                this.onNotificationOpened(remoteMessage);
-            }
-        });
-
-        // Check if app was opened from a notification (quit state)
-        messaging()
-            .getInitialNotification()
-            .then((remoteMessage) => {
-                if (remoteMessage) {
-                    console.log('App opened from quit state by notification:', remoteMessage);
-                    if (this.onNotificationOpened) {
-                        this.onNotificationOpened(remoteMessage);
                     }
-                }
-            });
+                });
+            } catch (e) {
+                console.warn('[Firebase] Toast error:', e);
+            }
+        });
     }
 
     /**
-     * Set notification callbacks
+     * Setup notification opened handler
      */
-    setNotificationCallbacks(onReceived, onOpened) {
-        console.log('Setting notification callbacks');
-        this.onNotificationReceived = onReceived;
-        this.onNotificationOpened = onOpened;
+    setupNotificationOpenedHandler() {
+        this.unsubscribeOnNotificationOpened = messaging().onNotificationOpenedApp((remoteMessage) => {
+            console.log('[Firebase] 👆 Notification Opened:', remoteMessage);
+            const data = remoteMessage.data || {};
+
+            if (this.onNotificationOpenedCallback) {
+                try {
+                    this.onNotificationOpenedCallback(remoteMessage);
+                } catch (e) {
+                    console.warn('[Firebase] Opened callback error:', e);
+                }
+            }
+
+            this.handleNotificationNavigation(data);
+        });
+    }
+
+    /**
+     * Check if app was opened from notification (killed state)
+     */
+    async checkInitialNotification() {
+        try {
+            const remoteMessage = await messaging().getInitialNotification();
+
+            if (remoteMessage) {
+                console.log('[Firebase] 🚀 Initial Notification:', remoteMessage);
+                const data = remoteMessage.data || {};
+
+                if (this.onNotificationOpenedCallback) {
+                    try {
+                        this.onNotificationOpenedCallback(remoteMessage);
+                    } catch (e) {
+                        console.warn('[Firebase] Initial callback error:', e);
+                    }
+                }
+
+                // Delay navigation to ensure app is fully loaded
+                setTimeout(() => {
+                    this.handleNotificationNavigation(data);
+                }, 1000);
+            }
+        } catch (error) {
+            console.error('[Firebase] Check initial notification error:', error);
+        }
+    }
+
+    /**
+     * Handle navigation based on notification data
+     */
+    handleNotificationNavigation(data) {
+        const type = data?.type || '';
+        const orderId = data?.orderId;
+
+        console.log('[Firebase] 🧭 Navigating for type:', type, 'orderId:', orderId);
+
+        if (orderId) {
+            // Navigate to order tracking if orderId exists
+            navigate('TrackOrder', { orderId });
+        } else if (type === 'PROMO' || type === 'PROMOTION') {
+            navigate('Vouchers');
+        } else if (type === 'CHAT' && data.chatId) {
+            navigate('Chat', { chatId: data.chatId });
+        } else {
+            // Default to notifications screen
+            navigate('Notifications');
+        }
     }
 
     /**
@@ -288,19 +339,14 @@ class FirebaseNotificationService {
     async fetchNotifications() {
         try {
             const response = await customerApi.get('/notifications/my-notifications');
-            // Interceptor returns res.data, so response IS the data object
-            // console.log('Fetched notifications response:', response);
-
             if (response?.success && Array.isArray(response?.data)) {
                 return response.data;
             } else if (Array.isArray(response)) {
-                // Fallback if backend returns direct array
                 return response;
             }
-
             return [];
         } catch (error) {
-            console.error('Error fetching notifications:', error);
+            console.error('[Firebase] Fetch notifications error:', error);
             return [];
         }
     }
@@ -313,7 +359,7 @@ class FirebaseNotificationService {
             await customerApi.patch(`/notifications/${notificationId}/read`);
             return true;
         } catch (error) {
-            console.error('Error marking notification as read:', error);
+            console.error('[Firebase] Mark as read error:', error);
             return false;
         }
     }
@@ -326,49 +372,72 @@ class FirebaseNotificationService {
             const notifications = await this.fetchNotifications();
             return notifications.filter(n => !n.isRead).length;
         } catch (error) {
-            console.error('Error getting unread count:', error);
+            console.error('[Firebase] Get unread count error:', error);
             return 0;
         }
     }
 
     /**
-     * Subscribe to a topic (for targeted notifications)
+     * Subscribe to topic for targeted notifications
      */
     async subscribeToTopic(topic) {
         try {
             await messaging().subscribeToTopic(topic);
-            console.log(`Subscribed to topic: ${topic}`);
+            console.log(`[Firebase] ✅ Subscribed to topic: ${topic}`);
+            return true;
         } catch (error) {
-            console.error(`Error subscribing to topic ${topic}:`, error);
+            console.error('[Firebase] Subscribe error:', error);
+            return false;
         }
     }
 
     /**
-     * Unsubscribe from a topic
+     * Unsubscribe from topic
      */
     async unsubscribeFromTopic(topic) {
         try {
             await messaging().unsubscribeFromTopic(topic);
-            console.log(`Unsubscribed from topic: ${topic}`);
+            console.log(`[Firebase] ✅ Unsubscribed from topic: ${topic}`);
+            return true;
         } catch (error) {
-            console.error(`Error unsubscribing from topic ${topic}:`, error);
+            console.error('[Firebase] Unsubscribe error:', error);
+            return false;
         }
     }
 
     /**
-     * Clean up resources
+     * Clean up listeners
      */
-    async cleanup() {
+    cleanup() {
         if (this.unsubscribeOnMessage) {
             this.unsubscribeOnMessage();
+            this.unsubscribeOnMessage = null;
         }
+        if (this.unsubscribeOnNotificationOpened) {
+            this.unsubscribeOnNotificationOpened();
+            this.unsubscribeOnNotificationOpened = null;
+        }
+        console.log('[Firebase] 🧹 Cleaned up');
+    }
 
-        if (this.sound) {
-            await this.sound.unloadAsync();
-            this.sound = null;
+    /**
+     * Delete token (for logout)
+     */
+    async deleteToken() {
+        try {
+            await messaging().deleteToken();
+            await AsyncStorage.removeItem(FCM_TOKEN_KEY);
+            this.fcmToken = null;
+            console.log('[Firebase] 🗑️ Token deleted');
+            return true;
+        } catch (error) {
+            console.error('[Firebase] Delete token error:', error);
+            return false;
         }
     }
 }
 
 // Export singleton instance
-export default new FirebaseNotificationService();
+const firebaseNotificationService = new FirebaseNotificationService();
+export default firebaseNotificationService;
+

@@ -21,6 +21,8 @@ import { useTheme } from './src/utils/ThemeContext';
 import Toast from 'react-native-toast-message';
 import { toastConfig } from './src/components/ToastConfig';
 import { navigationRef } from './src/navigation/navigationRef';
+import messaging from '@react-native-firebase/messaging';
+import { PermissionsAndroid } from 'react-native';
 
 const AppContent = () => {
   const { colors } = useTheme();
@@ -35,6 +37,51 @@ const AppContent = () => {
 
 // Minimal publishable key fallback (use env in production)
 const STRIPE_PUBLISHABLE_KEY = process.env.STRIPE_PUBLISHABLE_KEY || 'pk_test_51PT3CjP0xY0uRyP02HGOUxxzweu1yv7l8GMyECLggN1LJrLsbLfGb1lgMuqQHoADgb1LFYC9tDgRcmkaCLGvNFJR00CgHAWWNK';
+
+// Request notification permission (critical for Android 13+ and production APK)
+const requestNotificationPermission = async () => {
+  try {
+    console.log('[App] Requesting notification permission...');
+
+    // For Android 13+ (API level 33+), explicitly request POST_NOTIFICATIONS
+    if (Platform.OS === 'android' && Platform.Version >= 33) {
+      const granted = await PermissionsAndroid.request(
+        PermissionsAndroid.PERMISSIONS.POST_NOTIFICATIONS,
+        {
+          title: 'DeliGo Notifications',
+          message: 'Allow DeliGo to send you order updates and notifications',
+          buttonNeutral: 'Ask Me Later',
+          buttonNegative: 'Cancel',
+          buttonPositive: 'OK',
+        }
+      );
+
+      if (granted === PermissionsAndroid.RESULTS.GRANTED) {
+        console.log('[App] ✅ POST_NOTIFICATIONS permission granted');
+      } else {
+        console.log('[App] ⚠️ POST_NOTIFICATIONS permission denied');
+        return false;
+      }
+    }
+
+    // Request Firebase messaging permission
+    const authStatus = await messaging().requestPermission();
+    const enabled =
+      authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
+      authStatus === messaging.AuthorizationStatus.PROVISIONAL;
+
+    if (enabled) {
+      console.log('[App] ✅ Firebase messaging permission granted');
+    } else {
+      console.log('[App] ⚠️ Firebase messaging permission denied');
+    }
+
+    return enabled;
+  } catch (error) {
+    console.error('[App] Error requesting notification permission:', error);
+    return false;
+  }
+};
 
 // Keep the splash screen visible while we fetch resources
 SplashScreen.preventAutoHideAsync();
@@ -82,6 +129,10 @@ export default function App() {
         const startTime = Date.now();
 
         await loadFonts();
+
+        // Request notification permission early (critical for production APK)
+        await requestNotificationPermission();
+
         // initializeApp is no longer needed here as ProfileContext handles it via Provider
 
         // Ensure splash screen shows for at least 2 seconds

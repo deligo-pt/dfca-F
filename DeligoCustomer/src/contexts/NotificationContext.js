@@ -137,11 +137,41 @@ export const NotificationProvider = ({ children }) => {
 
       // Register FCM token
       if (isInitialized) {
-        firebaseNotificationService.getFCMToken().then(token => {
-          if (token) {
-            firebaseNotificationService.registerTokenWithBackend(token);
+        (async () => {
+          try {
+            // Check permission first
+            const permission = await firebaseNotificationService.checkPermission();
+            console.log('[NotificationContext] Permission status:', permission);
+
+            if (permission !== 'granted') {
+              console.log('[NotificationContext] Requesting permission...');
+              const granted = await firebaseNotificationService.requestPermission();
+              if (!granted) {
+                console.log('[NotificationContext] Permission denied');
+                return;
+              }
+            }
+
+            // Get and register token
+            const token = await firebaseNotificationService.getToken();
+            if (token) {
+              console.log('[NotificationContext] Token obtained:', token.substring(0, 50) + '...');
+              console.log('[NotificationContext] Registering with backend...');
+
+              const result = await firebaseNotificationService.registerTokenWithBackend(token);
+
+              if (result) {
+                console.log('[NotificationContext] ✅ Backend registration successful:', result);
+              } else {
+                console.log('[NotificationContext] ⚠️ Backend registration returned null - check error logs');
+              }
+            } else {
+              console.log('[NotificationContext] ❌ Failed to get token');
+            }
+          } catch (error) {
+            console.error('[NotificationContext] Token registration error:', error);
           }
-        });
+        })();
       }
     } else {
       setNotifications([]);
