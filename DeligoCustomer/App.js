@@ -1,6 +1,6 @@
 import { StatusBar } from 'expo-status-bar';
 import React, { useState, useEffect } from 'react';
-import { Text as RNText, TextInput as RNTextInput } from 'react-native';
+import { Text as RNText, TextInput as RNTextInput, Platform } from 'react-native';
 import { NavigationContainer } from '@react-navigation/native';
 import { SafeAreaProvider } from 'react-native-safe-area-context';
 import { colors } from './src/theme';
