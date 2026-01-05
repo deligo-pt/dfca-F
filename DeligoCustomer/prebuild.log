@@ -1,7 +1,0 @@
-! Git branch has uncommitted file changes
-› It's recommended to commit all changes before proceeding in case you want to revert generated changes.
-Git status is dirty but the command will continue because the terminal is not interactive.
-- Clearing android
-× Failed to delete android code: EBUSY: resource busy or locked, rmdir 'J:\deligo-food-customer-application-frontend\DeligoCustomer\android'
-Error: EBUSY: resource busy or locked, rmdir 'J:\deligo-food-customer-application-frontend\DeligoCustomer\android'
-Error: EBUSY: resource busy or locked, rmdir 'J:\deligo-food-customer-application-frontend\DeligoCustomer\android'
