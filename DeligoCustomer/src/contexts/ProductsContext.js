@@ -545,6 +545,53 @@ export const ProductsProvider = ({ children }) => {
     }
   }, []);
 
+  // Fetch business categories
+  const fetchBusinessCategories = useCallback(async () => {
+    try {
+      const endpoint = API_ENDPOINTS.UTIL.BUSINESS_CATEGORIES;
+      const url = `${BASE_API_URL}${endpoint}`;
+
+      let token = await getAccessToken();
+      // handle tokens stored as objects { accessToken } or { token }
+      if (token && typeof token === 'object') {
+        token = token.accessToken || token.token || token.value || null;
+      }
+
+      const headers = { Accept: 'application/json' };
+      if (token) {
+        // Backend now expects Bearer token
+        const authHeader = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+        headers.Authorization = authHeader;
+      }
+
+      const res = await fetch(url, {
+        method: 'GET',
+        headers: headers
+      });
+
+      console.log('[ProductsContext] fetchBusinessCategories status:', res.status);
+
+      if (!res.ok) throw new Error(`Failed to fetch categories: ${res.status}`);
+
+      const json = await res.json();
+      console.log('[ProductsContext] fetchBusinessCategories response:', JSON.stringify(json).slice(0, 200));
+
+      const items = json.data?.data || [];
+      console.log('[ProductsContext] fetchBusinessCategories items count:', items.length);
+
+      return items.map(item => ({
+        id: item._id,
+        name: item.name,
+        slug: item.slug,
+        icon: item.icon, // This is now a URL URL
+        isActive: item.isActive
+      }));
+    } catch (err) {
+      console.error('[ProductsContext] Error fetching business categories:', err);
+      return [];
+    }
+  }, []);
+
   // initial load
   useEffect(() => {
     // Trigger initial fetch using default params; fetchProducts will serve cache immediately if present
@@ -561,8 +608,9 @@ export const ProductsProvider = ({ children }) => {
     setParams,
     setParams,
     lastUpdated,
-    fetchRestaurantMenu
-  }), [products, loading, error, fetchProducts, params, lastUpdated, fetchRestaurantMenu]);
+    fetchRestaurantMenu,
+    fetchBusinessCategories
+  }), [products, loading, error, fetchProducts, params, lastUpdated, fetchRestaurantMenu, fetchBusinessCategories]);
 
   return (
     <ProductsContext.Provider value={contextValue}>

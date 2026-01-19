@@ -75,6 +75,7 @@ const CategoriesScreen = ({ navigation }) => {
     // Dynamic categories based on selected vendor type
     const dynamicCategories = React.useMemo(() => {
         const vendorName = (selectedVendorType || '').toLowerCase();
+        // Check includes with lowercased selected type (e.g. 'restaurant')
         if (vendorName.includes('resturent') || vendorName.includes('restaurant') || vendorName.includes('food')) {
             return RESTAURANT_CATEGORIES;
         }
@@ -105,8 +106,31 @@ const CategoriesScreen = ({ navigation }) => {
     }; */
 
     // Use products context for live data
-    const { products, fetchProducts, loading: productsLoading, error: productsError, lastUpdated } = useProducts();
+    const { products, fetchProducts, fetchBusinessCategories, loading: productsLoading, error: productsError, lastUpdated } = useProducts();
     const [refreshing, setRefreshing] = useState(false);
+
+    // Dynamic Categories from API
+    const [apiCategories, setApiCategories] = useState([]);
+
+    useEffect(() => {
+        let mounted = true;
+        (async () => {
+            if (fetchBusinessCategories) {
+                console.log('[CategoriesScreen] Fetching business categories...');
+                const cats = await fetchBusinessCategories();
+                console.log('[CategoriesScreen] Fetched categories:', cats?.length);
+                if (mounted && cats && cats.length > 0) {
+                    setApiCategories(cats);
+                }
+            }
+        })();
+        return () => { mounted = false; };
+    }, [fetchBusinessCategories]);
+
+    // Use API categories if available, else fallback logic (but user wants ONLY API)
+    // We will override vendorTypesFromProducts if apiCategories exists
+    // MOVED definition down below vendorTypesFromProducts to avoid ReferenceError/undefined
+
     // Local normalize function (same shape as ProductsContext.normalizeProduct)
     // Updated to handle nested vendorId object
     const localNormalize = (p) => {
@@ -444,10 +468,17 @@ const CategoriesScreen = ({ navigation }) => {
         }
         const filtered = arr.filter((p) => {
             const vtRaw = p._raw?.vendor?.vendorType ?? p.vendor?.vendorType ?? null;
-            const vt = vtRaw != null ? String(vtRaw).trim() : null;
+            // Normalize product vendor type to lowercase for comparison
+            const vt = vtRaw != null ? String(vtRaw).trim().toLowerCase() : null;
+
             const catRaw = p._raw?.category ?? p.category ?? (Array.isArray(p.tags) ? p.tags[0] : null);
             const cat = catRaw != null ? String(catRaw).trim() : null;
-            return (!selectedVendorType || vt === selectedVendorType) && (!selectedCuisine || cat === selectedCuisine);
+
+            // selectedVendorType is also normalized to lowercase now
+            const matchVendor = !selectedVendorType || (vt && vt.includes(selectedVendorType)); // fuzzy match (e.g. 'restaurant' matches 'food restaurant')
+            const matchCuisine = !selectedCuisine || cat === selectedCuisine;
+
+            return matchVendor && matchCuisine;
         });
 
         setDisplayedProducts(filtered);
@@ -513,16 +544,27 @@ const CategoriesScreen = ({ navigation }) => {
         }
     }, [displayedProducts, currentLocation]);
 
+    // Use API categories if available, else fallback logic
+    // Defined here to ensure vendorTypesFromProducts is available
+    const displayCategories = apiCategories.length > 0 ? apiCategories : vendorTypesFromProducts;
+    console.log('[CategoriesScreen] displayCategories count:', displayCategories ? displayCategories.length : 'undefined');
+
     const handleVendorTypePress = React.useCallback((vendor) => {
-        const vendorId = vendor.id || vendor.name;
-        const newSel = selectedVendorType === vendorId ? null : vendorId;
-        setSelectedVendorType(newSel);
+        // Use slug (store, restaurant) for ID if available, else name
+        const rawId = vendor.slug || vendor.name;
+        // Ensure consistent casing for comparison (API slugs usually lowercase)
+        const vendorId = rawId ? rawId.toLowerCase() : null;
+
+        // toggle logic
+        const newSel = (selectedVendorType && selectedVendorType.toLowerCase()) === vendorId ? null : vendorId;
+
+        setSelectedVendorType(newSel); // set normalized lowercase value
+
         // If unselecting vendor, also unselect cuisine
         if (newSel === null) setSelectedCuisine(null);
 
         persistSelection('selectedVendorType', newSel);
         if (newSel === null) persistSelection('selectedCuisine', null);
-        // Removed manual fetchProducts - useEffect will handle it based on state change
     }, [selectedVendorType]);
 
     const handleCuisinePress = React.useCallback((cuisine) => {
@@ -692,7 +734,7 @@ const CategoriesScreen = ({ navigation }) => {
 
                 {/* Glovo-Style "Super App" Bubbles */}
                 <GlovoBubbles
-                    categories={vendorTypesFromProducts}
+                    categories={displayCategories}
                     onPress={handleVendorTypePress}
                     selectedId={selectedVendorType}
                 />

@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Image } from 'react-native';
 import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
 import { fontSize, spacing } from '../theme';
@@ -25,8 +25,6 @@ const GlovoBubbles = ({ categories, onPress, selectedId }) => {
 
     // Render a single bubble
     const renderBubble = (category, index) => {
-        // Cycle through colors
-        const bgColor = bubbleColors[index % bubbleColors.length];
         const isSelected = selectedId === category.id;
 
         return (
@@ -34,13 +32,22 @@ const GlovoBubbles = ({ categories, onPress, selectedId }) => {
                 key={category.id}
                 style={styles.bubbleContainer}
                 onPress={() => onPress(category)}
-                activeOpacity={0.8}
+                activeOpacity={0.7}
             >
                 <View style={[
                     styles.bubbleCircle,
-                    { backgroundColor: isSelected ? colors.primary : bgColor }
+                    // If selected, show a subtle border or active state, else white/transparent
+                    isSelected && styles.selectedBubble
                 ]}>
-                    <Text style={styles.bubbleIcon}>{category.icon}</Text>
+                    {category.icon && category.icon.toString().startsWith('http') ? (
+                        <Image
+                            source={{ uri: category.icon }}
+                            style={styles.bubbleImage}
+                            resizeMode="cover"
+                        />
+                    ) : (
+                        <Text style={styles.bubbleIcon}>{category.icon}</Text>
+                    )}
                 </View>
                 <Text
                     style={[
@@ -86,28 +93,40 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'flex-start',
-        gap: 20, // Grid gap
+        gap: 16,
     },
     bubbleContainer: {
         alignItems: 'center',
-        width: (width - 48 - 60) / 3, // Roughly 3 columns
+        width: (width - 48 - 48) / 3, // Roughly 3 columns
         marginBottom: 16,
     },
     bubbleCircle: {
-        width: 72,
-        height: 72,
-        borderRadius: 36,
+        width: 80,
+        height: 80,
+        borderRadius: 40, // Perfectly rounded
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 8,
+        backgroundColor: '#F5F5F5', // Neutral professional background (light gray)
+        // subtle shadow
         shadowColor: "#000",
-        shadowOffset: { width: 0, height: 4 },
-        shadowOpacity: 0.15,
-        shadowRadius: 8,
-        elevation: 5,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.1,
+        shadowRadius: 4,
+        elevation: 2,
+        overflow: 'hidden', // Ensure image stays inside
+    },
+    selectedBubble: {
+        borderWidth: 2,
+        borderColor: '#FFC107', // Primary color border
+        backgroundColor: '#FFF',
     },
     bubbleIcon: {
         fontSize: 32,
+    },
+    bubbleImage: {
+        width: '100%',
+        height: '100%',
     },
     bubbleLabel: {
         fontSize: fontSize.sm,

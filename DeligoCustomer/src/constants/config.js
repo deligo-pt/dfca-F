@@ -113,6 +113,7 @@ export const API_ENDPOINTS = {
     SEARCH: '/search',
     CUISINES: '/cuisines',
     BANNERS: '/banners',
+    BUSINESS_CATEGORIES: '/categories/businessCategory',
   },
 
   // Notifications
