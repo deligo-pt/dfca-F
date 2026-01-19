@@ -106,11 +106,12 @@ const CategoriesScreen = ({ navigation }) => {
     }; */
 
     // Use products context for live data
-    const { products, fetchProducts, fetchBusinessCategories, loading: productsLoading, error: productsError, lastUpdated } = useProducts();
+    const { products, fetchProducts, fetchBusinessCategories, fetchProductCategories, loading: productsLoading, error: productsError, lastUpdated } = useProducts();
     const [refreshing, setRefreshing] = useState(false);
 
     // Dynamic Categories from API
     const [apiCategories, setApiCategories] = useState([]);
+    const [apiProductCategories, setApiProductCategories] = useState([]);
 
     useEffect(() => {
         let mounted = true;
@@ -123,9 +124,17 @@ const CategoriesScreen = ({ navigation }) => {
                     setApiCategories(cats);
                 }
             }
+            if (fetchProductCategories) {
+                console.log('[CategoriesScreen] Fetching product categories...');
+                const pcats = await fetchProductCategories();
+                console.log('[CategoriesScreen] Fetched product categories:', pcats?.length);
+                if (mounted && pcats && pcats.length > 0) {
+                    setApiProductCategories(pcats);
+                }
+            }
         })();
         return () => { mounted = false; };
-    }, [fetchBusinessCategories]);
+    }, [fetchBusinessCategories, fetchProductCategories]);
 
     // Use API categories if available, else fallback logic (but user wants ONLY API)
     // We will override vendorTypesFromProducts if apiCategories exists
@@ -568,11 +577,13 @@ const CategoriesScreen = ({ navigation }) => {
     }, [selectedVendorType]);
 
     const handleCuisinePress = React.useCallback((cuisine) => {
-        const cuisineId = cuisine.id || cuisine.name;
-        const newSel = selectedCuisine === cuisineId ? null : cuisineId;
-        setSelectedCuisine(newSel);
-        persistSelection('selectedCuisine', newSel);
-        // Removed manual fetchProducts - useEffect will handle it
+        // use slug or name for flexible matching
+        const val = cuisine.slug || cuisine.name;
+        // toggle
+        const newVal = selectedCuisine === val ? null : val;
+
+        setSelectedCuisine(newVal);
+        persistSelection('selectedCuisine', newVal);
     }, [selectedCuisine]);
 
     const handleRestaurantPress = (restaurant) => {
@@ -744,7 +755,11 @@ const CategoriesScreen = ({ navigation }) => {
                     title={selectedVendorType ? t('categories') : t('browseByCategory')}
                     showSeeAll={false}
                 />
-                <Category cuisines={Array.isArray(cuisines) ? cuisines : []} selectedCuisine={selectedCuisine} onPress={handleCuisinePress} />
+                <Category
+                    cuisines={apiProductCategories.length > 0 ? apiProductCategories : dynamicCategories}
+                    selectedCuisine={selectedCuisine}
+                    onPress={handleCuisinePress}
+                />
 
                 {/* Results Section */}
                 <SectionHeader

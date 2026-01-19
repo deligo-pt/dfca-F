@@ -114,6 +114,7 @@ export const API_ENDPOINTS = {
     CUISINES: '/cuisines',
     BANNERS: '/banners',
     BUSINESS_CATEGORIES: '/categories/businessCategory',
+    PRODUCT_CATEGORIES: '/categories/productCategory',
   },
 
   // Notifications

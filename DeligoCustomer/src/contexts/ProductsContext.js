@@ -62,7 +62,9 @@ export function normalizeProduct(p) {
   const vendorRating = (vendorSource.rating && typeof vendorSource.rating === 'number') ? vendorSource.rating : 0;
   const vendorLat = vendorSource.latitude || businessLocation.latitude;
   const vendorLng = vendorSource.longitude || businessLocation.longitude;
-  const vendorStorePhoto = vendorSource.storePhoto || vendorSource.logo || null;
+  // Extract documents if available
+  const documents = vendorSource.documents || {};
+  const vendorStorePhoto = documents.storePhoto || vendorSource.storePhoto || vendorSource.logo || null;
 
   return {
     _raw: raw,
@@ -368,7 +370,9 @@ export const ProductsProvider = ({ children }) => {
       };
 
       const newData = isNewData(cachedRaw, items);
-      if (newData) {
+
+      // If forced refresh OR new data detected, update state and cache
+      if (final.force || newData) {
         try {
           const ts = Date.now();
           await StorageService.setItem(cacheKey, { items, meta: json.meta || {}, ts });
@@ -592,6 +596,44 @@ export const ProductsProvider = ({ children }) => {
     }
   }, []);
 
+  // Fetch product categories (Cuisines)
+  const fetchProductCategories = useCallback(async () => {
+    try {
+      const endpoint = API_ENDPOINTS.UTIL.PRODUCT_CATEGORIES;
+      const url = `${BASE_API_URL}${endpoint}`;
+
+      let token = await getAccessToken();
+      if (token && typeof token === 'object') {
+        token = token.accessToken || token.token || token.value || null;
+      }
+
+      const headers = { Accept: 'application/json' };
+      if (token) {
+        const authHeader = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+        headers.Authorization = authHeader;
+      }
+
+      const res = await fetch(url, { method: 'GET', headers });
+
+      if (!res.ok) throw new Error(`Failed to fetch product categories: ${res.status}`);
+
+      const json = await res.json();
+      const items = json.data?.data || [];
+
+      return items.map(item => ({
+        id: item._id,
+        name: item.name,
+        slug: item.slug,
+        icon: item.icon, // URL
+        image: item.icon, // For compatibility with CuisineChip
+        isActive: item.isActive
+      }));
+    } catch (err) {
+      console.error('[ProductsContext] Error fetching product categories:', err);
+      return [];
+    }
+  }, []);
+
   // initial load
   useEffect(() => {
     // Trigger initial fetch using default params; fetchProducts will serve cache immediately if present
@@ -609,8 +651,9 @@ export const ProductsProvider = ({ children }) => {
     setParams,
     lastUpdated,
     fetchRestaurantMenu,
-    fetchBusinessCategories
-  }), [products, loading, error, fetchProducts, params, lastUpdated, fetchRestaurantMenu, fetchBusinessCategories]);
+    fetchBusinessCategories,
+    fetchProductCategories
+  }), [products, loading, error, fetchProducts, params, lastUpdated, fetchRestaurantMenu, fetchBusinessCategories, fetchProductCategories]);
 
   return (
     <ProductsContext.Provider value={contextValue}>

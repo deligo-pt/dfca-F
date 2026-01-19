@@ -1,5 +1,5 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { spacing, fontSize, borderRadius } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
 
@@ -12,7 +12,11 @@ const CuisineChip = ({ cuisine, onPress, isSelected = false }) => {
       onPress={onPress}
       activeOpacity={0.7}
     >
-      <Text style={styles(colors, isDarkMode).icon}>{cuisine.image}</Text>
+      {cuisine.icon && cuisine.icon.toString().startsWith('http') ? (
+        <Image source={{ uri: cuisine.icon }} style={styles(colors, isDarkMode).chipImage} resizeMode="contain" />
+      ) : (
+        <Text style={styles(colors, isDarkMode).icon}>{cuisine.image || cuisine.icon}</Text>
+      )}
       <Text style={[styles(colors, isDarkMode).name, isSelected && styles(colors, isDarkMode).selectedText]}>{cuisine.name}</Text>
     </TouchableOpacity>
   );
@@ -37,7 +41,11 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
     borderWidth: 0,
   },
   icon: {
-    fontSize: fontSize.md,
+    marginRight: spacing.xs,
+  },
+  chipImage: {
+    width: 20,
+    height: 20,
     marginRight: spacing.xs,
   },
   name: {
