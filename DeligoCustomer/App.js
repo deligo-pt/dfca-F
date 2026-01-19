@@ -131,7 +131,7 @@ export default function App() {
         await loadFonts();
 
         // Request notification permission early (critical for production APK)
-        await requestNotificationPermission();
+        // await requestNotificationPermission(); // Removed to enforce PermissionsScreen flow
 
         // initializeApp is no longer needed here as ProfileContext handles it via Provider
 

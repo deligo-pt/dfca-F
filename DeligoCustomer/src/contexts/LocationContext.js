@@ -71,7 +71,16 @@ export const LocationProvider = ({ children }) => {
                 return null;
             }
 
-            let loc = await Location.getCurrentPositionAsync({});
+            // 1. Try to get last known position (fast, cached)
+            let loc = await Location.getLastKnownPositionAsync({});
+
+            // 2. If no cached location, or user wants fresh, try current position with Balanced accuracy
+            // Balanced is faster and works better indoors/emulators than default/Highest
+            if (!loc) {
+                loc = await Location.getCurrentPositionAsync({
+                    accuracy: Location.Accuracy.Balanced,
+                });
+            }
 
             // Reverse geocode
             let addresses = await Location.reverseGeocodeAsync({
@@ -123,7 +132,8 @@ export const LocationProvider = ({ children }) => {
             return locationData;
         } catch (err) {
             console.error('Error getting location:', err);
-            setError('Error getting location');
+            // Don't set error state that blocks UI, just log it.
+            // setError('Error getting location');
             return null;
         } finally {
             setLoading(false);

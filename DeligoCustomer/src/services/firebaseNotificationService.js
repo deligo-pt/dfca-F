@@ -435,6 +435,26 @@ class FirebaseNotificationService {
             return false;
         }
     }
+    /**
+     * Re-initialize after permission granted during onboarding
+     */
+    async reinitializeAfterPermission() {
+        console.log('[Firebase] Re-initializing after permission grant...');
+        // Channels need creating
+        await this.createNotificationChannel();
+        
+        // Get and register token
+        const token = await this.getToken();
+        if (token) {
+            await this.registerTokenWithBackend(token);
+        }
+        
+        // Setup handlers
+        this.setupForegroundHandler();
+        this.setupNotificationOpenedHandler();
+        
+        return true;
+    }
 }
 
 // Export singleton instance

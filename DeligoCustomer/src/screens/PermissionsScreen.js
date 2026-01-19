@@ -1,46 +1,33 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Platform, Alert, Linking, AppState } from 'react-native';
+/**
+ * PermissionsScreen
+ * Step-by-step wizard to request permissions on first app launch
+ */
+
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
 import * as Location from 'expo-location';
-import messaging from '@react-native-firebase/messaging';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { spacing, fontSize } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
 import firebaseNotificationService from '../services/firebaseNotificationService';
 
+const PERMISSIONS_VIEWED_KEY = 'HAS_VIEWED_PERMISSIONS';
+
 const PermissionsScreen = (props) => {
-    const { navigation } = props;
     const { colors } = useTheme();
     const { t } = useLanguage();
-    const [currentStep, setCurrentStep] = useState(0); // 0: Intro, 1: Location, 2: Notifications, 3: Done
+    const [currentStep, setCurrentStep] = useState(0); // 0: Intro, 1: Location, 2: Notifications
     const [loading, setLoading] = useState(false);
 
     // Permission states
     const [locationStatus, setLocationStatus] = useState('undetermined');
     const [notificationStatus, setNotificationStatus] = useState('undetermined');
-    const appState = useRef(AppState.currentState);
 
     useEffect(() => {
         checkCurrentPermissions();
-
-        // Add AppState listener to re-check permissions when app comes to foreground
-        const subscription = AppState.addEventListener('change', nextAppState => {
-            if (
-                appState.current.match(/inactive|background/) &&
-                nextAppState === 'active'
-            ) {
-                console.log('App returned to foreground, checking permissions...');
-                checkCurrentPermissions();
-            }
-            appState.current = nextAppState;
-        });
-
-        return () => {
-            subscription.remove();
-        };
     }, []);
 
     const checkCurrentPermissions = async () => {
@@ -50,25 +37,10 @@ const PermissionsScreen = (props) => {
             setLocationStatus(locStatus);
 
             // Check Notifications
-            const authStatus = await messaging().hasPermission();
-            console.log('Current notification permission status:', authStatus);
-
-            const notifEnabled =
-                authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-                authStatus === messaging.AuthorizationStatus.PROVISIONAL;
-
-            // If newly granted, ensure we register the token
-            if (notifEnabled && notificationStatus !== 'granted') {
-                // Only register if we're moving from non-granted to granted state
-                if (notificationStatus !== 'undetermined') {
-                    console.log('Permission changed to granted in background, registering token...');
-                    await firebaseNotificationService.reinitializeAfterPermission();
-                }
-            }
-
-            setNotificationStatus(notifEnabled ? 'granted' : 'undetermined');
+            const notifStatus = await firebaseNotificationService.checkPermission();
+            setNotificationStatus(notifStatus);
         } catch (error) {
-            console.warn('Error checking permissions:', error);
+            console.warn('[PermissionsScreen] Error checking permissions:', error);
         }
     };
 
@@ -81,16 +53,17 @@ const PermissionsScreen = (props) => {
                 setCurrentStep(2); // Move to Notifications
             } else {
                 Alert.alert(
-                    'Location Required',
-                    'We need your location to show nearby restaurants and deliver food to you. Please enable it in settings.',
+                    t('permissions.locationRequired'),
+                    t('permissions.locationDescription'),
                     [
-                        { text: 'Cancel', style: 'cancel', onPress: () => setCurrentStep(2) }, // Allow skip
-                        { text: 'Settings', onPress: () => Linking.openSettings() }
+                        { text: t('cancel'), style: 'cancel', onPress: () => setCurrentStep(2) },
+                        { text: t('settings'), onPress: () => Linking.openSettings() }
                     ]
                 );
             }
         } catch (error) {
-            console.warn('Error requesting location permission:', error);
+            console.warn('[PermissionsScreen] Error requesting location permission:', error);
+            setCurrentStep(2);
         } finally {
             setLoading(false);
         }
@@ -99,38 +72,26 @@ const PermissionsScreen = (props) => {
     const handleNotificationPermission = async () => {
         setLoading(true);
         try {
-            console.log('Requesting notification permission...');
-            const authStatus = await messaging().requestPermission();
-            console.log('Permission request result:', authStatus);
-
-            const enabled =
-                authStatus === messaging.AuthorizationStatus.AUTHORIZED ||
-                authStatus === messaging.AuthorizationStatus.PROVISIONAL;
-
+            const enabled = await firebaseNotificationService.requestPermission();
             setNotificationStatus(enabled ? 'granted' : 'denied');
 
             if (enabled) {
                 // Immediately register FCM token with backend after permission is granted
-                console.log('Notification permission granted, registering FCM token...');
+                console.log('[PermissionsScreen] Notification permission granted, registering FCM token...');
                 await firebaseNotificationService.reinitializeAfterPermission();
                 completePermissions();
             } else {
-                // If denied, it might be permanently denied or user just said no.
-                // We should guide them to settings if they want to enable it.
                 Alert.alert(
-                    'Permission Required',
-                    'Notification permission was denied. Please enable it in system settings to receive order updates.',
+                    t('permissions.notificationsOptional'),
+                    t('permissions.notificationsSkipMessage'),
                     [
-                        { text: 'Later', style: 'cancel', onPress: () => completePermissions() },
-                        {
-                            text: 'Open Settings',
-                            onPress: () => Linking.openSettings()
-                        }
+                        { text: t('skip'), style: 'cancel', onPress: () => completePermissions() },
+                        { text: t('settings'), onPress: () => Linking.openSettings() }
                     ]
                 );
             }
         } catch (error) {
-            console.warn('Error requesting notification permission:', error);
+            console.warn('[PermissionsScreen] Error requesting notification permission:', error);
             completePermissions(); // Proceed anyway
         } finally {
             setLoading(false);
@@ -139,12 +100,15 @@ const PermissionsScreen = (props) => {
 
     const completePermissions = async () => {
         try {
-            await AsyncStorage.setItem('HAS_VIEWED_PERMISSIONS', 'true');
+            await AsyncStorage.setItem(PERMISSIONS_VIEWED_KEY, 'true');
             if (props.onComplete) {
                 props.onComplete();
             }
         } catch (e) {
-            console.warn(e);
+            console.warn('[PermissionsScreen] Error saving permissions viewed:', e);
+            if (props.onComplete) {
+                props.onComplete();
+            }
         }
     };
 
@@ -157,12 +121,14 @@ const PermissionsScreen = (props) => {
                     <View style={styles.iconContainer}>
                         <Ionicons name="shield-checkmark" size={80} color={colors.primary} />
                     </View>
-                    <Text style={styles.title}>Let's get you set up</Text>
+                    <Text style={styles.title}>
+                        {t('permissions.introTitle')}
+                    </Text>
                     <Text style={styles.description}>
-                        To provide the best food delivery experience, Deligo needs access to your location and notifications.
+                        {t('permissions.introDescription')}
                     </Text>
                     <TouchableOpacity style={styles.button} onPress={() => setCurrentStep(1)}>
-                        <Text style={styles.buttonText}>Continue</Text>
+                        <Text style={styles.buttonText}>{t('continue')}</Text>
                     </TouchableOpacity>
                 </>
             );
@@ -174,15 +140,23 @@ const PermissionsScreen = (props) => {
                     <View style={styles.iconContainer}>
                         <Ionicons name="location" size={80} color="#FF9800" />
                     </View>
-                    <Text style={styles.title}>Enable Location</Text>
-                    <Text style={styles.description}>
-                        We need your location to find restaurants near you and ensure precise delivery.
+                    <Text style={styles.title}>
+                        {t('permissions.locationTitle')}
                     </Text>
-                    <TouchableOpacity style={styles.button} onPress={handleLocationPermission} disabled={loading}>
-                        <Text style={styles.buttonText}>{loading ? 'Requesting...' : 'Allow Location'}</Text>
+                    <Text style={styles.description}>
+                        {t('permissions.locationDescription')}
+                    </Text>
+                    <TouchableOpacity
+                        style={[styles.button, loading && styles.buttonDisabled]}
+                        onPress={handleLocationPermission}
+                        disabled={loading}
+                    >
+                        <Text style={styles.buttonText}>
+                            {loading ? t('common.requesting') : t('permissions.allowLocation')}
+                        </Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.skipButton} onPress={() => setCurrentStep(2)}>
-                        <Text style={styles.skipText}>Skip for now</Text>
+                        <Text style={styles.skipText}>{t('common.skipForNow')}</Text>
                     </TouchableOpacity>
                 </>
             );
@@ -194,15 +168,23 @@ const PermissionsScreen = (props) => {
                     <View style={styles.iconContainer}>
                         <Ionicons name="notifications" size={80} color="#2196F3" />
                     </View>
-                    <Text style={styles.title}>Enable Notifications</Text>
-                    <Text style={styles.description}>
-                        Get real-time updates on your order status, delivery driver location, and exclusive promos.
+                    <Text style={styles.title}>
+                        {t('permissions.notificationsTitle')}
                     </Text>
-                    <TouchableOpacity style={styles.button} onPress={handleNotificationPermission} disabled={loading}>
-                        <Text style={styles.buttonText}>{loading ? 'Requesting...' : 'Allow Notifications'}</Text>
+                    <Text style={styles.description}>
+                        {t('permissions.notificationsDescription')}
+                    </Text>
+                    <TouchableOpacity
+                        style={[styles.button, loading && styles.buttonDisabled]}
+                        onPress={handleNotificationPermission}
+                        disabled={loading}
+                    >
+                        <Text style={styles.buttonText}>
+                            {loading ? t('common.requesting') : t('permissions.allowNotifications')}
+                        </Text>
                     </TouchableOpacity>
                     <TouchableOpacity style={styles.skipButton} onPress={completePermissions}>
-                        <Text style={styles.skipText}>Skip for now</Text>
+                        <Text style={styles.skipText}>{t('common.skipForNow')}</Text>
                     </TouchableOpacity>
                 </>
             );
@@ -275,6 +257,9 @@ const getStyles = (colors) => StyleSheet.create({
         alignItems: 'center',
         marginBottom: spacing.md,
     },
+    buttonDisabled: {
+        opacity: 0.7,
+    },
     buttonText: {
         color: '#fff',
         fontSize: fontSize.md,
@@ -309,3 +294,4 @@ const getStyles = (colors) => StyleSheet.create({
 });
 
 export default PermissionsScreen;
+export { PERMISSIONS_VIEWED_KEY };

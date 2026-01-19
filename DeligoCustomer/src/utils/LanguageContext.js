@@ -42,7 +42,23 @@ export const LanguageProvider = ({ children }) => {
   };
 
   const t = (key) => {
-    return translations[key] || key;
+    if (!key) return '';
+
+    // Direct lookup (fast path)
+    if (translations[key]) return translations[key];
+
+    // Nested lookup for keys with dots (e.g., 'permissions.introTitle')
+    if (key.includes('.')) {
+      const keys = key.split('.');
+      let value = translations;
+      for (let k of keys) {
+        value = value?.[k];
+        if (!value) break;
+      }
+      if (value && typeof value === 'string') return value;
+    }
+
+    return key;
   };
 
   return (
