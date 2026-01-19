@@ -13,8 +13,8 @@ async function getAuthHeader() {
     let token = await StorageService.getAccessToken();
     if (token && typeof token === 'object') token = token.accessToken || token.token || token.value;
     if (!token) return {};
-    const raw = token.startsWith('Bearer ') ? token.substring(7) : token;
-    return { Authorization: raw };
+    const authHeader = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+    return { Authorization: authHeader };
   } catch (e) {
     return {};
   }

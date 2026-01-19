@@ -11,8 +11,8 @@ const maskToken = (t) => {
   try {
     if (!t) return null;
     const s = t.toString();
-    if (s.length <= 12) return `${s.slice(0,4)}...`;
-    return `${s.slice(0,8)}...${s.slice(-4)}`;
+    if (s.length <= 12) return `${s.slice(0, 4)}...`;
+    return `${s.slice(0, 8)}...${s.slice(-4)}`;
   } catch (e) { return null; }
 };
 
@@ -34,10 +34,10 @@ class OrderAPI {
       }
 
       if (token) {
-        // Backend expects raw token without Bearer prefix
-        const rawToken = token.startsWith('Bearer ') ? token.substring(7) : token;
-        headers.Authorization = rawToken;
-        console.debug('[OrderAPI] auth present, mask:', maskToken(rawToken));
+        // Backend now expects Bearer token
+        const authHeader = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+        headers.Authorization = authHeader;
+        console.debug('[OrderAPI] auth present, mask:', maskToken(authHeader));
       }
     } catch (e) {
       console.debug('[OrderAPI] token read error', e);

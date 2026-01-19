@@ -119,6 +119,10 @@ const CategoriesScreen = ({ navigation }) => {
         const businessDetails = vendorSource.businessDetails || {};
         const businessLocation = vendorSource.businessLocation || {};
 
+        // Correctly access documents object which might be inside vendorSource
+        const documents = vendorSource.documents || {};
+        const storePhoto = documents.storePhoto || vendorSource.storePhoto || vendorSource.logo;
+
         const vendorName = vendorSource.businessName || businessDetails.businessName || vendorSource.vendorName || raw.name || t('unknown');
         // Check both businessType (new) and vendorType (old)
         let vendorType = vendorSource.businessType || businessDetails.businessType || vendorSource.vendorType || '';
@@ -134,7 +138,8 @@ const CategoriesScreen = ({ navigation }) => {
         return {
             _raw: raw,
             id: p._id || p.productId || vendorSource._id || `${Math.random().toString(36).slice(2)}`,
-            image: vendorSource.storePhoto || (Array.isArray(p.images) && p.images[0]) || null,
+            // Prioritize storePhoto for the main image if available
+            image: storePhoto || (Array.isArray(p.images) && p.images[0]) || null,
             name: vendorName,
             categories: Array.isArray(p.tags) ? p.tags : (p.category ? [p.category] : []),
             rating: (p.rating && (typeof p.rating === 'number' ? p.rating : p.rating.average)) || vendorRating || 0,
@@ -149,7 +154,7 @@ const CategoriesScreen = ({ navigation }) => {
                 rating: vendorRating,
                 latitude: vendorSource.latitude || businessLocation.latitude,
                 longitude: vendorSource.longitude || businessLocation.longitude,
-                storePhoto: vendorSource.storePhoto || vendorSource.logo
+                storePhoto: storePhoto
             }
         };
     };

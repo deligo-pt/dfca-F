@@ -34,10 +34,10 @@ class CheckoutAPI {
       }
 
       if (token) {
-        // Backend expects raw token without Bearer prefix
-        const rawToken = token.startsWith('Bearer ') ? token.substring(7) : token;
-        headers.Authorization = rawToken;
-        console.debug('[CheckoutAPI] auth present, mask:', maskToken(rawToken));
+        // Backend now expects Bearer token
+        const authHeader = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+        headers.Authorization = authHeader;
+        console.debug('[CheckoutAPI] auth present, mask:', maskToken(authHeader));
       }
     } catch (e) {
       console.debug('[CheckoutAPI] token read error', e);

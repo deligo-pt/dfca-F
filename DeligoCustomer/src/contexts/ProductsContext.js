@@ -129,9 +129,9 @@ export const ProductsProvider = ({ children }) => {
       } catch (e) { }
       const headers = { Accept: 'application/json' };
       if (token) {
-        // Backend expects raw token without Bearer prefix
-        const rawToken = token.startsWith('Bearer ') ? token.substring(7) : token;
-        headers.Authorization = rawToken;
+        // Backend now expects Bearer token
+        const authHeader = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+        headers.Authorization = authHeader;
       }
 
       const qs = new URLSearchParams();
@@ -239,10 +239,10 @@ export const ProductsProvider = ({ children }) => {
                 if (newRefresh) await setRefreshToken(newRefresh);
                 // Try several header formats for the retried GET in case backend expects raw token or custom header
                 const candidates = [];
-                // Raw token (no Bearer) - PRIMARY strategy matching api.js
-                candidates.push(newAccess.startsWith('Bearer ') ? newAccess.substring(7) : newAccess);
-                // Bearer form as fallback (though likely not needed if backend expects raw)
+                // Bearer form - PRIMARY strategy
                 candidates.push(newAccess.startsWith('Bearer ') ? newAccess : `Bearer ${newAccess}`);
+                // Raw token (no Bearer) as fallback
+                candidates.push(newAccess.startsWith('Bearer ') ? newAccess.substring(7) : newAccess);
                 // Also try x-access-token as a fallback header
                 // We'll attempt Authorization header variants first, then x-access-token
 
@@ -402,9 +402,9 @@ export const ProductsProvider = ({ children }) => {
 
       const headers = { Accept: 'application/json' };
       if (token) {
-        // Backend expects raw token without Bearer prefix
-        const rawToken = token.startsWith('Bearer ') ? token.substring(7) : token;
-        headers.Authorization = rawToken;
+        // Backend now expects Bearer token
+        const authHeader = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+        headers.Authorization = authHeader;
       }
 
       // Use the generic products endpoint with a vendor filter
@@ -446,10 +446,10 @@ export const ProductsProvider = ({ children }) => {
                 console.log('[ProductsContext] Token refreshed, retrying menu fetch');
 
                 const candidates = [];
-                // Raw token (no Bearer) - PRIMARY strategy matching api.js
-                candidates.push(newAccess.startsWith('Bearer ') ? newAccess.substring(7) : newAccess);
-                // Bearer form as fallback
+                // Bearer form - PRIMARY strategy
                 candidates.push(newAccess.startsWith('Bearer ') ? newAccess : `Bearer ${newAccess}`);
+                // Raw token (no Bearer) as fallback
+                candidates.push(newAccess.startsWith('Bearer ') ? newAccess.substring(7) : newAccess);
 
                 let retryRes = null;
                 // Try Authorization header variants

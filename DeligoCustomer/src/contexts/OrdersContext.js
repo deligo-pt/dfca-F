@@ -32,8 +32,8 @@ export const OrdersProvider = ({ children }) => {
         'Accept': 'application/json'
       };
       if (token) {
-        const rawToken = token.startsWith('Bearer ') ? token.substring(7) : token;
-        headers.Authorization = rawToken;
+        const authHeader = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+        headers.Authorization = authHeader;
       }
       const url = `${BASE_API_URL}${API_ENDPOINTS.ORDERS.LIST}`;
       const response = await fetch(url, { method: 'GET', headers });

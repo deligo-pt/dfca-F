@@ -45,10 +45,10 @@ customerApi.interceptors.request.use(
     try {
       const token = await getAccessToken();
       if (token) {
-        // Backend expects raw token without Bearer prefix based on logout behavior
-        const rawToken = token.startsWith('Bearer ') ? token.substring(7) : token;
-        config.headers.Authorization = rawToken;
-        console.debug('[api] request -> auth present, mask:', maskToken(rawToken));
+        // Backend now expects Bearer token
+        const authHeader = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+        config.headers.Authorization = authHeader;
+        console.debug('[api] request -> auth present, mask:', maskToken(authHeader));
       }
     } catch (e) {
       console.debug('[api] request -> token read error', e);
@@ -78,10 +78,10 @@ customerApi.interceptors.response.use(
             failedQueue.push({ resolve, reject });
           });
           originalRequest.headers = originalRequest.headers || {};
-          // Backend expects raw token without Bearer prefix
-          const rawToken = token.startsWith('Bearer ') ? token.substring(7) : token;
-          originalRequest.headers.Authorization = rawToken;
-          console.debug('[api] retry queued request with token mask:', maskToken(rawToken));
+          // Backend now expects Bearer token
+          const authHeader = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+          originalRequest.headers.Authorization = authHeader;
+          console.debug('[api] retry queued request with token mask:', maskToken(authHeader));
           return customerApi(originalRequest);
         } catch (e) {
           console.warn('[api] queued request failed after refresh', e);
@@ -136,18 +136,18 @@ customerApi.interceptors.response.use(
           processQueue(null, finalToken);
 
           originalRequest.headers = originalRequest.headers || {};
-          // Backend expects raw token without Bearer prefix
-          const rawToken = finalToken.startsWith('Bearer ') ? finalToken.substring(7) : finalToken;
+          // Backend now expects Bearer token
+          const authHeader = finalToken.startsWith('Bearer ') ? finalToken : `Bearer ${finalToken}`;
 
           // Handle Axios 1.x headers class
           if (originalRequest.headers.set && typeof originalRequest.headers.set === 'function') {
-            originalRequest.headers.set('Authorization', rawToken);
+            originalRequest.headers.set('Authorization', authHeader);
           } else {
-            originalRequest.headers.Authorization = rawToken;
-            originalRequest.headers['Authorization'] = rawToken;
+            originalRequest.headers.Authorization = authHeader;
+            originalRequest.headers['Authorization'] = authHeader;
           }
 
-          console.debug('[api] retry original with new token mask:', maskToken(rawToken));
+          console.debug('[api] retry original with new token mask:', maskToken(authHeader));
           return customerApi(originalRequest);
         } catch (refreshError) {
           console.warn('[api] refresh failed', refreshError);
