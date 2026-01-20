@@ -3,12 +3,17 @@ import { ScrollView } from 'react-native';
 import CuisineChip from '../CuisineChip';
 import { spacing } from '../../theme';
 
-export default function Category({ cuisines = [], selectedCuisine = null, onPress = () => {} }) {
+export default function Category({ cuisines = [], selectedCuisine = null, onPress = () => { } }) {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.md, paddingBottom: spacing.sm }}>
-      {cuisines.map((cuisine) => (
-        <CuisineChip key={cuisine.id} cuisine={cuisine} onPress={() => onPress(cuisine)} isSelected={selectedCuisine === cuisine.id} />
-      ))}
+      {cuisines.map((cuisine) => {
+        const isSelected = selectedCuisine === cuisine.id ||
+          selectedCuisine === cuisine.slug ||
+          (selectedCuisine && cuisine.name && selectedCuisine.toLowerCase() === cuisine.name.toLowerCase());
+        return (
+          <CuisineChip key={cuisine.id} cuisine={cuisine} onPress={() => onPress(cuisine)} isSelected={isSelected} />
+        );
+      })}
     </ScrollView>
   );
 }

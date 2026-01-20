@@ -1,125 +1,165 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, StyleSheet, Dimensions, Image } from 'react-native';
+import {
+    View,
+    Text,
+    TouchableOpacity,
+    StyleSheet,
+    Dimensions,
+    Image,
+} from 'react-native';
 import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
 import { fontSize, spacing } from '../theme';
 
 const { width } = Dimensions.get('window');
 
+// -------- helpers --------
+const getFallbackIcon = (category) => {
+    const name = (category.name || category.slug || category.id || '').toLowerCase();
+    if (name.includes('restaurant') || name.includes('food')) return '🍕';
+    if (name.includes('store') || name.includes('grocery') || name.includes('shop')) return '🛒';
+    if (name.includes('pharmacy')) return '💊';
+    if (name.includes('coffee') || name.includes('cafe')) return '☕';
+    return '🏪';
+};
+
+// -------- item --------
+const BubbleItem = ({ category, selectedId, onPress, colors }) => {
+    const [imageError, setImageError] = React.useState(false);
+
+    const isSelected =
+        selectedId === category.id ||
+        selectedId === category.slug ||
+        (selectedId &&
+            category.name &&
+            selectedId.toLowerCase() === category.name.toLowerCase());
+
+    const rawIcon = category.icon || category.image;
+    const isImage =
+        typeof rawIcon === 'string' &&
+        rawIcon.startsWith('http') &&
+        rawIcon.length > 15 &&
+        !imageError;
+
+    const fallbackIcon = getFallbackIcon(category);
+
+    return (
+        <TouchableOpacity
+            style={styles.bubbleContainer}
+            activeOpacity={0.75}
+            onPress={() => onPress(category)}
+        >
+            <View
+                style={[
+                    styles.bubbleCircle,
+                    {
+                        backgroundColor: isSelected ? '#FFF' : '#F3F4F6',
+                        // Add a subtle border to unselected so it's visible
+                        borderWidth: isSelected ? 2 : 1,
+                        borderColor: isSelected ? colors.primary : '#E5E7EB'
+                    },
+                ]}
+            >
+                {isImage ? (
+                    <Image
+                        source={{ uri: rawIcon }}
+                        style={[
+                            styles.bubbleImage,
+                            // If selected, we shrink it a bit like in your screenshot
+                            // If unselected, it fills the circle but gets clipped by overflow:hidden
+                            isSelected ? { width: '60%', height: '60%' } : { width: '100%', height: '100%' }
+                        ]}
+                        resizeMode={isSelected ? "contain" : "cover"}
+                        onError={() => setImageError(true)}
+                    />
+                ) : (
+                    <Text style={styles.bubbleIcon}>{fallbackIcon}</Text>
+                )}
+            </View>
+
+            <Text
+                numberOfLines={1}
+                style={[
+                    styles.bubbleLabel,
+                    { color: colors.text.primary },
+                    isSelected && {
+                        color: colors.primary,
+                        fontFamily: 'Poppins-Bold',
+                    },
+                ]}
+            >
+                {category.name}
+            </Text>
+        </TouchableOpacity>
+    );
+};
+
+// -------- main --------
 const GlovoBubbles = ({ categories, onPress, selectedId }) => {
-    const { colors, isDarkMode } = useTheme();
+    const { colors } = useTheme();
     const { t } = useLanguage();
 
-    // Define bubble colors for a vibrant look
-    const bubbleColors = [
-        '#FFC56F', // Yellow-Orange (Food)
-        '#A5D6A7', // Green (Grocery)
-        '#90CAF9', // Blue (Pharmacy)
-        '#FFAB91', // Peach
-        '#CE93D8', // Purple
-        '#80CBC4', // Teal
-    ];
-
-    // If no categories, return null
-    if (!categories || categories.length === 0) return null;
-
-    // Render a single bubble
-    const renderBubble = (category, index) => {
-        const isSelected = selectedId === category.id;
-
-        return (
-            <TouchableOpacity
-                key={category.id}
-                style={styles.bubbleContainer}
-                onPress={() => onPress(category)}
-                activeOpacity={0.7}
-            >
-                <View style={[
-                    styles.bubbleCircle,
-                    // If selected, show a subtle border or active state, else white/transparent
-                    isSelected && styles.selectedBubble
-                ]}>
-                    {category.icon && category.icon.toString().startsWith('http') ? (
-                        <Image
-                            source={{ uri: category.icon }}
-                            style={styles.bubbleImage}
-                            resizeMode="cover"
-                        />
-                    ) : (
-                        <Text style={styles.bubbleIcon}>{category.icon}</Text>
-                    )}
-                </View>
-                <Text
-                    style={[
-                        styles.bubbleLabel,
-                        { color: isDarkMode ? colors.text.primary : '#333' },
-                        isSelected && { color: colors.primary, fontFamily: 'Poppins-Bold' }
-                    ]}
-                    numberOfLines={1}
-                    adjustsFontSizeToFit={true}
-                    minimumFontScale={0.8}
-                >
-                    {category.name}
-                </Text>
-            </TouchableOpacity>
-        );
-    };
+    if (!categories?.length) return null;
 
     return (
         <View style={styles.container}>
             <Text style={[styles.title, { color: colors.text.primary }]}>
                 {t('whatDoYouNeed') || "What's on your mind?"}
             </Text>
+
             <View style={styles.grid}>
-                {categories.map((category, index) => renderBubble(category, index))}
+                {categories.map((category, index) => (
+                    <BubbleItem
+                        key={category.id || category.slug || index}
+                        category={category}
+                        selectedId={selectedId}
+                        onPress={onPress}
+                        colors={colors}
+                    />
+                ))}
             </View>
         </View>
     );
 };
 
+// -------- styles --------
+const CIRCLE_SIZE = 75; // Increased slightly to match your screenshot better
+
 const styles = StyleSheet.create({
     container: {
         paddingHorizontal: spacing.md,
         marginTop: spacing.md,
-        marginBottom: spacing.sm,
     },
     title: {
         fontSize: fontSize.lg,
         fontFamily: 'Poppins-Bold',
         marginBottom: spacing.md,
-        marginLeft: 4,
     },
     grid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'flex-start',
-        gap: 16,
+        gap: 15,
     },
     bubbleContainer: {
+        width: 85,
         alignItems: 'center',
-        width: (width - 48 - 48) / 3, // Roughly 3 columns
         marginBottom: 16,
     },
     bubbleCircle: {
-        width: 80,
-        height: 80,
-        borderRadius: 40, // Perfectly rounded
+        width: CIRCLE_SIZE,
+        height: CIRCLE_SIZE,
+        borderRadius: CIRCLE_SIZE / 2, // THIS MAKES IT A CIRCLE
+        overflow: 'hidden',           // THIS CLIPS THE IMAGE INSIDE TO THE CIRCLE
         alignItems: 'center',
         justifyContent: 'center',
         marginBottom: 8,
-        backgroundColor: '#F5F5F5', // Neutral professional background (light gray)
-        // subtle shadow
-        shadowColor: "#000",
+        // Optional shadows
+        shadowColor: '#000',
         shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.1,
-        shadowRadius: 4,
+        shadowOpacity: 0.05,
+        shadowRadius: 2,
         elevation: 2,
-        overflow: 'hidden', // Ensure image stays inside
-    },
-    selectedBubble: {
-        borderWidth: 2,
-        borderColor: '#FFC107', // Primary color border
-        backgroundColor: '#FFF',
     },
     bubbleIcon: {
         fontSize: 32,
@@ -129,9 +169,10 @@ const styles = StyleSheet.create({
         height: '100%',
     },
     bubbleLabel: {
-        fontSize: fontSize.sm,
-        fontFamily: 'Poppins-Medium',
+        fontSize: 11,
+        fontFamily: 'Poppins-Bold',
         textAlign: 'center',
+        textTransform: 'uppercase', // Matches your "STORE" and "RESTAURANTS" screenshot
     },
 });
 

@@ -475,17 +475,52 @@ const CategoriesScreen = ({ navigation }) => {
             setDisplayedProducts(arr);
             return;
         }
+        let logCount = 0;
         const filtered = arr.filter((p) => {
             const vtRaw = p._raw?.vendor?.vendorType ?? p.vendor?.vendorType ?? null;
             // Normalize product vendor type to lowercase for comparison
             const vt = vtRaw != null ? String(vtRaw).trim().toLowerCase() : null;
 
-            const catRaw = p._raw?.category ?? p.category ?? (Array.isArray(p.tags) ? p.tags[0] : null);
-            const cat = catRaw != null ? String(catRaw).trim() : null;
-
             // selectedVendorType is also normalized to lowercase now
-            const matchVendor = !selectedVendorType || (vt && vt.includes(selectedVendorType)); // fuzzy match (e.g. 'restaurant' matches 'food restaurant')
-            const matchCuisine = !selectedCuisine || cat === selectedCuisine;
+            const matchVendor = !selectedVendorType || (vt && vt.includes(selectedVendorType));
+
+            // Debug first 3 failures
+            if (selectedVendorType && !matchVendor && logCount < 3) {
+                console.log(`[FilterDebug] Fail Vendor Match. Prod: ${p.name}, VT: '${vt}', Selected: '${selectedVendorType}'`);
+                logCount++;
+            }
+            // Product Category handling
+            // Check p.categories array (preferred) or p.category single value
+            const pCats = Array.isArray(p.categories) ? p.categories : (p.category ? [p.category] : []);
+            // Also check raw tags if normalized ones failed
+            const rawTags = Array.isArray(p._raw?.tags) ? p._raw.tags : [];
+            const allCats = [...new Set([...pCats, ...rawTags])];
+
+            // Robust cuisine match: check if ANY of the product's categories match the selected one (case-insensitive)
+            // selectedCuisine is likely a slug or name coming from handleCuisinePress
+            const targetCuisine = selectedCuisine ? selectedCuisine.toLowerCase().trim() : null;
+
+            const matchCuisine = !targetCuisine || allCats.some(c => {
+                if (!c) return false;
+                // If c is string
+                if (typeof c === 'string') {
+                    const s = c.toLowerCase().trim();
+                    return s === targetCuisine || s.includes(targetCuisine);
+                }
+                // If c is object (populated category)
+                if (typeof c === 'object') {
+                    const name = c.name ? c.name.toLowerCase().trim() : '';
+                    const slug = c.slug ? c.slug.toLowerCase().trim() : '';
+                    const id = c._id || c.id ? String(c._id || c.id).toLowerCase().trim() : '';
+
+                    return name === targetCuisine || name.includes(targetCuisine) ||
+                        slug === targetCuisine || slug.includes(targetCuisine) ||
+                        id === targetCuisine;
+                }
+                return false;
+            });
+
+            // Removed unsafe logging that caused crash
 
             return matchVendor && matchCuisine;
         });
@@ -556,7 +591,8 @@ const CategoriesScreen = ({ navigation }) => {
     // Use API categories if available, else fallback logic
     // Defined here to ensure vendorTypesFromProducts is available
     const displayCategories = apiCategories.length > 0 ? apiCategories : vendorTypesFromProducts;
-    console.log('[CategoriesScreen] displayCategories count:', displayCategories ? displayCategories.length : 'undefined');
+
+    console.log('[CategoriesScreen] Render. Selected:', selectedVendorType, 'ApiCats:', apiCategories.length, 'DisplayCats:', displayCategories.length);
 
     const handleVendorTypePress = React.useCallback((vendor) => {
         // Use slug (store, restaurant) for ID if available, else name
