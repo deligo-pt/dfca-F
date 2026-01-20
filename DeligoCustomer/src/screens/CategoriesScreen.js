@@ -1,10 +1,9 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, StyleSheet, Animated, ActivityIndicator, Text, TouchableOpacity, RefreshControl, StatusBar, Platform } from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { View, StyleSheet, Animated, Text, TouchableOpacity, RefreshControl, StatusBar, Platform } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { spacing } from '../theme';
 
-const STATUSBAR_HEIGHT = Platform.OS === 'android' ? StatusBar.currentHeight : 0;
 import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
 import {
@@ -14,11 +13,9 @@ import {
     SkeletonCategory,
 } from '../components';
 import GlovoBubbles from '../components/GlovoBubbles';
-import VendorType from '../components/Categories/CategoriesList';
 import Category from '../components/Categories/CuisinesList';
 import { useProducts } from '../contexts/ProductsContext';
 import StorageService from '../utils/storage';
-import mockProductsRaw from '../data/mockData.json';
 
 import OfferModal from '../components/Categories/OfferModal';
 import RestaurantsList from '../components/Categories/RestaurantsList';
@@ -28,7 +25,7 @@ import { useProfile } from '../contexts/ProfileContext';
 import formatCurrency from '../utils/currency';
 
 const CategoriesScreen = ({ navigation }) => {
-    const { colors, isDarkMode } = useTheme();
+    const { colors } = useTheme();
     const { t } = useLanguage();
     const insets = useSafeAreaInsets();
 
@@ -37,13 +34,16 @@ const CategoriesScreen = ({ navigation }) => {
         currentLocation,
         address,
         loading: locationLoading,
-        error: locationError,
         getCurrentLocation
     } = useLocation();
 
+    // Business category (API) selection
+    // selectedVendorType remains the selected business category slug (e.g. "restaurant") for backwards UI compatibility
+    const [selectedBusinessCategoryId, setSelectedBusinessCategoryId] = useState(null);
+
     const [selectedVendorType, setSelectedVendorType] = useState(null);
     const [selectedCuisine, setSelectedCuisine] = useState(null);
-    const [searchQuery, setSearchQuery] = useState('');
+    const [searchQuery] = useState('');
     const scrollY = useRef(new Animated.Value(0)).current;
 
     // Session-persistent static lists
@@ -88,25 +88,15 @@ const CategoriesScreen = ({ navigation }) => {
 
     // Modal state for offer details
     const [offerModalVisible, setOfferModalVisible] = useState(false);
-    const [selectedOffer, setSelectedOffer] = useState(null);
+    const [selectedOffer] = useState(null);
 
     // Cart counts from context
     const { cartsArray, itemCount } = useCart();
     const cartVendorsCount = (cartsArray && cartsArray.length) ? cartsArray.length : 0; // number of vendor carts
     const cartItemCount = itemCount || 0; // Use context-provided total count
 
-    // Sample offer from API - set to null to test welcome greeting
-    // Sample offer from API - set to null to test welcome greeting
-    const activeOffer = null; /* {
-        title: 'First Order Special!',
-        subtitle: 'Get 50% OFF on your first order',
-        code: 'DELIGO50',
-        discount: '50%',
-        action: 'navigate_to_offers', // or offer ID
-    }; */
-
     // Use products context for live data
-    const { products, fetchProducts, fetchBusinessCategories, fetchProductCategories, loading: productsLoading, error: productsError, lastUpdated } = useProducts();
+    const { products, fetchProducts, fetchBusinessCategories, fetchProductCategories, loading: productsLoading } = useProducts();
     const [refreshing, setRefreshing] = useState(false);
 
     // Dynamic Categories from API
@@ -206,7 +196,7 @@ const CategoriesScreen = ({ navigation }) => {
     // const [displayedProducts, setDisplayedProducts] = useState(initialMockItems || []);
     const [displayedProducts, setDisplayedProducts] = useState([]);
     // Cache TTL ms state (user selectable) - ensure it's declared before any effect or UI references
-    const [cacheTtlMs, setCacheTtlMs] = useState(5 * 60 * 1000);
+    const [, setCacheTtlMs] = useState(5 * 60 * 1000);
 
     // On mount attempt to read default cached products so we can display them instantly
     useEffect(() => {
@@ -243,11 +233,6 @@ const CategoriesScreen = ({ navigation }) => {
         })();
         return () => { mounted = false; };
     }, []);
-
-    // Featured shops derived from products (those with meta.isFeatured)
-    const featuredShops = React.useMemo(() => {
-        return (products || []).filter((p) => p._raw?.meta?.isFeatured);
-    }, [products]);
 
     // User name for personalized greeting (from auth context)
     const { user, fetchUserProfile } = useProfile();
@@ -307,22 +292,30 @@ const CategoriesScreen = ({ navigation }) => {
         return Array.from(map.values());
     }, [sourceProducts]);
 
-    // Derive cuisines from products, optionally filtered by selected vendorType
+    // Derive cuisines from products, optionally filtered by selectedVendorType
+    // NOTE: selectedVendorType is stored as business category slug (e.g. "restaurant").
+    // We'll match it against vendorType using lowercase includes.
     const cuisinesForSelectedVendor = React.useMemo(() => {
         const map = new Map();
         const arr = Array.isArray(sourceProducts) ? sourceProducts : [];
-        for (const p of arr) {
-            const vt = p.vendor?.vendorType || (p._raw?.vendor?.vendorType) || '';
 
-            if (selectedVendorType && String(vt).trim() !== selectedVendorType) continue;
+        const selected = selectedVendorType ? String(selectedVendorType).toLowerCase().trim() : null;
+
+        for (const p of arr) {
+            const vtRaw = p.vendor?.vendorType || p._raw?.vendor?.vendorType || '';
+            const vt = vtRaw ? String(vtRaw).toLowerCase().trim() : '';
+
+            if (selected && (!vt || !vt.includes(selected))) continue;
 
             const catRaw = p._raw?.category ?? p.category ?? (Array.isArray(p.tags) ? p.tags[0] : null);
             const cat = catRaw != null ? String(catRaw).trim() : null;
             if (!cat) continue;
+
             const rec = map.get(cat) || { id: cat, name: cat, restaurants: 0 };
             rec.restaurants += 1;
             map.set(cat, rec);
         }
+
         return Array.from(map.values());
     }, [sourceProducts, selectedVendorType]);
 
@@ -330,14 +323,17 @@ const CategoriesScreen = ({ navigation }) => {
     const cuisinesFromProducts = React.useMemo(() => {
         const map = new Map();
         const arr = Array.isArray(sourceProducts) ? sourceProducts : [];
+
         for (const p of arr) {
             const catRaw = p._raw?.category ?? p.category ?? (Array.isArray(p.tags) ? p.tags[0] : null);
             const cat = catRaw != null ? String(catRaw).trim() : null;
             if (!cat) continue;
+
             const rec = map.get(cat) || { id: cat, name: cat, restaurants: 0 };
             rec.restaurants += 1;
             map.set(cat, rec);
         }
+
         return Array.from(map.values());
     }, [sourceProducts]);
 
@@ -350,17 +346,15 @@ const CategoriesScreen = ({ navigation }) => {
                 const storedCuisines = await StorageService.getItem('cuisines');
                 const storedSelVendor = await StorageService.getItem('selectedVendorType');
                 const storedSelCuisine = await StorageService.getItem('selectedCuisine');
+                const storedSelBusinessId = await StorageService.getItem('selectedBusinessCategoryId');
                 if (!mounted) return;
-                // Normalize storedVendorTypes: accept ['A','B'] or [{id,name}] or {data: [...]}
+
                 const normalizeList = (input) => {
                     if (!input) return [];
                     if (Array.isArray(input)) {
-                        // array of strings -> convert
                         if (input.every(i => typeof i === 'string')) return input.map(s => ({ id: s, name: s }));
-                        // array of objects -> ensure id/name
                         return input.map(i => (typeof i === 'string' ? { id: i, name: i } : { id: i.id || i.name || String(i), name: i.name || i.id || String(i) }));
                     }
-                    // if object with data key
                     if (input && typeof input === 'object') {
                         const arr = input.data || input.items || input.list || null;
                         if (Array.isArray(arr)) return normalizeList(arr);
@@ -374,6 +368,7 @@ const CategoriesScreen = ({ navigation }) => {
                 if (normCuisines.length) setStaticCuisines(normCuisines);
                 if (storedSelVendor) setSelectedVendorType(storedSelVendor);
                 if (storedSelCuisine) setSelectedCuisine(storedSelCuisine);
+                if (storedSelBusinessId) setSelectedBusinessCategoryId(storedSelBusinessId);
             } catch (e) {
                 console.debug('Failed to load session lists', e);
             } finally {
@@ -406,12 +401,6 @@ const CategoriesScreen = ({ navigation }) => {
 
     // Use the static lists if available, otherwise fall back to computed lists
     const vendorTypes = Array.isArray(staticVendorTypes) && staticVendorTypes.length ? staticVendorTypes : (Array.isArray(vendorTypesFromProducts) ? vendorTypesFromProducts : []);
-    // When a vendorType is selected, show cuisines filtered to that vendor; else show all cuisines
-    const cuisines = (selectedVendorType ? cuisinesForSelectedVendor : (Array.isArray(staticCuisines) && staticCuisines.length ? staticCuisines : (Array.isArray(cuisinesFromProducts) ? cuisinesFromProducts : [])));
-
-    // Debug values (now safe because cuisines is defined)
-    const debugVendorTypes = Array.isArray(vendorTypes) ? vendorTypes.map(v => v?.name || '').filter(Boolean).slice(0, 5).join(', ') : '';
-    const debugCuisines = Array.isArray(cuisines) ? cuisines.map(c => c?.name || '').filter(Boolean).slice(0, 5).join(', ') : '';
 
     // Load persisted TTL preference
     useEffect(() => {
@@ -428,99 +417,54 @@ const CategoriesScreen = ({ navigation }) => {
         return () => { mounted = false; };
     }, []);
 
-    const formatAgo = (ts) => {
-        if (!ts) return 'never';
-        const sec = Math.floor((Date.now() - ts) / 1000);
-        if (sec < 60) return `${sec}${t('sAgo')}`;
-        const min = Math.floor(sec / 60);
-        if (min < 60) return `${min}${t('mAgo')}`;
-        const hr = Math.floor(min / 60);
-        return `${hr}${t('hAgo')}`;
-    };
-
-    const setTtl = async (ms) => {
-        try {
-            await StorageService.setItem('PRODUCTS_CACHE_TTL_MS', ms);
-            setCacheTtlMs(ms);
-        } catch (e) {
-            console.debug('Failed to persist TTL', e);
-        }
-    };
-
-    const clearProductCache = async () => {
-        try {
-            setRefreshing(true);
-            await StorageService.removeKeysByPrefix('productsCache:');
-            // force refresh
-            await fetchProducts({ page: 1, force: true });
-        } catch (e) {
-            console.debug('Failed to clear product cache', e);
-        } finally {
-            setRefreshing(false);
-        }
-    };
-
-    // Persist user selections in session
+    // Persist user selections in session storage
     const persistSelection = async (key, value) => {
         try {
-            // store null as null, strings as-is
             await StorageService.setItem(key, value === null ? null : value);
-        } catch (e) { console.debug('Failed to persist selection', key, e); }
+        } catch (e) {
+            console.debug('Failed to persist selection', key, e);
+        }
     };
-
-    // Debounced search -> trigger context fetch (ONLY on search query change)
-    // Category/Cuisine filtering is done client-side for instant response
-    // Old search effect removed in favor of handleSearch logic
-
 
     // Keep displayedProducts in sync with sourceProducts and current filters (normalized comparisons)
     useEffect(() => {
         const arr = Array.isArray(sourceProducts) ? sourceProducts : [];
-        // REMOVED early return: if (arr.length === 0) return; 
-        // We MUST update displayedProducts even if arr is empty (to clear the list)
 
         // If no filters selected, show all
         if (!selectedVendorType && !selectedCuisine) {
             setDisplayedProducts(arr);
             return;
         }
+
         let logCount = 0;
         const filtered = arr.filter((p) => {
             const vtRaw = p._raw?.vendor?.vendorType ?? p.vendor?.vendorType ?? null;
-            // Normalize product vendor type to lowercase for comparison
             const vt = vtRaw != null ? String(vtRaw).trim().toLowerCase() : null;
 
-            // selectedVendorType is also normalized to lowercase now
             const matchVendor = !selectedVendorType || (vt && vt.includes(selectedVendorType));
 
-            // Debug first 3 failures
             if (selectedVendorType && !matchVendor && logCount < 3) {
                 console.log(`[FilterDebug] Fail Vendor Match. Prod: ${p.name}, VT: '${vt}', Selected: '${selectedVendorType}'`);
                 logCount++;
             }
+
             // Product Category handling
-            // Check p.categories array (preferred) or p.category single value
             const pCats = Array.isArray(p.categories) ? p.categories : (p.category ? [p.category] : []);
-            // Also check raw tags if normalized ones failed
             const rawTags = Array.isArray(p._raw?.tags) ? p._raw.tags : [];
             const allCats = [...new Set([...pCats, ...rawTags])];
 
-            // Robust cuisine match: check if ANY of the product's categories match the selected one (case-insensitive)
-            // selectedCuisine is likely a slug or name coming from handleCuisinePress
-            const targetCuisine = selectedCuisine ? selectedCuisine.toLowerCase().trim() : null;
+            const targetCuisine = selectedCuisine ? String(selectedCuisine).toLowerCase().trim() : null;
 
             const matchCuisine = !targetCuisine || allCats.some(c => {
                 if (!c) return false;
-                // If c is string
                 if (typeof c === 'string') {
                     const s = c.toLowerCase().trim();
                     return s === targetCuisine || s.includes(targetCuisine);
                 }
-                // If c is object (populated category)
                 if (typeof c === 'object') {
                     const name = c.name ? c.name.toLowerCase().trim() : '';
                     const slug = c.slug ? c.slug.toLowerCase().trim() : '';
-                    const id = c._id || c.id ? String(c._id || c.id).toLowerCase().trim() : '';
+                    const id = (c._id || c.id) ? String(c._id || c.id).toLowerCase().trim() : '';
 
                     return name === targetCuisine || name.includes(targetCuisine) ||
                         slug === targetCuisine || slug.includes(targetCuisine) ||
@@ -529,36 +473,87 @@ const CategoriesScreen = ({ navigation }) => {
                 return false;
             });
 
-            // Removed unsafe logging that caused crash
-
             return matchVendor && matchCuisine;
         });
 
         setDisplayedProducts(filtered);
     }, [sourceProducts, selectedVendorType, selectedCuisine]);
 
-    // --- NEW: produce a deduplicated + sorted list by vendorName ---
-    // This ensures the restaurants list shows one entry per vendor (keyed by vendorName) and is sorted by vendorName.
+    // Small helper: convert a product into a vendor-shaped object for RestaurantCard.
+    const toVendorCard = React.useCallback((p) => {
+        if (!p) return null;
+        const raw = p._raw || p;
+        const vendorIdObj = (raw.vendorId && typeof raw.vendorId === 'object') ? raw.vendorId : null;
+
+        // vendor info can be in multiple places depending on API response / normalization
+        const vendorMerged = {
+            ...(raw.vendor || {}),
+            ...(vendorIdObj || {}),
+            ...(p.vendor || {}),
+        };
+
+        const businessDetails = vendorMerged.businessDetails || {};
+        const businessLocation = vendorMerged.businessLocation || {};
+        const documents = vendorMerged.documents || {};
+
+        const vendorId = vendorMerged._id || vendorMerged.id || vendorMerged.vendorId || raw.vendorId || p.vendor?.id || null;
+        if (!vendorId) return null;
+
+        const vendorName =
+            vendorMerged.vendorName ||
+            businessDetails.businessName ||
+            vendorMerged.businessName ||
+            'Unknown';
+
+        const storePhoto = documents.storePhoto || vendorMerged.storePhoto || vendorMerged.logo || null;
+
+        return {
+            id: String(vendorId),
+            // RestaurantCard prefers `restaurant.vendor` + also falls back to restaurant._raw.vendorId
+            vendor: {
+                id: String(vendorId),
+                vendorName,
+                storePhoto,
+                rating: vendorMerged.rating,
+                vendorType: vendorMerged.businessType || businessDetails.businessType || vendorMerged.vendorType,
+                latitude: vendorMerged.latitude ?? businessLocation.latitude,
+                longitude: vendorMerged.longitude ?? businessLocation.longitude,
+                city: vendorMerged.city,
+                address: vendorMerged.address,
+                businessDetails,
+                businessLocation,
+                documents,
+            },
+            // Keep minimal raw structure for RestaurantCard fallbacks
+            _raw: {
+                vendor: vendorMerged,
+                vendorId: vendorIdObj || vendorMerged,
+                tags: raw.tags || p.tags || [],
+                images: raw.images || p.images || [],
+                rating: raw.rating || p.rating,
+            },
+            name: vendorName,
+        };
+    }, []);
+
+    // --- NEW: produce a deduplicated + sorted list by vendorId (not vendorName) ---
+    // This ensures the restaurants list shows one entry per vendor and displays vendor info.
     const displayedByVendor = React.useMemo(() => {
         try {
             const arr = Array.isArray(displayedProducts) ? displayedProducts : [];
             const map = new Map();
             for (const p of arr) {
-                const vendorName = (p && (p._raw?.vendor?.vendorName || p.vendor?.vendorName || p.name)) || '';
-                const key = String(vendorName || '').trim().toLowerCase();
-                if (!map.has(key)) {
-                    // ensure the item exposes a consistent `name` used for sorting/display
-                    const item = { ...p, name: vendorName || (p && p.name) || '' };
-                    map.set(key, item);
-                }
+                const card = toVendorCard(p);
+                if (!card) continue;
+                if (!map.has(card.id)) map.set(card.id, card);
             }
+
             const list = Array.from(map.values());
-            console.log(`[CategoriesScreen] Sorting ${list.length} items by distance...`);
 
             // Helper: Haversine Distance Calculation
             const getDistance = (lat1, lon1, lat2, lon2) => {
                 if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
-                const R = 6371; // Radius of the earth in km
+                const R = 6371;
                 const dLat = (lat2 - lat1) * (Math.PI / 180);
                 const dLon = (lon2 - lon1) * (Math.PI / 180);
                 const a =
@@ -566,66 +561,124 @@ const CategoriesScreen = ({ navigation }) => {
                     Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
                     Math.sin(dLon / 2) * Math.sin(dLon / 2);
                 const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-                return R * c; // Distance in km
+                return R * c;
             };
 
             const userLat = currentLocation?.latitude;
             const userLng = currentLocation?.longitude;
 
             list.sort((a, b) => {
-                // Get vendor coords
-                const latA = a._raw?.vendor?.latitude || a.vendor?.latitude;
-                const lngA = a._raw?.vendor?.longitude || a.vendor?.longitude;
-                const latB = b._raw?.vendor?.latitude || b.vendor?.latitude;
-                const lngB = b._raw?.vendor?.longitude || b.vendor?.longitude;
+                const latA = a.vendor?.latitude;
+                const lngA = a.vendor?.longitude;
+                const latB = b.vendor?.latitude;
+                const lngB = b.vendor?.longitude;
 
                 const distA = getDistance(userLat, userLng, latA, lngA);
                 const distB = getDistance(userLat, userLng, latB, lngB);
-
-                // Sort ascending (nearest first)
                 if (distA !== distB) return distA - distB;
-
-                return (String(a.name || '').localeCompare(String(b.name || '')));
+                return String(a.name || '').localeCompare(String(b.name || ''));
             });
-            console.log(`[CategoriesScreen] displayedByVendor count: ${list.length}`);
+
             return list;
         } catch (e) {
-            console.warn('[CategoriesScreen] Sort error:', e);
-            // On any unexpected shape issues, fall back to raw displayedProducts
-            // Deduplicate even in fallback to avoid crash
-            return Array.isArray(displayedProducts) ? displayedProducts : [];
+            console.warn('[CategoriesScreen] Vendor list build error:', e);
+            return [];
         }
-    }, [displayedProducts, currentLocation]);
+    }, [displayedProducts, currentLocation, toVendorCard]);
+
+    // --- API Product Categories filtered by selected Business Category ---
+    const productCategoriesForBusiness = React.useMemo(() => {
+        const arr = Array.isArray(apiProductCategories) ? apiProductCategories : [];
+        if (!selectedBusinessCategoryId) return [];
+        return arr.filter((c) => {
+            const bid = c?.businessCategoryId;
+            return bid && String(bid) === String(selectedBusinessCategoryId);
+        });
+    }, [apiProductCategories, selectedBusinessCategoryId]);
+
+    // --- Vendors list should be derived from products under selected business + selected product category ---
+    // We intentionally dedupe by vendorId (not vendorName) to avoid merging different vendors with same name.
+    const filteredVendors = React.useMemo(() => {
+        const arr = Array.isArray(sourceProducts) ? sourceProducts : [];
+
+        // If user hasn't chosen business + product category yet, keep existing behaviour
+        if (!selectedBusinessCategoryId && !selectedCuisine) {
+            return displayedByVendor;
+        }
+
+        const businessSlug = selectedVendorType ? String(selectedVendorType).toLowerCase().trim() : null;
+        const cuisineSlug = selectedCuisine ? String(selectedCuisine).toLowerCase().trim() : null;
+
+        const vendorMap = new Map();
+        for (const p of arr) {
+            const vtRaw = p._raw?.vendor?.vendorType ?? p.vendor?.vendorType ?? '';
+            const vt = vtRaw ? String(vtRaw).toLowerCase().trim() : '';
+            if (businessSlug && (!vt || !vt.includes(businessSlug))) continue;
+
+            if (cuisineSlug) {
+                const pCats = Array.isArray(p.categories) ? p.categories : (p.category ? [p.category] : []);
+                const rawTags = Array.isArray(p._raw?.tags) ? p._raw.tags : [];
+                const allCats = [...new Set([...pCats, ...rawTags])];
+
+                const matchesCuisine = allCats.some(c => {
+                    if (!c) return false;
+                    if (typeof c === 'string') {
+                        const s = c.toLowerCase().trim();
+                        return s === cuisineSlug || s.includes(cuisineSlug);
+                    }
+                    if (typeof c === 'object') {
+                        const name = c.name ? c.name.toLowerCase().trim() : '';
+                        const slug = c.slug ? c.slug.toLowerCase().trim() : '';
+                        const id = (c._id || c.id) ? String(c._id || c.id).toLowerCase().trim() : '';
+                        return name === cuisineSlug || name.includes(cuisineSlug) ||
+                            slug === cuisineSlug || slug.includes(cuisineSlug) ||
+                            id === cuisineSlug;
+                    }
+                    return false;
+                });
+                if (!matchesCuisine) continue;
+            }
+
+            const card = toVendorCard(p);
+            if (!card) continue;
+            if (!vendorMap.has(card.id)) vendorMap.set(card.id, card);
+        }
+
+        return Array.from(vendorMap.values());
+    }, [sourceProducts, selectedBusinessCategoryId, selectedVendorType, selectedCuisine, displayedByVendor, toVendorCard]);
 
     // Use API categories if available, else fallback logic
     // Defined here to ensure vendorTypesFromProducts is available
     const displayCategories = apiCategories.length > 0 ? apiCategories : vendorTypesFromProducts;
 
-    console.log('[CategoriesScreen] Render. Selected:', selectedVendorType, 'ApiCats:', apiCategories.length, 'DisplayCats:', displayCategories.length);
+    console.log('[CategoriesScreen] Render. Selected:', selectedVendorType, 'SelectedBusinessId:', selectedBusinessCategoryId, 'ApiCats:', apiCategories.length, 'DisplayCats:', displayCategories.length);
 
     const handleVendorTypePress = React.useCallback((vendor) => {
-        // Use slug (store, restaurant) for ID if available, else name
-        const rawId = vendor.slug || vendor.name;
-        // Ensure consistent casing for comparison (API slugs usually lowercase)
-        const vendorId = rawId ? rawId.toLowerCase() : null;
+        // Business category from API includes both slug and id.
+        const rawSlug = vendor?.slug || vendor?.name;
+        const vendorSlug = rawSlug ? String(rawSlug).toLowerCase().trim() : null;
 
-        // toggle logic
-        const newSel = (selectedVendorType && selectedVendorType.toLowerCase()) === vendorId ? null : vendorId;
+        const vendorId = vendor?._id || vendor?.id || null;
 
-        setSelectedVendorType(newSel); // set normalized lowercase value
+        const isSame = (selectedVendorType && selectedVendorType.toLowerCase()) === vendorSlug;
+        const newSel = isSame ? null : vendorSlug;
 
-        // If unselecting vendor, also unselect cuisine
-        if (newSel === null) setSelectedCuisine(null);
+        setSelectedVendorType(newSel);
+        setSelectedBusinessCategoryId(isSame ? null : vendorId);
+
+        // Changing business category resets product category
+        if (!newSel) setSelectedCuisine(null);
+        if (newSel) setSelectedCuisine(null);
 
         persistSelection('selectedVendorType', newSel);
-        if (newSel === null) persistSelection('selectedCuisine', null);
+        persistSelection('selectedBusinessCategoryId', isSame ? null : vendorId);
+        persistSelection('selectedCuisine', null);
     }, [selectedVendorType]);
 
     const handleCuisinePress = React.useCallback((cuisine) => {
-        // use slug or name for flexible matching
-        const val = cuisine.slug || cuisine.name;
-        // toggle
-        const newVal = selectedCuisine === val ? null : val;
+        // For API product categories, slug is stable. Fallback to name.
+        const val = cuisine?.slug || cuisine?.name;
+        const newVal = (selectedCuisine && val && String(selectedCuisine).toLowerCase().trim() === String(val).toLowerCase().trim()) ? null : val;
 
         setSelectedCuisine(newVal);
         persistSelection('selectedCuisine', newVal);
@@ -653,7 +706,12 @@ const CategoriesScreen = ({ navigation }) => {
     const handleRefresh = async () => {
         try {
             setRefreshing(true);
-            await fetchProducts({ page: 1, vendorType: selectedVendorType || undefined, category: selectedCuisine || undefined, force: true });
+            await fetchProducts({
+                page: 1,
+                vendorType: selectedVendorType || undefined,
+                category: selectedCuisine || undefined,
+                force: true
+            });
         } catch (e) {
             console.debug('handleRefresh failed', e);
         } finally {
@@ -673,30 +731,13 @@ const CategoriesScreen = ({ navigation }) => {
         navigation.navigate('LocationAddress');
     };
 
-    const handleOfferPress = (offer) => {
-        console.log('🎉 OFFER PRESSED:', offer);
-        setSelectedOffer(offer);
-        setOfferModalVisible(true);
-    };
-
-    const handleShopPress = (shop) => {
-        console.log('🏪 SHOP PRESSED:', shop);
-        if (shop === 'all') {
-            // Navigate to all featured restaurants
-            console.log('View all featured restaurants');
-            // navigation.navigate('FeaturedRestaurants');
-        } else {
-            // Navigate to specific restaurant
-            navigation.navigate('RestaurantDetails', { restaurant: shop });
-        }
-    };
-
     const prevNonEmptyRef = useRef([]);
     useEffect(() => {
-        if (Array.isArray(displayedProducts) && displayedProducts.length > 0) {
-            prevNonEmptyRef.current = displayedProducts;
+        // Cache last non-empty VENDOR LIST (not product list) to prevent jumping UI
+        if (Array.isArray(displayedByVendor) && displayedByVendor.length > 0) {
+            prevNonEmptyRef.current = displayedByVendor;
         }
-    }, [displayedProducts]);
+    }, [displayedByVendor]);
 
     // State to manage sticky header interactivity (pointerEvents)
     const [isStickyVisible, setIsStickyVisible] = useState(false);
@@ -796,30 +837,45 @@ const CategoriesScreen = ({ navigation }) => {
                         selectedId={selectedVendorType}
                     />
 
-                    {/* Categories Section - Dynamic from API based on vendor type */}
+                    {/* Categories Section - filtered by selected Business Category */}
                     <SectionHeader
                         title={selectedVendorType ? t('categories') : t('browseByCategory')}
                         showSeeAll={false}
                     />
-                    <Category
-                        cuisines={apiProductCategories.length > 0 ? apiProductCategories : dynamicCategories}
-                        selectedCuisine={selectedCuisine}
-                        onPress={handleCuisinePress}
-                    />
+
+                    {selectedBusinessCategoryId && productCategoriesForBusiness.length === 0 ? (
+                        <View style={styles(colors).noResultsContainer}>
+                            <Text style={styles(colors).noResultsText}>{t('noProductCategoriesAdded') || 'No product categories has added'}</Text>
+                        </View>
+                    ) : (
+                        <Category
+                            cuisines={selectedBusinessCategoryId ? productCategoriesForBusiness : (apiProductCategories.length > 0 ? apiProductCategories : dynamicCategories)}
+                            selectedCuisine={selectedCuisine}
+                            onPress={handleCuisinePress}
+                        />
+                    )}
 
                     {/* Results Section */}
                     <SectionHeader
                         title={searchQuery ? `${t('searchResults')} (${(products || []).length})` : t('nearYou')}
                         onSeeAll={!searchQuery ? () => navigation.navigate('SeeAll', {
-                            allItems: sourceProducts,  // ALL products (unfiltered)
-                            vendorTypes: vendorTypes,  // For filter chips
-                            availableCuisines: cuisinesFromProducts,  // All cuisines
+                            allItems: sourceProducts,
+                            vendorTypes: vendorTypes,
+                            availableCuisines: cuisinesFromProducts,
                             title: t('nearYou')
                         }) : undefined}
                     />
+
                     {productsLoading && (!displayedProducts || displayedProducts.length === 0) ? (
                         <SkeletonCategory />
+                    ) : (selectedBusinessCategoryId && selectedCuisine && filteredVendors.length === 0) ? (
+                        <View style={styles(colors).noResultsContainer}>
+                            <Text style={styles(colors).noResultsText}>{t('noVendorsFound') || 'No vendor is for that business categories'}</Text>
+                        </View>
+                    ) : (filteredVendors.length > 0) ? (
+                        <RestaurantsList restaurants={filteredVendors} onPress={handleRestaurantPress} searchQuery={searchQuery} disableScroll={true} />
                     ) : (displayedByVendor.length > 0) ? (
+                        // Default: always show vendors (deduped) when no strict filter has produced a vendor list
                         <RestaurantsList restaurants={displayedByVendor} onPress={handleRestaurantPress} searchQuery={searchQuery} disableScroll={true} />
                     ) : (prevNonEmptyRef.current.length > 0 && (selectedVendorType || selectedCuisine)) ? (
                         <RestaurantsList restaurants={prevNonEmptyRef.current} onPress={handleRestaurantPress} searchQuery={searchQuery} disableScroll={true} />
@@ -841,8 +897,10 @@ const CategoriesScreen = ({ navigation }) => {
                                 <TouchableOpacity
                                     onPress={() => {
                                         setSelectedVendorType(null);
+                                        setSelectedBusinessCategoryId(null);
                                         setSelectedCuisine(null);
                                         persistSelection('selectedVendorType', null);
+                                        persistSelection('selectedBusinessCategoryId', null);
                                         persistSelection('selectedCuisine', null);
                                     }}
                                     style={styles(colors).clearFiltersButton}

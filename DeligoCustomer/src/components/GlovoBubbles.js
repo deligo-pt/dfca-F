@@ -1,114 +1,92 @@
 import React from 'react';
-import {
-    View,
-    Text,
-    TouchableOpacity,
-    StyleSheet,
-    Dimensions,
-    Image,
-} from 'react-native';
+import { View, Text, TouchableOpacity, Image, StyleSheet, Dimensions } from 'react-native';
 import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
-import { fontSize, spacing } from '../theme';
 
 const { width } = Dimensions.get('window');
 
-// -------- helpers --------
-const getFallbackIcon = (category) => {
-    const name = (category.name || category.slug || category.id || '').toLowerCase();
-    if (name.includes('restaurant') || name.includes('food')) return '🍕';
-    if (name.includes('store') || name.includes('grocery') || name.includes('shop')) return '🛒';
-    if (name.includes('pharmacy')) return '💊';
-    if (name.includes('coffee') || name.includes('cafe')) return '☕';
-    return '🏪';
-};
-
-// -------- item --------
 const BubbleItem = ({ category, selectedId, onPress, colors }) => {
     const [imageError, setImageError] = React.useState(false);
 
-    const isSelected =
-        selectedId === category.id ||
-        selectedId === category.slug ||
-        (selectedId &&
-            category.name &&
-            selectedId.toLowerCase() === category.name.toLowerCase());
+    // Dynamic checks
+    const isSelected = selectedId === category.slug || selectedId === category.id;
 
-    const rawIcon = category.icon || category.image;
-    const isImage =
-        typeof rawIcon === 'string' &&
-        rawIcon.startsWith('http') &&
-        rawIcon.length > 15 &&
-        !imageError;
+    // Safety check for category object
+    if (!category) return null;
 
-    const fallbackIcon = getFallbackIcon(category);
+    const displayName = category.name || '';
+    const iconUrl = category.image || category.icon || null;
+
+    // Determine background color
+    const backgroundColor = isSelected ? colors.primaryLight : colors.surface;
+    const textColor = isSelected ? colors.white : colors.text.primary;
+    const iconColor = isSelected ? colors.white : colors.primary;
+
+    // Helper to determine if we should show image or text icon
+    const isImage = iconUrl && !imageError && (typeof iconUrl === 'string' && (iconUrl.startsWith('http') || iconUrl.startsWith('file')));
+    const isEmoji = !isImage && typeof iconUrl === 'string' && iconUrl.match(/\p{Emoji}/u);
+
+    // If no icon/image, use first letter
+    const fallbackLetter = displayName.charAt(0).toUpperCase();
 
     return (
         <TouchableOpacity
             style={styles.bubbleContainer}
-            activeOpacity={0.75}
-            onPress={() => onPress(category)}
+            onPress={() => onPress && onPress(category)}
+            activeOpacity={0.7}
         >
-            <View
-                style={[
-                    styles.bubbleCircle,
-                    {
-                        backgroundColor: isSelected ? '#FFF' : '#F3F4F6',
-                        // Add a subtle border to unselected so it's visible
-                        borderWidth: isSelected ? 2 : 1,
-                        borderColor: isSelected ? colors.primary : '#E5E7EB'
-                    },
-                ]}
-            >
+            <View style={[
+                styles.bubbleCircle,
+                {
+                    backgroundColor: backgroundColor,
+                    borderColor: isSelected ? colors.primary : colors.border,
+                    borderWidth: isSelected ? 0 : 1
+                }
+            ]}>
                 {isImage ? (
                     <Image
-                        source={{ uri: rawIcon }}
-                        style={[
-                            styles.bubbleImage,
-                            // If selected, we shrink it a bit like in your screenshot
-                            // If unselected, it fills the circle but gets clipped by overflow:hidden
-                            isSelected ? { width: '60%', height: '60%' } : { width: '100%', height: '100%' }
-                        ]}
-                        resizeMode={isSelected ? "contain" : "cover"}
+                        source={{ uri: iconUrl }}
+                        style={styles.bubbleImage}
                         onError={() => setImageError(true)}
+                        resizeMode="cover"
                     />
                 ) : (
-                    <Text style={styles.bubbleIcon}>{fallbackIcon}</Text>
+                    <Text style={[styles.bubbleEmoji, { fontSize: isEmoji ? 24 : 20, color: iconColor }]}>
+                        {isEmoji ? iconUrl : fallbackLetter}
+                    </Text>
                 )}
             </View>
-
             <Text
                 numberOfLines={1}
-                style={[
-                    styles.bubbleLabel,
-                    { color: colors.text.primary },
-                    isSelected && {
-                        color: colors.primary,
-                        fontFamily: 'Poppins-Bold',
-                    },
-                ]}
+                style={[styles.bubbleText, { color: isSelected ? colors.primary : colors.text.secondary, fontWeight: isSelected ? '700' : '500' }]}
             >
-                {category.name}
+                {displayName}
             </Text>
         </TouchableOpacity>
     );
 };
 
-// -------- main --------
 const GlovoBubbles = ({ categories, onPress, selectedId }) => {
     const { colors } = useTheme();
+    // Intentionally unused if not needed, but keeping hook call stable
     const { t } = useLanguage();
 
-    if (!categories?.length) return null;
+    // Ensure we have an array
+    const data = Array.isArray(categories) ? categories : [];
+
+    if (data.length === 0) {
+        return null;
+    }
 
     return (
         <View style={styles.container}>
-            <Text style={[styles.title, { color: colors.text.primary }]}>
-                {t('whatDoYouNeed') || "What's on your mind?"}
-            </Text>
-
+            <View style={styles.header}>
+                <Text style={[styles.title, { color: colors.text.primary }]}>
+                    {t('exploreCategories') || 'Explore Categories'}
+                </Text>
+            </View>
             <View style={styles.grid}>
-                {categories.map((category, index) => (
+                {data.map((category, index) => (
                     <BubbleItem
                         key={category.id || category.slug || index}
                         category={category}
@@ -122,58 +100,61 @@ const GlovoBubbles = ({ categories, onPress, selectedId }) => {
     );
 };
 
-// -------- styles --------
-const CIRCLE_SIZE = 75; // Increased slightly to match your screenshot better
-
 const styles = StyleSheet.create({
     container: {
-        paddingHorizontal: spacing.md,
-        marginTop: spacing.md,
+        paddingVertical: 15,
+        paddingHorizontal: 15,
+    },
+    header: {
+        marginBottom: 10,
+        paddingHorizontal: 5
     },
     title: {
-        fontSize: fontSize.lg,
-        fontFamily: 'Poppins-Bold',
-        marginBottom: spacing.md,
+        fontSize: 18,
+        fontWeight: 'bold',
+        textAlign: 'left',
     },
     grid: {
         flexDirection: 'row',
         flexWrap: 'wrap',
         justifyContent: 'flex-start',
-        gap: 15,
     },
     bubbleContainer: {
-        width: 85,
+        width: (width - 40) / 4, // 4 items per row roughly
         alignItems: 'center',
-        marginBottom: 16,
+        marginBottom: 15,
     },
     bubbleCircle: {
-        width: CIRCLE_SIZE,
-        height: CIRCLE_SIZE,
-        borderRadius: CIRCLE_SIZE / 2, // THIS MAKES IT A CIRCLE
-        overflow: 'hidden',           // THIS CLIPS THE IMAGE INSIDE TO THE CIRCLE
-        alignItems: 'center',
+        width: 65,
+        height: 65,
+        borderRadius: 32.5,
         justifyContent: 'center',
+        alignItems: 'center',
         marginBottom: 8,
-        // Optional shadows
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 2 },
-        shadowOpacity: 0.05,
-        shadowRadius: 2,
-        elevation: 2,
-    },
-    bubbleIcon: {
-        fontSize: 32,
+        // Shadow for depth
+        shadowColor: "#000",
+        shadowOffset: {
+            width: 0,
+            height: 2,
+        },
+        shadowOpacity: 0.1,
+        shadowRadius: 3.84,
+        elevation: 3,
     },
     bubbleImage: {
-        width: '100%',
-        height: '100%',
+        width: '60%',
+        height: '60%',
+        borderRadius: 10, // Slight rounding for icons
     },
-    bubbleLabel: {
-        fontSize: 11,
-        fontFamily: 'Poppins-Bold',
+    bubbleEmoji: {
         textAlign: 'center',
-        textTransform: 'uppercase', // Matches your "STORE" and "RESTAURANTS" screenshot
     },
+    bubbleText: {
+        fontSize: 12,
+        textAlign: 'center',
+        width: '100%',
+        paddingHorizontal: 2
+    }
 });
 
 export default GlovoBubbles;

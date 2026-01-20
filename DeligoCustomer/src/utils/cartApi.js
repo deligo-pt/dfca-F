@@ -68,23 +68,21 @@ class CartAPI {
           // The previous logic forced SKU. Now we trust the passed ID (sku variable matches productId) 
           // but we still check for regex to be safe if that's what was passed.
 
-          if (/^PROD-/i.test(sku)) {
-            // SKU format passed
-            console.debug('[CartAPI] Using SKU format:', sku);
-            return { productId: sku, quantity: it.quantity };
-          } else if (isValidObjectId(sku)) {
-            // Mongo ID passed
-            console.debug('[CartAPI] Using Mongo ID:', sku);
-            return { productId: sku, quantity: it.quantity };
-          } else if (internal) {
-            // Internal ID fallback
-            console.debug('[CartAPI] Using internal ID:', internal);
-            return { productId: internal, quantity: it.quantity };
-          } else {
-            // Fallback
-            console.debug('[CartAPI] Using fallback ID:', sku);
-            return { productId: sku, quantity: it.quantity };
+          // Construct payload with variantName if present
+          const payload = {
+            productId: sku || internal,
+            quantity: it.quantity
+          };
+
+          if (it.variantName) {
+            payload.variantName = it.variantName;
           }
+          if (it.options) {
+            payload.options = it.options;
+          }
+
+          console.debug('[CartAPI] Item payload:', payload);
+          return payload;
         });
       if (!preparedItems.length) {
         console.error('[CartAPI][cart:id-debug] no usable productIds in payload');
@@ -120,19 +118,26 @@ class CartAPI {
    * @param {string} action - 'increment' or 'decrement'
    * @returns {Promise}
    */
-  static async activateItem(productId, quantity, action = 'increment') {
+  static async activateItem(productId, quantity, action = 'increment', variantName = null) {
     try {
       // IMPORTANT: Use UPDATE_QUANTITY endpoint, not ACTIVATE_ITEM
       // ACTIVATE_ITEM is for toggling active/inactive (Boolean), not for quantity updates
       const url = `${BASE_API_URL}${API_ENDPOINTS.CART.UPDATE_QUANTITY}`;
       const headers = await this.getHeaders();
 
-      console.debug('[CartAPI] PATCH', url, { productId, quantity, action });
+      const payload = { productId, quantity, action };
+
+      // Include variantName if provided (required for products with variations)
+      if (variantName) {
+        payload.variantName = variantName;
+      }
+
+      console.debug('[CartAPI] PATCH', url, payload);
 
       const response = await fetch(url, {
         method: 'PATCH',
         headers,
-        body: JSON.stringify({ productId, quantity, action }),
+        body: JSON.stringify(payload),
       });
 
       const responseData = await response.json();
@@ -155,20 +160,34 @@ class CartAPI {
 
   /**
    * Delete items from cart
-   * @param {Array} productIds - Array of product IDs to delete
+   * @param {Array} items - Array of product IDs (strings) or objects with { productId, variantName }
    * @returns {Promise}
    */
-  static async deleteItems(productIds) {
+  static async deleteItems(items) {
     try {
       const url = `${BASE_API_URL}${API_ENDPOINTS.CART.DELETE_ITEM}`;
       const headers = await this.getHeaders();
 
-      console.debug('[CartAPI] DELETE', url, { productId: productIds });
+      // Transform input into array of objects with productId (and optional variantName)
+      const payload = Array.isArray(items)
+        ? items.map(item => {
+          if (typeof item === 'string') {
+            return { productId: item };
+          } else if (item && typeof item === 'object') {
+            const obj = { productId: item.productId || item.id };
+            if (item.variantName) obj.variantName = item.variantName;
+            return obj;
+          }
+          return { productId: item };
+        })
+        : [typeof items === 'string' ? { productId: items } : items];
+
+      console.debug('[CartAPI] DELETE', url, payload);
 
       const response = await fetch(url, {
         method: 'DELETE',
         headers,
-        body: JSON.stringify({ productId: productIds }),
+        body: JSON.stringify(payload),
       });
 
       const responseData = await response.json();

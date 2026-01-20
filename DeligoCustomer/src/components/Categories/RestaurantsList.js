@@ -6,13 +6,11 @@ import {
 
 import RestaurantCard from '../RestaurantCard';
 import { spacing } from '../../theme';
-import { useProducts } from '../../contexts/ProductsContext';
 
 export function RestaurantsList({ restaurants = [], onPress = () => {}, searchQuery: _searchQuery = '', disableScroll = false }) {
-    const { products: ctxProducts } = useProducts();
-
-    // Prefer passed-in restaurants prop, otherwise use context products
-    const data = (restaurants && restaurants.length) ? restaurants : (ctxProducts || []);
+    // IMPORTANT: this component should render ONLY the provided list.
+    // Falling back to context products causes "all products" to show when a vendor list is empty.
+    const data = Array.isArray(restaurants) ? restaurants : [];
 
     const renderItem = ({ item }) => (
         <RestaurantCard
@@ -20,9 +18,6 @@ export function RestaurantsList({ restaurants = [], onPress = () => {}, searchQu
             onPress={() => onPress(item)}
         />
     );
-
-    // Don't show loading/error states here - let parent handle them with skeleton
-    // This prevents flickering when switching filters
 
     // If this list is being rendered inside another vertical ScrollView, avoid nesting a FlatList.
     if (disableScroll) {

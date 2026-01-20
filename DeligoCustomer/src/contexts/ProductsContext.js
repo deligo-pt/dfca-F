@@ -55,8 +55,10 @@ export function normalizeProduct(p) {
   let vendorType = vendorSource.businessType || businessDetails.businessType || vendorSource.vendorType || '';
 
   // Just trim and uppercase, do NOT merge different spellings as per user request
+  // FIX: Explicitly correct API typo "RESTAURENT" -> "RESTAURANT"
   if (vendorType) {
     vendorType = String(vendorType).toUpperCase().trim();
+    if (vendorType === 'RESTAURENT') vendorType = 'RESTAURANT';
   }
 
   const vendorRating = (vendorSource.rating && typeof vendorSource.rating === 'number') ? vendorSource.rating : 0;
@@ -622,10 +624,12 @@ export const ProductsProvider = ({ children }) => {
 
       return items.map(item => ({
         id: item._id,
+        _id: item._id, // Keep _id just in case
         name: item.name,
         slug: item.slug,
         icon: item.icon, // URL
         image: item.icon, // For compatibility with CuisineChip
+        businessCategoryId: item.businessCategoryId, // REQUIRED for filtering
         isActive: item.isActive
       }));
     } catch (err) {

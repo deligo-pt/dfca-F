@@ -30,6 +30,7 @@ import { useLanguage } from '../utils/LanguageContext';
 import { useCart } from '../contexts/CartContext';
 import formatCurrency from '../utils/currency';
 import * as Location from 'expo-location';
+import AlertModal from '../components/AlertModal';
 
 const RestaurantDetailsScreen = ({ route, navigation }) => {
   const { colors, isDarkMode } = useTheme();
@@ -53,6 +54,10 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const [searchQuery, setSearchQuery] = useState('');
   const { addItem, updateQuantity: cartUpdateQuantity, itemsMap } = useCart();
 
+  // Alert modal state
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({ title: '', message: '' });
+
   // Enable LayoutAnimation on Android
   useEffect(() => {
     if (Platform.OS === 'android' && UIManager.setLayoutAnimationEnabledExperimental) {
@@ -73,8 +78,13 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const [activeProduct, setActiveProduct] = useState(null);
   const [updatingProductId, setUpdatingProductId] = useState(null);
 
+  const [selectedVariations, setSelectedVariations] = useState({});
+
   const openProductModal = (product) => {
     setActiveProduct(product);
+    setSelectedVariations({});
+    // Reset quantity to 1 for fresh addition
+    setLocalQty((prev) => ({ ...prev, [product.id]: 1 }));
     setProductModalVisible(true);
   };
 
@@ -246,12 +256,12 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
 
   // Update add/remove with optimistic updates and animation
-  const addToCart = async (item) => {
+  const addToCart = async (item, options = {}) => {
     const current = getQuantity(item.id);
     LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
     setLocalQty((prev) => ({ ...prev, [item.id]: current + 1 }));
     setUpdatingProductId(item.id);
-    await addItem(item, 1);
+    await addItem(item, 1, options);
     setTimeout(() => setUpdatingProductId(null), 250);
   };
 
@@ -279,8 +289,10 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const getTotalPrice = () => Object.keys(itemsMap || {}).reduce((s, id) => {
     const it = itemsMap[id];
     if (!it) return s;
-    const vendorIdOfItem = it.product.vendorId || it.product._raw?.vendor?.vendorId;
-    if (vendorIdOfItem && vendorIdOfItem === vendorId) return s + (Number(it.product.price || 0) * it.quantity);
+    const vendorIdOfItem = it.product.vendorId || it.product._raw?.vendor?.vendorId || it.vendorId;
+    // Use finalPrice if available to respect discounts
+    const price = Number(it.product.finalPrice ?? it.product.price ?? 0);
+    if (vendorIdOfItem && vendorIdOfItem === vendorId) return s + (price * it.quantity);
     return s;
   }, 0);
 
@@ -316,7 +328,15 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     const raw = product._raw || {};
     const displayProductName = raw.product?.name || raw.name || raw.productName || product.name || '';
     const image = product.image || (Array.isArray(raw.images) && raw.images[0]);
+
+    // Pricing logic
     const price = raw.pricing?.price ?? raw.price ?? product.price ?? 0;
+    const finalPrice = raw.pricing?.finalPrice ?? raw.finalPrice ?? price;
+    const discount = raw.pricing?.discount ?? raw.discount ?? 0;
+    const currency = raw.pricing?.currency ?? '';
+
+    // Logic for variations
+    const hasVariations = (raw.variations && raw.variations.length > 0) || (raw.options && raw.options.length > 0);
     const description = raw.description || raw.slug || '';
     const isUpdating = updatingProductId === product.id;
 
@@ -333,66 +353,72 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
           disabled={isUpdating}
         >
           {image ? (
-            <Image source={{ uri: image }} style={styles.menuItemImage} />
+            <View>
+              <Image source={{ uri: image }} style={styles.menuItemImage} />
+              {discount > 0 && (
+                <View style={[styles.discountBadgeAbsolute, { backgroundColor: colors.primary, position: 'absolute', top: 0, left: 0, paddingHorizontal: 4, paddingVertical: 2, borderBottomRightRadius: 8 }]}>
+                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>{discount}%</Text>
+                </View>
+              )}
+            </View>
           ) : (
             <View style={[styles.menuItemImage, { backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' }]}>
               <Ionicons name="fast-food" size={32} color={colors.text.secondary} />
+              {discount > 0 && (
+                <View style={[styles.discountBadgeAbsolute, { backgroundColor: colors.primary, position: 'absolute', top: 0, left: 0, paddingHorizontal: 4, paddingVertical: 2, borderBottomRightRadius: 8 }]}>
+                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>{discount}%</Text>
+                </View>
+              )}
             </View>
           )}
 
           <View style={styles.menuItemInfo}>
             <Text style={[styles.menuItemName, { color: colors.text.primary }]} numberOfLines={2}>{displayProductName}</Text>
-            {description && (
+            {description ? (
               <Text style={[styles.menuItemDescription, { color: colors.text.secondary }]} numberOfLines={2}>{description}</Text>
-            )}
-            <Text style={[styles.menuItemPrice, { color: colors.primary }]}>{formatCurrency(raw.pricing?.currency ?? '', price)}</Text>
+            ) : null}
+
+            <View style={{ marginTop: 4 }}>
+              {discount > 0 ? (
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={[styles.menuItemPrice, { color: colors.primary, marginRight: 6 }]}>
+                    {formatCurrency(currency, finalPrice)}
+                  </Text>
+                  <Text style={[styles.menuItemOriginalPrice, { color: colors.text.light, textDecorationLine: 'line-through', fontSize: 12 }]}>
+                    {formatCurrency(currency, price)}
+                  </Text>
+                </View>
+              ) : (
+                <Text style={[styles.menuItemPrice, { color: colors.primary }]}>
+                  {hasVariations ? 'From ' : ''}{formatCurrency(currency, price)}
+                </Text>
+              )}
+              {hasVariations && <Text style={{ fontSize: 10, color: colors.text.secondary, marginTop: 2 }}>{t('customizable') || 'Customizable'}</Text>}
+            </View>
           </View>
         </TouchableOpacity>
 
-        {/* Right: quantity control */}
+        {/* Right: Add button - always opens modal */}
         <View style={styles.menuItemActions} pointerEvents="box-none">
-          {quantity === 0 ? (
-            <TouchableOpacity
-              style={[styles.addButton, { backgroundColor: colors.primary }]}
-              onPress={() => addToCart(product)}
-              disabled={isUpdating}
-              hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-            >
-              {isUpdating ? (
-                <ActivityIndicator size="small" color="#fff" />
-              ) : (
+          <TouchableOpacity
+            style={[styles.addButton, { backgroundColor: colors.primary }]}
+            onPress={() => openProductModal(product)}
+            disabled={isUpdating}
+            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          >
+            {isUpdating ? (
+              <ActivityIndicator size="small" color="#fff" />
+            ) : (
+              <>
                 <Ionicons name="add" size={20} color="#fff" />
-              )}
-            </TouchableOpacity>
-          ) : (
-            <View style={[styles.quantityControl, { borderColor: colors.border }]}>
-              <TouchableOpacity
-                style={[styles.quantityButton, { backgroundColor: quantity > 0 ? colors.background : colors.border }]}
-                onPress={() => removeFromCart(product)}
-                disabled={quantity === 0 || isUpdating}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                {isUpdating ? (
-                  <ActivityIndicator size="small" color={quantity > 0 ? colors.primary : colors.text.light} />
-                ) : (
-                  <Ionicons name="remove" size={16} color={quantity > 0 ? colors.primary : colors.text.light} />
+                {quantity > 0 && (
+                  <View style={[styles.quantityBadge, { backgroundColor: '#fff' }]}>
+                    <Text style={[styles.quantityBadgeText, { color: colors.primary }]}>{quantity}</Text>
+                  </View>
                 )}
-              </TouchableOpacity>
-              <Text style={[styles.quantityText, { color: colors.text.primary }]}>{quantity}</Text>
-              <TouchableOpacity
-                style={[styles.quantityButton, { backgroundColor: colors.primary }]}
-                onPress={() => addToCart(product)}
-                disabled={isUpdating}
-                hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
-              >
-                {isUpdating ? (
-                  <ActivityIndicator size="small" color="#fff" />
-                ) : (
-                  <Ionicons name="add" size={16} color="#fff" />
-                )}
-              </TouchableOpacity>
-            </View>
-          )}
+              </>
+            )}
+          </TouchableOpacity>
         </View>
       </View>
     );
@@ -436,8 +462,66 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
                 <View style={[styles.modalPriceRow, { borderTopColor: colors.border, borderBottomColor: colors.border }]}>
                   <Text style={[styles.modalPriceLabel, { color: colors.text.secondary }]}>{t('price') || 'Price'}</Text>
-                  <Text style={[styles.modalPrice, { color: colors.primary }]}>{formatCurrency(currency, price)}</Text>
+                  <View style={{ alignItems: 'flex-end' }}>
+                    {(raw.pricing?.discount > 0 || raw.discount > 0) && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+                        <Text style={[styles.modalOriginalPrice, { color: colors.text.light, textDecorationLine: 'line-through', marginRight: 8 }]}>
+                          {formatCurrency(currency, raw.pricing?.price || raw.price || price)}
+                        </Text>
+                        <View style={[styles.discountBadge, { backgroundColor: colors.primary }]}>
+                          <Text style={styles.discountText}>{raw.pricing?.discount || raw.discount}% OFF</Text>
+                        </View>
+                      </View>
+                    )}
+                    <Text style={[styles.modalPrice, { color: colors.primary }]}>{formatCurrency(currency, raw.pricing?.finalPrice || raw.finalPrice || price)}</Text>
+                  </View>
                 </View>
+
+                {/* Variations Section */}
+                {((raw.variations || raw.options) && (raw.variations || raw.options).length > 0) && (
+                  <View style={styles.modalVariations}>
+                    {(raw.variations || raw.options || []).map((variation, vIndex) => (
+                      <View key={vIndex} style={styles.variationGroup}>
+                        <Text style={[styles.variationTitle, { color: colors.text.primary }]}>
+                          {variation.name || variation.title || `Option ${vIndex + 1}`}
+                          {variation.required && <Text style={{ color: 'red' }}> *</Text>}
+                        </Text>
+                        <View style={styles.variationOptions}>
+                          {(variation.items || variation.options || []).map((opt, oIndex) => {
+                            // Robust ID check - prefer label as ID if ID missing since extraction needs label
+                            const optId = opt.label || opt.name || opt.id || opt._id;
+                            const isSelected = selectedVariations[variation.name || variation.title || variation.id] === optId;
+                            return (
+                              <TouchableOpacity
+                                key={oIndex}
+                                style={[
+                                  styles.variationOptionChip,
+                                  { borderColor: colors.border },
+                                  isSelected && { borderColor: colors.primary, backgroundColor: colors.primary + '15' }
+                                ]}
+                                onPress={() => setSelectedVariations(prev => ({
+                                  ...prev,
+                                  [variation.name || variation.title || variation.id]: optId,
+                                  [`${variation.name || variation.title || variation.id}_obj`]: opt
+                                }))}
+                              >
+                                <Text style={[
+                                  styles.variationOptionText,
+                                  { color: colors.text.primary },
+                                  isSelected && { color: colors.primary, fontFamily: 'Poppins-SemiBold' }
+                                ]}>
+                                  {opt.label || opt.name || opt.value}
+                                  {(opt.price && opt.price > 0) ? ` (+${formatCurrency(currency, opt.price)})` : ''}
+                                </Text>
+                                {isSelected && <Ionicons name="checkmark-circle" size={18} color={colors.primary} style={{ marginLeft: 6 }} />}
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
+                      </View>
+                    ))}
+                  </View>
+                )}
 
                 {/* Quantity Controls */}
                 <View style={styles.modalQuantitySection}>
@@ -445,26 +529,23 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                   <View style={[styles.modalQuantityControl, { borderColor: colors.border }]}>
                     <TouchableOpacity
                       style={[styles.modalQuantityBtn, { backgroundColor: quantity > 0 ? colors.background : colors.border }]}
-                      onPress={() => quantity > 0 && removeFromCart(activeProduct)}
-                      disabled={quantity === 0 || isUpdating}
+                      onPress={() => {
+                        if (quantity > 0) {
+                          setLocalQty(prev => ({ ...prev, [activeProduct.id]: Math.max(0, quantity - 1) }));
+                        }
+                      }}
+                      disabled={quantity === 0}
                     >
-                      {isUpdating ? (
-                        <ActivityIndicator size="small" color={quantity > 0 ? colors.primary : colors.text.light} />
-                      ) : (
-                        <Ionicons name="remove" size={20} color={quantity > 0 ? colors.primary : colors.text.light} />
-                      )}
+                      <Ionicons name="remove" size={20} color={quantity > 0 ? colors.primary : colors.text.light} />
                     </TouchableOpacity>
                     <Text style={[styles.modalQuantityText, { color: colors.text.primary }]}>{quantity}</Text>
                     <TouchableOpacity
                       style={[styles.modalQuantityBtn, { backgroundColor: colors.primary }]}
-                      onPress={() => addToCart(activeProduct)}
-                      disabled={isUpdating}
+                      onPress={() => {
+                        setLocalQty(prev => ({ ...prev, [activeProduct.id]: quantity + 1 }));
+                      }}
                     >
-                      {isUpdating ? (
-                        <ActivityIndicator size="small" color="#fff" />
-                      ) : (
-                        <Ionicons name="add" size={20} color="#fff" />
-                      )}
+                      <Ionicons name="add" size={20} color="#fff" />
                     </TouchableOpacity>
                   </View>
                 </View>
@@ -474,22 +555,83 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
             {/* Footer */}
             <View style={[styles.modalFooter, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
               <TouchableOpacity
-                style={[styles.modalAddToCartBtn, { backgroundColor: colors.primary }]}
-                onPress={() => {
-                  if (quantity === 0) addToCart(activeProduct);
+                style={[
+                  styles.modalAddToCartBtn,
+                  {
+                    backgroundColor: quantity > 0 ? colors.primary : colors.border,
+                    opacity: quantity > 0 ? 1 : 0.5
+                  }
+                ]}
+                onPress={async () => {
+                  // Validate quantity first
+                  if (quantity === 0) {
+                    setAlertConfig({
+                      title: t('error') || 'Error',
+                      message: t('pleaseAddQuantity') || 'Please add at least 1 item'
+                    });
+                    setAlertVisible(true);
+                    return;
+                  }
+
+                  // Enhanced validation: Check if product has variations and ALL are selected
+                  const variations = raw.variations || raw.options || [];
+
+                  if (variations.length > 0) {
+                    // Check if ANY variation is not selected
+                    const unselected = variations.filter(v => !selectedVariations[v.name || v.title || v.id]);
+
+                    if (unselected.length > 0) {
+                      setAlertConfig({
+                        title: t('selectionRequired') || 'Selection Required',
+                        message: `${t('pleaseSelect') || 'Please select'}: ${unselected[0].name || unselected[0].title || 'a variation'}`
+                      });
+                      setAlertVisible(true);
+                      return;
+                    }
+                  }
+
+                  // Retrieve detailed objects for selections
+                  const variantNames = Object.keys(selectedVariations)
+                    .filter(k => k.endsWith('_obj'))
+                    .map(k => {
+                      const opt = selectedVariations[k];
+                      // Prioritize clean name/value over label if possible, to avoid price suffixes
+                      // If only label exists, try to strip price suffix like " (+€9.00)"
+                      let val = opt.name || opt.value || opt.id || opt.label;
+                      if (val && typeof val === 'string' && val.includes(' (+')) {
+                        val = val.split(' (+')[0];
+                      }
+                      return val;
+                    });
+
+                  // Fallback if no objects stored
+                  const finalLabels = variantNames.length > 0 ? variantNames : Object.keys(selectedVariations)
+                    .filter(k => !k.endsWith('_obj'))
+                    .map(k => selectedVariations[k]);
+
+                  // Construct variantName string
+                  const variantName = finalLabels.join(', ');
+
+                  const payload = {
+                    variantName: variantName || 'Standard',
+                    options: selectedVariations
+                  };
+
+                  // Add to cart with the selected quantity
+                  await addItem(activeProduct, quantity, payload);
                   closeProductModal();
                 }}
-                disabled={isUpdating}
+                disabled={isUpdating || quantity === 0}
               >
-                <Ionicons name="cart" size={20} color="#fff" style={{ marginRight: 8 }} />
-                <Text style={styles.modalAddToCartText}>
+                <Ionicons name="cart" size={20} color={quantity > 0 ? "#fff" : colors.text.light} style={{ marginRight: 8 }} />
+                <Text style={[styles.modalAddToCartText, { color: quantity > 0 ? '#fff' : colors.text.light }]}>
                   {quantity > 0 ? `${quantity} ${t('inCart') || 'in cart'}` : (t('addToCart') || 'Add to cart')}
                 </Text>
               </TouchableOpacity>
             </View>
           </View>
-        </View>
-      </Modal>
+        </View >
+      </Modal >
     );
   };
 
@@ -642,6 +784,14 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
       )}
 
       {renderProductModal()}
+
+      {/* Alert Modal */}
+      <AlertModal
+        visible={alertVisible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        onClose={() => setAlertVisible(false)}
+      />
     </SafeAreaView>
   );
 };
@@ -863,6 +1013,21 @@ const styles = StyleSheet.create({
     minWidth: 24,
     textAlign: 'center',
   },
+  quantityBadge: {
+    position: 'absolute',
+    top: -6,
+    right: -6,
+    minWidth: 20,
+    height: 20,
+    borderRadius: 10,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingHorizontal: 4,
+  },
+  quantityBadgeText: {
+    fontSize: 11,
+    fontFamily: 'Poppins-Bold',
+  },
   noResultsContainer: {
     alignItems: 'center',
     paddingVertical: 60,
@@ -1027,6 +1192,48 @@ const styles = StyleSheet.create({
     color: '#fff',
     fontSize: fontSize.lg,
     fontFamily: 'Poppins-Bold',
+  },
+  modalOriginalPrice: {
+    fontSize: fontSize.sm,
+    fontFamily: 'Poppins-Regular',
+  },
+  discountBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 4,
+  },
+  discountText: {
+    color: '#fff',
+    fontSize: 10,
+    fontFamily: 'Poppins-Bold',
+  },
+  modalVariations: {
+    paddingHorizontal: spacing.md,
+    marginTop: spacing.md,
+  },
+  variationGroup: {
+    marginBottom: spacing.md,
+  },
+  variationTitle: {
+    fontSize: fontSize.md,
+    fontFamily: 'Poppins-SemiBold',
+    marginBottom: spacing.sm,
+  },
+  variationOptions: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+  },
+  variationOptionChip: {
+    paddingHorizontal: spacing.md,
+    paddingVertical: spacing.sm,
+    borderRadius: borderRadius.md,
+    borderWidth: 1,
+    marginRight: spacing.sm,
+    marginBottom: spacing.sm,
+  },
+  variationOptionText: {
+    fontSize: fontSize.sm,
+    fontFamily: 'Poppins-Regular',
   },
 });
 

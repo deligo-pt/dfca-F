@@ -57,6 +57,8 @@ export const translations = {
     nearbyRestaurants: 'Nearby Restaurants',
     viewAll: 'View All',
 
+    noProductCategoriesAdded: 'No product categories added',
+
     // Categories Screen
     whatDoYouNeed: "What's on your mind?",
     cuisines: 'Cuisines',
@@ -80,6 +82,10 @@ export const translations = {
     deliveryFee: 'Delivery fee',
     minOrder: 'Min. order',
     rating: 'Rating',
+    selectionRequired: 'Selection Required',
+    pleaseSelect: 'Please select',
+    customizable: 'Customizable',
+    pleaseAddQuantity: 'Please add at least 1 item',
 
     // Cart
     cart: 'Cart',
@@ -548,8 +554,10 @@ export const translations = {
     popularRestaurants: 'Restaurantes Populares',
     nearYou: 'Perto de Você',
     nearbyRestaurants: 'Restaurantes Próximos',
+    nearbyRestaurants: 'Restaurantes Próximos',
     viewAll: 'Ver Todos',
 
+    noProductCategoriesAdded: 'Nenhum categoria de produto adicionada',
 
     // Categories Screen
     whatDoYouNeed: "Em que está a pensar?",
@@ -574,6 +582,10 @@ export const translations = {
     deliveryFee: 'Taxa de entrega',
     minOrder: 'Pedido min.',
     rating: 'Classificação',
+    selectionRequired: 'Seleção Obrigatória',
+    pleaseSelect: 'Por favor selecione',
+    customizable: 'Personalizável',
+    pleaseAddQuantity: 'Por favor adicione pelo menos 1 item',
 
     // Cart
     cart: 'Carrinho',

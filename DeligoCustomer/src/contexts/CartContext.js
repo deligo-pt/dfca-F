@@ -213,10 +213,10 @@ export const CartProvider = ({ children }) => {
     } catch (e) { return null; }
   };
 
-  const addItem = async (product, quantity = 1) => {
+  const addItem = async (product, quantity = 1, options = {}) => {
     const p = normalizeProductForCart(product);
     if (!p.id) return { success: false, message: 'invalid product (missing id)' };
-    console.debug('[cart:id-debug] addItem init', { id: p.id, idSource: p.idSource, idStyle: p.idStyle, quantity, vendorId: p.vendorId });
+    console.debug('[cart:id-debug] addItem init', { id: p.id, idSource: p.idSource, idStyle: p.idStyle, quantity, vendorId: p.vendorId, options });
     const vid = p.vendorId || 'unknown_vendor';
 
     // Optimistic update
@@ -226,7 +226,22 @@ export const CartProvider = ({ children }) => {
       const cur = carts[vendorKey] ? { ...carts[vendorKey] } : { vendorId: vendorKey, vendorName: p.vendorName || '', items: {}, appliedPromo: null, deliveryInstructions: '' };
       const existing = cur.items[p.id];
       const newQty = (existing?.quantity || 0) + quantity;
-      cur.items = { ...(cur.items || {}), [p.id]: { product: p, quantity: newQty } };
+
+      // Store selected variation in local state if provided
+      // Check multiple possible keys: variantName (from modal), variation, selectedVariation
+      const selectedVariation = options.variantName || options.variation || options.selectedVariation || null;
+
+      console.debug('[cart] addItem - storing variation:', { productId: p.id, selectedVariation, options });
+
+      cur.items = {
+        ...(cur.items || {}),
+        [p.id]: {
+          product: p,
+          quantity: newQty,
+          selectedVariation
+        }
+      };
+
       cur.vendorName = cur.vendorName || p.vendorName || p._raw?.vendor?.vendorName || cur.vendorName;
       carts[vendorKey] = cur;
       return { ...prev, carts };
@@ -243,7 +258,24 @@ export const CartProvider = ({ children }) => {
     // Sync with backend - p.id now always contains the correct ID (SKU preferred)
     try {
       setSyncing(true);
-      const res = await CartAPI.addToCart([{ productId: p.id, quantity }]);
+
+      const payload = { productId: p.id, quantity };
+
+      // Pass variantName if present (support both direct prop and nested in options)
+      // User schema specifically requested "variantName"
+      if (options.variantName) {
+        payload.variantName = options.variantName;
+      } else if (options.selectedVariation) {
+        // Fallback legacy support
+        payload.variantName = typeof options.selectedVariation === 'string' ? options.selectedVariation : options.selectedVariation.name;
+      }
+
+      // Pass full options object if available (contains detailed selection map)
+      if (options.options) {
+        payload.options = options.options;
+      }
+
+      const res = await CartAPI.addToCart([payload]);
       if (!res.success) {
         console.warn('[cart] addToCart failed response:', res);
         // If unauthorized, revert optimistic update and logout
@@ -366,8 +398,35 @@ export const CartProvider = ({ children }) => {
     // Backend sync with canonicalKey (prefer SKU key)
     try {
       setSyncing(true);
+
+      // Extract variantName from the cart item
+      let variantName = null;
+      setState(prev => {
+        const carts = prev.carts || {};
+        for (const vkey of Object.keys(carts)) {
+          const cart = carts[vkey];
+          if (cart.items && cart.items[canonicalKey]) {
+            const item = cart.items[canonicalKey];
+            variantName = item.selectedVariation;
+
+            // Fallback: try to extract from product metadata
+            if (!variantName && item.product) {
+              const product = item.product;
+              if (product.variantName) {
+                variantName = product.variantName;
+              } else if (product._raw?.variantName) {
+                variantName = product._raw.variantName;
+              }
+            }
+            break;
+          }
+        }
+        return prev; // No state change, just extracting data
+      });
+
       const action = delta > 0 ? 'increment' : 'decrement';
-      const res = await CartAPI.activateItem(canonicalKey, Math.abs(delta), action);
+      console.debug('[CartContext] updateQuantity - calling API with:', { canonicalKey, delta: Math.abs(delta), action, variantName });
+      const res = await CartAPI.activateItem(canonicalKey, Math.abs(delta), action, variantName);
 
       if (!res.success) {
         console.warn('[CartContext] updateQuantity API failed', res);
@@ -450,6 +509,22 @@ export const CartProvider = ({ children }) => {
 
   const removeItem = async (itemId, vendorId) => {
     const canonicalKey = resolveCartItemKeyGlobal(itemId);
+
+    // Extract variant info before removing from state
+    let variantName = null;
+    const carts = state.carts || {};
+    if (vendorId) {
+      const v = String(vendorId);
+      variantName = carts[v]?.items?.[canonicalKey]?.selectedVariation;
+    } else {
+      for (const vkey of Object.keys(carts)) {
+        if (carts[vkey].items && carts[vkey].items[canonicalKey]) {
+          variantName = carts[vkey].items[canonicalKey].selectedVariation;
+          break;
+        }
+      }
+    }
+
     setState(prev => {
       const carts = { ...(prev.carts || {}) };
       let modified = false;
@@ -475,7 +550,11 @@ export const CartProvider = ({ children }) => {
     });
     try {
       setSyncing(true);
-      await CartAPI.deleteItems([canonicalKey]);
+      // Pass variant info if available
+      const deletePayload = variantName
+        ? [{ productId: canonicalKey, variantName }]
+        : [canonicalKey];
+      await CartAPI.deleteItems(deletePayload);
     } catch (error) {
       console.error('Failed to sync item removal with backend:', error);
     } finally {
@@ -498,10 +577,41 @@ export const CartProvider = ({ children }) => {
     if (!vendorId) return { success: false, message: 'missing vendorId' };
     const v = String(vendorId);
 
-    // Collect item IDs
+    // Collect item IDs and variant info
     const vendorCart = getVendorCart(v);
-    const itemIds = vendorCart && vendorCart.items ? Object.keys(vendorCart.items) : [];
-    if (itemIds.length === 0) return { success: true, message: 'nothing to clear' };
+    if (!vendorCart || !vendorCart.items) return { success: true, message: 'nothing to clear' };
+
+    console.debug('[cart] clearVendorCartAndSync - vendor cart items:', vendorCart.items);
+
+    const itemsToDelete = Object.keys(vendorCart.items).map(itemId => {
+      const item = vendorCart.items[itemId];
+      let variantName = item.selectedVariation;
+
+      // If no selectedVariation in local state, try to extract from product metadata
+      if (!variantName && item.product) {
+        const product = item.product;
+        // Check if product has variation data stored
+        if (product.variantName) {
+          variantName = product.variantName;
+        } else if (product._raw?.variantName) {
+          variantName = product._raw.variantName;
+        } else if (product.selectedOptions) {
+          // Try to construct from selected options
+          variantName = Object.values(product.selectedOptions).join(', ');
+        }
+      }
+
+      console.debug('[cart] clearVendorCartAndSync - item:', { itemId, variantName, fullItem: item });
+
+      if (variantName) {
+        return { productId: itemId, variantName };
+      }
+      return itemId; // backward compatible: just the ID string
+    });
+
+    console.debug('[cart] clearVendorCartAndSync - final payload:', itemsToDelete);
+
+    if (itemsToDelete.length === 0) return { success: true, message: 'nothing to clear' };
 
     // Optimistic: remove vendor cart, keep previous copy for potential rollback
     let prevVendorCart = null;
@@ -516,7 +626,7 @@ export const CartProvider = ({ children }) => {
 
     try {
       setSyncing(true);
-      const res = await CartAPI.deleteItems(itemIds);
+      const res = await CartAPI.deleteItems(itemsToDelete);
       if (!res.success) {
         console.warn('[cart] clearVendorCartAndSync failed', res);
         // Rollback
