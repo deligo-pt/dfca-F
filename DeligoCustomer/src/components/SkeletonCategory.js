@@ -59,11 +59,11 @@ const SkeletonCategory = () => {
                 </View>
             </View>
 
-            {/* Categories Horizontal Scroll Skeleton */}
+            {/* Business Categories Skeleton (GlovoBubbles) */}
             <View style={styles.section}>
                 <SkeletonItem width={150} height={20} style={{ marginBottom: 15 }} />
                 <View style={styles.horizontalRow}>
-                    {[1, 2, 3, 4].map((i) => (
+                    {[1, 2, 3].map((i) => (
                         <View key={i} style={styles.categoryItem}>
                             <SkeletonItem width={70} height={70} style={{ borderRadius: 35, marginBottom: 8 }} />
                             <SkeletonItem width={50} height={12} />
@@ -72,9 +72,16 @@ const SkeletonCategory = () => {
                 </View>
             </View>
 
-            {/* Banners / Offers Skeleton */}
+            {/* Product Categories Skeleton (Cuisines) */}
             <View style={styles.section}>
-                <SkeletonItem width={width - 40} height={140} style={{ borderRadius: 16 }} />
+                <SkeletonItem width={180} height={20} style={{ marginBottom: 15 }} />
+                <View style={styles.horizontalRow}>
+                    {[1, 2, 3, 4].map((i) => (
+                        <View key={i} style={{ marginRight: 15 }}>
+                            <SkeletonItem width={100} height={35} style={{ borderRadius: 20 }} />
+                        </View>
+                    ))}
+                </View>
             </View>
 
             {/* Restaurants List Skeleton */}
@@ -114,7 +121,8 @@ const styles = StyleSheet.create({
     },
     horizontalRow: {
         flexDirection: 'row',
-        justifyContent: 'space-between',
+        justifyContent: 'flex-start', // Align left to match GlovoBubbles
+        gap: 16, // Consistent gap
     },
     categoryItem: {
         alignItems: 'center',

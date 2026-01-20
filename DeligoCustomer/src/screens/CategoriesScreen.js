@@ -112,25 +112,34 @@ const CategoriesScreen = ({ navigation }) => {
     // Dynamic Categories from API
     const [apiCategories, setApiCategories] = useState([]);
     const [apiProductCategories, setApiProductCategories] = useState([]);
+    const [categoriesLoading, setCategoriesLoading] = useState(true);
 
     useEffect(() => {
         let mounted = true;
         (async () => {
-            if (fetchBusinessCategories) {
-                console.log('[CategoriesScreen] Fetching business categories...');
-                const cats = await fetchBusinessCategories();
-                console.log('[CategoriesScreen] Fetched categories:', cats?.length);
-                if (mounted && cats && cats.length > 0) {
-                    setApiCategories(cats);
+            // Avoid double loading state if already loading products, but ensure we catch category fetch time
+            setCategoriesLoading(true);
+            try {
+                if (fetchBusinessCategories) {
+                    console.log('[CategoriesScreen] Fetching business categories...');
+                    const cats = await fetchBusinessCategories();
+                    console.log('[CategoriesScreen] Fetched categories:', cats?.length);
+                    if (mounted && cats && cats.length > 0) {
+                        setApiCategories(cats);
+                    }
                 }
-            }
-            if (fetchProductCategories) {
-                console.log('[CategoriesScreen] Fetching product categories...');
-                const pcats = await fetchProductCategories();
-                console.log('[CategoriesScreen] Fetched product categories:', pcats?.length);
-                if (mounted && pcats && pcats.length > 0) {
-                    setApiProductCategories(pcats);
+                if (fetchProductCategories) {
+                    console.log('[CategoriesScreen] Fetching product categories...');
+                    const pcats = await fetchProductCategories();
+                    console.log('[CategoriesScreen] Fetched product categories:', pcats?.length);
+                    if (mounted && pcats && pcats.length > 0) {
+                        setApiProductCategories(pcats);
+                    }
                 }
+            } catch (error) {
+                console.error('[CategoriesScreen] Error fetching categories:', error);
+            } finally {
+                if (mounted) setCategoriesLoading(false);
             }
         })();
         return () => { mounted = false; };
@@ -745,106 +754,108 @@ const CategoriesScreen = ({ navigation }) => {
                 pointerEvents={isStickyVisible ? 'auto' : 'none'}
             />
 
-
-
-            <Animated.ScrollView
-                style={styles(colors).scrollView}
-                showsVerticalScrollIndicator={false}
-                bounces={true}
-                scrollEventThrottle={16}
-                refreshControl={
-                    <RefreshControl
-                        refreshing={refreshing}
-                        onRefresh={handleRefresh}
-                        colors={[colors.primary]}
-                        tintColor={colors.primary}
-                        progressViewOffset={insets.top + 20}
+            {(productsLoading || categoriesLoading) && !refreshing ? (
+                <SkeletonCategory />
+            ) : (
+                <Animated.ScrollView
+                    style={styles(colors).scrollView}
+                    showsVerticalScrollIndicator={false}
+                    bounces={true}
+                    scrollEventThrottle={16}
+                    refreshControl={
+                        <RefreshControl
+                            refreshing={refreshing}
+                            onRefresh={handleRefresh}
+                            colors={[colors.primary]}
+                            tintColor={colors.primary}
+                            progressViewOffset={insets.top + 20}
+                        />
+                    }
+                    onScroll={Animated.event(
+                        [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+                        { useNativeDriver: true }
+                    )}
+                >
+                    {/* Location Header with Search - scrolls away */}
+                    <LocationHeader
+                        location={currentLocation}
+                        area={address}
+                        loading={locationLoading}
+                        onLocationPress={handleLocationPress}
+                        onSearchPress={handleSearchPress}
+                        userName={userName}
+                        onProfilePress={() => navigation.navigate('Profile')}
+                        onNotificationPress={() => navigation.navigate('Notifications')}
+                        paddingTop={insets.top}
                     />
-                }
-                onScroll={Animated.event(
-                    [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-                    { useNativeDriver: true }
-                )}
-            >
-                {/* Location Header with Search - scrolls away */}
-                <LocationHeader
-                    location={currentLocation}
-                    area={address}
-                    loading={locationLoading}
-                    onLocationPress={handleLocationPress}
-                    onSearchPress={handleSearchPress}
-                    userName={userName}
-                    onProfilePress={() => navigation.navigate('Profile')}
-                    onNotificationPress={() => navigation.navigate('Notifications')}
-                    paddingTop={insets.top}
-                />
 
-                {/* Glovo-Style "Super App" Bubbles */}
-                <GlovoBubbles
-                    categories={displayCategories}
-                    onPress={handleVendorTypePress}
-                    selectedId={selectedVendorType}
-                />
+                    {/* Glovo-Style "Super App" Bubbles */}
+                    <GlovoBubbles
+                        categories={displayCategories}
+                        onPress={handleVendorTypePress}
+                        selectedId={selectedVendorType}
+                    />
 
-                {/* Categories Section - Dynamic from API based on vendor type */}
-                <SectionHeader
-                    title={selectedVendorType ? t('categories') : t('browseByCategory')}
-                    showSeeAll={false}
-                />
-                <Category
-                    cuisines={apiProductCategories.length > 0 ? apiProductCategories : dynamicCategories}
-                    selectedCuisine={selectedCuisine}
-                    onPress={handleCuisinePress}
-                />
+                    {/* Categories Section - Dynamic from API based on vendor type */}
+                    <SectionHeader
+                        title={selectedVendorType ? t('categories') : t('browseByCategory')}
+                        showSeeAll={false}
+                    />
+                    <Category
+                        cuisines={apiProductCategories.length > 0 ? apiProductCategories : dynamicCategories}
+                        selectedCuisine={selectedCuisine}
+                        onPress={handleCuisinePress}
+                    />
 
-                {/* Results Section */}
-                <SectionHeader
-                    title={searchQuery ? `${t('searchResults')} (${(products || []).length})` : t('nearYou')}
-                    onSeeAll={!searchQuery ? () => navigation.navigate('SeeAll', {
-                        allItems: sourceProducts,  // ALL products (unfiltered)
-                        vendorTypes: vendorTypes,  // For filter chips
-                        availableCuisines: cuisinesFromProducts,  // All cuisines
-                        title: t('nearYou')
-                    }) : undefined}
-                />
-                {productsLoading && (!displayedProducts || displayedProducts.length === 0) ? (
-                    <SkeletonCategory />
-                ) : (displayedByVendor.length > 0) ? (
-                    <RestaurantsList restaurants={displayedByVendor} onPress={handleRestaurantPress} searchQuery={searchQuery} disableScroll={true} />
-                ) : (prevNonEmptyRef.current.length > 0 && (selectedVendorType || selectedCuisine)) ? (
-                    <RestaurantsList restaurants={prevNonEmptyRef.current} onPress={handleRestaurantPress} searchQuery={searchQuery} disableScroll={true} />
-                ) : (
-                    <View style={styles(colors).noResultsContainer}>
-                        <Text style={styles(colors).noResultsText}>
-                            {selectedVendorType || selectedCuisine
-                                ? (t('noResultsFor') + ' ' + (selectedVendorType || selectedCuisine) || t('noMatchSelection'))
-                                : (t('noResultsFor') + ' ' + (selectedVendorType || selectedCuisine) || t('noResultsFound'))
-                            }
-                        </Text>
-                        <Text style={styles(colors).noResultsSubtext}>
-                            {selectedVendorType || selectedCuisine
-                                ? t('tryDifferentFilter')
-                                : t('tryAdjustingFilters')
-                            }
-                        </Text>
-                        {(selectedVendorType || selectedCuisine) && (
-                            <TouchableOpacity
-                                onPress={() => {
-                                    setSelectedVendorType(null);
-                                    setSelectedCuisine(null);
-                                    persistSelection('selectedVendorType', null);
-                                    persistSelection('selectedCuisine', null);
-                                }}
-                                style={styles(colors).clearFiltersButton}
-                            >
-                                <Text style={styles(colors).clearFiltersText}>{t('clearFilters')}</Text>
-                            </TouchableOpacity>
-                        )}
-                    </View>
-                )}
+                    {/* Results Section */}
+                    <SectionHeader
+                        title={searchQuery ? `${t('searchResults')} (${(products || []).length})` : t('nearYou')}
+                        onSeeAll={!searchQuery ? () => navigation.navigate('SeeAll', {
+                            allItems: sourceProducts,  // ALL products (unfiltered)
+                            vendorTypes: vendorTypes,  // For filter chips
+                            availableCuisines: cuisinesFromProducts,  // All cuisines
+                            title: t('nearYou')
+                        }) : undefined}
+                    />
+                    {productsLoading && (!displayedProducts || displayedProducts.length === 0) ? (
+                        <SkeletonCategory />
+                    ) : (displayedByVendor.length > 0) ? (
+                        <RestaurantsList restaurants={displayedByVendor} onPress={handleRestaurantPress} searchQuery={searchQuery} disableScroll={true} />
+                    ) : (prevNonEmptyRef.current.length > 0 && (selectedVendorType || selectedCuisine)) ? (
+                        <RestaurantsList restaurants={prevNonEmptyRef.current} onPress={handleRestaurantPress} searchQuery={searchQuery} disableScroll={true} />
+                    ) : (
+                        <View style={styles(colors).noResultsContainer}>
+                            <Text style={styles(colors).noResultsText}>
+                                {selectedVendorType || selectedCuisine
+                                    ? (t('noResultsFor') + ' ' + (selectedVendorType || selectedCuisine) || t('noMatchSelection'))
+                                    : (t('noResultsFor') + ' ' + (selectedVendorType || selectedCuisine) || t('noResultsFound'))
+                                }
+                            </Text>
+                            <Text style={styles(colors).noResultsSubtext}>
+                                {selectedVendorType || selectedCuisine
+                                    ? t('tryDifferentFilter')
+                                    : t('tryAdjustingFilters')
+                                }
+                            </Text>
+                            {(selectedVendorType || selectedCuisine) && (
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setSelectedVendorType(null);
+                                        setSelectedCuisine(null);
+                                        persistSelection('selectedVendorType', null);
+                                        persistSelection('selectedCuisine', null);
+                                    }}
+                                    style={styles(colors).clearFiltersButton}
+                                >
+                                    <Text style={styles(colors).clearFiltersText}>{t('clearFilters')}</Text>
+                                </TouchableOpacity>
+                            )}
+                        </View>
+                    )}
 
-                <View style={{ height: 100 }} />
-            </Animated.ScrollView>
+                    <View style={{ height: 100 }} />
+                </Animated.ScrollView>
+            )}
 
             <OfferModal visible={offerModalVisible} onClose={() => setOfferModalVisible(false)} offer={selectedOffer} onApply={(o) => console.log('Apply offer:', o)} />
         </View>
