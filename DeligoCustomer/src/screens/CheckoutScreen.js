@@ -499,19 +499,30 @@ const CheckoutScreen = ({ route, navigation }) => {
       name: p?.name,
       price: basePrice,
       finalPrice: finalUnitPrice,
+      // Pass backend totals if available
+      subtotal: cart.items[id].subtotal,
+      totalPrice: cart.items[id].totalPrice,
       discountPercent,
       taxPercent,
       quantity: cart.items[id].quantity,
       image: p?.image,
+      image: p?.image,
       currency: (rawPricing && rawPricing.currency) || p?.currency,
+      // Pass through customization data from cart item
+      addons: cart.items[id].addons || [],
+      variantName: cart.items[id].variantName || '',
+      options: cart.items[id].options || {},
     });
   }) : (cartData?.items || []);
 
   const currency = cartItems.length > 0 ? (cartItems[0].currency || 'EUR') : 'EUR';
   // Compute item-level subtotal (after item discounts, before tax) and tax
   const itemsSubtotal = cartItems.reduce((sum, it) => {
+    const addonsTotal = (it.addons || []).reduce((s, ad) => s + Number(ad.price || 0), 0);
+    // FIX: Discount applies only to base price
     const unitDiscount = (it.price || 0) * ((it.discountPercent || 0) / 100);
-    const unitTaxable = (it.price || 0) - unitDiscount;
+    const unitDiscountedBase = (it.price || 0) - unitDiscount;
+    const unitTaxable = unitDiscountedBase + addonsTotal;
     return sum + unitTaxable * (it.quantity || 0);
   }, 0);
   const itemsTax = cartItems.reduce((sum, it) => {
@@ -527,7 +538,10 @@ const CheckoutScreen = ({ route, navigation }) => {
   const discount = cart?.appliedPromo?.discount || cartData?.discount || 0;
 
   // Build baseSubtotal/discountTotal/taxAmount/total to match CartDetail
-  const baseSubtotal = cartItems.reduce((sum, it) => sum + (it.price || 0) * (it.quantity || 0), 0);
+  const baseSubtotal = cartItems.reduce((sum, it) => {
+    const addonsTotal = (it.addons || []).reduce((s, ad) => s + Number(ad.price || 0), 0);
+    return sum + ((it.price || 0) + addonsTotal) * (it.quantity || 0);
+  }, 0);
   const discountTotal = cartItems.reduce((sum, it) => {
     const unitDiscount = (it.price || 0) * ((it.discountPercent || 0) / 100);
     return sum + unitDiscount * (it.quantity || 0);
@@ -542,7 +556,10 @@ const CheckoutScreen = ({ route, navigation }) => {
   const total = subtotalAfterDiscount + taxAmount;
 
   // Calculate display subtotal using finalPrice (price after tax and discount)
-  const displaySubtotal = cartItems.reduce((sum, it) => sum + (it.finalPrice || it.price || 0) * (it.quantity || 0), 0);
+  const displaySubtotal = cartItems.reduce((sum, it) => {
+    const addonsTotal = (it.addons || []).reduce((s, ad) => s + Number(ad.price || 0), 0);
+    return sum + ((it.finalPrice || it.price || 0) + addonsTotal) * (it.quantity || 0);
+  }, 0);
 
   // Debug: Log checkoutResponse to verify it's being populated
   console.debug('[CheckoutScreen] Render - checkoutResponse:', checkoutResponse, 'local total:', total);
@@ -577,6 +594,9 @@ const CheckoutScreen = ({ route, navigation }) => {
       // nested under data
       ['data', 'CheckoutSummaryId'],
       ['data', 'checkoutSummaryId'],
+      // fallback to _id if explicit ID is missing
+      ['data', '_id'],
+      ['_id'],
       // nested summary objects
       ['data', 'checkoutSummary', '_id'],
       ['checkoutSummary', '_id'],
@@ -849,28 +869,56 @@ const CheckoutScreen = ({ route, navigation }) => {
             <Text style={styles(colors).itemCount}>{cartItems.length} {t('items')}</Text>
           </View>
           <View style={styles(colors).orderItemsContainer}>
-            {cartItems.map((item, index) => (
-              <View key={item.id || index} style={styles(colors).orderItemRow}>
-                <View style={styles(colors).orderItemLeft}>
-                  <View style={styles(colors).quantityBadge}>
-                    <Text style={styles(colors).quantityText}>{item.quantity}</Text>
+            {cartItems.map((item, index) => {
+              // Priority: Backend Subtotal > Calculated Subtotal
+              // Check subtotal or totalPrice or totalBeforeTax or finalPrice*qty
+              const itemTotal = (item.subtotal !== undefined && item.subtotal !== null)
+                ? Number(item.subtotal)
+                : ((item.finalPrice || item.price || 0) + (item.addons || []).reduce((s, ad) => s + Number(ad.price || 0), 0)) * item.quantity;
+
+              // Back-calculate unit price for display consistency
+              // If backend gives total 25.3 for qty 3, unit is ~8.43
+              const unitPrice = item.quantity > 0 ? (itemTotal / item.quantity) : 0;
+
+              return (
+                <View key={item.id || index} style={styles(colors).orderItemRow}>
+                  <View style={styles(colors).orderItemLeft}>
+                    <View style={styles(colors).quantityBadge}>
+                      <Text style={styles(colors).quantityText}>{item.quantity}</Text>
+                    </View>
+                    <View style={{ flex: 1 }}>
+                      <Text style={styles(colors).itemNameText} numberOfLines={2}>
+                        {item.name}
+                      </Text>
+                      {/* Unit price (Base + Addons) */}
+                      <Text style={{ fontSize: 12, fontFamily: 'Poppins-Regular', color: colors.text.secondary, marginTop: 4 }}>
+                        {formatCurrency(currency, unitPrice)} {t('each')}
+                      </Text>
+
+                      {/* Variations & Add-ons */}
+                      {(item.variantName && item.variantName !== 'Standard') && (
+                        <Text style={{ fontSize: 12, color: colors.text.secondary, marginTop: 2 }}>
+                          {item.variantName}
+                        </Text>
+                      )}
+                      {item.addons && item.addons.length > 0 && (
+                        <View style={{ marginTop: 4 }}>
+                          {item.addons.map((addon, aIdx) => (
+                            <Text key={aIdx} style={{ fontSize: 12, color: colors.text.secondary }}>
+                              + {addon.name}
+                            </Text>
+                          ))}
+                        </View>
+                      )}
+                    </View>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text style={styles(colors).itemNameText} numberOfLines={2}>
-                      {item.name}
-                    </Text>
-                    {/* Simple unit price - detailed breakdown shown in CartDetail */}
-                    <Text style={{ fontSize: 12, fontFamily: 'Poppins-Regular', color: colors.text.secondary, marginTop: 4 }}>
-                      {formatCurrency(currency, item.finalPrice || item.price)} {t('each')}
-                    </Text>
-                  </View>
+                  {/* Line total */}
+                  <Text style={styles(colors).itemPriceText}>
+                    {formatCurrency(currency, itemTotal)}
+                  </Text>
                 </View>
-                {/* Line total uses final price if available */}
-                <Text style={styles(colors).itemPriceText}>
-                  {formatCurrency(currency, (item.finalPrice || item.price) * item.quantity)}
-                </Text>
-              </View>
-            ))}
+              )
+            })}
           </View>
         </View>
 
@@ -1001,32 +1049,36 @@ const CheckoutScreen = ({ route, navigation }) => {
         </View>
 
         {/* Payment Error Banner */}
-        {!!stripeError && (
-          <View style={{ backgroundColor: '#FFEBEE', padding: 12, borderRadius: 12, marginHorizontal: spacing.lg, marginBottom: 12, borderWidth: 1, borderColor: '#F44336' }}>
-            <Text style={{ color: '#D32F2F', fontFamily: 'Poppins-Medium', fontSize: 13 }}>{typeof stripeError === 'string' ? stripeError : t('error')}</Text>
+        {
+          !!stripeError && (
+            <View style={{ backgroundColor: '#FFEBEE', padding: 12, borderRadius: 12, marginHorizontal: spacing.lg, marginBottom: 12, borderWidth: 1, borderColor: '#F44336' }}>
+              <Text style={{ color: '#D32F2F', fontFamily: 'Poppins-Medium', fontSize: 13 }}>{typeof stripeError === 'string' ? stripeError : t('error')}</Text>
 
-            {profileIncomplete ? (
-              <TouchableOpacity
-                onPress={() => navigation.navigate('EditProfile')}
-                style={{ marginTop: 12, backgroundColor: '#D32F2F', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, alignSelf: 'flex-start' }}
-              >
-                <Text style={{ color: '#fff', fontFamily: 'Poppins-Bold', fontSize: 13 }}>{t('editProfile') || 'Complete Profile'}</Text>
-              </TouchableOpacity>
-            ) : (
-              <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 8 }}>
-                <Text style={{ color: '#D32F2F', fontFamily: 'Poppins-Bold', textDecorationLine: 'underline' }}>{t('goBack')}</Text>
-              </TouchableOpacity>
-            )}
-          </View>
-        )}
+              {profileIncomplete ? (
+                <TouchableOpacity
+                  onPress={() => navigation.navigate('EditProfile')}
+                  style={{ marginTop: 12, backgroundColor: '#D32F2F', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, alignSelf: 'flex-start' }}
+                >
+                  <Text style={{ color: '#fff', fontFamily: 'Poppins-Bold', fontSize: 13 }}>{t('editProfile') || 'Complete Profile'}</Text>
+                </TouchableOpacity>
+              ) : (
+                <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 8 }}>
+                  <Text style={{ color: '#D32F2F', fontFamily: 'Poppins-Bold', textDecorationLine: 'underline' }}>{t('goBack')}</Text>
+                </TouchableOpacity>
+              )}
+            </View>
+          )
+        }
 
         {/* Checkout Initializing Banner */}
-        {initializingCheckout && (
-          <View style={{ backgroundColor: '#E3F2FD', padding: 12, borderRadius: 12, marginHorizontal: spacing.lg, marginBottom: 12, borderWidth: 1, borderColor: '#2196F3', flexDirection: 'row', alignItems: 'center' }}>
-            <ActivityIndicator size="small" color="#1976D2" style={{ marginRight: 8 }} />
-            <Text style={{ color: '#1565C0', fontFamily: 'Poppins-Medium', fontSize: 13 }}>{t('preparingCheckout')}</Text>
-          </View>
-        )}
+        {
+          initializingCheckout && (
+            <View style={{ backgroundColor: '#E3F2FD', padding: 12, borderRadius: 12, marginHorizontal: spacing.lg, marginBottom: 12, borderWidth: 1, borderColor: '#2196F3', flexDirection: 'row', alignItems: 'center' }}>
+              <ActivityIndicator size="small" color="#1976D2" style={{ marginRight: 8 }} />
+              <Text style={{ color: '#1565C0', fontFamily: 'Poppins-Medium', fontSize: 13 }}>{t('preparingCheckout')}</Text>
+            </View>
+          )
+        }
 
         {/* Place Order Button */}
         <View style={styles(colors).checkoutButtonContainer}>
@@ -1064,11 +1116,11 @@ const CheckoutScreen = ({ route, navigation }) => {
 
         {/* Bottom Spacing for safe area */}
         <View style={{ height: Math.max(100, insets.bottom + 90) }} />
-      </ScrollView>
+      </ScrollView >
 
       {renderProcessingModal()}
       {renderSuccessModal()}
-    </SafeAreaView>
+    </SafeAreaView >
   );
 };
 

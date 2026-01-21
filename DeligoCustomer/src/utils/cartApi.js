@@ -80,6 +80,9 @@ class CartAPI {
           if (it.options) {
             payload.options = it.options;
           }
+          if (it.addons) {
+            payload.addons = it.addons;
+          }
 
           console.debug('[CartAPI] Item payload:', payload);
           return payload;
@@ -88,6 +91,7 @@ class CartAPI {
         console.error('[CartAPI][cart:id-debug] no usable productIds in payload');
         return { success: false, error: 'No productId provided', status: 422 };
       }
+
       console.debug('[CartAPI] POST', url, 'items:', preparedItems);
       const response = await fetch(url, {
         method: 'POST',
@@ -241,6 +245,50 @@ class CartAPI {
       return { success: true, data: responseData };
     } catch (error) {
       console.error('Cart API - Update quantity network error:', error);
+      return { success: false, error: error?.message || 'Network error' };
+    }
+  }
+
+  /**
+   * Update add-on quantity
+   * @param {string} productId - The parent product ID
+   * @param {string} variantName - The variant name (required)
+   * @param {string} optionId - The add-on option ID
+   * @param {string} action - 'increment' or 'decrement'
+   */
+  static async updateAddonQuantity(productId, variantName, optionId, action = 'increment') {
+    try {
+      const url = `${BASE_API_URL}${API_ENDPOINTS.CART.UPDATE_ADDON_QUANTITY}`;
+      const headers = await this.getHeaders();
+
+      const payload = {
+        productId,
+        variantName,
+        optionId,
+        action
+      };
+
+      console.debug('[CartAPI] PATCH (Addon)', url, payload);
+
+      const response = await fetch(url, {
+        method: 'PATCH',
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        const errorMessage = responseData?.message || responseData?.error || 'Failed to update addon quantity';
+        console.error('Cart API - Update addon error:', {
+          status: response.status,
+          data: responseData
+        });
+        return { success: false, error: errorMessage, status: response.status };
+      }
+      return { success: true, data: responseData };
+    } catch (error) {
+      console.error('Cart API - Update addon network error:', error);
       return { success: false, error: error?.message || 'Network error' };
     }
   }
