@@ -535,7 +535,8 @@ const CheckoutScreen = ({ route, navigation }) => {
   // Fees and promo discount
   const deliveryFee = cartData?.deliveryFee || 0;
   const serviceFee = cartData?.serviceFee || 0;
-  const discount = cart?.appliedPromo?.discount || cartData?.discount || 0;
+  // Extract discount from server response first, then fallback
+  const discount = checkoutResponse?.data?.discount || cart?.appliedPromo?.discount || cartData?.discount || 0;
 
   // Build baseSubtotal/discountTotal/taxAmount/total to match CartDetail
   const baseSubtotal = cartItems.reduce((sum, it) => {
@@ -936,6 +937,64 @@ const CheckoutScreen = ({ route, navigation }) => {
           </View>
         </View>
 
+        {/* Voucher / Promo Code */}
+        <View style={styles(colors).section}>
+          <TouchableOpacity
+            style={styles(colors).voucherButton}
+            onPress={() => navigation.navigate('Vouchers', {
+              selectionMode: true,
+              vendorId: vendorId,
+              currentTotal: displayTotal,
+              onSelect: async (coupon) => {
+                // Handle coupon application logic here
+                // 1. Call API to apply coupon to THIS checkout/cart
+                setIsProcessing(true);
+                try {
+                  // Import dynamically if needed or assume CouponAPI is available
+                  const CouponAPI = require('../utils/couponApi').default;
+                  const res = await CouponAPI.applyCoupon(coupon.id || coupon._id, 'CART');
+
+                  if (res.success) {
+                    // 2. Update checkout response with new totals
+                    // Assuming backend returns updated checkout/cart object in res.data
+                    // We need to merge this into `checkoutResponse` to reflect changes in UI
+                    setCheckoutResponse(prev => ({
+                      ...prev,
+                      data: {
+                        ...(prev?.data || {}),
+                        ...res.data, // Merge updated totals/discount
+                        // Ensure we update key fields explicitly if structure varies
+                        discount: res.data.discount,
+                        total: res.data.total,
+                        subTotal: res.data.subTotal,
+                      }
+                    }));
+                    // Also set local discount state if we used it separate
+                    // setDiscount(res.data.discount);
+                  } else {
+                    setStripeError(res.error || 'Failed to apply coupon');
+                  }
+                } catch (e) {
+                  console.error('Coupon apply failed', e);
+                  setStripeError('Failed to apply coupon');
+                } finally {
+                  setIsProcessing(false);
+                }
+              }
+            })}
+          >
+            <View style={styles(colors).voucherLeft}>
+              <View style={styles(colors).voucherIconBadge}>
+                <Ionicons name="pricetag" size={20} color={colors.primary} />
+              </View>
+              <Text style={styles(colors).voucherButtonText}>
+                {checkoutResponse?.data?.discount > 0 ? t('voucherApplied') : t('applyVoucher')}
+              </Text>
+            </View>
+            <Ionicons name="chevron-forward" size={20} color={colors.text.secondary} />
+          </TouchableOpacity>
+        </View>
+
         {/* Payment Methods */}
         <View style={styles(colors).section}>
           <View style={styles(colors).sectionHeader}>
@@ -1050,6 +1109,16 @@ const CheckoutScreen = ({ route, navigation }) => {
                 {formatCurrency(currency, finalDeliveryFee)}
               </Text>
             </View>
+
+            {/* Discount Row */}
+            {discount > 0 && (
+              <View style={styles(colors).summaryRow}>
+                <Text style={styles(colors).summaryLabelDiscount}>{t('discount')}</Text>
+                <Text style={styles(colors).summaryValueDiscount}>
+                  -{formatCurrency(currency, discount)}
+                </Text>
+              </View>
+            )}
 
             <View style={styles(colors).divider} />
 

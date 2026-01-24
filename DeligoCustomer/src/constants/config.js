@@ -109,6 +109,14 @@ export const API_ENDPOINTS = {
     CREATE_PAYMENT_INTENT: '/payment/stripe/create-payment-intent',
   },
 
+  // Coupons & Offers
+  COUPONS: {
+    LIST: '/coupons', // Get eligible coupons
+    VERIFY: '/coupons/verify', // Check code validity
+    APPLY: '/coupons/apply-coupon', // Apply to cart
+    REMOVE: '/coupons/remove-coupon',
+  },
+
   // General & Utility
   UTIL: {
     SEARCH: '/search',
