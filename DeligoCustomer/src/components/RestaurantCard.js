@@ -82,17 +82,42 @@ const RestaurantCard = ({ restaurant, onPress }) => {
 
   const displayLocation = mergedVendor.city || mergedVendor.address || dynamicLocation;
 
+  const isStoreOpen = mergedVendor.isStoreOpen === true;
+
   return (
     <TouchableOpacity
-      style={[styles(colors).card]}
+      style={[
+        styles(colors).card,
+        !isStoreOpen && { backgroundColor: isDarkMode ? '#333' : '#f0f0f0', opacity: 0.9 } // Optional: subtle gray effect for the whole card context
+      ]}
       activeOpacity={0.92}
-      onPress={() => onPress && onPress(restaurant)}
+      onPress={() => {
+        if (isStoreOpen && onPress) {
+          onPress(restaurant);
+        }
+      }}
+      disabled={!isStoreOpen}
     >
       <View style={{ position: 'relative' }}>
-        <Image source={imageSource} style={[styles(colors).heroImage]} resizeMode="cover" />
+        <Image
+          source={imageSource}
+          style={[
+            styles(colors).heroImage,
+            !isStoreOpen && { opacity: 0.4 } // Dim the image if closed
+          ]}
+          resizeMode="cover"
+        />
+
+        {!isStoreOpen && (
+          <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)' }]}>
+            <View style={{ backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 4 }}>
+              <Text style={{ color: '#fff', fontFamily: 'Poppins-Bold', fontSize: 14 }}>Vendor is closed now</Text>
+            </View>
+          </View>
+        )}
 
         {/* Floating Rating Badge (Bottom Left) */}
-        {ratingValue !== null && (
+        {ratingValue !== null && isStoreOpen && (
           <View style={styles(colors).ratingPill}>
             <Ionicons name="star" size={12} color="#FFC107" />
             <Text style={styles(colors).ratingPillText}>{` ${ratingValue}`}</Text>
@@ -100,12 +125,14 @@ const RestaurantCard = ({ restaurant, onPress }) => {
         )}
 
         {/* Floating Delivery Time Badge (Bottom Right) */}
-        <View style={[styles(colors).deliveryPill]}>
-          <Text style={styles(colors).deliveryPillText}>20-30 min</Text>
-        </View>
+        {isStoreOpen && (
+          <View style={[styles(colors).deliveryPill]}>
+            <Text style={styles(colors).deliveryPillText}>20-30 min</Text>
+          </View>
+        )}
       </View>
 
-      <View style={styles(colors).infoContainer}>
+      <View style={[styles(colors).infoContainer, !isStoreOpen && { opacity: 0.6 }]}>
         <View style={styles(colors).body}>
           <View style={styles(colors).rowTop}>
             <View style={styles(colors).nameContainer}>
