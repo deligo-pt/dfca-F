@@ -525,8 +525,8 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                           {formatCurrency(currency, finalTotal)}
                         </Text>
                         {discountPercent > 0 && (
-                          <View style={[styles.modalBadge, { backgroundColor: colors.primary }]}>
-                            <Text style={styles.modalBadgeText}>{discountPercent}% OFF</Text>
+                          <View style={[styles.modalBadge, { backgroundColor: colors.primary, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }]}>
+                            <Text style={[styles.modalBadgeText, { fontSize: 14, fontWeight: 'bold', color: '#fff' }]}>{discountPercent}% OFF</Text>
                           </View>
                         )}
                       </>
@@ -539,17 +539,18 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
               {/* Add-ons Info Banner - Addons will be selected on separate screen */}
               {activeAddons.length > 0 && (
-                <View style={[styles.addonsBanner, { backgroundColor: colors.primary + '10', borderColor: colors.primary + '30' }]}>
-                  <Ionicons name="add-circle-outline" size={24} color={colors.primary} />
-                  <View style={{ marginLeft: 12, flex: 1 }}>
-                    <Text style={[styles.addonsBannerTitle, { color: colors.text.primary }]}>
-                      {t('extrasAvailable') || 'Extras Available'}
+                <View style={[styles.addonsBanner, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, paddingVertical: 12 }]}>
+                  <View style={{ backgroundColor: colors.primary + '15', padding: 8, borderRadius: 20, marginRight: 12 }}>
+                    <Ionicons name="add-circle-outline" size={20} color={colors.primary} />
+                  </View>
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.addonsBannerTitle, { color: colors.text.primary, fontSize: 14, marginBottom: 2 }]}>
+                      {t('extrasAvailable')}
                     </Text>
-                    <Text style={[styles.addonsBannerText, { color: colors.text.secondary }]}>
-                      {t('addExtrasAfterCart') || 'You can add extras after adding to cart'}
+                    <Text style={[styles.addonsBannerText, { color: colors.text.secondary, fontSize: 12 }]}>
+                      {t('addExtrasAfterCart')}
                     </Text>
                   </View>
-                  <Ionicons name="chevron-forward" size={20} color={colors.primary} />
                 </View>
               )}
 
@@ -664,12 +665,14 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
                   if (variations.length > 0) {
                     // Check if ANY variation is not selected
-                    const unselected = variations.filter(v => !selectedVariations[v.name || v.title || v.id]);
+                    // RELAXED: User requested optional variants. Only enforce if 'required' is explicitly true.
+                    // If your data doesn't have 'required' property, this loop effectively becomes optional.
+                    const unselectedRequired = variations.filter(v => v.required && !selectedVariations[v.name || v.title || v.id]);
 
-                    if (unselected.length > 0) {
+                    if (unselectedRequired.length > 0) {
                       setAlertConfig({
                         title: t('selectionRequired') || 'Selection Required',
-                        message: `${t('pleaseSelect') || 'Please select'}: ${unselected[0].name || unselected[0].title || 'a variation'}`
+                        message: `${t('pleaseSelect') || 'Please select'}: ${unselectedRequired[0].name || unselectedRequired[0].title || 'a variation'}`
                       });
                       setAlertVisible(true);
                       return;
@@ -680,89 +683,146 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                   setAddingToCart(true);
 
                   try {
-                  // Validate Add-on requirements
-                  // DISABLED: User report indicates strict validation blocks intent (backend data mismatch with UX).
-                  // Relaxing client-side check to allow adding to cart. Backend will reject if critical.
-                  /*
-                  for (const group of activeAddons) {
-                    if (group.minSelectable > 0) {
-                      const groupSelections = selectedAddons[group._id] || {};
-                      // Check total items count for "select X items" requirement
-                      const totalCount = Object.values(groupSelections).reduce((s, o) => s + (o.quantity || 0), 0);
-        
-                      if (totalCount < group.minSelectable) {
-                        setAlertConfig({
-                          title: t('selectionRequired') || 'Selection Required',
-                          message: `${t('pleaseSelect') || 'Please select at least'} ${group.minSelectable} ${t('from') || 'from'} ${group.title || group.name}`
-                        });
-                        setAlertVisible(true);
-                        return;
+                    // Validate Add-on requirements
+                    // DISABLED: User report indicates strict validation blocks intent (backend data mismatch with UX).
+                    // Relaxing client-side check to allow adding to cart. Backend will reject if critical.
+                    /*
+                    for (const group of activeAddons) {
+                      if (group.minSelectable > 0) {
+                        const groupSelections = selectedAddons[group._id] || {};
+                        // Check total items count for "select X items" requirement
+                        const totalCount = Object.values(groupSelections).reduce((s, o) => s + (o.quantity || 0), 0);
+          
+                        if (totalCount < group.minSelectable) {
+                          setAlertConfig({
+                            title: t('selectionRequired') || 'Selection Required',
+                            message: `${t('pleaseSelect') || 'Please select at least'} ${group.minSelectable} ${t('from') || 'from'} ${group.title || group.name}`
+                          });
+                          setAlertVisible(true);
+                          return;
+                        }
                       }
                     }
-                  }
-                  */
+                    */
 
-                  // Retrieve detailed objects for selections
-                  const variantNames = Object.keys(selectedVariations)
-                    .filter(k => k.endsWith('_obj'))
-                    .map(k => {
-                      const opt = selectedVariations[k];
-                      return opt.name || opt.value || opt.id || opt.label;
-                    });
-
-                  // Calculate final unit price for cart (Base + VariationDiff + Addons)
-                  // Actually, if Variation is Absolute, it replaces Base.
-                  // Logic: (SelectedVariationPrice || ProductPrice) - Discount + Addons
-
-                  // Use pricing.price from API (not raw.price which may be undefined)
-                  // Build variant name from selected variations
-                  const variantName = variantNames.length > 0 ? variantNames.join(', ') : 'Standard';
-
-                  // Check if product has addon groups
-                  const addonGroupIds = raw.addonGroups || [];
-                  const hasAddons = addonGroupIds.length > 0;
-
-                  // Payload for cart - addons will be handled on separate screen
-                  const payload = {
-                    variantName: variantName,
-                    options: selectedVariations,
-                    addons: [] // Don't send addons here, let AddonsScreen handle it
-                  };
-
-                  // Add the product to cart first (without addons)
-                  const result = await addItem(activeProduct, quantity, payload);
-
-                  if (result && !result.success) {
-                    console.warn('[RestaurantDetails] Add to cart failed:', result);
-                    throw new Error(result.message || 'Failed to add to cart');
-                  }
-
-                  closeProductModal();
-
-                  // If product has addons, navigate to AddonsScreen
-                  if (hasAddons) {
-                    // Small delay to ensure modal is closed
-                    setTimeout(() => {
-                      // Use MongoDB _id for productId since backend looks up items by _id
-                      const mongoProductId = raw._id || activeProduct._raw?._id || activeProduct.id;
-
-                      navigation.navigate('Addons', {
-                        product: {
-                          name: raw.name || activeProduct.name,
-                          id: mongoProductId,
-                        },
-                        productId: mongoProductId,
-                        variantName: variantName,
-                        addonGroupIds: addonGroupIds,
-                        currency: raw.pricing?.currency || 'EUR'
+                    // Retrieve detailed objects for selections
+                    const variantNames = Object.keys(selectedVariations)
+                      .filter(k => k.endsWith('_obj'))
+                      .map(k => {
+                        const opt = selectedVariations[k];
+                        return opt.name || opt.value || opt.id || opt.label;
                       });
-                    }, 300);
-                  }
+
+                    // Calculate final unit price for cart (Base + VariationDiff + Addons)
+                    // Actually, if Variation is Absolute, it replaces Base.
+                    // Logic: (SelectedVariationPrice || ProductPrice) - Discount + Addons
+
+                    // Use pricing.price from API (not raw.price which may be undefined)
+                    // Build variant name from selected variations
+                    // FIX: Do NOT default to 'Standard' - use null if no variations selected
+                    const variantName = variantNames.length > 0 ? variantNames.join(', ') : null;
+
+                    // Check if product has addon groups
+                    const addonGroupIds = raw.addonGroups || [];
+                    const hasAddons = addonGroupIds.length > 0;
+
+                    // Payload for cart - addons will be handled on separate screen
+                    const payload = {
+                      variantName: variantName,
+                      options: selectedVariations,
+                      addons: [] // Don't send addons here, let AddonsScreen handle it
+                    };
+
+                    // Add the product to cart first (without addons)
+                    const result = await addItem(activeProduct, quantity, payload);
+
+                    if (result && !result.success) {
+                      // Check for different vendor error
+                      if (result.error === 'DIFFERENT_VENDOR') {
+                        setAlertConfig({
+                          title: t('startNewBasket') || 'Start new basket?',
+                          message: t('clearCartConfirm') || 'Your cart contains items from another restaurant. Do you want to clear it and add this item?',
+                          buttons: [
+                            {
+                              text: t('cancel') || 'Cancel',
+                              style: 'cancel',
+                              onPress: () => console.log('Cancelled new basket')
+                            },
+                            {
+                              text: t('clearAndAdd') || 'Clear & Add',
+                              onPress: async () => {
+                                try {
+                                  // Clear all carts directly
+                                  await clearAllCarts();
+                                  // Wait a tick for state to update
+                                  setTimeout(async () => {
+                                    // Retry adding
+                                    const retry = await addItem(activeProduct, quantity, payload);
+                                    if (retry && !retry.success) {
+                                      setAlertConfig({
+                                        title: t('error') || 'Error',
+                                        message: retry.message || t('addToCartFailed') || 'Failed to add item'
+                                      });
+                                      setAlertVisible(true);
+                                    } else {
+                                      // Success path - same as below
+                                      closeProductModal();
+                                      if (hasAddons) {
+                                        // ... navigate to addons
+                                        setTimeout(() => {
+                                          const mongoProductId = raw._id || activeProduct._raw?._id || activeProduct.id;
+                                          navigation.navigate('Addons', {
+                                            product: { name: raw.name || activeProduct.name, id: mongoProductId },
+                                            productId: mongoProductId,
+                                            variantName: variantName,
+                                            addonGroupIds: addonGroupIds,
+                                            currency: raw.pricing?.currency || 'EUR'
+                                          });
+                                        }, 300);
+                                      }
+                                    }
+                                  }, 100);
+                                } catch (e) {
+                                  console.error('Failed to clear and add:', e);
+                                }
+                              }
+                            }
+                          ]
+                        });
+                        setAlertVisible(true);
+                        return; // Stop execution, wait for user input
+                      }
+                      console.warn('[RestaurantDetails] Add to cart failed:', result);
+                      throw new Error(result.message || 'Failed to add to cart');
+                    }
+
+                    closeProductModal();
+
+                    // If product has addons, navigate to AddonsScreen
+                    if (hasAddons) {
+                      // Small delay to ensure modal is closed
+                      setTimeout(() => {
+                        // Use MongoDB _id for productId since backend looks up items by _id
+                        const mongoProductId = raw._id || activeProduct._raw?._id || activeProduct.id;
+
+                        navigation.navigate('Addons', {
+                          product: {
+                            name: raw.name || activeProduct.name,
+                            id: mongoProductId,
+                          },
+                          productId: mongoProductId,
+                          variantName: variantName,
+                          addonGroupIds: addonGroupIds,
+                          currency: raw.pricing?.currency || 'EUR'
+                        });
+                      }, 300);
+                    }
                   } catch (error) {
                     console.error('[RestaurantDetails] Add to cart error:', error);
                     setAlertConfig({
                       title: t('error') || 'Error',
-                      message: t('addToCartFailed') || 'Failed to add item to cart. Please try again.'
+                      // Show actual error message if available, otherwise fallback
+                      message: error.message || t('addToCartFailed') || 'Failed to add item to cart'
                     });
                     setAlertVisible(true);
                   } finally {
@@ -780,14 +840,14 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                   {addingToCart
                     ? (t('adding') || 'Adding...')
                     : quantity > 0
-                    ? (() => {
-                      // Calculate total based on finalPrice (includes discount)
-                      const base = raw.pricing?.finalPrice ?? raw.finalPrice ?? price ?? 0;
-                      const total = base * quantity;
+                      ? (() => {
+                        // Calculate total based on finalPrice (includes discount)
+                        const base = raw.pricing?.finalPrice ?? raw.finalPrice ?? price ?? 0;
+                        const total = base * quantity;
 
-                      return `${t('add') || 'Add'} ${quantity} ${t('for') || 'for'} ${formatCurrency(currency, total)}`;
-                    })()
-                    : (t('addToCart') || 'Add to cart')
+                        return `${t('add') || 'Add'} ${quantity} ${t('for') || 'for'} ${formatCurrency(currency, total)}`;
+                      })()
+                      : (t('addToCart') || 'Add to cart')
                   }
                 </Text>
               </TouchableOpacity>

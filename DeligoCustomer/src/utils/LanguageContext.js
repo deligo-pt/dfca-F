@@ -58,6 +58,11 @@ export const LanguageProvider = ({ children }) => {
       if (value && typeof value === 'string') return value;
     }
 
+    // Debug missing keys
+    if (!translations[key] && !key.includes('.')) {
+      console.warn(`[LanguageContext] Missing key: ${key}`);
+    }
+
     return key;
   };
 

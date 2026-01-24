@@ -86,6 +86,9 @@ export const translations = {
     pleaseSelect: 'Please select',
     customizable: 'Customizable',
     pleaseAddQuantity: 'Please add at least 1 item',
+    extrasAvailable: 'Customize your order',
+    addExtrasAfterCart: 'Choose toppings & extras in the next step',
+    loadingAddons: 'Loading extras...',
 
     // Cart
     cart: 'Cart',
@@ -94,6 +97,9 @@ export const translations = {
     tax: 'Tax',
     total: 'Total',
     proceedToCheckout: 'Proceed to Checkout',
+    startNewBasket: 'Start new basket?',
+    clearCartConfirm: 'Your cart contains items from another restaurant. Do you want to clear it and add this item?',
+    clearAndAdd: 'Clear & Add',
     clearAll: 'Clear all',
     addMoreItems: 'Add more items',
     itemsTotal: 'Items Total',
@@ -241,6 +247,7 @@ export const translations = {
     enjoyYourMeal: 'Enjoy your meal!',
     estimatedDelivery: 'Estimated Delivery',
     contactRider: 'Contact Rider',
+    addToCartFailed: 'Failed to add item to cart',
     from: 'From',
     estimatedDeliveryTime: 'Estimated delivery time',
     preparingCheckout: 'Preparing checkout...',
@@ -589,6 +596,9 @@ export const translations = {
     pleaseSelect: 'Por favor selecione',
     customizable: 'Personalizável',
     pleaseAddQuantity: 'Por favor adicione pelo menos 1 item',
+    extrasAvailable: 'Personalize o seu pedido',
+    addExtrasAfterCart: 'Escolha extras e complementos no próximo passo',
+    loadingAddons: 'A carregar extras...',
 
     // Cart
     cart: 'Carrinho',
@@ -780,6 +790,7 @@ export const translations = {
     enjoyYourMeal: 'Bom apetite!',
     estimatedDelivery: 'Entrega Estimada',
     contactRider: 'Contactar Estafeta',
+    addToCartFailed: 'Falha ao adicionar item ao carrinho',
     from: 'De',
     estimatedDeliveryTime: 'Tempo estimado de entrega',
     preparingCheckout: 'A preparar checkout...',

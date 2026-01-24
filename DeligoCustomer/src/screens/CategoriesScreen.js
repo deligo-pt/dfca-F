@@ -186,7 +186,8 @@ const CategoriesScreen = ({ navigation }) => {
                 rating: vendorRating,
                 latitude: vendorSource.latitude || businessLocation.latitude,
                 longitude: vendorSource.longitude || businessLocation.longitude,
-                storePhoto: storePhoto
+                storePhoto: storePhoto,
+                isStoreOpen: businessDetails.isStoreOpen ?? vendorSource.isStoreOpen
             }
         };
     };
@@ -520,6 +521,7 @@ const CategoriesScreen = ({ navigation }) => {
                 longitude: vendorMerged.longitude ?? businessLocation.longitude,
                 city: vendorMerged.city,
                 address: vendorMerged.address,
+                isStoreOpen: vendorMerged.isStoreOpen ?? businessDetails.isStoreOpen,
                 businessDetails,
                 businessLocation,
                 documents,

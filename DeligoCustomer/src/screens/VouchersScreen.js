@@ -14,6 +14,7 @@ import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, colors } from '../theme';
 import { useLanguage } from '../utils/LanguageContext';
+import formatCurrency from '../utils/currency';
 import CouponAPI from '../utils/couponApi';
 
 const VouchersScreen = ({ navigation, route }) => {
@@ -55,20 +56,38 @@ const VouchersScreen = ({ navigation, route }) => {
   };
 
   const handleVerifyManualCode = async () => {
-    if (!manualCode.trim()) return;
+    const code = manualCode.trim();
+    if (!code) return;
+
     setVerifying(true);
 
-    // First verification step
-    const res = await CouponAPI.verifyCode(manualCode);
+    // 1. Check if we have this coupon in the fetched list
+    const foundLocal = coupons.find(c => c.code && c.code.toLowerCase() === code.toLowerCase());
+
+    if (foundLocal) {
+      setVerifying(false);
+      if (selectionMode && onSelect) {
+        onSelect(foundLocal);
+        navigation.goBack();
+      } else {
+        // Just highlight it or show detail?
+        Alert.alert(t('success'), t('couponAvailable'));
+      }
+      return;
+    }
+
+    // 2. If not found locally, try to APPLY it directly via API
+    // User indicated 'apply-coupon' handles both check and apply
+    const res = await CouponAPI.applyCoupon(code, 'CART', true); // isCode=true
     setVerifying(false);
 
     if (res.success) {
-      // If code is valid, and we are in selection mode, apply it immediately
       if (selectionMode && onSelect) {
-        onSelect(res.data); // Assuming data is the coupon object
+        // Pass the Result back, not a coupon object, because we already applied it
+        onSelect(null, res.data);
         navigation.goBack();
       } else {
-        Alert.alert(t('success'), t('couponValid'));
+        Alert.alert(t('success'), t('couponApplied'));
       }
     } else {
       Alert.alert(t('error'), res.error || t('invalidPromoCode'));

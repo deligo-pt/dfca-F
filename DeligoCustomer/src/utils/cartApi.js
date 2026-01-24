@@ -77,7 +77,7 @@ class CartAPI {
           if (it.variantName) {
             payload.variantName = it.variantName;
           }
-          if (it.options) {
+          if (it.options && Object.keys(it.options).length > 0) {
             payload.options = it.options;
           }
           if (it.addons) {

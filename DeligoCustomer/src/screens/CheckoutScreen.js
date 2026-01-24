@@ -77,6 +77,7 @@ const CheckoutScreen = ({ route, navigation }) => {
   const [notes, setNotes] = useState('');
   const [stripeReady, setStripeReady] = useState(false);
   const [stripeError, setStripeError] = useState(null);
+  const [appliedOffer, setAppliedOffer] = useState(null);
 
   // Get real cart data from CartContext
   const { getVendorCart } = useCart();
@@ -353,14 +354,38 @@ const CheckoutScreen = ({ route, navigation }) => {
       if (isCartPurchase) {
         // CART PURCHASE
         checkoutPayload.useCart = true;
-        // Don't send items for cart purchase as per requirement
+        // SPECIAL CASE: If we have an applied offer, we MUST send items with offerCode
+        // even if it's a cart purchase, if the backend supports overriding cart items
+        if (appliedOffer && appliedOffer.code) {
+          const itemsWithOffer = (cartData?.items || []).map(it => {
+            const rawId = it.productId || it.product?.id || it.product?._id || it.id || it._id;
+            return {
+              productId: (rawId && rawId.includes('|')) ? rawId.split('|')[0] : rawId,
+              quantity: it.quantity || 1,
+              offerCode: appliedOffer.code,
+              // Also pass addons/options if needed, though usually just ID/Qty is enough for backend calculation unless it's a dynamic price
+              // If backend requires them to validate price:
+              // addons: it.addons,
+              // options: it.options 
+            };
+          });
+          checkoutPayload.items = itemsWithOffer;
+
+          // CRITICAL: When sending specific items (especially with offerCode), disable useCart
+          // to force the backend to calculate based on THESE items, not the server-side cart.
+          checkoutPayload.useCart = false;
+        }
       } else {
         // DIRECT PURCHASE (Buy Now / Reorder / etc)
         // Extract items from cartData params
-        const directItems = (cartData?.items || []).map(it => ({
-          productId: it.productId || it.product?.id || it.id, // Ensure productId is set
-          quantity: it.quantity || 1
-        }));
+        const directItems = (cartData?.items || []).map(it => {
+          const rawId = it.productId || it.product?.id || it.product?._id || it.id || it._id;
+          return {
+            productId: (rawId && rawId.includes('|')) ? rawId.split('|')[0] : rawId, // Ensure productId is set and clean
+            quantity: it.quantity || 1,
+            offerCode: appliedOffer?.code // Inject offerCode
+          };
+        });
         checkoutPayload.items = directItems;
         // Don't send useCart
       }
@@ -379,51 +404,19 @@ const CheckoutScreen = ({ route, navigation }) => {
 
       try {
         console.debug('[CheckoutScreen] Creating checkout via API with payload type:', isCartPurchase ? 'CART' : 'DIRECT');
+        const res = await CheckoutAPI.createCheckout(checkoutPayload);
 
-        // Pass checkoutPayload to API
-        let res = await CheckoutAPI.createCheckout(checkoutPayload);
-
-        // Fallback Strategy: If still 400 "Delivery address not found"
-        // Try sending WITHOUT the IDs, forcing the backend to use the raw address fields (which are spread in root)        
-        if (!res.success && res.status === 400 && backendAddressId) {
-          const errorMsg = typeof res.error === 'string' ? res.error : (res.error?.message || '');
-          if (errorMsg.includes('Delivery address not found')) {
-            console.warn('[CheckoutScreen] ID-based checkout failed. Retrying with Raw Address Object (no ID)...');
-
-            // Construct payload that relies on embedded address data, NOT ID lookups
-            const fallbackPayload = { ...checkoutPayload };
-            delete fallbackPayload.deliveryAddressId;
-            delete fallbackPayload.addressId;
-            delete fallbackPayload.deliveryAddress;
-
-            res = await CheckoutAPI.createCheckout(fallbackPayload);
-            console.debug('[CheckoutScreen] Retry createCheckout result:', res);
-          }
+        if (res.success || (res.data && res.data.success)) {
+          const checkoutData = res.data?.data || res.data || res;
+          console.debug('[CheckoutScreen] Checkout created successfully, ID:', extractCheckoutSummaryId(checkoutData));
+          setCheckoutResponse(checkoutData);
+        } else {
+          console.warn('[CheckoutScreen] Checkout creation failed:', res.error);
+          setStripeError(res.error || 'Failed to initialize checkout');
         }
-
-        console.debug('[CheckoutScreen] createCheckout final result:', res);
-
-        if (canceled) return;
-
-        if (!res.success) {
-          const msg = typeof res.error === 'string' ? res.error : (res.error?.message || 'Failed to initialize checkout');
-
-          if (msg.toLowerCase().includes('complete your profile')) {
-            setProfileIncomplete(true);
-          }
-
-          setStripeError(msg);
-          setInitializingCheckout(false);
-          return;
-        }
-
-        // Store response for Stripe initialization
-        setCheckoutResponse(res.data);
       } catch (err) {
         console.error('[CheckoutScreen] createCheckout error:', err);
-        if (!canceled) {
-          setStripeError(err?.message || 'Failed to create checkout');
-        }
+        setStripeError('An error occurred while initializing checkout. Please try again.');
       } finally {
         if (!canceled) {
           setInitializingCheckout(false);
@@ -436,7 +429,7 @@ const CheckoutScreen = ({ route, navigation }) => {
     return () => {
       canceled = true;
     };
-  }, [address, detailedAddress, city, postalCode]); // Re-run if any address field changes
+  }, [address, detailedAddress, city, postalCode, appliedOffer]); // Re-run if address or offer changes
 
   // Calculate real cart values with ProductsContext enrichment
   const cartItems = cart?.items ? Object.keys(cart.items).map(id => {
@@ -535,18 +528,44 @@ const CheckoutScreen = ({ route, navigation }) => {
   // Fees and promo discount
   const deliveryFee = cartData?.deliveryFee || 0;
   const serviceFee = cartData?.serviceFee || 0;
-  // Extract discount from server response first, then fallback
-  const discount = checkoutResponse?.data?.discount || cart?.appliedPromo?.discount || cartData?.discount || 0;
+  // Extract discount from server main object or data object
+  // serverData is already checkoutResponse?.data || checkoutResponse
+  let discount = serverData?.discount || serverData?.discountAmount || cart?.appliedPromo?.discount || cartData?.discount || 0;
+
+  console.debug('[CheckoutScreen] Discount Calculation:', {
+    serverDiscount: discount,
+    serverDataTotal: serverData?.total || serverData?.subTotal,
+    itemsSubtotal: displaySubtotal,
+    appliedOffer: appliedOffer ? { code: appliedOffer.code, type: appliedOffer.type, value: appliedOffer.value, discountAmount: appliedOffer.discountAmount } : 'null'
+  });
+
+  // Fallback: Calculate local discount if server didn't return it but we have an applied offer
+  if ((!discount || discount === 0) && appliedOffer) {
+    if (appliedOffer.discountType === 'PERCENTAGE' || appliedOffer.type === 'PERCENTAGE') {
+      const pct = Number(appliedOffer.discountAmount || appliedOffer.value || 0);
+      // Calculate against displaySubtotal (or baseSubtotal)
+      discount = (displaySubtotal * pct) / 100;
+      // Check max discount
+      if (appliedOffer.maxDiscountAmount && discount > appliedOffer.maxDiscountAmount) {
+        discount = appliedOffer.maxDiscountAmount;
+      }
+    } else if (appliedOffer.discountType === 'FIXED' || appliedOffer.type === 'FIXED') {
+      discount = Number(appliedOffer.discountAmount || appliedOffer.value || 0);
+    }
+  }
 
   // Build baseSubtotal/discountTotal/taxAmount/total to match CartDetail
   const baseSubtotal = cartItems.reduce((sum, it) => {
     const addonsTotal = (it.addons || []).reduce((s, ad) => s + Number(ad.price || 0), 0);
     return sum + ((it.price || 0) + addonsTotal) * (it.quantity || 0);
   }, 0);
-  const discountTotal = cartItems.reduce((sum, it) => {
-    const unitDiscount = (it.price || 0) * ((it.discountPercent || 0) / 100);
-    return sum + unitDiscount * (it.quantity || 0);
-  }, 0);
+  const discountTotal = discount; // Use the calculated/server discount as total discount
+
+  /* 
+   * Previous logic was calculating line-item discounts from product.discountPercent.
+   * IF we want to show Coupon Discount separately, we should distinguish item-discounts from order-discounts.
+   * For now, we overwrite discountTotal with the Order Level discount if present.
+   */
   const subtotalAfterDiscount = baseSubtotal - discountTotal;
   const taxAmount = cartItems.reduce((sum, it) => {
     const unitDiscount = (it.price || 0) * ((it.discountPercent || 0) / 100);
@@ -578,9 +597,21 @@ const CheckoutScreen = ({ route, navigation }) => {
   const displayTotal = serverTotal ?? total;
 
   // Calculate delivery fee: Explicit -> Diff -> CartData -> 0
-  const finalDeliveryFee = serverDeliveryFee !== null
-    ? Number(serverDeliveryFee)
-    : (serverTotal ? (Number(serverTotal) - displaySubtotal) : (cartData?.deliveryFee || 0));
+  let finalDeliveryFee = 0;
+
+  if (serverDeliveryFee !== null && serverDeliveryFee !== undefined) {
+    finalDeliveryFee = Number(serverDeliveryFee);
+  } else if (serverTotal) {
+    // Determine fee from total diff (User confirmed distance-based)
+    const diff = Number(serverTotal) - displaySubtotal;
+    // Only clamp negative
+    finalDeliveryFee = diff > 0 ? diff : 0;
+  } else {
+    finalDeliveryFee = cartData?.deliveryFee || 0;
+  }
+
+  // Ensure non-negative
+  if (finalDeliveryFee < 0) finalDeliveryFee = 0;
 
   // Set initial notes from cart delivery instructions
   useEffect(() => {
@@ -945,40 +976,15 @@ const CheckoutScreen = ({ route, navigation }) => {
               selectionMode: true,
               vendorId: vendorId,
               currentTotal: displayTotal,
-              onSelect: async (coupon) => {
-                // Handle coupon application logic here
-                // 1. Call API to apply coupon to THIS checkout/cart
-                setIsProcessing(true);
-                try {
-                  // Import dynamically if needed or assume CouponAPI is available
-                  const CouponAPI = require('../utils/couponApi').default;
-                  const res = await CouponAPI.applyCoupon(coupon.id || coupon._id, 'CART');
-
-                  if (res.success) {
-                    // 2. Update checkout response with new totals
-                    // Assuming backend returns updated checkout/cart object in res.data
-                    // We need to merge this into `checkoutResponse` to reflect changes in UI
-                    setCheckoutResponse(prev => ({
-                      ...prev,
-                      data: {
-                        ...(prev?.data || {}),
-                        ...res.data, // Merge updated totals/discount
-                        // Ensure we update key fields explicitly if structure varies
-                        discount: res.data.discount,
-                        total: res.data.total,
-                        subTotal: res.data.subTotal,
-                      }
-                    }));
-                    // Also set local discount state if we used it separate
-                    // setDiscount(res.data.discount);
-                  } else {
-                    setStripeError(res.error || 'Failed to apply coupon');
-                  }
-                } catch (e) {
-                  console.error('Coupon apply failed', e);
-                  setStripeError('Failed to apply coupon');
-                } finally {
-                  setIsProcessing(false);
+              onSelect: async (coupon, manualResult) => {
+                // Simply set determining offer and let createCheckoutOnEnter handle the API call
+                if (coupon && coupon.code) {
+                  console.debug('[CheckoutScreen] Voucher selected:', coupon.code);
+                  setAppliedOffer(coupon);
+                  setStripeError(null);
+                } else {
+                  console.warn('[CheckoutScreen] Voucher selected but invalid or missing code:', coupon);
+                  setStripeError('Invalid voucher selected');
                 }
               }
             })}

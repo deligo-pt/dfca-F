@@ -19,12 +19,17 @@ class CouponAPI {
 
         try {
             let token = await StorageService.getAccessToken();
+            console.debug('[CouponAPI] Raw token from storage:', token ? (typeof token === 'object' ? JSON.stringify(token) : 'string ' + token.substr(0, 10)) : 'null');
+
             if (token && typeof token === 'object') {
                 token = token.accessToken || token.token || token.value || null;
             }
             if (token) {
                 const authHeader = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
                 headers.Authorization = authHeader;
+                console.debug('[CouponAPI] Authorization header set:', authHeader.substring(0, 15) + '...');
+            } else {
+                console.warn('[CouponAPI] No token found for Authorization header');
             }
         } catch (e) {
             console.debug('[CouponAPI] token read error', e);
@@ -33,15 +38,15 @@ class CouponAPI {
     }
 
     /**
-     * Get all available coupons
+     * Get all available coupons/offers
      * @param {string} vendorId - Optional vendor ID to filter coupons
      */
     static async getCoupons(vendorId = null) {
         try {
-            let url = `${BASE_API_URL}${API_ENDPOINTS.COUPONS.LIST}`;
-            if (vendorId) {
-                url += `?vendorId=${vendorId}`;
-            }
+            // Use OFFERS list if available in config, fallback to COUPONS.LIST
+            let url = `${BASE_API_URL}${API_ENDPOINTS.OFFERS?.LIST || API_ENDPOINTS.COUPONS.LIST}`;
+            // Query params if supported by backend
+            // if (vendorId) url += `?vendorId=${vendorId}`; 
 
             const headers = await this.getHeaders();
             console.debug('[CouponAPI] GET', url);
@@ -57,7 +62,17 @@ class CouponAPI {
                 return { success: false, error: data?.message || 'Failed to fetch coupons', status: response.status };
             }
 
-            return { success: true, data: data.data || data };
+            // The API returns { data: { data: [...] } } based on user snippet
+            // Handle both structures mainly
+            const items = data.data?.data || data.data || [];
+
+            // Client-side filter by vendor if API doesn't support it directly yet (safe fallback)
+            // Some global offers might not have vendorId or apply to all
+            const filtered = vendorId
+                ? items.filter(i => !i.vendorId || i.vendorId === vendorId)
+                : items;
+
+            return { success: true, data: filtered };
         } catch (error) {
             console.error('[CouponAPI] getCoupons error:', error);
             return { success: false, error: error?.message || 'Network error' };
@@ -66,14 +81,21 @@ class CouponAPI {
 
     /**
      * Apply a coupon to the cart
-     * @param {string} couponId - The ID of the coupon to apply
+     * @param {string} identifier - The ID or Code of the coupon/offer
      * @param {string} type - Application type (default: 'CART')
+     * @param {boolean} isCode - Whether the identifier is a manual code (vs ID)
      */
-    static async applyCoupon(couponId, type = 'CART') {
+    static async applyCoupon(identifier, type = 'CART', isCode = false) {
         try {
             const url = `${BASE_API_URL}${API_ENDPOINTS.COUPONS.APPLY}`;
             const headers = await this.getHeaders();
-            const payload = { couponId, type };
+
+            const payload = { type };
+            if (isCode) {
+                payload.code = identifier;
+            } else {
+                payload.couponId = identifier;
+            }
 
             console.debug('[CouponAPI] POST Apply', url, payload);
 
@@ -86,7 +108,6 @@ class CouponAPI {
             const data = await response.json();
 
             if (!response.ok) {
-                // handle 400 etc
                 return { success: false, error: data?.message || data?.error || 'Failed to apply coupon', status: response.status };
             }
 
@@ -98,32 +119,38 @@ class CouponAPI {
     }
 
     /**
-     * Verify a manual coupon code (resolves to ID if valid)
-     * @param {string} code - The manual code entered by user
+     * Check if an offer is applicable (Validation)
+     * Recommended method for manual code checking before applying
      */
-    static async verifyCode(code) {
+    static async getApplicableOffer(vendorId, subTotal, offerCode) {
         try {
-            const url = `${BASE_API_URL}${API_ENDPOINTS.COUPONS.VERIFY}`;
-            const headers = await this.getHeaders();
+            const url = `${BASE_API_URL}${API_ENDPOINTS.OFFERS?.GET_APPLICABLE}`;
+            if (!url || url.includes('undefined')) {
+                console.warn('[CouponAPI] GET_APPLICABLE endpoint missing');
+                return { success: false, error: 'Feature not configured' };
+            }
 
-            console.debug('[CouponAPI] POST Verify', url, { code });
+            const headers = await this.getHeaders();
+            const payload = { vendorId, subTotal, offerCode };
+
+            console.debug('[CouponAPI] PATCH CheckAvailable', url, payload);
 
             const response = await fetch(url, {
-                method: 'POST',
+                method: 'PATCH',
                 headers,
-                body: JSON.stringify({ code })
+                body: JSON.stringify(payload)
             });
 
             const data = await response.json();
 
             if (!response.ok) {
-                return { success: false, error: data?.message || 'Invalid code', status: response.status };
+                return { success: false, error: data?.message || 'Offer not applicable', status: response.status };
             }
 
-            return { success: true, data: data.data || data };
+            return { success: true, data: data };
         } catch (error) {
-            console.error('[CouponAPI] verifyCode error:', error);
-            return { success: false, error: error?.message || 'Network error' };
+            console.error('[CouponAPI] getApplicableOffer error:', error);
+            return { success: false, error: error.message };
         }
     }
 }

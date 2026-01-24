@@ -111,10 +111,13 @@ export const API_ENDPOINTS = {
 
   // Coupons & Offers
   COUPONS: {
-    LIST: '/coupons', // Get eligible coupons
-    VERIFY: '/coupons/verify', // Check code validity
     APPLY: '/coupons/apply-coupon', // Apply to cart
     REMOVE: '/coupons/remove-coupon',
+  },
+
+  OFFERS: {
+    LIST: '/offers', // Get all public offers
+    GET_APPLICABLE: '/offers/get-applicable-offer', // Check specific code validity
   },
 
   // General & Utility

@@ -1,7 +1,8 @@
-export default function formatCurrency(currency, amount) {
-  const code = currency ? String(currency).toUpperCase() : 'EUR';
-  const symbols = { EUR: '€', USD: '$', GBP: '£', JPY: '¥' };
-  const sym = symbols[code] || '';
+export default function formatCurrency(currencyIgnored, amount) {
+  // FORCE CURRENCY TO EURO as per user request
+  const code = 'EUR';
+  const symbols = { EUR: '€' };
+  const sym = '€';
   const num = (amount === undefined || amount === null || isNaN(Number(amount))) ? 0 : Number(amount);
 
   // Keep two decimal places
