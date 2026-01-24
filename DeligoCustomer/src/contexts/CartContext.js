@@ -257,6 +257,18 @@ export const CartProvider = ({ children }) => {
     console.debug('[cart:id-debug] addItem init', { id: p.id, idSource: p.idSource, idStyle: p.idStyle, quantity, vendorId: p.vendorId, options });
     const vid = p.vendorId || 'unknown_vendor';
 
+    // CHECK FOR DIFFERENT VENDOR
+    // Backend only supports single-vendor orders. Prevent mixing.
+    const currentVendorIds = Object.keys(state.carts || {});
+    if (currentVendorIds.length > 0) {
+      const existingVendorId = currentVendorIds[0];
+      // Note: both are strings due to keys being strings
+      if (existingVendorId !== 'unknown_vendor' && String(vid) !== 'unknown_vendor' && existingVendorId !== String(vid)) {
+        console.log('[CartContext] Blocked adding item from different vendor', { existing: existingVendorId, new: vid });
+        return { success: false, error: 'DIFFERENT_VENDOR', existingVendorId };
+      }
+    }
+
     // Optimistic update
     setState(prev => {
       const carts = { ...(prev.carts || {}) };

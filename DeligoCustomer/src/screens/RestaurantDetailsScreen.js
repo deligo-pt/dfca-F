@@ -53,7 +53,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const [selectedCategory, setSelectedCategory] = useState('All');
   const [searchVisible, setSearchVisible] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
-  const { addItem, updateQuantity: cartUpdateQuantity, itemsMap } = useCart();
+  const { addItem, updateQuantity: cartUpdateQuantity, itemsMap, clearAllCarts } = useCart();
 
   // Alert modal state
   const [alertVisible, setAlertVisible] = useState(false);
@@ -706,21 +706,30 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                     */
 
                     // Retrieve detailed objects for selections
-                    const variantNames = Object.keys(selectedVariations)
+                    const selectedObjs = Object.keys(selectedVariations)
                       .filter(k => k.endsWith('_obj'))
-                      .map(k => {
-                        const opt = selectedVariations[k];
-                        return opt.name || opt.value || opt.id || opt.label;
-                      });
+                      .map(k => selectedVariations[k]);
 
-                    // Calculate final unit price for cart (Base + VariationDiff + Addons)
-                    // Actually, if Variation is Absolute, it replaces Base.
-                    // Logic: (SelectedVariationPrice || ProductPrice) - Discount + Addons
+                    // FIX: Backend only supports single variant name (SKU lookup).
+                    // Strategy: Find the option that has a 'sku' field. Use that as the variantName.
+                    // If multiple or none, fallback intelligently.
+                    let targetVariantName = null;
 
-                    // Use pricing.price from API (not raw.price which may be undefined)
-                    // Build variant name from selected variations
-                    // FIX: Do NOT default to 'Standard' - use null if no variations selected
-                    const variantName = variantNames.length > 0 ? variantNames.join(', ') : null;
+                    // 1. Look for option with explicit SKU
+                    const skuOption = selectedObjs.find(o => o.sku);
+                    if (skuOption) {
+                      targetVariantName = skuOption.label || skuOption.name || skuOption.value;
+                    }
+                    // 2. If no SKU, check for "Size" or "Variations" (common primary attributes)
+                    else {
+                      // Fallback: don't join with commas. Just pick the first significant one.
+                      // Ideally we'd pick the one that affects price the most? 
+                      // For now, pick the first one to avoid "A, B" errors.
+                      const firstOpt = selectedObjs[0];
+                      if (firstOpt) targetVariantName = firstOpt.label || firstOpt.name || firstOpt.value;
+                    }
+
+                    const variantName = targetVariantName || null;
 
                     // Check if product has addon groups
                     const addonGroupIds = raw.addonGroups || [];
@@ -739,17 +748,23 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                     if (result && !result.success) {
                       // Check for different vendor error
                       if (result.error === 'DIFFERENT_VENDOR') {
+                        // Helper to safely fallback if t(key) returns key
+                        const safeT = (key, fallback) => {
+                          const val = t(key);
+                          return val === key ? fallback : val;
+                        };
+
                         setAlertConfig({
-                          title: t('startNewBasket') || 'Start new basket?',
-                          message: t('clearCartConfirm') || 'Your cart contains items from another restaurant. Do you want to clear it and add this item?',
+                          title: safeT('startNewBasket', 'Start new basket?'),
+                          message: safeT('clearCartConfirm', 'Your cart contains items from another restaurant. Do you want to clear it and add this item?'),
                           buttons: [
                             {
-                              text: t('cancel') || 'Cancel',
+                              text: safeT('cancel', 'Cancel'),
                               style: 'cancel',
                               onPress: () => console.log('Cancelled new basket')
                             },
                             {
-                              text: t('clearAndAdd') || 'Clear & Add',
+                              text: safeT('clearAndAdd', 'Clear & Add'),
                               onPress: async () => {
                                 try {
                                   // Clear all carts directly
@@ -760,8 +775,8 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                                     const retry = await addItem(activeProduct, quantity, payload);
                                     if (retry && !retry.success) {
                                       setAlertConfig({
-                                        title: t('error') || 'Error',
-                                        message: retry.message || t('addToCartFailed') || 'Failed to add item'
+                                        title: safeT('error', 'Error'),
+                                        message: retry.message || safeT('addToCartFailed', 'Failed to add item')
                                       });
                                       setAlertVisible(true);
                                     } else {
@@ -1013,6 +1028,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
         visible={alertVisible}
         title={alertConfig.title}
         message={alertConfig.message}
+        buttons={alertConfig.buttons}
         onClose={() => setAlertVisible(false)}
       />
     </SafeAreaView>

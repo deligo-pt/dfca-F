@@ -26,6 +26,7 @@ const AlertModal = ({
     icon = 'alert-circle',
     iconColor,
     onClose,
+    buttons,
 }) => {
     const { colors } = useTheme();
     const { t } = useLanguage();
@@ -58,14 +59,40 @@ const AlertModal = ({
                         {message}
                     </Text>
 
-                    {/* OK Button */}
-                    <TouchableOpacity
-                        style={[styles.button, { backgroundColor: colors.primary }]}
-                        onPress={onClose}
-                        activeOpacity={0.8}
-                    >
-                        <Text style={styles.buttonText}>{t('ok') || 'OK'}</Text>
-                    </TouchableOpacity>
+                    {/* Buttons */}
+                    {buttons && buttons.length > 0 ? (
+                        <View style={styles.buttonContainer}>
+                            {buttons.map((btn, index) => (
+                                <TouchableOpacity
+                                    key={index}
+                                    style={[
+                                        styles.button,
+                                        btn.style === 'cancel' ? styles.cancelButton : { backgroundColor: colors.primary },
+                                        { flex: 1, marginHorizontal: 6 }
+                                    ]}
+                                    onPress={() => {
+                                        if (btn.onPress) btn.onPress();
+                                        onClose();
+                                    }}
+                                    activeOpacity={0.8}
+                                >
+                                    <Text style={[
+                                        styles.buttonText,
+                                        btn.style === 'cancel' && { color: colors.text.primary }
+                                    ]}>{btn.text}</Text>
+                                </TouchableOpacity>
+                            ))}
+                        </View>
+                    ) : (
+                        /* Default OK Button */
+                        <TouchableOpacity
+                            style={[styles.button, { backgroundColor: colors.primary }]}
+                            onPress={onClose}
+                            activeOpacity={0.8}
+                        >
+                            <Text style={styles.buttonText}>{t('ok') || 'OK'}</Text>
+                        </TouchableOpacity>
+                    )}
                 </View>
             </View>
         </Modal>
@@ -122,6 +149,17 @@ const styles = StyleSheet.create({
         color: '#fff',
         fontSize: 16,
         fontFamily: 'Poppins-SemiBold',
+    },
+    buttonContainer: {
+        flexDirection: 'row',
+        justifyContent: 'space-between',
+        width: '100%',
+        marginTop: 8,
+    },
+    cancelButton: {
+        backgroundColor: '#f5f5f5',
+        borderWidth: 1,
+        borderColor: '#e0e0e0',
     },
 });
 
