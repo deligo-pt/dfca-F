@@ -132,6 +132,44 @@ function normalizeProductForCart(p) {
   };
 }
 
+// Helper to generate a unique key for cart items based on content
+// Format: productId|variantName|optionsHash
+const generateCartItemKey = (productId, options = {}) => {
+  if (!productId) return `unknown_${Date.now()}`;
+
+  const variant = options.variantName || 'Standard';
+
+  // Create a stable hash of addons/options
+  // We need to support both "addons" array and generic "options" object
+  let components = [];
+
+  // Addons: sort by ID to ensure order doesn't matter
+  if (Array.isArray(options.addons) && options.addons.length > 0) {
+    const sortedAddons = [...options.addons].sort((a, b) => {
+      const idA = String(a.addonId || a.id);
+      const idB = String(b.addonId || b.id);
+      return idA.localeCompare(idB);
+    });
+    // Include quantity in key if it matters? Yes, identical addons are same key.
+    components.push('addons:' + JSON.stringify(sortedAddons));
+  }
+
+  // Options (Variations): sort keys
+  if (options.options && typeof options.options === 'object') {
+    const sortedKeys = Object.keys(options.options).sort();
+    const optParts = sortedKeys.map(k => `${k}:${options.options[k]}`);
+    components.push('opts:' + optParts.join(','));
+  }
+
+  // legacy "selectedVariation" support
+  if (!options.variantName && options.selectedVariation) {
+    components.push('legacy:' + JSON.stringify(options.selectedVariation));
+  }
+
+  const suffix = components.length > 0 ? '|' + components.join('|') : '';
+  return `${productId}|${variant}${suffix}`;
+};
+
 // New shape: { carts: { [vendorId]: { vendorId, vendorName, items: { [itemId]: { product, quantity } }, appliedPromo, deliveryInstructions } } }
 export const CartProvider = ({ children }) => {
   const [state, setState] = useState({ carts: {} });
@@ -224,21 +262,24 @@ export const CartProvider = ({ children }) => {
       const carts = { ...(prev.carts || {}) };
       const vendorKey = String(vid);
       const cur = carts[vendorKey] ? { ...carts[vendorKey] } : { vendorId: vendorKey, vendorName: p.vendorName || '', items: {}, appliedPromo: null, deliveryInstructions: '' };
-      const existing = cur.items[p.id];
+
+      const itemKey = generateCartItemKey(p.id, options);
+      const existing = cur.items[itemKey];
       const newQty = (existing?.quantity || 0) + quantity;
 
       // Store selected variation in local state if provided
-      // Check multiple possible keys: variantName (from modal), variation, selectedVariation
       const selectedVariation = options.variantName || options.variation || options.selectedVariation || null;
 
-      console.debug('[cart] addItem - storing variation:', { productId: p.id, selectedVariation, options });
+      console.debug('[cart] addItem - storing item:', { key: itemKey, productId: p.id, selectedVariation, options });
 
       cur.items = {
         ...(cur.items || {}),
-        [p.id]: {
+        [itemKey]: {
           product: p,
           quantity: newQty,
-          selectedVariation
+          selectedVariation,
+          addons: options.addons, // Store addons locally too
+          options: options.options // Store options locally
         }
       };
 
@@ -275,6 +316,11 @@ export const CartProvider = ({ children }) => {
         payload.options = options.options;
       }
 
+      // Pass addons if available 
+      if (options.addons) {
+        payload.addons = options.addons;
+      }
+
       const res = await CartAPI.addToCart([payload]);
       if (!res.success) {
         console.warn('[cart] addToCart failed response:', res);
@@ -285,10 +331,12 @@ export const CartProvider = ({ children }) => {
             const carts = { ...(prev.carts || {}) };
             const vendorKey = String(vid);
             const cur = carts[vendorKey] ? { ...carts[vendorKey] } : null;
-            if (cur && cur.items && cur.items[p.id]) {
-              const nextQty = (cur.items[p.id].quantity || 0) - quantity;
-              if (nextQty <= 0) delete cur.items[p.id];
-              else cur.items[p.id] = { ...cur.items[p.id], quantity: nextQty };
+            const itemKey = generateCartItemKey(p.id, options);
+
+            if (cur && cur.items && cur.items[itemKey]) {
+              const nextQty = (cur.items[itemKey].quantity || 0) - quantity;
+              if (nextQty <= 0) delete cur.items[itemKey];
+              else cur.items[itemKey] = { ...cur.items[itemKey], quantity: nextQty };
               if (!Object.keys(cur.items).length) delete carts[vendorKey];
             }
             return { ...prev, carts };
@@ -303,10 +351,12 @@ export const CartProvider = ({ children }) => {
           const carts = { ...(prev.carts || {}) };
           const vendorKey = String(vid);
           const cur = carts[vendorKey] ? { ...carts[vendorKey] } : null;
-          if (cur && cur.items && cur.items[p.id]) {
-            const nextQty = (cur.items[p.id].quantity || 0) - quantity;
-            if (nextQty <= 0) delete cur.items[p.id];
-            else cur.items[p.id] = { ...cur.items[p.id], quantity: nextQty };
+          const itemKey = generateCartItemKey(p.id, options);
+
+          if (cur && cur.items && cur.items[itemKey]) {
+            const nextQty = (cur.items[itemKey].quantity || 0) - quantity;
+            if (nextQty <= 0) delete cur.items[itemKey];
+            else cur.items[itemKey] = { ...cur.items[itemKey], quantity: nextQty };
             if (!Object.keys(cur.items).length) delete carts[vendorKey];
           }
           return { ...prev, carts };
@@ -323,10 +373,12 @@ export const CartProvider = ({ children }) => {
         const carts = { ...(prev.carts || {}) };
         const vendorKey = String(vid);
         const cur = carts[vendorKey] ? { ...carts[vendorKey] } : null; // fixed typo (was carts[vendorId])
-        if (cur && cur.items && cur.items[p.id]) {
-          const nextQty = (cur.items[p.id].quantity || 0) - quantity;
-          if (nextQty <= 0) delete cur.items[p.id];
-          else cur.items[p.id] = { ...cur.items[p.id], quantity: nextQty };
+        const itemKey = generateCartItemKey(p.id, options);
+
+        if (cur && cur.items && cur.items[itemKey]) {
+          const nextQty = (cur.items[itemKey].quantity || 0) - quantity;
+          if (nextQty <= 0) delete cur.items[itemKey];
+          else cur.items[itemKey] = { ...cur.items[itemKey], quantity: nextQty };
           if (!Object.keys(cur.items).length) delete carts[vendorKey];
           else carts[vendorKey] = cur;
         }
@@ -510,20 +562,27 @@ export const CartProvider = ({ children }) => {
   const removeItem = async (itemId, vendorId) => {
     const canonicalKey = resolveCartItemKeyGlobal(itemId);
 
-    // Extract variant info before removing from state
-    let variantName = null;
+    // Find the item object to extract details for payload
+    let targetItem = null;
     const carts = state.carts || {};
+
     if (vendorId) {
-      const v = String(vendorId);
-      variantName = carts[v]?.items?.[canonicalKey]?.selectedVariation;
+      targetItem = carts[String(vendorId)]?.items?.[canonicalKey];
     } else {
       for (const vkey of Object.keys(carts)) {
         if (carts[vkey].items && carts[vkey].items[canonicalKey]) {
-          variantName = carts[vkey].items[canonicalKey].selectedVariation;
+          targetItem = carts[vkey].items[canonicalKey];
           break;
         }
       }
     }
+
+    // Extract details for payload
+    // If targetItem is found, use its real product ID (sku/_id) instead of the composite key
+    const productId = targetItem?.product?.id || canonicalKey;
+    const variantName = targetItem?.selectedVariation;
+    const options = targetItem?.options;
+    const addons = targetItem?.addons;
 
     setState(prev => {
       const carts = { ...(prev.carts || {}) };
@@ -550,10 +609,13 @@ export const CartProvider = ({ children }) => {
     });
     try {
       setSyncing(true);
-      // Pass variant info if available
-      const deletePayload = variantName
-        ? [{ productId: canonicalKey, variantName }]
-        : [canonicalKey];
+      // Construct detailed payload
+      const payloadObj = { productId };
+      if (variantName) payloadObj.variantName = variantName;
+      if (options) payloadObj.options = options;
+      if (addons) payloadObj.addons = addons;
+
+      const deletePayload = [payloadObj];
       await CartAPI.deleteItems(deletePayload);
     } catch (error) {
       console.error('Failed to sync item removal with backend:', error);
@@ -585,6 +647,10 @@ export const CartProvider = ({ children }) => {
 
     const itemsToDelete = Object.keys(vendorCart.items).map(itemId => {
       const item = vendorCart.items[itemId];
+      const realProductId = item.product?.id || itemId;
+
+      const payloadObj = { productId: realProductId };
+
       let variantName = item.selectedVariation;
 
       // If no selectedVariation in local state, try to extract from product metadata
@@ -601,12 +667,11 @@ export const CartProvider = ({ children }) => {
         }
       }
 
-      console.debug('[cart] clearVendorCartAndSync - item:', { itemId, variantName, fullItem: item });
+      if (variantName) payloadObj.variantName = variantName;
+      if (item.options) payloadObj.options = item.options;
+      if (item.addons) payloadObj.addons = item.addons;
 
-      if (variantName) {
-        return { productId: itemId, variantName };
-      }
-      return itemId; // backward compatible: just the ID string
+      return payloadObj;
     });
 
     console.debug('[cart] clearVendorCartAndSync - final payload:', itemsToDelete);
@@ -724,10 +789,19 @@ export const CartProvider = ({ children }) => {
     for (const vkey of Object.keys(cartsLocal)) {
       const cart = cartsLocal[vkey];
       for (const storedKey of Object.keys(cart.items || {})) {
-        const prod = cart.items[storedKey]?.product;
+        // If storedKey IS the incoming ID, match directly
+        if (storedKey === String(incomingId)) return storedKey;
+
+        const item = cart.items[storedKey];
+        const prod = item?.product;
         if (!prod) continue;
+
+        // Check if incomingId matches the Product ID inside the item
+        // This is risky if we have multiple items with same product ID.
+        // But some legacy calls might pass productId and expect to find "the item".
+        // In that case, returning the first match is arguably correct behavior for legacy support.
         const raw = prod._raw || {};
-        const candidates = [storedKey, prod.id, raw.productId, raw._id, raw.id, raw.product?._id];
+        const candidates = [prod.id, raw.productId, raw._id, raw.id, raw.product?._id];
         if (candidates.filter(Boolean).map(String).includes(String(incomingId))) {
           return storedKey;
         }
@@ -827,7 +901,23 @@ export const CartProvider = ({ children }) => {
         const vendorKey = String(vid);
         const qty = Number(item.quantity ?? item.qty ?? item.count ?? 1) || 1;
 
-        if (!normalized.id) continue;
+        // Use backend _id as key if available (standard), else synthesize logic to match optimistic
+        // If the backend returns a real cart item ID, use it.
+        // If we are just parsing a list of products (unlikely for getCart), we might fall back.
+        let itemKey = item._id || item.id;
+
+        // If the ID looks like a product ID (e.g. valid mongo id but matches product.id), we might want to be careful.
+        // But usually cart items have their own unique IDs.
+        // Fallback: If no unique cart item ID, generate one using the same logic as addItem
+        if (!itemKey || itemKey === normalized.id) {
+          const opts = {
+            variantName: item.variantName,
+            selectedVariation: item.selectedVariation,
+            addons: item.addons,
+            options: item.options
+          };
+          itemKey = generateCartItemKey(normalized.id, opts);
+        }
 
         if (!newCarts[vendorKey]) {
           newCarts[vendorKey] = {
@@ -855,9 +945,12 @@ export const CartProvider = ({ children }) => {
           }
         }
 
-        newCarts[vendorKey].items[normalized.id] = {
+        newCarts[vendorKey].items[itemKey] = {
           product: normalized,
-          quantity: qty
+          quantity: qty,
+          selectedVariation: item.variantName || item.selectedVariation,
+          addons: item.addons,
+          options: item.options
         };
       }
 

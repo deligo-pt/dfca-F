@@ -180,6 +180,14 @@ class CartAPI {
           } else if (item && typeof item === 'object') {
             const obj = { productId: item.productId || item.id };
             if (item.variantName) obj.variantName = item.variantName;
+            if (item.options) obj.options = item.options;
+            if (item.addons) {
+              // Ensure mapping matches what addToCart uses (addOnId vs addonId)
+              obj.addons = item.addons.map(a => ({
+                addOnId: a.addOnId || a.addonId || a.id,
+                quantity: a.quantity || 1
+              }));
+            }
             return obj;
           }
           return { productId: item };

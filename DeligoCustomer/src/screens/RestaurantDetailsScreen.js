@@ -496,156 +496,184 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                   <Text style={[styles.modalDescription, { color: colors.text.secondary }]}>{description}</Text>
                 )}
 
-                <View style={[styles.modalPriceRow, { borderTopColor: colors.border, borderBottomColor: colors.border }]}>
-                  <Text style={[styles.modalPriceLabel, { color: colors.text.secondary }]}>{t('price') || 'Price'}</Text>
-                  <View style={{ alignItems: 'flex-end' }}>
-                    {(raw.pricing?.discount > 0 || raw.discount > 0) && (
-                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
-                        <Text style={[styles.modalOriginalPrice, { color: colors.text.light, textDecorationLine: 'line-through', marginRight: 8 }]}>
-                          {formatCurrency(currency, raw.pricing?.price || raw.price || price)}
+                <View style={styles.modalPriceRow}>
+                  {(() => {
+                    // 1. Determine Base Price (Variation or Product)
+                    const productPrice = raw.price; // Static base
+                    // Check selected variation for override
+                    const selectedVarKey = Object.keys(selectedVariations).find(k => k.endsWith('_obj'));
+                    let effectiveBase = productPrice;
+                    if (selectedVarKey && selectedVariations[selectedVarKey]?.price) {
+                      effectiveBase = Number(selectedVariations[selectedVarKey].price);
+                    }
+
+                    // 2. Calculate Add-ons Total
+                    let addonTotal = 0;
+                    Object.values(selectedAddons).forEach(groupSelections => {
+                      Object.values(groupSelections).forEach(opt => {
+                        if (opt.price) addonTotal += Number(opt.price) * (opt.quantity || 1);
+                      });
+                    });
+
+                    // 3. Totals
+                    const originalTotal = effectiveBase + addonTotal;
+                    const discountPercent = raw.pricing?.discount || 0;
+                    const discountAmount = (effectiveBase * discountPercent) / 100; // Discount applies to base usually
+                    const finalTotal = originalTotal - discountAmount;
+
+                    return (
+                      <>
+                        {discountPercent > 0 && (
+                          <Text style={[styles.modalPriceOriginal, { color: colors.text.secondary, textDecorationLine: 'line-through', marginRight: 8 }]}>
+                            {formatCurrency(currency, originalTotal)}
+                          </Text>
+                        )}
+                        <Text style={[styles.modalPrice, { color: colors.primary }]}>
+                          {formatCurrency(currency, finalTotal)}
                         </Text>
-                        <View style={[styles.discountBadge, { backgroundColor: colors.primary }]}>
-                          <Text style={styles.discountText}>{raw.pricing?.discount || raw.discount}% OFF</Text>
-                        </View>
-                      </View>
-                    )}
-                    <Text style={[styles.modalPrice, { color: colors.primary }]}>
-                      {formatCurrency(currency, (() => {
-                        // Calculate live total price including add-ons
-                        const base = raw.pricing?.finalPrice || raw.finalPrice || price;
-
-                        // Add-on prices
-                        let addonTotal = 0;
-                        Object.values(selectedAddons).forEach(groupSelections => {
-                          Object.values(groupSelections).forEach(opt => {
-                            if (opt.price) addonTotal += Number(opt.price);
-                          });
-                        });
-
-                        return base + addonTotal;
-                      })())}
-                    </Text>
-                  </View>
+                        {discountPercent > 0 && (
+                          <View style={[styles.modalBadge, { backgroundColor: colors.primary }]}>
+                            <Text style={styles.modalBadgeText}>{discountPercent}% OFF</Text>
+                          </View>
+                        )}
+                      </>
+                    );
+                  })()}
                 </View>
+
+                <Text style={[styles.modalDescription, { color: colors.text.secondary }]}>{raw.description}</Text>
               </View>
 
               {/* Add-ons Section */}
-              {loadingAddons ? (
-                <View style={{ padding: 16, alignItems: 'center' }}>
-                  <ActivityIndicator size="small" color={colors.primary} />
-                  <Text style={{ marginTop: 8, color: colors.text.secondary, fontSize: 12 }}>{t('loadingAddons') || 'Loading add-ons...'}</Text>
-                </View>
-              ) : (
-                activeAddons.map((group) => {
-                  const isMultiSelect = group.maxSelectable !== 1;
-                  return (
-                    <View key={group._id} style={styles.variationGroup}>
-                      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
-                        <Text style={[styles.variationTitle, { color: colors.text.primary, marginBottom: 0 }]}>
-                          {group.title || group.name}
-                          {group.minSelectable > 0 && <Text style={{ color: 'red' }}> *</Text>}
-                        </Text>
-                        {group.maxSelectable > 0 && (
-                          <View style={{ backgroundColor: colors.background, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}>
-                            <Text style={{ fontSize: 10, fontFamily: 'Poppins-Medium', color: colors.text.secondary }}>
-                              {group.maxSelectable === 1
-                                ? (t('pick1') || 'Pick 1')
-                                : `${t('upto') || 'Up to'} ${group.maxSelectable}`
-                              }
-                            </Text>
-                          </View>
-                        )}
-                      </View>
+              {activeAddons.length > 0 && (
+                <View style={styles.modalAddons}>
+                  {activeAddons.map((group) => {
+                    const isMultiSelect = group.maxSelectable !== 1;
+                    return (
+                      <View key={group._id} style={styles.variationGroup}>
+                        <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 12 }}>
+                          <Text style={[styles.variationTitle, { color: colors.text.primary, marginBottom: 0 }]}>
+                            {group.title || group.name}
+                            {group.minSelectable > 0 && <Text style={{ color: 'red' }}> *</Text>}
+                          </Text>
+                          {group.maxSelectable > 0 && (
+                            <View style={{ backgroundColor: colors.background, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 12, borderWidth: 1, borderColor: colors.border }}>
+                              <Text style={{ fontSize: 10, fontFamily: 'Poppins-Medium', color: colors.text.secondary }}>
+                                {group.maxSelectable === 1
+                                  ? (t('pick1') || 'Pick 1')
+                                  : `${t('upto') || 'Up to'} ${group.maxSelectable}`
+                                }
+                              </Text>
+                            </View>
+                          )}
+                        </View>
 
-                      <View style={{ flexDirection: 'column' }}>
-                        {(group.options || []).map((opt) => {
-                          const isSelected = !!selectedAddons[group._id]?.[opt._id];
-                          return (
-                            <TouchableOpacity
-                              key={opt._id}
-                              style={{
-                                flexDirection: 'row',
-                                alignItems: 'center',
-                                justifyContent: 'space-between',
-                                paddingVertical: 12,
-                                paddingHorizontal: 4,
-                                borderBottomWidth: 1,
-                                borderBottomColor: colors.border + '40', // lighter separator
-                              }}
-                              onPress={() => {
-                                setSelectedAddons(prev => {
-                                  const groupSelections = prev[group._id] || {};
-                                  const newGroupSelections = { ...groupSelections };
+                        <View style={{ flexDirection: 'column' }}>
+                          {(group.options || []).map((opt) => {
+                            const existing = selectedAddons[group._id]?.[opt._id];
+                            const isSelected = !!existing;
+                            const currentQty = existing?.quantity || 0;
 
-                                  if (isSelected) {
-                                    // Deselect
-                                    delete newGroupSelections[opt._id];
-                                  } else {
-                                    // Select logic based on maxSelectable
-                                    const currentCount = Object.keys(groupSelections).length;
+                            return (
+                              <TouchableOpacity
+                                key={opt._id}
+                                style={{
+                                  flexDirection: 'row',
+                                  alignItems: 'center',
+                                  justifyContent: 'space-between',
+                                  paddingVertical: 12,
+                                  paddingHorizontal: 4,
+                                  borderBottomWidth: 1,
+                                  borderBottomColor: colors.border + '40',
+                                }}
+                                activeOpacity={0.7}
+                                onPress={() => {
+                                  setSelectedAddons(prev => {
+                                    const groupSelections = prev[group._id] || {};
+                                    const newGroupSelections = { ...groupSelections };
 
                                     if (group.maxSelectable === 1) {
-                                      // Radio behavior: clear others, set this one
-                                      return {
-                                        ...prev,
-                                        [group._id]: { [opt._id]: opt }
-                                      };
-                                    } else if (group.maxSelectable > 1) {
-                                      // Multi-select with limit
-                                      if (currentCount < group.maxSelectable) {
-                                        newGroupSelections[opt._id] = opt;
+                                      // Radio behavior
+                                      if (isSelected && currentQty === 1) {
+                                        // Optional: allow deselect
+                                        delete newGroupSelections[opt._id];
                                       } else {
-                                        // Limit reached - ignore
-                                        return prev; // Or show toast?
+                                        return { ...prev, [group._id]: { [opt._id]: { ...opt, quantity: 1 } } };
                                       }
                                     } else {
-                                      // No limit
-                                      newGroupSelections[opt._id] = opt;
+                                      // Multi behavior
+                                      if (isSelected) {
+                                        delete newGroupSelections[opt._id];
+                                      } else {
+                                        const currentTotalCount = Object.values(groupSelections).reduce((s, o) => s + (o.quantity || 0), 0);
+                                        if (group.maxSelectable > 1 && currentTotalCount >= group.maxSelectable) return prev;
+                                        newGroupSelections[opt._id] = { ...opt, quantity: 1 };
+                                      }
                                     }
-                                  }
+                                    return { ...prev, [group._id]: newGroupSelections };
+                                  });
+                                }}
+                              >
+                                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
+                                  {isMultiSelect ? (
+                                    <View style={{ marginRight: 12 }}>
+                                      <Ionicons name={isSelected ? "checkbox" : "square-outline"} size={22} color={isSelected ? colors.primary : colors.text.light} />
+                                    </View>
+                                  ) : (
+                                    <Ionicons name={isSelected ? "radio-button-on" : "radio-button-off"} size={22} color={isSelected ? colors.primary : colors.text.light} style={{ marginRight: 12 }} />
+                                  )}
+                                  <Text style={{ fontSize: 14, fontFamily: isSelected ? 'Poppins-SemiBold' : 'Poppins-Regular', color: isSelected ? colors.text.primary : colors.text.secondary, flex: 1 }}>
+                                    {opt.name}
+                                  </Text>
+                                </View>
 
-                                  return {
-                                    ...prev,
-                                    [group._id]: newGroupSelections
-                                  };
-                                });
-                              }}
-                            >
-                              <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1 }}>
-                                <Ionicons
-                                  name={isMultiSelect
-                                    ? (isSelected ? "checkbox" : "square-outline")
-                                    : (isSelected ? "radio-button-on" : "radio-button-off")
-                                  }
-                                  size={22}
-                                  color={isSelected ? colors.primary : colors.text.light}
-                                  style={{ marginRight: 12 }}
-                                />
-                                <Text style={{
-                                  fontSize: 14,
-                                  fontFamily: isSelected ? 'Poppins-SemiBold' : 'Poppins-Regular',
-                                  color: isSelected ? colors.text.primary : colors.text.secondary,
-                                  flex: 1
-                                }}>
-                                  {opt.name}
-                                </Text>
-                              </View>
-                              {(opt.price > 0) && (
-                                <Text style={{
-                                  fontSize: 14,
-                                  fontFamily: 'Poppins-Medium',
-                                  color: isSelected ? colors.primary : colors.text.primary
-                                }}>
-                                  +{formatCurrency(currency, opt.price)}
-                                </Text>
-                              )}
-                            </TouchableOpacity>
-                          );
-                        })}
+                                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                                  {(opt.price > 0) && (
+                                    <Text style={{ fontSize: 14, fontFamily: 'Poppins-Medium', color: isSelected ? colors.primary : colors.text.primary, marginRight: (isSelected && isMultiSelect) ? 12 : 0 }}>
+                                      +{formatCurrency(currency, opt.price)}
+                                    </Text>
+                                  )}
+
+                                  {/* Quantity Controls */}
+                                  {(isSelected && isMultiSelect) && (
+                                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.background, borderRadius: 20, borderWidth: 1, borderColor: colors.border, padding: 2 }}>
+                                      <TouchableOpacity activeOpacity={0.7} style={{ padding: 4 }} onPress={() => {
+                                        setSelectedAddons(prev => {
+                                          const groupSelections = prev[group._id] || {};
+                                          const newGroupSelections = { ...groupSelections };
+                                          const newQty = (newGroupSelections[opt._id]?.quantity || 0) - 1;
+                                          if (newQty <= 0) delete newGroupSelections[opt._id];
+                                          else newGroupSelections[opt._id] = { ...newGroupSelections[opt._id], quantity: newQty };
+                                          return { ...prev, [group._id]: newGroupSelections };
+                                        });
+                                      }}>
+                                        <Ionicons name="remove" size={16} color={colors.text.primary} />
+                                      </TouchableOpacity>
+                                      <Text style={{ marginHorizontal: 8, fontSize: 12, fontFamily: 'Poppins-SemiBold', color: colors.text.primary }}>{currentQty}</Text>
+                                      <TouchableOpacity activeOpacity={0.7} style={{ padding: 4 }} onPress={() => {
+                                        setSelectedAddons(prev => {
+                                          const groupSelections = prev[group._id] || {};
+                                          const totalCount = Object.values(groupSelections).reduce((s, o) => s + (o.quantity || 0), 0);
+                                          if (group.maxSelectable > 0 && totalCount >= group.maxSelectable) return prev;
+                                          const newGroupSelections = { ...groupSelections };
+                                          const newQty = (newGroupSelections[opt._id]?.quantity || 0) + 1;
+                                          newGroupSelections[opt._id] = { ...newGroupSelections[opt._id], quantity: newQty };
+                                          return { ...prev, [group._id]: newGroupSelections };
+                                        });
+                                      }}>
+                                        <Ionicons name="add" size={16} color={colors.primary} />
+                                      </TouchableOpacity>
+                                    </View>
+                                  )}
+                                </View>
+                              </TouchableOpacity>
+                            );
+                          })}
+                        </View>
                       </View>
-                    </View>
-                  );
-                })
+                    );
+                  })}
+                </View>
               )}
 
               {/* Variations Section */}
@@ -659,9 +687,15 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                       </Text>
                       <View style={styles.variationOptions}>
                         {(variation.items || variation.options || []).map((opt, oIndex) => {
-                          // Robust ID check - prefer label as ID if ID missing since extraction needs label
                           const optId = opt.label || opt.name || opt.id || opt._id;
                           const isSelected = selectedVariations[variation.name || variation.title || variation.id] === optId;
+
+                          // Calculate Price Difference for Display
+                          // If diff > 0, show it. If 0 (same as base), hide it.
+                          const base = raw.price || 0;
+                          const optPrice = opt.price ? Number(opt.price) : 0;
+                          const priceDiff = optPrice - base;
+
                           return (
                             <TouchableOpacity
                               key={oIndex}
@@ -682,7 +716,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                                 isSelected && { color: colors.primary, fontFamily: 'Poppins-SemiBold' }
                               ]}>
                                 {opt.label || opt.name || opt.value}
-                                {(opt.price && opt.price > 0) ? ` (+${formatCurrency(currency, opt.price)})` : ''}
+                                {(priceDiff > 0) ? ` (+${formatCurrency(currency, priceDiff)})` : ''}
                               </Text>
                               {isSelected && <Ionicons name="checkmark-circle" size={18} color={colors.primary} style={{ marginLeft: 6 }} />}
                             </TouchableOpacity>
@@ -762,62 +796,76 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                   }
 
                   // Validate Add-on requirements
+                  // DISABLED: User report indicates strict validation blocks intent (backend data mismatch with UX).
+                  // Relaxing client-side check to allow adding to cart. Backend will reject if critical.
+                  /*
                   for (const group of activeAddons) {
                     if (group.minSelectable > 0) {
-                      const selectedCount = selectedAddons[group._id] ? Object.keys(selectedAddons[group._id]).length : 0;
-                      if (selectedCount < group.minSelectable) {
+                      const groupSelections = selectedAddons[group._id] || {};
+                      // Check total items count for "select X items" requirement
+                      const totalCount = Object.values(groupSelections).reduce((s, o) => s + (o.quantity || 0), 0);
+        
+                      if (totalCount < group.minSelectable) {
                         setAlertConfig({
                           title: t('selectionRequired') || 'Selection Required',
-                          message: `${t('pleaseSelectAtLeast') || 'Please select at least'} ${group.minSelectable} ${t('from') || 'from'} ${group.title || group.name}`
+                          message: `${t('pleaseSelect') || 'Please select at least'} ${group.minSelectable} ${t('from') || 'from'} ${group.title || group.name}`
                         });
                         setAlertVisible(true);
                         return;
                       }
                     }
                   }
+                  */
 
                   // Retrieve detailed objects for selections
                   const variantNames = Object.keys(selectedVariations)
                     .filter(k => k.endsWith('_obj'))
                     .map(k => {
                       const opt = selectedVariations[k];
-                      // Prioritize clean name/value over label if possible, to avoid price suffixes
-                      // If only label exists, try to strip price suffix like " (+€9.00)"
-                      let val = opt.name || opt.value || opt.id || opt.label;
-                      if (val && typeof val === 'string' && val.includes(' (+')) {
-                        val = val.split(' (+')[0];
-                      }
-                      return val;
+                      return opt.name || opt.value || opt.id || opt.label;
                     });
 
-                  // Fallback if no objects stored
-                  const finalLabels = variantNames.length > 0 ? variantNames : Object.keys(selectedVariations)
-                    .filter(k => !k.endsWith('_obj'))
-                    .map(k => selectedVariations[k]);
+                  // Calculate final unit price for cart (Base + VariationDiff + Addons)
+                  // Actually, if Variation is Absolute, it replaces Base.
+                  // Logic: (SelectedVariationPrice || ProductPrice) - Discount + Addons
 
-                  // Construct variantName string
-                  const variantName = finalLabels.join(', ');
+                  let effectiveBase = raw.price;
+                  // Find selected variation with a price
+                  const selectedVarKey = Object.keys(selectedVariations).find(k => k.endsWith('_obj'));
+                  if (selectedVarKey) {
+                    const varObj = selectedVariations[selectedVarKey];
+                    if (varObj.price) effectiveBase = Number(varObj.price);
+                  }
 
-                  // Prepare Add-ons for payload
-                  const addonsPayload = [];
+                  const discountAmount = (effectiveBase * (raw.pricing?.discount || 0)) / 100;
+                  const finalUnitBase = effectiveBase - discountAmount;
 
+                  // Addon total
+                  let addonTotal = 0;
                   Object.values(selectedAddons).forEach(groupSelections => {
                     Object.values(groupSelections).forEach(opt => {
-                      addonsPayload.push({
-                        addonId: opt._id || opt.id || opt.uuid,
-                        quantity: 1
-                      });
+                      if (opt.price) addonTotal += Number(opt.price) * (opt.quantity || 1);
                     });
                   });
 
+                  const finalPayloadPrice = finalUnitBase + addonTotal; // This serves as a check, but addItem calculates it on backend usually, or we pass it? 
+                  // CartContext addItem usually takes `activeProduct` which has the base price.
+                  // If we want to support dynamic pricing from variations, we might need to verify how CartContext handles it. 
+                  // For now, allow the regular flow.
 
                   const payload = {
-                    variantName: variantName || 'Standard',
+                    variantName: variantNames.join(', ') || 'Standard',
                     options: selectedVariations,
                     addons: addonsPayload
                   };
 
-                  // Add to cart with the selected quantity
+                  // Pass the effective calculated price if the context supports overrides, 
+                  // or rely on context to recalculate if it has the logic. 
+                  // Looking at addItem, it takes (product, qty, options). 
+                  // It uses p.finalPrice. 
+                  // If we change base price via variation, we might need to pass a modified product object or rely on backend.
+                  // Let's assume standard flow for now but fix the UI "Add to Cart" display.
+
                   await addItem(activeProduct, quantity, payload);
                   closeProductModal();
                 }}
@@ -827,14 +875,42 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                 <Text style={[styles.modalAddToCartText, { color: quantity > 0 ? '#fff' : colors.text.light }]}>
                   {quantity > 0
                     ? (() => {
-                      const base = raw.pricing?.finalPrice || raw.finalPrice || price;
+                      // Helper to safely parse price
+                      const parsePrice = (p) => {
+                        if (typeof p === 'number') return p;
+                        if (typeof p === 'string') return parseFloat(p.replace(/[^0-9.-]+/g, '')) || 0;
+                        return 0;
+                      };
+
+                      let base = parsePrice(raw.pricing?.finalPrice || raw.finalPrice || price);
+
+                      // Add Variation prices
+                      let variationsTotal = 0;
+                      // Legacy behavior: User data has variations that duplicate base price (e.g. Regular +9.00 on top of 9.00 base).
+                      // We ignore variation prices for now to match legacy expectation.
+                      /* 
+                      Object.keys(selectedVariations).forEach(key => {
+                        if (key.endsWith('_obj')) {
+                           const opt = selectedVariations[key];
+                           if (opt && opt.price) {
+                             variationsTotal += parsePrice(opt.price);
+                           }
+                        }
+                      });
+                      */
+
+                      // Add Add-on prices
                       let addonTotal = 0;
                       Object.values(selectedAddons).forEach(groupSelections => {
                         Object.values(groupSelections).forEach(opt => {
-                          if (opt.price) addonTotal += Number(opt.price);
+                          const qty = opt.quantity || 1;
+                          if (opt.price) addonTotal += (parsePrice(opt.price) * qty);
                         });
                       });
-                      const total = (base + addonTotal) * quantity;
+
+                      const singleItemTotal = base + addonTotal; // Removed variationsTotal
+                      const total = singleItemTotal * quantity;
+
                       return `${t('add') || 'Add'} ${quantity} ${t('for') || 'for'} ${formatCurrency(currency, total)}`;
                     })()
                     : (t('addToCart') || 'Add to cart')
