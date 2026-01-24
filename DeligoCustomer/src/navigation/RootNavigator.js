@@ -12,6 +12,7 @@ import {
     PrivacyPolicyScreen,
     LocationAddressScreen,
     RestaurantDetailsScreen,
+    AddonsScreen,
     TrackOrderScreen,
     CheckoutScreen,
     EditProfileScreen,
@@ -78,6 +79,7 @@ export default function RootNavigator() {
                 <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
                 <Stack.Screen name="LocationAddress" component={LocationAddressScreen} />
                 <Stack.Screen name="RestaurantDetails" component={RestaurantDetailsScreen} />
+                <Stack.Screen name="Addons" component={AddonsScreen} />
                 <Stack.Screen name="CartDetail" component={CartDetailScreen} />
                 <Stack.Screen name="SeeAll" component={SeeAllScreen} />
                 <Stack.Screen name="Search" component={SearchScreen} />

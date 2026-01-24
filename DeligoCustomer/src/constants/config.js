@@ -95,6 +95,7 @@ export const API_ENDPOINTS = {
     ACTIVATE_ITEM: '/carts/activate-item/:productId',
     DELETE_ITEM: '/carts/delete-item',
     UPDATE_QUANTITY: '/carts/update-quantity',
+    UPDATE_ADDON_QUANTITY: '/carts/update-addon-quantity',
     CLEAR: '/carts/clear',
   },
 

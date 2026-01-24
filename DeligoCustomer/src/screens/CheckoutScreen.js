@@ -557,15 +557,29 @@ const CheckoutScreen = ({ route, navigation }) => {
 
   // Calculate display subtotal using finalPrice (price after tax and discount)
   const displaySubtotal = cartItems.reduce((sum, it) => {
-    const addonsTotal = (it.addons || []).reduce((s, ad) => s + Number(ad.price || 0), 0);
-    return sum + ((it.finalPrice || it.price || 0) + addonsTotal) * (it.quantity || 0);
+    // Match CartDetail logic: Addons are flat cost per line item
+    const addonsCost = (it.addons || []).reduce((aSum, a) => aSum + (Number(a.price || 0) * Number(a.quantity || 1)), 0);
+    const itemTotal = (it.finalPrice || it.price || 0) * (it.quantity || 0);
+    return sum + itemTotal + addonsCost;
   }, 0);
 
   // Debug: Log checkoutResponse to verify it's being populated
   console.debug('[CheckoutScreen] Render - checkoutResponse:', checkoutResponse, 'local total:', total);
 
-  // Use server's subTotal as the total
-  const displayTotal = checkoutResponse?.data?.subTotal;
+  // Extract values from server response
+  const serverData = checkoutResponse?.data || checkoutResponse || {};
+
+  // Try to find explicit delivery fee
+  const serverDeliveryFee = serverData.deliveryFee ?? serverData.delivery_fee ?? serverData.deliveryCharge ?? null;
+  const serverTotal = serverData.total ?? serverData.totalAmount ?? serverData.subTotal; // Fallback to subTotal if total missing (legacy)
+
+  // Use server's total if available, else local
+  const displayTotal = serverTotal ?? total;
+
+  // Calculate delivery fee: Explicit -> Diff -> CartData -> 0
+  const finalDeliveryFee = serverDeliveryFee !== null
+    ? Number(serverDeliveryFee)
+    : (serverTotal ? (Number(serverTotal) - displaySubtotal) : (cartData?.deliveryFee || 0));
 
   // Set initial notes from cart delivery instructions
   useEffect(() => {
@@ -1033,7 +1047,7 @@ const CheckoutScreen = ({ route, navigation }) => {
             <View style={styles(colors).summaryRow}>
               <Text style={styles(colors).summaryLabel}>{t('deliveryFee')}</Text>
               <Text style={styles(colors).summaryValue}>
-                {formatCurrency(currency, checkoutResponse?.data?.subTotal - displaySubtotal)}
+                {formatCurrency(currency, finalDeliveryFee)}
               </Text>
             </View>
 
@@ -1042,7 +1056,7 @@ const CheckoutScreen = ({ route, navigation }) => {
             <View style={styles(colors).summaryRow}>
               <Text style={styles(colors).totalLabel}>{t('total')}</Text>
               <Text style={styles(colors).totalValue}>
-                {formatCurrency(currency, checkoutResponse?.data?.subTotal || displayTotal)}
+                {formatCurrency(currency, displayTotal || total)}
               </Text>
             </View>
           </View>

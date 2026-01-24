@@ -365,6 +365,11 @@ export const CartProvider = ({ children }) => {
         return { success: false, message: res.error || 'Failed to add item' };
       }
 
+      // Refresh cart from backend to get accurate subtotal (includes addons, discounts)
+      // Immediate call, silent mode to avoid loading flicker
+      console.log('[CartContext] addItem success, refreshing cart for accurate subtotal');
+      fetchCart({ force: true, silent: true });
+
       return { success: true, data: res.data };
     } catch (error) {
       console.error('Failed to sync cart with backend:', error);
@@ -516,6 +521,10 @@ export const CartProvider = ({ children }) => {
           }
           return { ...prev, carts };
         });
+      } else {
+        // Success - refresh cart to get updated subtotal from backend
+        console.log('[CartContext] updateQuantity success, refreshing cart for accurate subtotal');
+        fetchCart({ force: true, silent: true });
       }
     } catch (error) {
       console.error('Failed to sync quantity update with backend:', error);
@@ -765,9 +774,15 @@ export const CartProvider = ({ children }) => {
   const cartItems = useMemo(() => Object.keys(itemsMap).map(id => ({ id, ...itemsMap[id] })), [itemsMap]);
   const itemCount = useMemo(() => cartItems.reduce((s, it) => s + (it.quantity || 0), 0), [cartItems]);
   const total = useMemo(() => cartItems.reduce((s, it) => {
+    // Use backend subtotal if available (includes addons, discounts, taxes)
+    if (it.subtotal !== undefined && it.subtotal !== null) {
+      return s + Number(it.subtotal);
+    }
+    // Fallback to local calculation
     const p = it.product;
     const priceToUse = (p.finalPrice !== undefined && p.finalPrice !== null) ? Number(p.finalPrice) : Number(p.price || 0);
-    return s + (priceToUse * (it.quantity || 0));
+    const addonsTotal = (it.addons || []).reduce((sum, ad) => sum + (Number(ad.price || 0) * (ad.quantity || 1)), 0);
+    return s + (priceToUse * (it.quantity || 0)) + addonsTotal;
   }, 0), [cartItems]);
 
   // Helper: vendor subtotal
@@ -777,9 +792,15 @@ export const CartProvider = ({ children }) => {
     if (!cart) return 0;
     return Object.keys(cart.items || {}).reduce((s, id) => {
       const item = cart.items[id];
+      // Use backend subtotal if available
+      if (item.subtotal !== undefined && item.subtotal !== null) {
+        return s + Number(item.subtotal);
+      }
+      // Fallback to local calculation
       const p = item.product;
       const priceToUse = (p.finalPrice !== undefined && p.finalPrice !== null) ? Number(p.finalPrice) : Number(p.price || 0);
-      return s + (priceToUse * (item.quantity || 0));
+      const addonsTotal = (item.addons || []).reduce((sum, ad) => sum + (Number(ad.price || 0) * (ad.quantity || 1)), 0);
+      return s + (priceToUse * (item.quantity || 0)) + addonsTotal;
     }, 0);
   };
 
@@ -950,7 +971,11 @@ export const CartProvider = ({ children }) => {
           quantity: qty,
           selectedVariation: item.variantName || item.selectedVariation,
           addons: item.addons,
-          options: item.options
+          options: item.options,
+          // Preserve backend calculated totals
+          subtotal: item.subtotal ?? rawProd.subtotal,
+          totalBeforeTax: item.totalBeforeTax ?? rawProd.totalBeforeTax,
+          taxAmount: item.taxAmount ?? rawProd.taxAmount,
         };
       }
 

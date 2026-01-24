@@ -101,15 +101,36 @@ export default function CartDetail({ vendorId, navigation }) {
       taxPercent,
       taxUnit,
       finalUnit,
+      // Preserve backend subtotal for accurate total calculation
+      backendSubtotal: it.subtotal ?? it.totalBeforeTax ?? null,
+      // Include addons for display
+      addons: it.addons || [],
     };
   });
+
+  // Debug: Log total calculation
+  if (items.length > 0) {
+    console.debug('[CartDetail] Total calculation:', items.map(it => ({
+      name: it.product?.name,
+      backendSubtotal: it.backendSubtotal,
+      fallback: it.finalUnit * it.qty,
+      addons: it.addons?.length || 0
+    })));
+  }
 
   const currency = items[0]?.currency || '';
   const baseSubtotal = items.reduce((s, it) => s + it.basePrice * it.qty, 0);
   const discountTotal = items.reduce((s, it) => s + it.discountUnit * it.qty, 0);
   const subtotalAfterDiscount = baseSubtotal - discountTotal;
   const taxTotal = items.reduce((s, it) => s + it.taxUnit * it.qty, 0);
-  const total = items.reduce((s, it) => s + it.finalUnit * it.qty, 0);
+
+  // Use backend subtotal if available (includes addons), otherwise fallback to local calculation
+  const total = items.reduce((s, it) => {
+    if (it.backendSubtotal !== null && it.backendSubtotal !== undefined) {
+      return s + Number(it.backendSubtotal);
+    }
+    return s + it.finalUnit * it.qty;
+  }, 0);
 
   // Resolve Vendor Details (Context > Cart > Item)
   // Try to find vendor info from the first item since they belong to the same vendor
@@ -254,13 +275,54 @@ export default function CartDetail({ vendorId, navigation }) {
                   {it.product._raw?.description && (
                     <Text style={{ color: colors.text.secondary, fontSize: 12, marginTop: 2 }} numberOfLines={2}>{it.product._raw.description}</Text>
                   )}
-                  {/* Pricing breakdown */}
-                  <Text style={{ color: colors.text.secondary, fontSize: 12, marginTop: 6, fontFamily: 'Poppins-Regular' }}>
-                    {formatCurrency(it.currency, it.basePrice)}
-                    {it.discountPercent > 0 ? ` • -${Math.round(it.discountPercent)}%` : ''}
-                    {it.taxPercent > 0 ? ` • +${Math.round(it.taxPercent)}% tax` : ''}
-                    {` • = ${formatCurrency(it.currency, it.finalUnit)}`}
-                  </Text>
+
+                  {/* Selected Variation */}
+                  {it.selectedVariation && (
+                    <Text style={{ color: colors.text.secondary, fontSize: 12, marginTop: 2, fontFamily: 'Poppins-Regular' }}>
+                      {t('variant') || 'Variant'}: <Text style={{ fontFamily: 'Poppins-SemiBold' }}>{it.selectedVariation}</Text>
+                    </Text>
+                  )}
+
+                  {/* Options (e.g. choice selections) */}
+                  {it.options && Object.keys(it.options).length > 0 && (
+                    <View style={{ marginTop: 2 }}>
+                      {Object.entries(it.options).map(([key, value]) => (
+                        <Text key={key} style={{ color: colors.text.secondary, fontSize: 12, fontFamily: 'Poppins-Regular' }}>
+                          {key}: <Text style={{ fontFamily: 'Poppins-SemiBold' }}>{value}</Text>
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+
+                  {/* Addons */}
+                  {it.addons && it.addons.length > 0 && (
+                    <View style={{ marginTop: 4 }}>
+                      {it.addons.map((addon, idx) => (
+                        <Text key={idx} style={{ color: colors.text.secondary, fontSize: 12, fontFamily: 'Poppins-Regular' }}>
+                          + {addon.quantity > 1 ? `${addon.quantity}x ` : ''}{addon.name}
+                          {addon.price > 0 && ` (${formatCurrency(it.currency, addon.price)})`}
+                        </Text>
+                      ))}
+                    </View>
+                  )}
+                  {/* Pricing breakdown - CLEANER UI */}
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+                    <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 14, color: colors.text.primary }}>
+                      {formatCurrency(it.currency, it.finalUnit)}
+                    </Text>
+                    {it.discountPercent > 0 && (
+                      <>
+                        <Text style={{ fontFamily: 'Poppins-Regular', fontSize: 12, color: colors.text.light, textDecorationLine: 'line-through', marginLeft: 6 }}>
+                          {formatCurrency(it.currency, it.basePrice)}
+                        </Text>
+                        <View style={{ backgroundColor: '#E8F5E9', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginLeft: 8 }}>
+                          <Text style={{ color: '#2E7D32', fontSize: 10, fontFamily: 'Poppins-Bold' }}>
+                            -{Math.round(it.discountPercent)}%
+                          </Text>
+                        </View>
+                      </>
+                    )}
+                  </View>
                 </View>
               </View>
 
@@ -306,7 +368,34 @@ export default function CartDetail({ vendorId, navigation }) {
                 {/* Total Price & Remove Link */}
                 <View style={{ alignItems: 'flex-end', justifyContent: 'center' }}>
                   <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-Bold', fontSize: 16 }}>
-                    {formatCurrency(it.currency, it.finalUnit * it.qty)}
+                    {(() => {
+                      // Calculate total per unit including addons
+                      const addonTotalPerUnit = (it.addons || []).reduce((sum, addon) => {
+                        const price = Number(addon.price || 0);
+                        const qty = Number(addon.quantity || 1);
+                        return sum + (price * qty);
+                      }, 0);
+
+                      // Total = (Base Discounted + Addons) * Qty
+                      // But wait! Addons are usually per item.
+                      // If it.addons array has `quantity`, it might be total quantity for that addon within the single product configuration? 
+                      // Actually, based on screenshot: Addon "Extra Garlic Dip", Price 1.00. 
+                      // If I order 2 Calamari, I pay 1.00 per Calamari for the dip?
+                      // Usually yes. So the line item total should be (Unit + Addons) * Qty.
+
+                      // Let's rely on backendSubtotal logic if available, but PER ITEM is tricky if backend gives total subtotal.
+                      // If we have backendSubtotal (19.60), and qty is 2. Item total displayed should be 19.60.
+
+                      if (it.backendSubtotal !== null && it.backendSubtotal !== undefined) {
+                        return formatCurrency(it.currency, it.backendSubtotal);
+                      }
+
+                      // Fallback calculation
+                      const unitTotal = it.finalUnit * it.qty;
+                      // Addons are flat cost per line item (not multiplied by qty)
+                      const lineTotal = unitTotal + addonTotalPerUnit;
+                      return formatCurrency(it.currency, lineTotal);
+                    })()}
                   </Text>
                 </View>
               </View>
@@ -338,29 +427,69 @@ export default function CartDetail({ vendorId, navigation }) {
             <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.lg, marginLeft: spacing.sm }}>{t('orderSummary')}</Text>
           </View>
 
-          <View style={styles.rowBetween}>
-            <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>{t('subtotal')}</Text>
-            <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>{formatCurrency(currency, baseSubtotal)}</Text>
-          </View>
-          {discountTotal > 0 && (
-            <View style={styles.rowBetween}>
-              <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>{t('discount')}</Text>
-              <Text style={{ color: '#4CAF50', fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>-{formatCurrency(currency, discountTotal)}</Text>
-            </View>
-          )}
+          {(() => {
+            // Recalculate summary details locally to be consistent
+            const itemsTotalBase = items.reduce((sum, it) => sum + (it.basePrice * it.qty), 0);
+            const itemsDiscount = items.reduce((sum, it) => sum + (it.discountUnit * it.qty), 0);
 
+            // Addons are apparently treated as flat total per line item by backend (based on 19.60 total vs 24.80 calculation)
+            // So we sum up the addon prices directly, NOT multiplied by item quantity
+            const itemsAddons = items.reduce((sum, it) => {
+              const addonsCost = (it.addons || []).reduce((aSum, a) => aSum + (Number(a.price || 0) * Number(a.quantity || 1)), 0);
+              return sum + addonsCost;
+            }, 0);
 
-          <View style={styles.rowBetween}>
-            <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>{t('tax')}</Text>
-            <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>{formatCurrency(currency, taxTotal)}</Text>
-          </View>
+            const calculatedSubtotal = itemsTotalBase + itemsAddons;
 
-          <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
+            // If backend provides a total, we should ideally use that for the final line
+            // But for the breakdown, our local calc is safer for "Subtotal" vs "Discount" visual logic
 
-          <View style={styles.rowBetween}>
-            <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-Bold', fontSize: fontSize.lg }}>{t('total')}</Text>
-            <Text style={{ color: colors.primary, fontFamily: 'Poppins-Bold', fontSize: fontSize.xl }}>{formatCurrency(currency, total)}</Text>
-          </View>
+            return (
+              <>
+                <View style={styles.rowBetween}>
+                  <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>{t('itemsTotal') || 'Items Total'}</Text>
+                  <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>
+                    {formatCurrency(currency, itemsTotalBase)}
+                  </Text>
+                </View>
+
+                {itemsAddons > 0 && (
+                  <View style={styles.rowBetween}>
+                    <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>{t('addons') || 'Add-ons'}</Text>
+                    <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>
+                      {formatCurrency(currency, itemsAddons)}
+                    </Text>
+                  </View>
+                )}
+
+                {itemsDiscount > 0 && (
+                  <View style={styles.rowBetween}>
+                    <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>{t('discount')}</Text>
+                    <Text style={{ color: '#4CAF50', fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>
+                      -{formatCurrency(currency, itemsDiscount)}
+                    </Text>
+                  </View>
+                )}
+
+                {/* Provide visual assurance if taxes are included */}
+                <View style={styles.rowBetween}>
+                  <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>{t('tax')}</Text>
+                  <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>
+                    {taxTotal > 0 ? formatCurrency(currency, taxTotal) : formatCurrency(currency, 0)}
+                  </Text>
+                </View>
+
+                <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
+
+                <View style={styles.rowBetween}>
+                  <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-Bold', fontSize: fontSize.lg }}>{t('total')}</Text>
+                  <Text style={{ color: colors.primary, fontFamily: 'Poppins-Bold', fontSize: fontSize.xl }}>
+                    {formatCurrency(currency, total)}
+                  </Text>
+                </View>
+              </>
+            );
+          })()}
         </View>
       </ScrollView>
 

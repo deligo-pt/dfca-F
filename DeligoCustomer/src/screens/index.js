@@ -9,6 +9,7 @@ export { default as TermsOfServiceScreen } from './TermsOfServiceScreen';
 export { default as PrivacyPolicyScreen } from './PrivacyPolicyScreen';
 export { default as LocationAddressScreen } from './LocationAddressScreen';
 export { default as RestaurantDetailsScreen } from './RestaurantDetailsScreen';
+export { default as AddonsScreen } from './AddonsScreen';
 export { default as TrackOrderScreen } from './TrackOrderScreen';
 export { default as CheckoutScreen } from './CheckoutScreen';
 export { default as CartDetailScreen } from './CartDetailScreen';
