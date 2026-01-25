@@ -1,13 +1,22 @@
-// Storage keys for AsyncStorage
+/**
+ * Application Storage Constants
+ * 
+ * Central registry of keys used for AsyncStorage persistence.
+ * Ensures consistent key usage across the app.
+ */
 export const STORAGE_KEYS = {
+  // Onboarding Status
   ONBOARDING_COMPLETED: 'onboardingCompleted',
+
+  // Authentication & Session
   USER_TOKEN: 'userToken',
   USER_DATA: 'userData',
-  // Backwards-compatible aliases used across the codebase
+  REFRESH_TOKEN: 'refreshToken',
+
+  // Legacy Compatibility Mappings
   ACCESS_TOKEN: 'userToken',
   USER: 'userData',
-  // Refresh token storage key
-  REFRESH_TOKEN: 'refreshToken',
 };
 
 export default STORAGE_KEYS;
+

@@ -4,28 +4,35 @@ import { useTheme } from '../utils/ThemeContext';
 import { useNavigation } from '@react-navigation/native';
 import NotificationPopup from './NotificationPopup';
 
+/**
+ * NotificationOverlay Component
+ * 
+ * Global notification handler rendering alerts over current screen content.
+ * Subscribes to NotificationContext for real-time updates.
+ */
 const NotificationOverlay = () => {
   const { latestNotification, showPopup, dismissPopup, markAsRead } = useNotifications();
   const { colors } = useTheme();
   const navigation = useNavigation();
 
-  // We are now using Toast for notifications, so this component is effectively disabled
-  // but kept for backward compatibility or if we want to switch back to custom popups
-  // Returning null effectively disables the overlay
-  // if (true) return null;
-
+  /**
+   * Handles user interaction with the notification popup.
+   * - Marks the notification as read.
+   * - Navigates to the specific content (e.g., Order Tracking) if applicable data exists.
+   * - Defaults to the main Notifications hub if no specific data is present.
+   * 
+   * @param {Object} notification - The notification data object.
+   */
   const handleNotificationPress = async (notification) => {
-    // Mark as read
+    // Mark as read immediately on interaction
     if (notification._id && !notification.isRead) {
       await markAsRead(notification._id);
     }
 
-    // Navigate based on notification type
+    // Direct navigation rationale
     if (notification.type === 'ORDER' && notification.data?.orderId) {
-      // Navigate to TrackOrder screen
       navigation.navigate('TrackOrder', { orderId: notification.data.orderId });
     } else {
-      // Navigate to notifications screen
       navigation.navigate('Notifications');
     }
   };

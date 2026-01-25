@@ -13,8 +13,23 @@ import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { spacing, fontSize } from '../theme';
 
-const { width } = Dimensions.get('window');
-
+/**
+ * NotificationPopup Component
+ *
+ * A sophisticated, animated notification toast designed for high-visibility alerts.
+ * Features:
+ * - Dynamic entrance/exit animations (slide, scale, fade).
+ * - Context-aware visual styling (icons, gradients) based on notification type/status.
+ * - Auto-dismissal with a visual countdown timer.
+ * 
+ * @param {Object} props
+ * @param {Object} props.notification - Notification payload containing type, title, message, and status.
+ * @param {boolean} props.visible - Controls the display state of the popup.
+ * @param {Function} props.onPress - Callback triggered on user interaction.
+ * @param {Function} props.onDismiss - Callback triggered when the popup closes (auto or manual).
+ * @param {Object} props.colors - Theme palette for consistent styling.
+ * @param {number} [props.duration=5000] - Display duration in milliseconds before auto-dismissal.
+ */
 const NotificationPopup = ({
   notification,
   visible,
@@ -32,12 +47,12 @@ const NotificationPopup = ({
 
   useEffect(() => {
     if (visible && notification) {
-      // Reset animations
+      // Initialize animation states
       progressAnim.setValue(1);
       scaleAnim.setValue(0.9);
       opacityAnim.setValue(0);
 
-      // Animate in with spring
+      // Execute entrance sequence
       Animated.parallel([
         Animated.spring(slideAnim, {
           toValue: 0,
@@ -58,14 +73,14 @@ const NotificationPopup = ({
         }),
       ]).start();
 
-      // Animate progress bar
+      // Start progress bar countdown
       Animated.timing(progressAnim, {
         toValue: 0,
         duration: duration,
         useNativeDriver: false,
       }).start();
 
-      // Auto dismiss after duration
+      // Schedule auto-dismissal
       timerRef.current = setTimeout(() => {
         handleDismiss();
       }, duration);
@@ -76,7 +91,7 @@ const NotificationPopup = ({
         }
       };
     } else if (!visible) {
-      // Slide out
+      // Execute exit sequence
       Animated.parallel([
         Animated.timing(slideAnim, {
           toValue: -200,
@@ -125,11 +140,14 @@ const NotificationPopup = ({
 
   if (!notification) return null;
 
+  /**
+   * Determines the visual configuration (icon, color, label) based on notification type and status.
+   */
   const getNotificationConfig = () => {
     const type = notification.type?.toUpperCase() || 'ORDER';
     const status = notification.data?.status || notification.data?.orderStatus;
 
-    // Status-based icons for ORDER type
+    // Prioritize specific order statuses for tailored feedback
     if (type === 'ORDER' && status) {
       switch (status) {
         case 'ACCEPTED':
@@ -183,7 +201,7 @@ const NotificationPopup = ({
       }
     }
 
-    // Title-based detection
+    // Fallback detection based on title keywords if structured status is missing
     const title = notification.title?.toLowerCase() || '';
     if (title.includes('accepted')) {
       return {
@@ -237,7 +255,7 @@ const NotificationPopup = ({
       };
     }
 
-    // Type-based fallbacks
+    // Generic type-based configurations
     switch (type) {
       case 'ORDER':
         return {
@@ -304,13 +322,13 @@ const NotificationPopup = ({
         onPress={handlePress}
         style={[styles.popup, { backgroundColor: colors.surface }]}
       >
-        {/* Gradient accent on left */}
+        {/* Visual Accent Bar */}
         <LinearGradient
           colors={config.gradient}
           style={styles.accentBar}
         />
 
-        {/* Icon with gradient background */}
+        {/* Icon Container */}
         <View style={styles.iconWrapper}>
           <LinearGradient
             colors={config.gradient}
@@ -322,11 +340,10 @@ const NotificationPopup = ({
               <Ionicons name={config.icon} size={22} color="#FFFFFF" />
             )}
           </LinearGradient>
-          {/* Pulse animation ring */}
           <View style={[styles.pulseRing, { borderColor: config.color + '40' }]} />
         </View>
 
-        {/* Content */}
+        {/* Text Content */}
         <View style={styles.content}>
           <View style={styles.headerRow}>
             <Text style={[styles.label, { color: config.color }]}>
@@ -344,7 +361,7 @@ const NotificationPopup = ({
           </Text>
         </View>
 
-        {/* Close Button */}
+        {/* Dismissal Control */}
         <TouchableOpacity
           onPress={handleDismiss}
           style={[styles.closeButton, { backgroundColor: colors.background }]}
@@ -353,7 +370,7 @@ const NotificationPopup = ({
           <Ionicons name="close" size={16} color={colors.text.light} />
         </TouchableOpacity>
 
-        {/* Animated Progress Bar */}
+        {/* Duration Indicator */}
         <View style={[styles.progressBarContainer, { backgroundColor: colors.border }]}>
           <Animated.View
             style={[

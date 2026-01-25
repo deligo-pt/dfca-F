@@ -1,7 +1,9 @@
 /**
  * Firebase Notification Service
- * Handles all native Firebase Cloud Messaging operations for DeliGo Customer
- * Implements foreground (toast + custom sound) and background/killed (native sound) notifications
+ * 
+ * Manages Firebase Cloud Messaging (FCM) operations for the customer application.
+ * Handles token management, permission requests, and notification routing for
+ * both foreground and background states.
  */
 
 import messaging from '@react-native-firebase/messaging';
@@ -24,7 +26,7 @@ class FirebaseNotificationService {
     }
 
     /**
-     * Set callbacks for notification events
+     * Attach message handlers for incoming notifications
      */
     setNotificationCallbacks(onNotificationReceived, onNotificationOpened) {
         this.onNotificationReceivedCallback = onNotificationReceived;
@@ -33,7 +35,7 @@ class FirebaseNotificationService {
     }
 
     /**
-     * Create notification channel with custom sound for Android
+     * Initialize notification channels (Android-specific configuration)
      */
     async createNotificationChannel() {
         if (Platform.OS === 'android') {
@@ -54,8 +56,7 @@ class FirebaseNotificationService {
     }
 
     /**
-     * Initialize Firebase Messaging
-     * Should be called once on app startup
+     * Initialize messaging service and listeners
      */
     async initialize() {
         try {
@@ -213,7 +214,7 @@ class FirebaseNotificationService {
     }
 
     /**
-     * Setup foreground message handler (plays custom sound from assets)
+     * Configure handler for notifications received while app is in foreground
      */
     setupForegroundHandler() {
         console.log('[Firebase] Setting up foreground message handler...');
@@ -263,7 +264,7 @@ class FirebaseNotificationService {
     }
 
     /**
-     * Setup notification opened handler
+     * Configure handler for notifications that open the app from background
      */
     setupNotificationOpenedHandler() {
         this.unsubscribeOnNotificationOpened = messaging().onNotificationOpenedApp((remoteMessage) => {
@@ -283,7 +284,7 @@ class FirebaseNotificationService {
     }
 
     /**
-     * Check if app was opened from notification (killed state)
+     * Handle notification that launched the app from a killed state
      */
     async checkInitialNotification() {
         try {
@@ -436,23 +437,23 @@ class FirebaseNotificationService {
         }
     }
     /**
-     * Re-initialize after permission granted during onboarding
+     * Re-initialize service sequence following permission grant
      */
     async reinitializeAfterPermission() {
         console.log('[Firebase] Re-initializing after permission grant...');
         // Channels need creating
         await this.createNotificationChannel();
-        
+
         // Get and register token
         const token = await this.getToken();
         if (token) {
             await this.registerTokenWithBackend(token);
         }
-        
+
         // Setup handlers
         this.setupForegroundHandler();
         this.setupNotificationOpenedHandler();
-        
+
         return true;
     }
 }

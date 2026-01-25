@@ -17,7 +17,10 @@ import {
 
 export { colors };
 
-// Base spacing (legacy support)
+/**
+ * Legacy Spacing System
+ * @deprecated - Prefer using 'designTokens.spacing' for responsive layouts.
+ */
 export const spacing = {
   xs: 4,
   sm: 8,
@@ -27,7 +30,10 @@ export const spacing = {
   xxl: 48,
 };
 
-// Base font sizes (legacy support)
+/**
+ * Legacy Typography System
+ * @deprecated - Prefer using 'designTokens.fontSize' for responsive text.
+ */
 export const fontSize = {
   xs: 12,
   sm: 14,
@@ -37,7 +43,10 @@ export const fontSize = {
   xxl: 32,
 };
 
-// Base border radius (legacy support)
+/**
+ * Legacy Border Radius System
+ * @deprecated - Prefer using 'designTokens.borderRadius'.
+ */
 export const borderRadius = {
   sm: 4,
   md: 8,
@@ -46,7 +55,13 @@ export const borderRadius = {
   round: 999,
 };
 
-// Professional design tokens
+/**
+ * Design System Tokens
+ *
+ * Comprehensive collection of UI tokens for building consistent, responsive interfaces.
+ * Includes colors, typography, spacing, shadows, and utility functions.
+ * All new components should strictly utilize these tokens.
+ */
 export const designTokens = {
   // Responsive spacing that adapts to screen size
   spacing: responsiveSpacing,

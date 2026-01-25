@@ -1,36 +1,52 @@
 import React, { useRef, useState } from 'react';
 import { View, TextInput, StyleSheet, Platform } from 'react-native';
 
+/**
+ * OTPInput Component
+ * 
+ * segmented input for OTP entry.
+ * Handles auto-focus switching and clipboard paste events.
+ * 
+ * @param {Object} props
+ * @param {number} [props.length=4] - Digit count.
+ * @param {string} props.value - Current entry.
+ * @param {Function} props.onChangeText - Value change handler.
+ * @param {boolean} [props.disabled=false] - Disable input.
+ */
 const OTPInput = ({ length = 4, value, onChangeText, disabled = false }) => {
   const inputRefs = useRef([]);
   const [focusedIndex, setFocusedIndex] = useState(null);
 
+  /**
+   * Handles individual character input and focus management.
+   * Supports standard typing, backspace, and pasting full codes.
+   */
   const handleChange = (text, index) => {
-    // Only allow numbers
+    // Sanitize input to numbers only
     const numericText = text.replace(/[^0-9]/g, '');
 
     if (numericText.length === 0) {
-      // Handle deletion
+      // Deletion logic
       const newValue = value.split('');
       newValue[index] = '';
       onChangeText(newValue.join(''));
 
-      // Move to previous input
+      // Move focus backward on delete
       if (index > 0) {
         inputRefs.current[index - 1]?.focus();
       }
     } else if (numericText.length === 1) {
-      // Handle single digit input
+      // Single character entry
       const newValue = value.split('');
       newValue[index] = numericText;
       onChangeText(newValue.join(''));
 
-      // Move to next input
+      // Move focus forward
       if (index < length - 1) {
         inputRefs.current[index + 1]?.focus();
       }
     } else if (numericText.length > 1) {
-      // Handle paste of multiple digits
+      // Paste Logic: Distribute characters across inputs
       const digits = numericText.slice(0, length).split('');
       const newValue = value.split('');
 
@@ -42,12 +58,15 @@ const OTPInput = ({ length = 4, value, onChangeText, disabled = false }) => {
 
       onChangeText(newValue.join(''));
 
-      // Focus the next empty box or the last box
+      // Set focus to the end of the pasted sequence
       const nextIndex = Math.min(index + digits.length, length - 1);
       inputRefs.current[nextIndex]?.focus();
     }
   };
 
+  /**
+   * Handles special key events, primarily for backspace navigation logic when a field is empty.
+   */
   const handleKeyPress = (e, index) => {
     if (e.nativeEvent.key === 'Backspace' && !value[index] && index > 0) {
       inputRefs.current[index - 1]?.focus();
@@ -72,7 +91,7 @@ const OTPInput = ({ length = 4, value, onChangeText, disabled = false }) => {
           onFocus={() => setFocusedIndex(index)}
           onBlur={() => setFocusedIndex(null)}
           keyboardType="number-pad"
-          maxLength={1}
+          maxLength={1} // Actual length handled in onChangeText to support paste
           selectTextOnFocus
           editable={!disabled}
           textAlign="center"

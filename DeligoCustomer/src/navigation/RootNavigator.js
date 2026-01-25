@@ -33,35 +33,52 @@ import { BottomTabNavigator } from './index'; // assuming index.js exports Botto
 
 const Stack = createStackNavigator();
 
+/**
+ * RootNavigator
+ * 
+ * Primary navigation controller acting as the app's entry point.
+ * Manages high-level state-based routing:
+ * - Permissions (First launch)
+ * - Onboarding (New users)
+ * - Authentication (Login/Register)
+ * - Main App (Authenticated flow)
+ * 
+ * Also handles global modal screens and overlays.
+ */
 export default function RootNavigator() {
     const { isAuthenticated, isOnboardingCompleted, isLoading } = useProfile();
 
-    // Note: we might want to show a splash/loading screen here if isLoading is true, 
-    // but App.js handles the native splash screen. 
-    // If we need a js-rendering loading state, we can return null or a specific component.
+    // Permissions state tracking
+    // Returns null initially to prevent premature rendering before check completes
     const [hasViewedPermissions, setHasViewedPermissions] = useState(null);
 
     useEffect(() => {
         checkPermissionsViewed();
     }, []);
 
+    /**
+     * Checks if the user has already viewed the permissions screen.
+     * Persists the state in AsyncStorage to show it only once.
+     */
     const checkPermissionsViewed = async () => {
         try {
             const viewed = await AsyncStorage.getItem('HAS_VIEWED_PERMISSIONS');
             setHasViewedPermissions(viewed === 'true');
         } catch (e) {
-            console.warn(e);
+            console.warn('[RootNavigator] Permissions check failed:', e);
             setHasViewedPermissions(false);
         }
     };
 
+    // Prevent rendering until critical state checks are complete
     if (isLoading || hasViewedPermissions === null) {
-        return null;
+        return null; // Native splash screen remains visible
     }
 
     return (
         <>
             <Stack.Navigator screenOptions={{ headerShown: false }}>
+                {/* Authorization Flow */}
                 {!hasViewedPermissions ? (
                     <Stack.Screen name="Permissions">
                         {(props) => <PermissionsScreen {...props} onComplete={() => setHasViewedPermissions(true)} />}
@@ -74,7 +91,7 @@ export default function RootNavigator() {
                     <Stack.Screen name="Main" component={BottomTabNavigator} />
                 )}
 
-                {/* Common Screens accessible from various places */}
+                {/* Shared/Modal Screens */}
                 <Stack.Screen name="TermsOfService" component={TermsOfServiceScreen} />
                 <Stack.Screen name="PrivacyPolicy" component={PrivacyPolicyScreen} />
                 <Stack.Screen name="LocationAddress" component={LocationAddressScreen} />
@@ -86,7 +103,7 @@ export default function RootNavigator() {
                 <Stack.Screen name="TrackOrder" component={TrackOrderScreen} />
                 <Stack.Screen name="Checkout" component={CheckoutScreen} />
 
-                {/* Account Related Screens */}
+                {/* Profile & Settings Group */}
                 <Stack.Screen name="EditProfile" component={EditProfileScreen} />
                 <Stack.Screen name="Vouchers" component={VouchersScreen} />
                 <Stack.Screen name="SavedAddresses" component={SavedAddressesScreen} />
@@ -98,7 +115,7 @@ export default function RootNavigator() {
                 <Stack.Screen name="Chat" component={ChatScreen} />
             </Stack.Navigator>
 
-            {/* Global Notification Overlay */}
+            {/* Global Overlays */}
             {isAuthenticated && <NotificationOverlay />}
         </>
     );

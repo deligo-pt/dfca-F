@@ -3,6 +3,20 @@ import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { spacing, fontSize, borderRadius } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
 
+/**
+ * CategoryCard Component
+ *
+ * Renders a visually distinct card for a specific food category or cuisine.
+ * Designed to be colorful and eye-catching to encourage exploration.
+ *
+ * @param {Object} props
+ * @param {Object} props.category - The category data object.
+ * @param {string} props.category.name - Display name of the category.
+ * @param {string} props.category.icon - Emoji or icon character.
+ * @param {string} props.category.description - Short description or tagline.
+ * @param {string} props.category.color - Background color hex code.
+ * @param {Function} props.onPress - Handler for selection events.
+ */
 const CategoryCard = ({ category, onPress }) => {
   const { colors } = useTheme();
 
@@ -37,13 +51,13 @@ const styles = (colors) => StyleSheet.create({
     fontSize: 40,
   },
   name: {
-    color: colors.text.white,
+    color: colors.text.white || '#FFFFFF',
     fontSize: fontSize.lg,
     fontFamily: 'Poppins-Bold',
     marginTop: spacing.xs,
   },
   description: {
-    color: colors.text.white,
+    color: colors.text.white || '#FFFFFF',
     fontSize: fontSize.xs,
     fontFamily: 'Poppins-Regular',
     opacity: 0.9,

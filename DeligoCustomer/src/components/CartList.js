@@ -8,88 +8,40 @@ import { useLanguage } from '../utils/LanguageContext';
 import formatCurrency from '../utils/currency';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
+/**
+ * CartList Component
+ * 
+ * Renders a list of active shopping carts, separated by vendor.
+ * Supports multi-vendor cart management (switching active carts, deleting drafts).
+ * Resolves vendor details via context caches to ensure consistent branding.
+ * 
+ * @param {Object} props
+ * @param {Object} props.navigation - Navigation prop.
+ */
 export default function CartList({ navigation }) {
   const { t } = useLanguage();
   const { cartsArray, getVendorSubtotal, clearVendorCartAndSync, enforceSingleVendor } = useCart();
   const { products } = useProducts();
   const { colors, isDarkMode } = useTheme();
+
+  // State to track which vendor's options menu is currently open
   const [menuForVendor, setMenuForVendor] = useState(null);
+
+  // Loading states for async actions
   const [deletingVendorId, setDeletingVendorId] = useState(null);
   const [switchingVendorId, setSwitchingVendorId] = useState(null);
+
+  // Cache for resolved vendor details to avoid repeated heavy lookups (optimization)
   const [vendorDetailsCache, setVendorDetailsCache] = useState({});
-
-  // NOTE: Vendor details fetch disabled - endpoint /restaurants/:id doesn't exist on backend
-  // ProductsContext and cart data already provide vendor information
-  /*
-  React.useEffect(() => {
-    const fetchMissingDetails = async () => {
-      if (!cartsArray) return;
-
-      for (const cart of cartsArray) {
-        const name = cart.vendorName;
-        const vid = cart.vendorId;
-        // If name is missing or generic "Store"/"Vendor" and we haven't fetched it yet
-        if ((!name || name === 'Store' || name === 'Vendor') && vid && !vendorDetailsCache[vid]) {
-          try {
-            const { API_ENDPOINTS, BASE_API_URL } = require('../constants/config');
-            const StorageService = require('../utils/storage').default;
-
-            const token = await StorageService.getAccessToken();
-            const rawToken = (token && typeof token === 'object') ? (token.accessToken || token.token) : token;
-            const authHeader = rawToken ? (rawToken.startsWith('Bearer ') ? rawToken.substring(7) : rawToken) : null;
-
-            if (authHeader) {
-              const url = `${BASE_API_URL}${API_ENDPOINTS.RESTAURANTS.GET_DETAILS.replace(':id', vid)}`;
-              console.debug('[CartList] Fetching vendor details:', url);
-              const res = await fetch(url, {
-                method: 'GET',
-                headers: {
-                  'Content-Type': 'application/json',
-                  'Authorization': `Bearer ${rawToken}` // Use rawToken here for the Bearer prefix
-                }
-              });
-              const json = await res.json();
-              console.debug('[CartList] Vendor details response:', json);
-
-              if (res.ok && json.success && json.data) {
-                // It might be nested under `restaurant` or `vendor`
-                const v = json.data.restaurant || json.data.vendor || json.data;
-                console.debug('[CartList] Extracted vendor data:', v);
-                if (v && (v.vendorName || v.name)) {
-                  setVendorDetailsCache(prev => ({
-                    ...prev,
-                    [vid]: {
-                      name: v.vendorName || v.name || v.restaurantName,
-                      image: v.storePhoto || v.logo || v.image,
-                      rating: v.rating,
-                      deliveryTime: v.deliveryTime
-                    }
-                  }));
-                }
-              } else {
-                console.warn('[CartList] API response not successful or data missing for vendor', vid, json);
-                setVendorDetailsCache(prev => ({ ...prev, [vid]: { failed: true } }));
-              }
-            }
-          } catch (e) {
-            console.warn('[CartList] Failed to fetch vendor details for', vid, e);
-            // Mark as attempted to avoid infinite loop
-            setVendorDetailsCache(prev => ({ ...prev, [vid]: { failed: true } }));
-          }
-        }
-      }
-    };
-
-    // Debounce slightly
-    const t = setTimeout(fetchMissingDetails, 500);
-    return () => clearTimeout(t);
-  }, [cartsArray, vendorDetailsCache]);
-  */
 
   if (!cartsArray || cartsArray.length === 0) {
     return null;
   }
 
+  /**
+   * Removes a specific vendor's cart from the state.
+   * @param {string} vendorId 
+   */
   const handleDeleteVendorCart = async (vendorId) => {
     if (!vendorId) return;
     setDeletingVendorId(vendorId);
@@ -101,6 +53,11 @@ export default function CartList({ navigation }) {
     }
   };
 
+  /**
+   * Sets a specific vendor as the active context and navigates to the detailed view.
+   * Useful when enforcing single-vendor constraints.
+   * @param {string} vendorId 
+   */
   const handleSwitchVendor = async (vendorId) => {
     if (!vendorId) return;
     setSwitchingVendorId(vendorId);
@@ -115,30 +72,29 @@ export default function CartList({ navigation }) {
 
   return (
     <View style={{ padding: spacing.md, position: 'relative' }}>
-      {/* Overlay to close menu when tapping outside */}
+      {/* Invisible overlay to handle outside taps for closing the active menu */}
       {menuForVendor && (
         <Pressable onPress={() => setMenuForVendor(null)} style={[StyleSheet.absoluteFillObject, { zIndex: 1 }]} />
       )}
+
       {cartsArray.map((cart) => {
         const itemCount = Object.keys(cart.items || {}).reduce((s, id) => s + (cart.items[id].quantity || 0), 0);
         const subtotal = getVendorSubtotal(cart.vendorId);
 
-        // Try to get vendor info from multiple sources
-        // 1. Cached details from API fetch
-        // 2. Cart object itself
-        // 3. ProductsContext lookup (User Request)
-        // 4. First item in cart
+        // Data Resolution Strategy:
+        // 1. Check local cache (vendorDetailsCache).
+        // 2. Check the Cart object itself.
+        // 3. Look up in 'ProductsContext' using the first item in the cart to find the parent vendor.
 
         const cached = vendorDetailsCache[cart.vendorId];
         const firstId = cart.items && Object.keys(cart.items).length ? Object.keys(cart.items)[0] : null;
         const firstItem = firstId ? cart.items[firstId].product : null;
 
-        // Lookup in ProductsContext using first item's ID
+        // Attempt to resolve vendor from the Product Context via the first item
         let productContextMatch = null;
         if (products && products.length > 0 && firstItem) {
           const rawId = firstItem.id || firstItem._id || firstItem.productId;
           if (rawId) {
-            // Try to find by ID or partial ID match
             productContextMatch = products.find(p =>
               p.id === rawId ||
               p._id === rawId ||
@@ -147,7 +103,7 @@ export default function CartList({ navigation }) {
           }
         }
 
-        // Fallback: If no product match, try to find ANY product from this vendor to get vendor details
+        // Secondary fallback: Match any product by Vendor ID if item lookup fails
         if (!productContextMatch && products && products.length > 0 && cart.vendorId) {
           productContextMatch = products.find(p => {
             const v = p.vendor || {};
@@ -163,16 +119,12 @@ export default function CartList({ navigation }) {
           });
         }
 
-        if (products) console.debug(`[CartList] products available: ${products.length} for vendor ${cart.vendorId}`);
-
         const pcVendor = productContextMatch?.vendor || productContextMatch?._raw?.vendor;
-        // In ProductsContext, 'name' is often the vendor name
         const pcVendorName = pcVendor?.vendorName || pcVendor?.name || productContextMatch?.name;
-        // Vendor image from context
         const pcVendorImage = pcVendor?.storePhoto || pcVendor?.logo || pcVendor?.image;
-        // Product image from context (strong fallback)
         const pcProductImage = productContextMatch?.image;
 
+        // Finalize display values with a prioritized waterfall
         const finalVendorName = pcVendorName ||
           cached?.name ||
           (cart.vendorName && !['Store', 'Vendor'].includes(cart.vendorName) ? cart.vendorName : null) ||
@@ -187,30 +139,11 @@ export default function CartList({ navigation }) {
           firstItem?.image ||
           null;
 
-        // Debug log for troubleshooting image issues
-        if (!finalVendorImage && cart.vendorId) {
-          console.debug('[CartList] Image resolution failed for vendor', cart.vendorId, {
-            cached: !!cached?.image,
-            cartFields: !!cart.vendorImage,
-            pcMatch: !!productContextMatch,
-            pcVendorImage: !!pcVendorImage,
-            pcProductImage: !!pcProductImage,
-            firstItemImage: !!firstItem?.image
-          });
-        }
-
-        const finalRating = cached?.rating ||
-          cart.vendorRating ||
-          pcVendor?.rating ||
-          firstItem?._raw?.vendor?.rating ||
-          '4.5';
-
         const finalDeliveryTime = cached?.deliveryTime ||
           cart.vendorDeliveryTime ||
           pcVendor?.deliveryTime ||
           firstItem?._raw?.vendor?.deliveryTime ||
           '30-40 min';
-
 
         const isMenuOpen = menuForVendor === cart.vendorId;
 
@@ -222,7 +155,7 @@ export default function CartList({ navigation }) {
               style={[styles.vendorCard, { backgroundColor: colors.surface, borderColor: colors.border, shadowColor: colors.shadow }]}
             >
               <View style={styles.cardContent}>
-                {/* Vendor Image */}
+                {/* Vendor Logo / Placeholder */}
                 <View style={styles.imageContainer}>
                   {finalVendorImage ? (
                     <Image source={{ uri: finalVendorImage }} style={styles.vendorImage} />
@@ -233,7 +166,7 @@ export default function CartList({ navigation }) {
                   )}
                 </View>
 
-                {/* Info */}
+                {/* Vendor Details */}
                 <View style={styles.infoContainer}>
                   <View style={styles.headerRow}>
                     <Text style={[styles.vendorName, { color: colors.text.primary }]} numberOfLines={1}>
@@ -261,7 +194,7 @@ export default function CartList({ navigation }) {
                 </View>
               </View>
 
-              {/* Action Footer */}
+              {/* Action Footer Button */}
               <View style={styles.cardFooter}>
                 <TouchableOpacity
                   style={[styles.checkoutButton, { backgroundColor: colors.primary }]}
@@ -275,7 +208,7 @@ export default function CartList({ navigation }) {
               </View>
             </TouchableOpacity>
 
-            {/* Inline popover menu */}
+            {/* Context Menu (Popover) */}
             {isMenuOpen && (
               <View style={styles.popoverMenu}>
                 <View style={[styles.popoverContent, { backgroundColor: colors.surface, borderColor: colors.border }]}>
@@ -325,7 +258,7 @@ const styles = StyleSheet.create({
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.05,
     shadowRadius: 8,
-    borderWidth: 1, // Optional: Glovo often uses very subtle borders if flat
+    borderWidth: 1,
     borderColor: '#eee',
   },
   cardContent: {

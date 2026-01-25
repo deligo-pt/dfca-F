@@ -1,8 +1,10 @@
 /**
- * Robust API client with refresh-token handling and queued retries for concurrent 401s.
- * - Attaches access token from StorageService
- * - On 401: attempts refresh (body -> cookie), persists new access token, retries original
- * - Queues requests arriving during refresh to avoid multiple refresh calls
+ * API Client Configuration
+ * 
+ * Centralized Axios instance with interceptors for:
+ * - Automatic token injection (Bearer auth)
+ * - Response error handling
+ * - Seamless token refresh (401 handling) with queue management for concurrent requests
  */
 
 import axios from 'axios';
@@ -45,7 +47,7 @@ customerApi.interceptors.request.use(
     try {
       const token = await getAccessToken();
       if (token) {
-        // Backend now expects Bearer token
+        // Attach Bearer token
         const authHeader = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
         config.headers.Authorization = authHeader;
         console.debug('[api] request -> auth present, mask:', maskToken(authHeader));
@@ -78,7 +80,7 @@ customerApi.interceptors.response.use(
             failedQueue.push({ resolve, reject });
           });
           originalRequest.headers = originalRequest.headers || {};
-          // Backend now expects Bearer token
+          // Attach Bearer token
           const authHeader = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
           originalRequest.headers.Authorization = authHeader;
           console.debug('[api] retry queued request with token mask:', maskToken(authHeader));
@@ -97,7 +99,7 @@ customerApi.interceptors.response.use(
           const refreshToken = await StorageService.getRefreshToken();
           console.debug('[api] attempting refresh, refresh mask:', maskToken(refreshToken));
 
-          // Attempt body-based refresh first
+          // Strategy 1: Refresh via request body
           let resp = null;
           try {
             resp = await axios.post(refreshUrl, { refreshToken }, { withCredentials: true, headers: { 'Content-Type': 'application/json' } });
@@ -105,7 +107,7 @@ customerApi.interceptors.response.use(
             console.debug('[api] body refresh failed or returned non-200', e?.response?.status || e.message);
           }
 
-          // If no token, try cookie-only refresh (some backends use httpOnly cookie)
+          // Strategy 2: Refresh via HttpOnly cookie
           let newAccessToken = resp?.data?.data?.accessToken || resp?.data?.accessToken || resp?.data?.token || resp?.data?.access_token || null;
           if (!newAccessToken) {
             try {
@@ -136,10 +138,10 @@ customerApi.interceptors.response.use(
           processQueue(null, finalToken);
 
           originalRequest.headers = originalRequest.headers || {};
-          // Backend now expects Bearer token
+          // Attach Bearer token
           const authHeader = finalToken.startsWith('Bearer ') ? finalToken : `Bearer ${finalToken}`;
 
-          // Handle Axios 1.x headers class
+          // Compatibility: Handle Axios header formats
           if (originalRequest.headers.set && typeof originalRequest.headers.set === 'function') {
             originalRequest.headers.set('Authorization', authHeader);
           } else {

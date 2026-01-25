@@ -1,4 +1,9 @@
-// Language translations for English and Portuguese
+/**
+ * Internationalization (i18n) Translations
+ * 
+ * Contains dictionary objects for supported languages (English, Portuguese).
+ * Structured by screens and common UI elements.
+ */
 export const translations = {
   en: {
     // Common

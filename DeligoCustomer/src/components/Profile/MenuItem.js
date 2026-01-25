@@ -1,12 +1,27 @@
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
-import { useTheme } from '../../utils/ThemeContext'; // Adjust path as needed
+import { useTheme } from '../../utils/ThemeContext';
 
+/**
+ * MenuItem Component
+ * 
+ * Standard list item for profile and settings menus.
+ * Supports icons, subtitles, and customizable styles.
+ * 
+ * @param {Object} props
+ * @param {string} props.iconName - Ionicons name.
+ * @param {string} props.title - Primary text.
+ * @param {string} [props.subtitle] - Secondary text.
+ * @param {Function} props.onPress - Interaction handler.
+ * @param {boolean} [props.showDivider=true] - Toggle bottom separator.
+ * @param {string} [props.iconColor] - Custom icon color override.
+ */
 const MenuItem = ({ iconName, title, subtitle, onPress, showDivider = true, iconColor }) => {
   const { colors } = useTheme();
   const [pressed, setPressed] = useState(false);
 
+  // Fallback color logic for the chevron icon
   const chevronColor = colors.text?.light || colors.text?.secondary || '#999';
 
   return (
@@ -18,6 +33,7 @@ const MenuItem = ({ iconName, title, subtitle, onPress, showDivider = true, icon
         onPressOut={() => setPressed(false)}
         activeOpacity={0.8}
       >
+        {/* Icon Container with visual feedback on press */}
         <View style={[
           styles.menuIconContainer,
           { backgroundColor: colors.surface, borderColor: colors.border },
@@ -29,13 +45,21 @@ const MenuItem = ({ iconName, title, subtitle, onPress, showDivider = true, icon
             color={iconColor || colors.primary}
           />
         </View>
+
         <View style={styles.menuTextContainer}>
           <Text style={[styles.menuText, { color: colors.text.primary }]}>{title}</Text>
-          {subtitle && <Text style={[styles.menuSubtitle, { color: colors.text.secondary }]}>{subtitle}</Text>}
+          {subtitle && (
+            <Text style={[styles.menuSubtitle, { color: colors.text.secondary }]}>{subtitle}</Text>
+          )}
         </View>
+
         <Ionicons name="chevron-forward" size={20} color={chevronColor} />
       </TouchableOpacity>
-      {showDivider && <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />}
+
+      {/* Conditional Divider for list separation */}
+      {showDivider && (
+        <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+      )}
     </>
   );
 };

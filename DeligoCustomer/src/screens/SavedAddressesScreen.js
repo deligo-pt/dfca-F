@@ -1,20 +1,25 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar, ActivityIndicator, RefreshControl, Modal } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import React, { useState, useEffect, useCallback } from 'react';
+import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, SafeAreaView, StatusBar, RefreshControl, ScrollView, Modal } from 'react-native';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
 import { useProfile } from '../contexts/ProfileContext';
 import { useLocation } from '../contexts/LocationContext';
-import { customerApi } from '../utils/api';
 import AddressApi from '../utils/addressApi';
-import { API_ENDPOINTS } from '../constants/config';
+import CustomModal from '../components/CustomModal';
+
+/**
+ * SavedAddressesScreen
+ * 
+ * Manages the user's saved delivery addresses, allowing for addition, deletion,
+ * selection, and setting of the default active address.
+ */
 
 const SavedAddressesScreen = ({ navigation, route }) => {
   const { colors, isDarkMode } = useTheme();
   const { t } = useLanguage();
   const { user, fetchUserProfile } = useProfile();
-  const { selectAddress } = useLocation(); // Import selectAddress
+  const { selectAddress } = useLocation();
   const [loading, setLoading] = useState(false);
   const [refreshing, setRefreshing] = useState(false);
   const [localAddresses, setLocalAddresses] = useState([]);
@@ -27,14 +32,14 @@ const SavedAddressesScreen = ({ navigation, route }) => {
   const showConfirm = (title, message, onConfirm) => setConfirmConfig({ visible: true, title, message, onConfirm });
   const hideConfirm = () => setConfirmConfig(prev => ({ ...prev, visible: false }));
 
-  // Check if we are in selection mode
+  // Determine if operating in selection mode
   const { onSelect, selectedId } = route.params || {};
 
   useEffect(() => {
     if (user?.deliveryAddresses) {
       setLocalAddresses(user.deliveryAddresses);
 
-      // Auto-sync active address to LocationContext so Checkout uses it
+      // Synchronize active address with LocationContext for checkout consistency
       const activeAddr = user.deliveryAddresses.find(a => a.isActive);
       if (activeAddr) {
         selectAddress({
@@ -51,7 +56,7 @@ const SavedAddressesScreen = ({ navigation, route }) => {
     }
   }, [user]);
 
-  // Initial fetch if needed
+
   useEffect(() => {
     fetchUserProfile();
   }, []);
@@ -64,7 +69,7 @@ const SavedAddressesScreen = ({ navigation, route }) => {
 
   const handleToggleStatus = async (addressId, isActive) => {
     try {
-      // Optimistic update: If activating, deactivate all others. If deactivating, just deactivate self.
+      // Optimistic update: toggle target, and if activating, ensure others are deactivated.
       const updatedLocal = localAddresses.map(addr => {
         if (addressId === addr._id) return { ...addr, isActive: !isActive }; // Toggle target
         if (!isActive) return { ...addr, isActive: false }; // If target is becoming active, force others inactive
@@ -132,8 +137,7 @@ const SavedAddressesScreen = ({ navigation, route }) => {
 
   const handleSelect = async (address) => {
     if (onSelect) {
-      // If selecting a non-active address, make it active globally first
-      // This ensures that "Selected" for checkout == "Active" in backend context
+      // Ensure selected address is active to align with backend context
       if (!address.isActive) {
         setLoading(true);
         try {
@@ -193,7 +197,7 @@ const SavedAddressesScreen = ({ navigation, route }) => {
           </View>
 
           <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-            {/* Toggle Switch - Only show if NOT in selection mode */}
+            {/* Toggle Switch - Hidden in selection mode */}
             {!onSelect && (
               <TouchableOpacity onPress={() => handleToggleStatus(address._id, address.isActive)} style={{ padding: 4 }}>
                 <MaterialCommunityIcons

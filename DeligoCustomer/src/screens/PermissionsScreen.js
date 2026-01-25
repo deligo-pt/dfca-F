@@ -1,6 +1,8 @@
 /**
  * PermissionsScreen
- * Step-by-step wizard to request permissions on first app launch
+ * 
+ * Manages the initial onboarding flow for requesting necessary device permissions
+ * (Location, Notifications) to ensure core app functionality.
  */
 
 import React, { useState, useEffect } from 'react';
@@ -22,7 +24,6 @@ const PermissionsScreen = (props) => {
     const [currentStep, setCurrentStep] = useState(0); // 0: Intro, 1: Location, 2: Notifications
     const [loading, setLoading] = useState(false);
 
-    // Permission states
     const [locationStatus, setLocationStatus] = useState('undetermined');
     const [notificationStatus, setNotificationStatus] = useState('undetermined');
 
@@ -32,15 +33,13 @@ const PermissionsScreen = (props) => {
 
     const checkCurrentPermissions = async () => {
         try {
-            // Check Location
             const { status: locStatus } = await Location.getForegroundPermissionsAsync();
             setLocationStatus(locStatus);
 
-            // Check Notifications
             const notifStatus = await firebaseNotificationService.checkPermission();
             setNotificationStatus(notifStatus);
         } catch (error) {
-            console.warn('[PermissionsScreen] Error checking permissions:', error);
+            console.warn('[PermissionsScreen] Failed to retrieve permission status:', error);
         }
     };
 
@@ -49,8 +48,9 @@ const PermissionsScreen = (props) => {
         try {
             const { status } = await Location.requestForegroundPermissionsAsync();
             setLocationStatus(status);
+
             if (status === 'granted') {
-                setCurrentStep(2); // Move to Notifications
+                setCurrentStep(2);
             } else {
                 Alert.alert(
                     t('permissions.locationRequired'),
@@ -62,7 +62,7 @@ const PermissionsScreen = (props) => {
                 );
             }
         } catch (error) {
-            console.warn('[PermissionsScreen] Error requesting location permission:', error);
+            console.warn('[PermissionsScreen] Location permission request failed:', error);
             setCurrentStep(2);
         } finally {
             setLoading(false);
@@ -76,8 +76,7 @@ const PermissionsScreen = (props) => {
             setNotificationStatus(enabled ? 'granted' : 'denied');
 
             if (enabled) {
-                // Immediately register FCM token with backend after permission is granted
-                console.log('[PermissionsScreen] Notification permission granted, registering FCM token...');
+                // Register token immediately upon granting permission to ensure timely delivery of updates
                 await firebaseNotificationService.reinitializeAfterPermission();
                 completePermissions();
             } else {
@@ -91,8 +90,8 @@ const PermissionsScreen = (props) => {
                 );
             }
         } catch (error) {
-            console.warn('[PermissionsScreen] Error requesting notification permission:', error);
-            completePermissions(); // Proceed anyway
+            console.warn('[PermissionsScreen] Notification permission request failed:', error);
+            completePermissions();
         } finally {
             setLoading(false);
         }
@@ -105,7 +104,7 @@ const PermissionsScreen = (props) => {
                 props.onComplete();
             }
         } catch (e) {
-            console.warn('[PermissionsScreen] Error saving permissions viewed:', e);
+            console.warn('[PermissionsScreen] Failed to save completion state:', e);
             if (props.onComplete) {
                 props.onComplete();
             }

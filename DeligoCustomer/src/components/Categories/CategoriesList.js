@@ -1,81 +1,114 @@
+/**
+ * CategoriesList Component
+ * 
+ * Displays a horizontally scrollable list of categories with selection support.
+ * Handles item rendering with emoji fallbacks for missing icons.
+ */
 import React from 'react';
 import { ScrollView, TouchableOpacity, View, Text, StyleSheet } from 'react-native';
-import { spacing, fontSize, borderRadius } from '../../theme';
+import { spacing, fontSize } from '../../theme';
 import { useTheme } from '../../utils/ThemeContext';
 
-import { Ionicons } from '@expo/vector-icons';
-import { MaterialCommunityIcons } from '@expo/vector-icons';
-
-export default function VendorType({ categories = [], onPress = () => { }, selectedId = null }) {
+/**
+ * Functional component for rendering the category strip.
+ * 
+ * @param {Object} props
+ * @param {Array} props.categories - Array of category objects to display.
+ * @param {Function} props.onPress - Handler for category selection. Receives the category object.
+ * @param {string|number} props.selectedId - ID of the currently active category for highlighting.
+ */
+const CategoriesList = ({ categories = [], onPress = () => { }, selectedId = null }) => {
   const { colors } = useTheme();
+  const styles = getStyles(colors);
 
-  // Use emoji icons for reliable cross-platform rendering
+  /**
+   * Returns a fallback emoji based on category name keywords.
+   * Used when no remote icon URL is provided by the API.
+   * 
+   * @param {string} name - Category name to analyze.
+   * @returns {string} Emoji character.
+   */
   const getIcon = (name) => {
-    const n = (name || '').toLowerCase().trim();
-    console.log('[VendorType] getIcon for:', name, '-> normalized:', n);
+    const normalizedName = (name || '').toLowerCase().trim();
 
-    // Restaurant/Food matching
-    if (n === 'resturent' || n === 'restaurant' || n.includes('food') || n.includes('burger')) {
-      return '🍔'; // Food/Restaurant
+    if (['resturent', 'restaurant', 'food', 'burger'].some(term => normalizedName.includes(term))) {
+      return '🍔';
     }
-    // Store/Grocery matching
-    if (n === 'store' || n.includes('grocery') || n.includes('shop') || n.includes('mart')) {
-      return '🛒'; // Shopping Cart for Store
+    if (['store', 'grocery', 'shop', 'mart'].some(term => normalizedName.includes(term))) {
+      return '🛒';
     }
-    // Default fallback - always show something
-    return '📦'; // Default package icon
+    return '📦';
   };
 
   return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: spacing.md, paddingBottom: spacing.sm }}>
+    <ScrollView
+      horizontal
+      showsHorizontalScrollIndicator={false}
+      contentContainerStyle={staticStyles.scrollContent}
+    >
       {categories.map((category) => {
         const isSelected = selectedId === category.id;
         return (
-          <TouchableOpacity key={category.id} style={[styles(colors).card, isSelected && styles(colors).selected]} onPress={() => onPress(category)} activeOpacity={0.8}>
-            <View style={[styles(colors).iconWrap, isSelected && styles(colors).iconWrapSelected]}>
-              <Text style={styles(colors).iconEmoji}>{category.icon || getIcon(category.name)}</Text>
+          <TouchableOpacity
+            key={category.id}
+            style={[styles.card, isSelected && styles.selected]}
+            onPress={() => onPress(category)}
+            activeOpacity={0.8}
+          >
+            <View style={[styles.iconWrap, isSelected && styles.iconWrapSelected]}>
+              <Text style={styles.iconEmoji}>{category.icon || getIcon(category.name)}</Text>
             </View>
-            <Text style={[styles(colors).name, isSelected && styles(colors).nameSelected]} numberOfLines={1}>{category.name}</Text>
+            <Text
+              style={[styles.name, isSelected && styles.nameSelected]}
+              numberOfLines={1}
+            >
+              {category.name}
+            </Text>
           </TouchableOpacity>
         );
       })}
     </ScrollView>
   );
-}
+};
 
-const styles = (colors) => StyleSheet.create({
+const staticStyles = StyleSheet.create({
+  scrollContent: {
+    paddingHorizontal: spacing.md,
+    paddingBottom: spacing.sm,
+  },
+});
+
+const getStyles = (colors) => StyleSheet.create({
   card: {
     alignItems: 'center',
     justifyContent: 'center',
     marginRight: spacing.lg,
-    width: 70, // Fixed width for alignment
+    width: 70,
   },
-  selected: {
-    // No specific container style for selection in bubble mode, controlled by iconWrap
-  },
+  selected: {},
   iconWrap: {
     width: 70,
     height: 70,
-    borderRadius: 35, // Fully circular
+    borderRadius: 35,
     alignItems: 'center',
     justifyContent: 'center',
-    backgroundColor: colors.surfaceVariant || colors.border || '#F5F5F5', // Soft gray/pastel background
+    backgroundColor: colors.surfaceVariant || colors.border || '#F5F5F5',
     marginBottom: spacing.xs,
-    // Removed overflow: hidden and elevation to fix Android shadow artifact
-    // iOS shadow only
+    // Shadow for iOS
     shadowColor: colors.shadow || '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.08,
     shadowRadius: 2,
-    // NO elevation - it causes white square on Android
+    // Disable Android elevation to prevent artifacts
+    elevation: 0,
   },
   iconWrapSelected: {
-    backgroundColor: colors.primaryLight || 'rgba(255, 105, 180, 0.15)', // Light primary tint
+    backgroundColor: colors.primaryLight || 'rgba(255, 105, 180, 0.15)',
     borderWidth: 2,
     borderColor: colors.primary,
   },
   iconEmoji: {
-    fontSize: 32, // Large emoji size
+    fontSize: 32,
     textAlign: 'center',
   },
   name: {
@@ -83,7 +116,6 @@ const styles = (colors) => StyleSheet.create({
     fontSize: fontSize.xs + 1,
     fontFamily: 'Poppins-Medium',
     textAlign: 'center',
-    numberOfLines: 2,
     lineHeight: 16,
   },
   nameSelected: {
@@ -91,3 +123,6 @@ const styles = (colors) => StyleSheet.create({
     fontFamily: 'Poppins-SemiBold',
   },
 });
+
+export default CategoriesList;
+

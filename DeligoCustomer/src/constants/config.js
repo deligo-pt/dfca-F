@@ -1,45 +1,56 @@
 /**
- * @format
- * API Configuration for Deligo Customer Application
- * Central configuration for all API endpoints and base URLs.
+ * API Configuration
+ *
+ * Centralized configuration for API endpoints, base URLs, and environment settings.
  */
 
-// Environment-based API Base URLs
+/**
+ * Base URLs for different environments.
+ */
 const API_BASE_URLS = {
-  // IMPORTANT: Change this to your computer's IP address for physical device/emulator testing
-  // Find your IP: Windows (ipconfig) | Mac/Linux (ifconfig)
-  // Android Emulator: Use 10.0.2.2 (maps to host machine's localhost)
-  // iOS Simulator: Use localhost or your computer's IP
-  // Physical Device: Use your computer's local network IP (e.g., 192.168.x.x)
+  // Local Development Targets
+  development: 'http://10.0.2.2:5000', // Android Emulator (maps to host localhost)
+  // development: 'http://192.168.1.100:5000',  // Physical Device (Use PC's local IP)
+  // development: 'http://localhost:5000',  // iOS Simulator
 
-  development: 'http://10.0.2.2:5000', // For Android Emulator (maps to host localhost)
-  // development: 'http://192.168.1.100:5000',  // Uncomment and use your PC's IP for physical device
-  // development: 'http://localhost:5000',  // For iOS Simulator only
-
-  // staging: 'https://deligo-test-server.vercel.app',
+  // Deployment Targets
   staging: 'https://deligo-food-backend.vercel.app',
   production: 'https://api.deligo.com',
 };
 
-// Current environment - Should be managed by build scripts or CI/CD
-const ENVIRONMENT = 'staging'; // 'development' | 'staging' | 'production'
+/**
+ * Current Environment
+ * Change this value to switch between 'development', 'staging', and 'production' modes.
+ */
+const ENVIRONMENT = 'staging';
 
-// API Configuration
+/**
+ * General API Settings
+ */
 export const API_CONFIG = {
   BASE_URL: API_BASE_URLS[ENVIRONMENT],
   API_VERSION: 'v1',
-  TIMEOUT: 30000, // 30 seconds
+  TIMEOUT: 30000, // 30 seconds global timeout
 };
 
-// Construct full base URL for the API
-// NOTE: backend routes are under /api/v1/... (no extra /customer segment)
-// Use base URL without the trailing '/customer' so endpoints like '/auth/login-customer' resolve to '/api/v1/auth/login-customer'
+/**
+ * Base API URL Construction
+ *
+ * Dynamically constructs the full API base URL string.
+ * Ensures clean path concatenation by removing trailing slashes before appending the version.
+ * Result: {BASE_URL}/api/{API_VERSION}
+ */
 const cleanBaseUrl = API_CONFIG.BASE_URL.replace(/\/+$/, '');
 export const BASE_API_URL = `${cleanBaseUrl}/api/${API_CONFIG.API_VERSION}`;
 
-// API Endpoint Categories for Customer App
+/**
+ * API Endpoint Definitions
+ *
+ * Organized by domain feature for clarity and maintainability.
+ * Use these constants throughout the app to prevent hardcoded path strings.
+ */
 export const API_ENDPOINTS = {
-  // Authentication & User Account
+  // --- Authentication ---
   AUTH: {
     REGISTER: '/auth/register',
     LOGIN: '/auth/login',
@@ -52,7 +63,7 @@ export const API_ENDPOINTS = {
     CHANGE_PASSWORD: '/auth/change-password',
   },
 
-  // Customer Profile & Data
+  // --- User Profile ---
   PROFILE: {
     GET: '/profile',
     UPDATE: '/customers/:id',
@@ -63,10 +74,12 @@ export const API_ENDPOINTS = {
     FAVORITES: '/profile/favorites',
   },
 
+  // --- Products Catalog ---
   PRODUCTS: {
     GET_ALL: '/products'
   },
-  // Restaurants & Menus
+
+  // --- Restaurants & Menus ---
   RESTAURANTS: {
     LIST: '/restaurants',
     GET_DETAILS: '/restaurants/:id',
@@ -76,7 +89,7 @@ export const API_ENDPOINTS = {
     ADD_REVIEW: '/restaurants/:id/reviews/add',
   },
 
-  // Order Management
+  // --- Order Management ---
   ORDERS: {
     LIST: '/orders',
     GET_BY_ID: '/orders/:id',
@@ -88,7 +101,7 @@ export const API_ENDPOINTS = {
     HISTORY: '/orders/history',
   },
 
-  // Cart Management
+  // --- Cart Operations ---
   CART: {
     GET: '/carts/view-cart',
     ADD_TO_CART: '/carts/add-to-cart',
@@ -99,28 +112,28 @@ export const API_ENDPOINTS = {
     CLEAR: '/carts/clear',
   },
 
-  // Checkout
+  // --- Checkout Flow ---
   CHECKOUT: {
     CREATE: '/checkout',
   },
 
-  // Payment (Stripe)
+  // --- Payments ---
   PAYMENT: {
     CREATE_PAYMENT_INTENT: '/payment/stripe/create-payment-intent',
   },
 
-  // Coupons & Offers
+  // --- Discounts & Offers ---
   COUPONS: {
-    APPLY: '/coupons/apply-coupon', // Apply to cart
+    APPLY: '/coupons/apply-coupon',
     REMOVE: '/coupons/remove-coupon',
   },
 
   OFFERS: {
-    LIST: '/offers', // Get all public offers
-    GET_APPLICABLE: '/offers/get-applicable-offer', // Check specific code validity
+    LIST: '/offers',
+    GET_APPLICABLE: '/offers/get-applicable-offer',
   },
 
-  // General & Utility
+  // --- Common Utilities ---
   UTIL: {
     SEARCH: '/search',
     CUISINES: '/cuisines',
@@ -129,7 +142,7 @@ export const API_ENDPOINTS = {
     PRODUCT_CATEGORIES: '/categories/productCategory',
   },
 
-  // Notifications
+  // --- Notifications ---
   NOTIFICATIONS: {
     LIST: '/notifications',
     MARK_READ: '/notifications/:id/read',
@@ -139,7 +152,9 @@ export const API_ENDPOINTS = {
   },
 };
 
-// HTTP Status Codes
+/**
+ * Standard HTTP Status Codes
+ */
 export const HTTP_STATUS = {
   OK: 200,
   CREATED: 201,
@@ -155,14 +170,17 @@ export const HTTP_STATUS = {
   SERVICE_UNAVAILABLE: 503,
 };
 
-// Request timeout configurations
+/**
+ * Timeout Constants (ms)
+ *
+ * Pre-defined durations for handling various network request scenarios.
+ */
 export const TIMEOUT_CONFIG = {
-  SHORT: 10000,   // 10 seconds - for quick operations
-  MEDIUM: 30000,  // 30 seconds - default
-  LONG: 60000,    // 60 seconds - for file uploads, etc.
+  SHORT: 10000,   // Quick checks / heartbeat
+  MEDIUM: 30000,  // Standard API calls
+  LONG: 60000,    // Heavy operations (uploads, complex reports)
 };
 
-// Default export for convenience
 export default {
   API_CONFIG,
   BASE_API_URL,
@@ -170,3 +188,4 @@ export default {
   HTTP_STATUS,
   TIMEOUT_CONFIG,
 };
+

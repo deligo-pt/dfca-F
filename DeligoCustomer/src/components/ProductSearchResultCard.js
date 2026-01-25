@@ -5,24 +5,39 @@ import { spacing, fontSize, borderRadius } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
 import formatCurrency from '../utils/currency';
 
+/**
+ * ProductSearchResultCard Component
+ * 
+ * Compact product summary for search results.
+ * Handles variable API response structures via normalization.
+ * 
+ * @param {Object} props
+ * @param {Object} props.product - Raw product data.
+ * @param {Function} props.onPress - Interaction handler.
+ */
 const ProductSearchResultCard = ({ product, onPress }) => {
     const { colors, isDarkMode } = useTheme();
 
-    // Data Normalization
+    // Data Normalization:
+    // Flattens nested `_raw` properties and handles fallback values
+    // to ensure safe rendering regardless of backend schema variations.
+
     const raw = product._raw || {};
+
+    // Product Title Resolution
     const name = raw.product?.name || raw.name || raw.productName || product.name || 'Unknown Product';
 
-    // Image handling: Try product image first, then raw images array, then vendor, then fallback
+    // Image URI Resolution: Explicit property > Gallery First Item > Vendor Store Photo
     const imageUri = product.image ||
         (Array.isArray(raw.images) && raw.images.length > 0 ? raw.images[0] : null) ||
         raw.vendor?.storePhoto ||
         null;
 
-    // Price handling
+    // Pricing Resolution
     const price = raw.pricing?.price ?? raw.price ?? product.price ?? 0;
     const currency = raw.pricing?.currency ?? '';
 
-    // Vendor Name
+    // Vendor Information Resolution
     const vendorName = raw.vendor?.vendorName || product.vendor?.vendorName || raw.vendorName || '';
 
     return (
@@ -31,7 +46,7 @@ const ProductSearchResultCard = ({ product, onPress }) => {
             onPress={() => onPress && onPress(product)}
             activeOpacity={0.7}
         >
-            {/* Image Section */}
+            {/* Image Thumbnail */}
             <View style={styles(colors, isDarkMode).imageContainer}>
                 {imageUri ? (
                     <Image source={{ uri: imageUri }} style={styles(colors, isDarkMode).image} />
@@ -42,7 +57,7 @@ const ProductSearchResultCard = ({ product, onPress }) => {
                 )}
             </View>
 
-            {/* Info Section */}
+            {/* Product Details */}
             <View style={styles(colors, isDarkMode).infoContainer}>
                 <Text style={styles(colors, isDarkMode).name} numberOfLines={2}>
                     {name}
@@ -59,7 +74,7 @@ const ProductSearchResultCard = ({ product, onPress }) => {
                 </Text>
             </View>
 
-            {/* Action Icon */}
+            {/* Navigation Indicator */}
             <View style={styles(colors, isDarkMode).actionContainer}>
                 <Ionicons name="arrow-forward-circle-outline" size={24} color={colors.primary} />
             </View>
@@ -75,7 +90,6 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
         backgroundColor: colors.surface,
         borderRadius: borderRadius.lg,
         alignItems: 'center',
-        // Shadow for depth
         shadowColor: isDarkMode ? '#000' : '#ccc',
         shadowOffset: { width: 0, height: 2 },
         shadowOpacity: 0.1,

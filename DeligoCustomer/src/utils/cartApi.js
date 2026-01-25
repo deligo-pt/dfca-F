@@ -1,8 +1,9 @@
 /**
- * @format
  * Cart API Service
- * Centralized API calls for cart operations
- * Uses direct fetch calls similar to ProductsContext pattern
+ * 
+ * Centralized management of shopping cart operations including addition,
+ * modification, and removal of items. Abstracts payload construction and
+ * error handling.
  */
 
 import { BASE_API_URL, API_ENDPOINTS } from '../constants/config';
@@ -36,7 +37,7 @@ class CartAPI {
       }
 
       if (token) {
-        // Backend now expects Bearer token
+        // Attach Bearer token
         const authHeader = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
         headers.Authorization = authHeader;
         console.debug('[CartAPI] auth present, mask:', maskToken(authHeader));
@@ -64,9 +65,8 @@ class CartAPI {
           const sku = it.productId.trim();
           const internal = typeof it.internalId === 'string' && /^[0-9a-fA-F]{24}$/.test(it.internalId) ? it.internalId : null;
 
-          // IMPORTANT: User requested to prioritize Mongo ID. 
-          // The previous logic forced SKU. Now we trust the passed ID (sku variable matches productId) 
-          // but we still check for regex to be safe if that's what was passed.
+          // Prioritize internal ID for strict validation
+          // Falls back to SKU/ProductId if Internal ID is missing or invalid
 
           // Construct payload with variantName if present
           const payload = {
@@ -124,8 +124,7 @@ class CartAPI {
    */
   static async activateItem(productId, quantity, action = 'increment', variantName = null) {
     try {
-      // IMPORTANT: Use UPDATE_QUANTITY endpoint, not ACTIVATE_ITEM
-      // ACTIVATE_ITEM is for toggling active/inactive (Boolean), not for quantity updates
+      // Update item quantity via dedicated endpoint
       const url = `${BASE_API_URL}${API_ENDPOINTS.CART.UPDATE_QUANTITY}`;
       const headers = await this.getHeaders();
 
@@ -182,7 +181,7 @@ class CartAPI {
             if (item.variantName) obj.variantName = item.variantName;
             if (item.options) obj.options = item.options;
             if (item.addons) {
-              // Ensure mapping matches what addToCart uses (addOnId vs addonId)
+              // Normalize addon structure
               obj.addons = item.addons.map(a => ({
                 addOnId: a.addOnId || a.addonId || a.id,
                 quantity: a.quantity || 1
@@ -336,8 +335,7 @@ class CartAPI {
   }
 
   /**
-   * Note: Clear entire cart endpoint doesn't exist on backend (returns 404)
-   * Use deleteItems() to remove individual items or multiple items at once
+   * Note: Full cart clear is performed via batch item deletion
    */
 }
 

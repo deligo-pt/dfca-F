@@ -9,33 +9,46 @@ import { useTheme } from '../utils/ThemeContext';
 import { useCart } from '../contexts/CartContext';
 import CartList from '../components/CartList';
 
+/**
+ * CartScreen
+ * 
+ * The main shopping cart view.
+ * - Displays items grouped by vendor.
+ * - Auto-refreshes cart data on focus to ensure pricing/stock accuracy.
+ * - Provides pull-to-refresh capability for manual updates.
+ * - Handles empty states and synchronization indicators.
+ * 
+ * @param {Object} props
+ * @param {Object} props.navigation - Navigation prop.
+ */
 const CartScreen = ({ navigation }) => {
   const { t } = useLanguage();
   const { colors, isDarkMode } = useTheme();
   const [refreshing, setRefreshing] = useState(false);
 
-  // Use Cart context for real data (cartsArray provides multiple vendor carts)
   const { cartsArray, itemCount, syncing, fetchCart } = useCart();
 
-  // Keep latest fetchCart in a ref to avoid useFocusEffect dependency churn
+  // Reference retention to maintain stable callback identity for focus effects
   const fetchCartRef = useRef(fetchCart);
   useEffect(() => { fetchCartRef.current = fetchCart; }, [fetchCart]);
 
-  // Fetch cart data when screen comes into focus (call the ref, no dependency on function identity)
-  // IMPORTANT: Use force:true to bypass throttling and ensure cart is always fresh when user returns
+  /**
+   * Screen Focus Handler
+   * Triggers a forced cart refresh whenever the screen becomes active.
+   * Ensures the user sees the most up-to-date cart state (prices, availability).
+   */
   useFocusEffect(
     useCallback(() => {
       let active = true;
       const loadCart = async () => {
         const fn = fetchCartRef.current;
         if (fn && active) {
+          // Force refresh to bypass client-side cache throttling
           const result = await fn({ silent: true, force: true });
           if (result?.skipped) {
             console.debug('[CartScreen] fetch skipped:', result.reason);
           } else if (!result?.success) {
             console.warn('[CartScreen] Failed to fetch cart:', result?.error);
-          } else {
-            console.debug('[CartScreen] cart fetched and refreshed');
           }
         }
       };
@@ -44,7 +57,10 @@ const CartScreen = ({ navigation }) => {
     }, [])
   );
 
-  // Pull-to-refresh handler
+  /**
+   * Manual Refresh Handler
+   * Triggers a full data reload when the user pulls down the list.
+   */
   const handleRefresh = useCallback(async () => {
     setRefreshing(true);
     const result = await fetchCart({ force: true });
@@ -62,7 +78,7 @@ const CartScreen = ({ navigation }) => {
         translucent={true}
         animated={true}
       />
-      {/* Modern Header (Clean & Minimal) */}
+      {/* Header */}
       <View style={[styles.header, { backgroundColor: colors.background }]}>
         <View style={styles.headerContent}>
           <Text style={[styles.headerTitle, { color: colors.text.primary }]}>{t('cart')}</Text>

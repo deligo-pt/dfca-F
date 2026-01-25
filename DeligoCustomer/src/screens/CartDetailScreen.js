@@ -7,6 +7,17 @@ import { useTheme } from '../utils/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useCart } from '../contexts/CartContext';
 
+/**
+ * CartDetailScreen
+ * 
+ * Displays the full details of a specific vendor cart.
+ * Acts as a wrapper around the `CartDetail` component, handling route parameters
+ * and providing a dedicated navigation context for the shopping cart view.
+ * 
+ * @param {Object} props
+ * @param {Object} props.route - Route parameters containing `vendorId`.
+ * @param {Object} props.navigation - Navigation prop.
+ */
 export default function CartDetailScreen({ route, navigation }) {
   const { t } = useLanguage();
   const { vendorId } = route.params || {};

@@ -1,18 +1,38 @@
-
+/**
+ * LocationContext Provider
+ *
+ * Manages user location data, including current coordinates, resolved addresses,
+ * and saved address lists. Handles persistence to local storage and integration
+ * with native location services (via Expo Location).
+ */
 import React, { createContext, useContext, useState, useEffect, useRef } from 'react';
 import * as Location from 'expo-location';
 import StorageService from '../utils/storage';
 import { useProfile } from './ProfileContext';
 
+/**
+ * Storage keys for persisting location state.
+ */
 const STORAGE_KEY_LOCATION = 'deligo_user_location';
 const STORAGE_KEY_SAVED_ADDRESSES = 'deligo_saved_addresses';
 
 export const LocationContext = createContext(null);
 
+/**
+ * Hook to access the LocationContext.
+ * @returns {Object} The location context value.
+ */
 export const useLocation = () => useContext(LocationContext);
 
+/**
+ * LocationProvider Component
+ * 
+ * Provides location state and methods to the application.
+ * Automatically loads persisted location data on mount.
+ */
 export const LocationProvider = ({ children }) => {
-    const [currentLocation, setCurrentLocation] = useState(null);
+    // --- State Management ---
+    const [currentLocation, setCurrentLocation] = useState(null); // { latitude, longitude }
     const [address, setAddress] = useState('');
     const [detailedAddress, setDetailedAddress] = useState('');
     const [city, setCity] = useState('');
@@ -20,6 +40,8 @@ export const LocationProvider = ({ children }) => {
     const [state, setState] = useState('');
     const [country, setCountry] = useState('');
     const [savedAddresses, setSavedAddresses] = useState([]);
+
+    // UI/Metadata State
     const [label, setLabel] = useState('Home');
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState(null);
@@ -27,15 +49,19 @@ export const LocationProvider = ({ children }) => {
     const { isAuthenticated } = useProfile();
     const prevAuthRef = useRef(isAuthenticated);
 
-    // Load saved addresses and last known location on mount
+    /**
+     * Initialize location data from local storage on mount.
+     */
     useEffect(() => {
         const init = async () => {
-            loadStoredLocationData();
-            // Permissions are now handled in PermissionsScreen
+            await loadStoredLocationData();
         };
         init();
     }, []);
 
+    /**
+     * Loads saved addresses and the last selected location from storage.
+     */
     const loadStoredLocationData = async () => {
         try {
             const storedLocation = await StorageService.getItem(STORAGE_KEY_LOCATION);
@@ -56,14 +82,22 @@ export const LocationProvider = ({ children }) => {
                 setSavedAddresses(storedAddresses);
             }
         } catch (err) {
-            console.warn('Failed to load location data:', err);
+            console.warn('[Location] Failed to load stored data:', err);
         }
     };
 
+    /**
+     * Requests permissions and retrieves the device's current location.
+     * Performs reverse geocoding to determine address details from coordinates.
+     * 
+     * @returns {Promise<Object|null>} Location data object or null if failed/denied.
+     */
     const getCurrentLocation = async () => {
         setLoading(true);
         setError(null);
         try {
+            // Request permissions implicitly if not already granted
+            // Note: Best practice is to handle this in a dedicated permission flow (e.g. PermissionsScreen)
             let { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
                 setError('Permission to access location was denied');
@@ -71,18 +105,19 @@ export const LocationProvider = ({ children }) => {
                 return null;
             }
 
-            // 1. Try to get last known position (fast, cached)
+            // Strategy: 
+            // 1. Try last known position (fast)
+            // 2. Fallback to current position (slower but accurate)
             let loc = await Location.getLastKnownPositionAsync({});
 
-            // 2. If no cached location, or user wants fresh, try current position with Balanced accuracy
-            // Balanced is faster and works better indoors/emulators than default/Highest
             if (!loc) {
+                // 'Balanced' accuracy is a good trade-off for speed/battery vs precision
                 loc = await Location.getCurrentPositionAsync({
                     accuracy: Location.Accuracy.Balanced,
                 });
             }
 
-            // Reverse geocode
+            // Reverse Geocoding
             let addresses = await Location.reverseGeocodeAsync({
                 latitude: loc.coords.latitude,
                 longitude: loc.coords.longitude,
@@ -97,7 +132,7 @@ export const LocationProvider = ({ children }) => {
             if (addresses && addresses.length > 0) {
                 const addr = addresses[0];
 
-                // Comprehensive address construction matching other screens
+                // Construct a readable address string filtering out duplicates/empty values
                 mainAddress = [
                     addr.district,
                     addr.street,
@@ -120,8 +155,9 @@ export const LocationProvider = ({ children }) => {
                 country: locCountry
             };
 
-            // We don't automatically save this as the "selected" address unless confirmed,
-            // but for now we update the state to reflect the current fetched location
+            // Update local state with fetched data
+            // Note: This does not auto-save as "selected" until confirmed by user action usually,
+            // but this implementation updates the "current view" state immediately.
             setCurrentLocation(loc.coords);
             setAddress(mainAddress);
             setCity(locCity);
@@ -131,20 +167,25 @@ export const LocationProvider = ({ children }) => {
 
             return locationData;
         } catch (err) {
-            console.error('Error getting location:', err);
-            // Don't set error state that blocks UI, just log it.
-            // setError('Error getting location');
+            console.error('[Location] Error getting current location:', err);
+            // We log but don't set a hard error state that blocks the UI permanently
             return null;
         } finally {
             setLoading(false);
         }
     };
 
+    /**
+     * Saves a new address to the saved addresses list and updates storage.
+     * Also sets it as the currently active address.
+     * 
+     * @param {Object} newAddressData - The address details to save.
+     * @returns {Promise<boolean>} True if successful, false otherwise.
+     */
     const saveAddress = async (newAddressData) => {
         try {
-            // newAddressData: { address, detailedAddress, city, postalCode, state, country, label, coordinates }
             const newAddress = {
-                id: Date.now().toString(), // Simple ID generation
+                id: Date.now().toString(),
                 ...newAddressData
             };
 
@@ -152,8 +193,7 @@ export const LocationProvider = ({ children }) => {
             setSavedAddresses(updatedAddresses);
             await StorageService.setItem(STORAGE_KEY_SAVED_ADDRESSES, updatedAddresses);
 
-            // Also set as current active address
-            // Also set as current active address
+            // Set as current active address
             setAddress(newAddress.address);
             setDetailedAddress(newAddress.detailedAddress);
             setCity(newAddress.city);
@@ -163,15 +203,21 @@ export const LocationProvider = ({ children }) => {
             setLabel(newAddress.label);
             setCurrentLocation(newAddress.coordinates);
 
+            // Persist as the active location
             await StorageService.setItem(STORAGE_KEY_LOCATION, newAddress);
 
             return true;
         } catch (err) {
-            console.error('Error saving address:', err);
+            console.error('[Location] Error saving address:', err);
             return false;
         }
     };
 
+    /**
+     * Selects an existing address from the saved list as the active location.
+     * 
+     * @param {Object} selectedAddress - The address object to select.
+     */
     const selectAddress = async (selectedAddress) => {
         setAddress(selectedAddress.address);
         setDetailedAddress(selectedAddress.detailedAddress || '');
@@ -181,28 +227,39 @@ export const LocationProvider = ({ children }) => {
         setCountry(selectedAddress.country || '');
         setLabel(selectedAddress.label || 'Home');
         setCurrentLocation(selectedAddress.coordinates);
+
         await StorageService.setItem(STORAGE_KEY_LOCATION, selectedAddress);
     };
 
+    /**
+     * Deletes an address from the saved list.
+     * 
+     * @param {string} addressId - ID of the address to remove.
+     */
     const deleteAddress = async (addressId) => {
         const updatedAddresses = savedAddresses.filter(addr => addr.id !== addressId);
         setSavedAddresses(updatedAddresses);
         await StorageService.setItem(STORAGE_KEY_SAVED_ADDRESSES, updatedAddresses);
     };
 
+    /**
+     * Clears all user-specific location data from state and storage.
+     * Usually called on logout.
+     */
     const clearUserData = async () => {
         setSavedAddresses([]);
         setLabel('Home');
         try {
             await StorageService.removeItem(STORAGE_KEY_SAVED_ADDRESSES);
         } catch (e) {
-            console.warn('Failed to clear saved addresses:', e);
+            console.warn('[Location] Failed to clear saved addresses:', e);
         }
     };
 
+    // Handle auto-clear on logout
     useEffect(() => {
         if (prevAuthRef.current && !isAuthenticated) {
-            console.log('[LocationContext] User logged out, clearing user data');
+            console.log('[Location] User logged out, clearing user data');
             clearUserData();
         }
         prevAuthRef.current = isAuthenticated;
@@ -210,6 +267,7 @@ export const LocationProvider = ({ children }) => {
 
     return (
         <LocationContext.Provider value={{
+            // State
             currentLocation,
             address,
             detailedAddress,
@@ -221,18 +279,20 @@ export const LocationProvider = ({ children }) => {
             savedAddresses,
             loading,
             error,
+            // Actions
             getCurrentLocation,
             saveAddress,
             selectAddress,
             deleteAddress,
-            setAddress, // Expose setters for manual input
+            clearUserData,
+            // Setters (Exposed for manual input forms)
+            setAddress,
             setDetailedAddress,
             setCity,
             setPostalCode,
             setState,
             setCountry,
             setLabel,
-            clearUserData
         }}>
             {children}
         </LocationContext.Provider>

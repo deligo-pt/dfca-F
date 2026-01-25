@@ -1,10 +1,17 @@
+/**
+ * Theme Context
+ * 
+ * Manages application theming (Dark/Light mode).
+ * Persists user preference and falls back to system settings.
+ */
+
 import React, { createContext, useState, useEffect, useContext } from 'react';
 import { Appearance } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 
 const ThemeContext = createContext();
 
-// Light theme colors
+// Light mode palette
 export const lightColors = {
   primary: '#DC3173',
   primaryLight: '#E956A8', // Lighter shade for gradient
@@ -26,7 +33,7 @@ export const lightColors = {
   overlay: 'rgba(0, 0, 0, 0.5)',
 };
 
-// Dark theme colors
+// Dark mode palette
 export const darkColors = {
   primary: '#DC3173',
   primaryLight: '#E956A8', // Lighter shade for gradient
@@ -253,7 +260,7 @@ export const ThemeProvider = ({ children }) => {
         setIsDarkMode(isDark);
         setColors(isDark ? darkColors : lightColors);
       } else {
-        // Use system preference if no saved preference
+        // Default to system appearance
         const colorScheme = Appearance.getColorScheme();
         const isDark = colorScheme === 'dark';
         setIsDarkMode(isDark);

@@ -4,6 +4,15 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../utils/ThemeContext';
 import { useLanguage } from '../../utils/LanguageContext';
 
+/**
+ * VouchersCard Component
+ * 
+ * Navigation entry point for the user's vouchers section.
+ * Displays a badge for active/available vouchers.
+ * 
+ * @param {Object} props
+ * @param {Object} props.navigation - Navigation prop.
+ */
 const VouchersCard = ({ navigation }) => {
   const { colors } = useTheme();
   const { t } = useLanguage();
@@ -17,10 +26,14 @@ const VouchersCard = ({ navigation }) => {
         <View style={[styles.voucherIconContainer, { backgroundColor: `${colors.primary}15` }]}>
           <Ionicons name="ticket" size={24} color={colors.primary} />
         </View>
+
         <Text style={[styles.voucherText, { color: colors.text.primary }]}>{t('vouchers')}</Text>
+
+        {/* Badge indicating the number of available vouchers (Currently static '0', connect to state) */}
         <View style={[styles.voucherBadge, { backgroundColor: colors.primary }]}>
           <Text style={styles.voucherBadgeText}>0</Text>
         </View>
+
         <Ionicons name="chevron-forward" size={20} color={colors.text.light} />
       </TouchableOpacity>
     </View>

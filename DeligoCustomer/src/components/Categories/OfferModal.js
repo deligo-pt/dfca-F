@@ -4,49 +4,93 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../../utils/ThemeContext';
 import { spacing } from '../../theme';
 
+/**
+ * OfferModal Component
+ *
+ * Displays detailed information about a specific promotional offer.
+ * Allows identifying the offer via promo code and applying it to the current context.
+ *
+ * @param {Object} props - Component props
+ * @param {boolean} props.visible - Controls the visibility of the modal
+ * @param {Function} [props.onClose] - Callback function to close the modal
+ * @param {Object} [props.offer] - The offer object containing code, discount, title, etc.
+ * @param {Function} [props.onApply] - Callback function when the offer is applied
+ * @returns {JSX.Element|null} The rendered OfferModal component or null if no offer is provided
+ */
 export default function OfferModal({ visible, onClose, offer, onApply }) {
   const { colors } = useTheme();
 
   if (!offer) return null;
 
   return (
-    <Modal animationType="slide" transparent={true} visible={visible} onRequestClose={onClose}>
-      <View style={[styles.overlay, { backgroundColor: colors.overlay }] }>
-        <View style={[styles.content, { backgroundColor: colors.surface, shadowColor: colors.shadow, borderTopLeftRadius: 24, borderTopRightRadius: 24 }] }>
-          <TouchableOpacity style={[styles.closeButton, { backgroundColor: colors.background, borderColor: colors.border }]} onPress={onClose}>
+    <Modal
+      animationType="slide"
+      transparent={true}
+      visible={visible}
+      onRequestClose={onClose}
+    >
+      <View style={[styles.overlay, { backgroundColor: colors.overlay }]}>
+        <View style={[styles.content, { backgroundColor: colors.surface, shadowColor: colors.shadow }]}>
+          <TouchableOpacity
+            style={[styles.closeButton, { backgroundColor: colors.background, borderColor: colors.border }]}
+            onPress={onClose}
+          >
             <Ionicons name="close" size={24} color={colors.text.secondary} />
           </TouchableOpacity>
 
           <View style={styles.header}>
-            <Text style={[styles.icon, { fontSize: 56 } ]}>🎉</Text>
-            <Text style={[styles.title, { color: colors.text.primary }]}>{offer.title || 'Special Offer'}</Text>
+            <Text style={styles.icon}>🎉</Text>
+            <Text style={[styles.title, { color: colors.text.primary }]}>
+              {offer.title || 'Special Offer'}
+            </Text>
           </View>
 
           <View style={styles.body}>
-            <Text style={[styles.subtitle, { color: colors.text.secondary }]}>{offer.subtitle || 'Limited time offer'}</Text>
+            <Text style={[styles.subtitle, { color: colors.text.secondary }]}>
+              {offer.subtitle || 'Limited time offer'}
+            </Text>
 
             {offer.code && (
               <View style={styles.promoContainer}>
                 <Text style={[styles.promoLabel, { color: colors.text.secondary }]}>Promo Code:</Text>
-                <View style={[styles.promoCode, { backgroundColor: colors.primary, borderColor: colors.primary }] }>
+                <View style={[styles.promoCode, { backgroundColor: colors.primary, borderColor: colors.primary }]}>
                   <Text style={styles.promoCodeText}>{offer.code}</Text>
                 </View>
                 <Text style={[styles.copyHint, { color: colors.text.light }]}>Tap to copy</Text>
               </View>
             )}
 
-            <View style={[styles.discountBadge, { backgroundColor: colors.background === '#FFFFFF' ? '#FFF8E1' : 'rgba(255, 217, 61, 0.15)', borderColor: colors.background === '#FFFFFF' ? '#FFD93D' : 'rgba(255, 217, 61, 0.3)' }]}>
-              <Text style={[styles.discountText, { color: colors.primary }]}>{offer.discount || '50%'}</Text>
+            <View style={[
+              styles.discountBadge,
+              {
+                backgroundColor: colors.background === '#FFFFFF' ? '#FFF8E1' : 'rgba(255, 217, 61, 0.15)',
+                borderColor: colors.background === '#FFFFFF' ? '#FFD93D' : 'rgba(255, 217, 61, 0.3)'
+              }
+            ]}>
+              <Text style={[styles.discountText, { color: colors.primary }]}>
+                {offer.discount || '50%'}
+              </Text>
               <Text style={[styles.discountLabel, { color: colors.primary }]}>OFF</Text>
             </View>
 
             <View style={[styles.terms, { backgroundColor: colors.background, borderColor: colors.border }]}>
               <Text style={[styles.termsTitle, { color: colors.text.primary }]}>Terms & Conditions:</Text>
-              <Text style={[styles.termsText, { color: colors.text.secondary }]}>• Valid for first-time users only{"\n"}• Minimum order value: €20{"\n"}• Not applicable with other offers{"\n"}• Valid until: December 31, 2025</Text>
+              <Text style={[styles.termsText, { color: colors.text.secondary }]}>
+                • Valid for first-time users only{"\n"}
+                • Minimum order value: €20{"\n"}
+                • Not applicable with other offers{"\n"}
+                • Valid until: December 31, 2025
+              </Text>
             </View>
           </View>
 
-          <TouchableOpacity style={[styles.applyButton, { backgroundColor: colors.primary, shadowColor: colors.primary }]} onPress={() => { onApply && onApply(offer); onClose && onClose(); }}>
+          <TouchableOpacity
+            style={[styles.applyButton, { backgroundColor: colors.primary, shadowColor: colors.primary }]}
+            onPress={() => {
+              if (onApply) onApply(offer);
+              if (onClose) onClose();
+            }}
+          >
             <Text style={[styles.applyText, { color: colors.text.white }]}>Apply Offer</Text>
           </TouchableOpacity>
         </View>
@@ -89,6 +133,7 @@ const styles = StyleSheet.create({
     marginBottom: spacing.lg,
   },
   icon: {
+    fontSize: 56,
     marginBottom: spacing.sm,
   },
   title: {

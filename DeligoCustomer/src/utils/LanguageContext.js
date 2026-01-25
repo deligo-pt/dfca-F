@@ -1,3 +1,10 @@
+/**
+ * Language Context
+ * 
+ * Manages application localization state, providing translation strings and
+ * language switching capabilities using persistent storage.
+ */
+
 import React, { createContext, useContext, useState, useEffect } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getLanguageTranslations } from './i18n';
@@ -44,10 +51,10 @@ export const LanguageProvider = ({ children }) => {
   const t = (key) => {
     if (!key) return '';
 
-    // Direct lookup (fast path)
+    // Optimize: direct lookup
     if (translations[key]) return translations[key];
 
-    // Nested lookup for keys with dots (e.g., 'permissions.introTitle')
+    // Resolve nested keys (dot notation)
     if (key.includes('.')) {
       const keys = key.split('.');
       let value = translations;
@@ -58,7 +65,7 @@ export const LanguageProvider = ({ children }) => {
       if (value && typeof value === 'string') return value;
     }
 
-    // Debug missing keys
+    // Log missing translation keys
     if (!translations[key] && !key.includes('.')) {
       console.warn(`[LanguageContext] Missing key: ${key}`);
     }

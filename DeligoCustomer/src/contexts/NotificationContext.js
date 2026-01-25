@@ -1,3 +1,12 @@
+/**
+ * NotificationContext Provider
+ *
+ * Manages the application's push notification system, including:
+ * - Storing and retrieving local notification state.
+ * - interacting with Firebase Messaging (FCM) through the service layer.
+ * - Handling incoming notifications (foreground) and interactions (taps).
+ * - Managing notification permission and token registration.
+ */
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { AppState } from 'react-native';
 import firebaseNotificationService from '../services/firebaseNotificationService';
@@ -6,6 +15,11 @@ import { navigateToOrder, navigateToNotifications } from '../navigation/navigati
 
 const NotificationContext = createContext();
 
+/**
+ * Hook to access the NotificationContext.
+ * @returns {Object} The notification context value.
+ * @throws {Error} If used outside of NotificationProvider.
+ */
 export const useNotifications = () => {
   const context = useContext(NotificationContext);
   if (!context) {
@@ -14,6 +28,12 @@ export const useNotifications = () => {
   return context;
 };
 
+/**
+ * NotificationProvider Component
+ * 
+ * initializes the notification subsystem, registers listeners for foreground messages
+ * and background taps, and syncs notification state with the backend.
+ */
 export const NotificationProvider = ({ children }) => {
   const [notifications, setNotifications] = useState([]);
   const [unreadCount, setUnreadCount] = useState(0);
@@ -23,21 +43,24 @@ export const NotificationProvider = ({ children }) => {
 
   const { isAuthenticated } = useProfile();
 
-  // Handle foreground notification received
+  /**
+   * Callback handling foreground notifications.
+   * Parses the payload to extract displayable title/message and updates local state.
+   */
   const handleNotificationReceived = useCallback((remoteMessage) => {
-    console.log('New notification received in Context:', remoteMessage);
+    console.log('[NotificationContext] Received foreground message:', remoteMessage);
 
-    // Parse notification data with robust fallbacks
     const data = remoteMessage.data || {};
-
-    // Determine title
     let title = remoteMessage.notification?.title || data.title;
+    let message = remoteMessage.notification?.body || data.body || data.message;
+
+    // Fallback logic for constructing titles/messages if payload is raw data-only
     if (!title) {
       if (data.type === 'ORDER') {
         title = 'Order Update';
         if (data.status) {
-          title = data.status.split('_').map(word =>
-            word.charAt(0).toUpperCase() + word.slice(1).toLowerCase()
+          title = data.status.split('_').map(w =>
+            w.charAt(0).toUpperCase() + w.slice(1).toLowerCase()
           ).join(' ');
         }
       } else if (data.orderId) {
@@ -47,8 +70,6 @@ export const NotificationProvider = ({ children }) => {
       }
     }
 
-    // Determine message/body
-    let message = remoteMessage.notification?.body || data.body || data.message;
     if (!message) {
       if (data.orderId) {
         message = `Update for order #${data.orderId.slice(-6)}`;
@@ -59,58 +80,55 @@ export const NotificationProvider = ({ children }) => {
 
     const notification = {
       _id: remoteMessage.messageId || Date.now().toString(),
-      title: title,
-      message: message,
+      title,
+      message,
       type: data.type || 'SYSTEM',
-      data: data,
+      data,
       isRead: false,
       createdAt: new Date().toISOString(),
     };
 
-    // Update state immediately
+    // Prevent duplicates and update state
     setNotifications(prev => {
-      // Check if notification already exists to avoid duplicates
-      if (prev.some(n => n._id === notification._id)) {
-        return prev;
-      }
+      if (prev.some(n => n._id === notification._id)) return prev;
       return [notification, ...prev];
     });
-    
+
     setLatestNotification(notification);
     setUnreadCount(prev => prev + 1);
-    
-    // We rely on Toast in firebaseNotificationService for the visual popup
-    // so we don't set showPopup(true) here to avoid double notifications.
-    // setShowPopup(true); 
+
+    // Note: popup display is handled by the Toast logic in the service layer
+    // triggering it here again would cause duplication.
   }, []);
 
-  // Handle notification opened (tapped)
+  /**
+   * Callback handling user interaction (tapping) on a notification.
+   * Navigates the user to the appropriate screen based on payload type.
+   */
   const handleNotificationOpened = useCallback((remoteMessage) => {
-    console.log('Notification opened:', remoteMessage);
+    console.log('[NotificationContext] Notification opened:', remoteMessage);
 
-    // Navigate based on notification data
     const data = remoteMessage.data || {};
     const type = data.type || '';
 
     if ((type === 'ORDER' || data.orderId) && data.orderId) {
-      console.log('Navigating to order:', data.orderId);
-      // Navigate to order tracking screen
+      console.log('[NotificationContext] Navigating to order:', data.orderId);
       navigateToOrder(data.orderId);
     } else {
-      // For other notification types, go to notifications screen
-      console.log('Navigating to notifications screen');
+      console.log('[NotificationContext] Navigating to notification center');
       navigateToNotifications();
     }
   }, []);
 
-  // Initialize Firebase notification service
+  /**
+   * Initialize notification service and register callbacks on mount.
+   */
   useEffect(() => {
     const init = async () => {
       try {
-        // Set callbacks BEFORE initializing to ensure we don't miss any messages
         firebaseNotificationService.setNotificationCallbacks(
-            handleNotificationReceived,
-            handleNotificationOpened
+          handleNotificationReceived,
+          handleNotificationOpened
         );
 
         const success = await firebaseNotificationService.initialize();
@@ -118,28 +136,23 @@ export const NotificationProvider = ({ children }) => {
           setIsInitialized(true);
         }
       } catch (error) {
-        console.error('Error initializing notification service:', error);
+        console.error('[NotificationContext] Initialization error:', error);
       }
     };
-
     init();
-
-    // Cleanup on unmount
-    return () => {
-      firebaseNotificationService.cleanup();
-    };
+    return () => { firebaseNotificationService.cleanup(); };
   }, [handleNotificationReceived, handleNotificationOpened]);
 
-  // Fetch notifications and register token when authenticated
+  /**
+   * Handle authentication changes: fetch notifications and ensure FCM token is registered with backend.
+   */
   useEffect(() => {
     if (isAuthenticated) {
       fetchNotifications();
 
-      // Register FCM token
       if (isInitialized) {
         (async () => {
           try {
-            // Check permission first
             const permission = await firebaseNotificationService.checkPermission();
             console.log('[NotificationContext] Permission status:', permission);
 
@@ -152,21 +165,15 @@ export const NotificationProvider = ({ children }) => {
               }
             }
 
-            // Get and register token
             const token = await firebaseNotificationService.getToken();
             if (token) {
-              console.log('[NotificationContext] Token obtained:', token.substring(0, 50) + '...');
-              console.log('[NotificationContext] Registering with backend...');
-
+              console.log('[NotificationContext] Registering token...');
               const result = await firebaseNotificationService.registerTokenWithBackend(token);
 
-              if (result) {
-                console.log('[NotificationContext] ✅ Backend registration successful:', result);
-              } else {
-                console.log('[NotificationContext] ⚠️ Backend registration returned null - check error logs');
-              }
+              if (result) console.log('[NotificationContext] Backend registration successful');
+              else console.warn('[NotificationContext] Backend registration failed/incomplete');
             } else {
-              console.log('[NotificationContext] ❌ Failed to get token');
+              console.warn('[NotificationContext] Failed to retrieve FCM token');
             }
           } catch (error) {
             console.error('[NotificationContext] Token registration error:', error);
@@ -174,95 +181,90 @@ export const NotificationProvider = ({ children }) => {
         })();
       }
     } else {
+      // Clear state on logout
       setNotifications([]);
       setUnreadCount(0);
     }
-  }, [isAuthenticated, isInitialized]);
+  }, [isAuthenticated, isInitialized, fetchNotifications]);
 
-  // Refetch notifications when app comes to foreground
+  /**
+   * Re-fetch notifications when the application returns to the foreground.
+   */
   useEffect(() => {
     const subscription = AppState.addEventListener('change', nextAppState => {
       if (nextAppState === 'active' && isAuthenticated) {
-        console.log('App became active, fetching notifications...');
+        console.log('[NotificationContext] App active, refreshing notifications...');
         fetchNotifications();
       }
     });
-
-    return () => {
-      subscription.remove();
-    };
+    return () => { subscription.remove(); };
   }, [isAuthenticated, fetchNotifications]);
 
-  // Fetch notifications from API
+  /**
+   * Fetches the latest notifications from the backend API.
+   * @returns {Promise<Array>} The list of notifications.
+   */
   const fetchNotifications = useCallback(async () => {
     try {
       const data = await firebaseNotificationService.fetchNotifications();
       setNotifications(data);
 
-      // Update unread count
       const unread = data.filter(n => !n.isRead).length;
       setUnreadCount(unread);
-
       return data;
     } catch (error) {
-      console.error('Error fetching notifications:', error);
+      console.error('[NotificationContext] Fetch error:', error);
       return [];
     }
   }, []);
 
-  // Mark notification as read
+  /**
+   * Marks a single notification as read.
+   * Optimistically updates local state before confirming with API.
+   *
+   * @param {string} notificationId - The ID of the notification to mark read.
+   */
   const markAsRead = useCallback(async (notificationId) => {
     try {
       const success = await firebaseNotificationService.markAsRead(notificationId);
       if (success) {
-        // Update local state
         setNotifications(prev =>
-          prev.map(n =>
-            n._id === notificationId ? { ...n, isRead: true } : n
-          )
+          prev.map(n => n._id === notificationId ? { ...n, isRead: true } : n)
         );
-
-        // Update unread count
         setUnreadCount(prev => Math.max(0, prev - 1));
       }
       return success;
     } catch (error) {
-      console.error('Error marking notification as read:', error);
+      console.error('[NotificationContext] Error marking as read:', error);
       return false;
     }
   }, []);
 
-  // Mark all as read
+  /**
+   * Marks all current notifications as read.
+   */
   const markAllAsRead = useCallback(async () => {
     try {
       const unreadNotifications = notifications.filter(n => !n.isRead);
-
-      // Mark each unread notification as read
       await Promise.all(
         unreadNotifications.map(n => firebaseNotificationService.markAsRead(n._id))
       );
 
-      // Update local state
       setNotifications(prev =>
         prev.map(n => ({ ...n, isRead: true }))
       );
-
-      // Reset unread count
       setUnreadCount(0);
-
       return true;
     } catch (error) {
-      console.error('Error marking all notifications as read:', error);
+      console.error('[NotificationContext] Error marking all as read:', error);
       return false;
     }
   }, [notifications]);
 
-  // Dismiss popup
   const dismissPopup = useCallback(() => {
     setShowPopup(false);
   }, []);
 
-  // Refresh notifications
   const refreshNotifications = useCallback(async () => {
     return await fetchNotifications();
   }, [fetchNotifications]);

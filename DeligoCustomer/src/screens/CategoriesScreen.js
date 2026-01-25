@@ -24,6 +24,19 @@ import { useLocation } from '../contexts/LocationContext';
 import { useProfile } from '../contexts/ProfileContext';
 import formatCurrency from '../utils/currency';
 
+/**
+ * CategoriesScreen
+ * 
+ * Main discovery interface for browsing vendors and products.
+ * Features:
+ * - Business type and cuisine filtering.
+ * - Location-based vendor sorting (Proximity).
+ * - Sticky header with global search and cart access.
+ * - Session-persistent filter state.
+ * 
+ * @param {Object} props
+ * @param {Object} props.navigation - Navigation controller.
+ */
 const CategoriesScreen = ({ navigation }) => {
     const { colors } = useTheme();
     const { t } = useLanguage();

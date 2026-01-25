@@ -1,7 +1,8 @@
 /**
- * @format
  * Order API Service
- * Handles order creation and management
+ * 
+ * Manages order creation lifecycle, bridging checkout summaries and payment
+ * confirmations to generate final orders.
  */
 
 import { BASE_API_URL, API_ENDPOINTS } from '../constants/config';
@@ -34,7 +35,7 @@ class OrderAPI {
       }
 
       if (token) {
-        // Backend now expects Bearer token
+        // Attach Bearer token
         const authHeader = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
         headers.Authorization = authHeader;
         console.debug('[OrderAPI] auth present, mask:', maskToken(authHeader));

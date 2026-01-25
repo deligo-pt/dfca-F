@@ -1,3 +1,16 @@
+/**
+ * NotificationsScreen
+ * 
+ * Central hub for all user notifications (Orders, Promos, System).
+ * Features:
+ * - Real-time updates via NotificationContext.
+ * - Filtering by type (All/Unread/Orders/Promos).
+ * - Detailed modal view for specific notifications.
+ * - Deep linking to relevant screens (e.g., TrackOrder).
+ * 
+ * @param {Object} props
+ * @param {Object} props.navigation - Navigation controller.
+ */
 import React, { useState, useCallback, useEffect } from 'react';
 import {
   View,

@@ -1,3 +1,10 @@
+/**
+ * StickySearchHeader Component
+ * 
+ * A header component that becomes visible upon scrolling.
+ * Provides easy access to location, cart, and search functions.
+ * Uses animated opacity for smooth transitions based on scroll position.
+ */
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, Animated, ScrollView, ActivityIndicator, Platform, StatusBar } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
@@ -6,6 +13,22 @@ import { useTheme } from '../utils/ThemeContext';
 
 const STATUSBAR_HEIGHT = Platform.OS === 'android' ? StatusBar.currentHeight : 0;
 
+/**
+ * StickySearchHeader Component
+ * 
+ * Scroll-activated persistent header with quick access controls.
+ * transitions opacity based on scroll position to provide seamless navigation.
+ * 
+ * @param {Object} props
+ * @param {Animated.Value} props.scrollY - Scroll animation value.
+ * @param {Function} props.onCartPress - Cart action handler.
+ * @param {Function} props.onLocationPress - Location picker handler.
+ * @param {string} props.area - Current location label.
+ * @param {number} [props.cartItemCount=0] - Active cart items.
+ * @param {Function} props.onSearchPress - Search action handler.
+ * @param {number} [props.paddingTop=0] - SafeArea/Statusbar padding.
+ * @param {string} [props.pointerEvents='auto'] - Touch event control.
+ */
 const StickySearchHeader = ({
   onCartPress,
   scrollY,
@@ -33,7 +56,6 @@ const StickySearchHeader = ({
         style={[styles(colors, isDarkMode).container, { paddingTop: paddingTop }]}
         pointerEvents={pointerEvents}
       >
-        {/* Row 1: Location & Cart (Clean, Minimal) - Hidden when searching */}
         <View style={styles(colors, isDarkMode).topRow}>
           <TouchableOpacity
             style={styles(colors, isDarkMode).locationButton}
@@ -61,9 +83,7 @@ const StickySearchHeader = ({
           </TouchableOpacity>
         </View>
 
-        {/* Row 2: Search Bar (PROMINENT, CLEAN) */}
         <View style={styles(colors, isDarkMode).searchRow}>
-          {/* Search Input - FULL WIDTH, CLEAN */}
           <TouchableOpacity
             style={styles(colors, isDarkMode).searchContainer}
             activeOpacity={0.9}
@@ -81,7 +101,6 @@ const StickySearchHeader = ({
           </TouchableOpacity>
         </View>
       </View>
-
     </Animated.View>
   );
 };
@@ -93,12 +112,10 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 1000,
-    // Fix for flicker: Solid background ensures no transparency during opacity transition
     backgroundColor: colors.primary,
   },
   container: {
     backgroundColor: colors.primary,
-    // paddingTop handled via prop
     paddingBottom: spacing.sm,
     paddingHorizontal: spacing.md,
     shadowColor: colors.shadow || '#000',
@@ -109,7 +126,6 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
     borderBottomLeftRadius: 20,
     borderBottomRightRadius: 20,
   },
-  // Row 1: Location & Cart - COMPACT
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -137,7 +153,6 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
     justifyContent: 'center',
     position: 'relative',
   },
-  // Row 2: Search - COMPACT
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -184,7 +199,6 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
     padding: spacing.xs - 2,
     marginLeft: spacing.xs,
   },
-  // Badge - COMPACT
   badge: {
     position: 'absolute',
     top: 0,
@@ -206,7 +220,6 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
     includeFontPadding: false,
     textAlignVertical: 'center',
   },
-  // Suggestions Dropdown Wrapper & Container
   suggestionsWrapper: {
     position: 'absolute',
     top: '100%',
@@ -265,6 +278,7 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
     color: colors.text.secondary,
   },
 });
+
 
 export default StickySearchHeader;
 

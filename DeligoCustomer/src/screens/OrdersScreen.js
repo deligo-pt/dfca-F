@@ -1,3 +1,16 @@
+/**
+ * OrdersScreen
+ * 
+ * Displays user order history and active statuses.
+ * Tabs:
+ * - Ongoing: Real-time tracking for active orders.
+ * - History: Past delivered or cancelled orders.
+ * 
+ * Features:
+ * - Pull-to-refresh for latest status.
+ * - One-tap reordering from history.
+ * - Detailed status indicators (Pending, Cooking, Delivered).
+ */
 import React, { useState, useEffect } from 'react';
 import {
   View,

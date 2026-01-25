@@ -5,28 +5,47 @@ import { useTheme } from '../../utils/ThemeContext';
 import { useLanguage } from '../../utils/LanguageContext';
 import { logoutUser } from '../../utils/auth';
 
+/**
+ * LogoutButton Component
+ * 
+ * Standardized logout trigger with loading state handling.
+ * Can be controlled internally or via external props.
+ * 
+ * @param {Object} props
+ * @param {Function} [props.onLogoutPress] - Override default handler.
+ * @param {boolean} [props.isLoggingOut] - External loading state.
+ * @param {Animated.Value} [props.scaleAnim] - Animation driver.
+ * @param {Function} [props.onLogoutSuccess] - Completion callback.
+ */
 const LogoutButton = ({ onLogoutPress, isLoggingOut: isLoggingOutProp, scaleAnim, onLogoutSuccess }) => {
   const { colors } = useTheme();
   const { t } = useLanguage();
   const [localLoggingOut, setLocalLoggingOut] = useState(false);
+
+  // Determine if logging out based on prop control or internal state
   const isLoggingOut = typeof isLoggingOutProp === 'boolean' ? isLoggingOutProp : localLoggingOut;
 
+  /**
+   * internalLogout
+   *
+   * Handles the logout process when no external handler is provided.
+   * Manages local loading state and calls the auth utility.
+   */
   const internalLogout = async () => {
     try {
       setLocalLoggingOut(true);
       const result = await logoutUser();
-      console.warn('[auth] logout button result', result);
 
       if (result && result.success) {
         if (onLogoutSuccess) onLogoutSuccess();
       } else if (result && result.status === 401) {
-        // treat as session expired
+        // Handle 401 as successful logout (session already expired)
         if (onLogoutSuccess) onLogoutSuccess();
       } else {
-        console.warn('[auth] logout failed from button', result);
+        console.warn('[LogoutButton] Logout failed:', result);
       }
     } catch (err) {
-      console.warn('[auth] logout button error', err);
+      console.error('[LogoutButton] Error during logout:', err);
     } finally {
       setLocalLoggingOut(false);
     }
@@ -41,6 +60,7 @@ const LogoutButton = ({ onLogoutPress, isLoggingOut: isLoggingOutProp, scaleAnim
           isLoggingOut && { opacity: 0.7 },
         ]}
         onPress={() => {
+          // prioritize external handler if available
           if (onLogoutPress) return onLogoutPress();
           return internalLogout();
         }}
@@ -50,6 +70,7 @@ const LogoutButton = ({ onLogoutPress, isLoggingOut: isLoggingOutProp, scaleAnim
         <View style={[styles.logoutIconContainer, { backgroundColor: `${colors.error}15` }]}>
           <Ionicons name="log-out-outline" size={22} color={colors.error} />
         </View>
+
         {isLoggingOut ? (
           <ActivityIndicator size="small" color={colors.error} style={{ flex: 1 }} />
         ) : (

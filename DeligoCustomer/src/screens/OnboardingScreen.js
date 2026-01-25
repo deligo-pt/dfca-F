@@ -11,6 +11,17 @@ import { DealsIllustration, DeliveryIllustration, DiscoverIllustration } from '.
 import { colors } from '../theme';
 import { useProfile } from '../contexts/ProfileContext';
 
+/**
+ * OnboardingScreen
+ * 
+ * Introduction flow for new users displaying core value propositions.
+ * Slides:
+ * 1. Exclusive Deals
+ * 2. Fast Delivery
+ * 3. Discover Restaurants
+ * 
+ * Manages first-time user navigation and persistence via ProfileContext.
+ */
 const slides = [
   {
     key: 'deals',

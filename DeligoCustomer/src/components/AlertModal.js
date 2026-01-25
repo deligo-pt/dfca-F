@@ -1,9 +1,3 @@
-/**
- * @format
- * AlertModal - Professional alert modal component
- * Reusable modal for displaying alerts, warnings, and confirmations
- */
-
 import React from 'react';
 import {
     Modal,
@@ -19,6 +13,20 @@ import { useLanguage } from '../utils/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
+/**
+ * AlertModal Component
+ * 
+ * A generalized modal for presenting alerts, warnings, or confirmations.
+ * 
+ * @param {Object} props
+ * @param {boolean} props.visible - Modal visibility flag.
+ * @param {string} props.title - Alert header text.
+ * @param {string} props.message - Alert body text.
+ * @param {string} [props.icon='alert-circle'] - Ionicons name.
+ * @param {string} [props.iconColor] - Custom icon tint.
+ * @param {Function} props.onClose - Dismissal handler.
+ * @param {Array<{text: string, style?: 'cancel'|'default', onPress?: Function}>} [props.buttons] - Custom action buttons.
+ */
 const AlertModal = ({
     visible,
     title,
@@ -40,7 +48,6 @@ const AlertModal = ({
         >
             <View style={styles.overlay}>
                 <View style={[styles.modalContainer, { backgroundColor: colors.surface }]}>
-                    {/* Icon */}
                     <View style={[styles.iconContainer, { backgroundColor: (iconColor || colors.primary) + '15' }]}>
                         <Ionicons
                             name={icon}
@@ -49,17 +56,14 @@ const AlertModal = ({
                         />
                     </View>
 
-                    {/* Title */}
                     <Text style={[styles.title, { color: colors.text.primary }]}>
                         {title}
                     </Text>
 
-                    {/* Message */}
                     <Text style={[styles.message, { color: colors.text.secondary }]}>
                         {message}
                     </Text>
 
-                    {/* Buttons */}
                     {buttons && buttons.length > 0 ? (
                         <View style={styles.buttonContainer}>
                             {buttons.map((btn, index) => (
@@ -84,7 +88,6 @@ const AlertModal = ({
                             ))}
                         </View>
                     ) : (
-                        /* Default OK Button */
                         <TouchableOpacity
                             style={[styles.button, { backgroundColor: colors.primary }]}
                             onPress={onClose}

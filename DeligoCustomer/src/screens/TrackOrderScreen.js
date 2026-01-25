@@ -1,3 +1,10 @@
+/**
+ * TrackOrderScreen
+ * 
+ * Visualization of live order tracking with map integration, real-time driver
+ * location updates, and stage-based status progress.
+ */
+
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import {
   View,
@@ -23,7 +30,7 @@ import { useTheme, darkMapStyle } from '../utils/ThemeContext';
 
 const { height } = Dimensions.get('window');
 
-// Helper: format address object to single-line string
+// Format address object to string
 const formatAddress = (addr) => {
   try {
     if (!addr) return '';
@@ -48,7 +55,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
   const insets = useSafeAreaInsets();
   const { order } = route.params || {};
 
-  // Map API order status to internal stage IDs
+  // Map API status to internal stage
   const mapOrderStatusToStage = (status) => {
     const statusMap = {
       'PENDING': 'preparing',
@@ -72,7 +79,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
   const [progressAnim] = useState(new Animated.Value(0));
   const mapRef = useRef(null);
 
-  // Location states
+  // Location state management
   const [userLocation, setUserLocation] = useState(null);
   const [driverLocation, setDriverLocation] = useState(null);
   const [restaurantLocation, setRestaurantLocation] = useState(null);
@@ -80,7 +87,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
   const [mapReady, setMapReady] = useState(false);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
 
-  // Normalize order data to handle both detailed and simple formats
+  // Normalize order data structure
   const normalizeOrderData = (data) => {
     if (!data) return null;
 
@@ -196,7 +203,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
     };
   };
 
-  // Mock order data if not provided - Professional format
+  // Default mock data
   const defaultMockData = {
     id: '1',
     orderNumber: '#DLG-2024-1234',
@@ -281,7 +288,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
     },
   ], [language]);
 
-  // Professional Call Handler
+  // Handle driver call
   const handleCallDriver = async () => {
     const phoneNumber = orderData.driverPhone.replace(/\D/g, ''); // Remove non-numeric characters
     const phoneUrl = Platform.OS === 'ios' ? `telprompt:${phoneNumber}` : `tel:${phoneNumber}`;
@@ -314,7 +321,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
     }
   };
 
-  // Professional Call Restaurant Handler
+  // Handle restaurant call
   const handleCallRestaurant = async () => {
     const phoneNumber = orderData.restaurantPhone.replace(/\D/g, '');
     const phoneUrl = Platform.OS === 'ios' ? `telprompt:${phoneNumber}` : `tel:${phoneNumber}`;
@@ -347,7 +354,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
     }
   };
 
-  // Professional Message Handler
+  // Handle driver messaging
   const handleMessageDriver = () => {
     Alert.alert(
       t('messageDriver'),
@@ -419,7 +426,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
     );
   };
 
-  // Request location permissions and get user location
+  // Initialize location services
   useEffect(() => {
     (async () => {
       try {
@@ -522,7 +529,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
     })();
   }, [order]);
 
-  // Simulate driver movement towards user
+  // Simulate driver progression
   useEffect(() => {
     if (!userLocation || !driverLocation) return;
 
@@ -564,14 +571,14 @@ const TrackOrderScreen = ({ route, navigation }) => {
     return () => clearInterval(interval);
   }, [userLocation, driverLocation]);
 
-  // Update route when driver moves
+  // Update route coordinates
   useEffect(() => {
     if (restaurantLocation && driverLocation && userLocation) {
       setRouteCoordinates([restaurantLocation, driverLocation, userLocation]);
     }
   }, [driverLocation, restaurantLocation, userLocation]);
 
-  // Fit map to show all markers
+  // Adjust map viewport
   useEffect(() => {
     if (mapReady && mapRef.current && routeCoordinates.length > 0) {
       const timeoutId = setTimeout(() => {

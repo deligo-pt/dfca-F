@@ -1,3 +1,10 @@
+/**
+ * BottomTabNavigator Component
+ *
+ * Main application navigation.
+ * Manages tab routes (Categories, Orders, Cart, Profile).
+ * Handles safe area insets and active/inactive styling.
+ */
 import React from 'react';
 import { createBottomTabNavigator } from '@react-navigation/bottom-tabs';
 import { CategoriesScreen, OrdersScreen, CartScreen, ProfileScreen } from '../screens';
@@ -12,17 +19,27 @@ import { useOrders } from '../contexts/OrdersContext';
 
 const Tab = createBottomTabNavigator();
 
+/**
+ * BottomTabNavigator
+ * 
+ * @param {Object} props
+ * @param {Function} props.onLogout - Logout handler.
+ */
 const BottomTabNavigator = ({ onLogout }) => {
     const { colors, isDarkMode } = useTheme();
     const { t } = useLanguage();
     const insets = useSafeAreaInsets();
+
+    // Context hooks for badges
     const { cartsArray } = useCart();
     const { ongoingOrders, ordersCount, fetchOrders } = useOrders();
+
+    // Badge calculations
     const cartsCount = (cartsArray && cartsArray.length) ? cartsArray.length : 0;
     const ongoingCount = Array.isArray(ongoingOrders) ? ongoingOrders.length : 0;
     const ordersBadge = ongoingCount > 0 ? ongoingCount : (ordersCount > 0 ? ordersCount : undefined);
 
-    // Calculate proper bottom padding for tab bar
+    // Calculate dynamic bottom padding to respect safe areas (notch/home bar)
     const bottomPadding = Platform.select({
         ios: insets.bottom > 0 ? insets.bottom : 12,
         android: Math.max(insets.bottom, 12),
@@ -31,6 +48,7 @@ const BottomTabNavigator = ({ onLogout }) => {
     const tabBarBaseHeight = 64;
     const totalTabBarHeight = tabBarBaseHeight + bottomPadding;
 
+    // Custom tab bar styling to support floating effect and dark mode
     const tabBarStyle = {
         position: 'absolute',
         left: 0,
@@ -110,6 +128,7 @@ const BottomTabNavigator = ({ onLogout }) => {
                             }}
                             listeners={{
                                 focus: () => {
+                                    // Refresh orders when tab becomes active
                                     try { fetchOrders && fetchOrders(); } catch { }
                                 }
                             }}

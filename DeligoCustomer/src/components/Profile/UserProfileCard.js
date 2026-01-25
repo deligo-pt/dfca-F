@@ -9,6 +9,15 @@ const API_URL = `${BASE_API_URL}${API_ENDPOINTS.PROFILE.GET}`;
 
 const LOGOUT_URL = `${BASE_API_URL}${API_ENDPOINTS.AUTH.LOGOUT}`;
 
+/**
+ * Securely logs out the user.
+ * Attempts multiple API strategies to ensure server-side session termination.
+ * Always cleans up local storage.
+ * 
+ * @param {string} authToken
+ * @param {string} refreshToken
+ * @returns {Promise<Object>} API result of the logout attempt.
+ */
 export const logoutApi = async (authToken, refreshToken) => {
     const doAttempt = async (attemptName, headersObj, bodyObj) => {
         try {
@@ -40,6 +49,7 @@ export const logoutApi = async (authToken, refreshToken) => {
     const rawAuth = authToken || '';
     const bearerAuth = rawAuth && rawAuth.startsWith('Bearer ') ? rawAuth : rawAuth ? `Bearer ${rawAuth}` : undefined;
 
+    // Retry strategies for different backend auth configurations
     const attempts = [
         {
             name: 'bearer-header+body-refresh',
@@ -84,6 +94,7 @@ export const logoutApi = async (authToken, refreshToken) => {
         const res = await doAttempt(a.name, a.headers, a.body);
         if (res.success) return res;
 
+        // Don't retry if unauthorized (already logged out)
         if (res.status === 401) {
             lastErr = res;
             continue;
@@ -104,15 +115,17 @@ export const performLogout = async () => {
         apiResult = await logoutApi(authToken, refreshToken);
 
         if (apiResult) {
-            console.warn('[auth] logout result', { attempt: apiResult.attempt, status: apiResult.status, success: apiResult.success });
+            console.warn('[Helper] Logout result:', { attempt: apiResult.attempt, status: apiResult.status, success: apiResult.success });
         }
 
+        // Clean up local storage regardless of API result
         await removeAccessToken();
         await removeRefreshToken();
         await removeUser();
 
         return apiResult || { success: true };
     } catch (error) {
+        // Fallback cleanup
         try {
             await removeAccessToken();
             await removeRefreshToken();
@@ -123,6 +136,16 @@ export const performLogout = async () => {
     }
 };
 
+/**
+ * UserProfileCard Component
+ * 
+ * Displays user profile summary with navigation to edit details.
+ * Fetches profile data if not provided via props.
+ * 
+ * @param {Object} props
+ * @param {Object} [props.user] - Pre-loaded user object.
+ * @param {Object} props.navigation - Navigation prop.
+ */
 export default function UserProfileCard({ user: userProp, navigation }) {
     const { colors } = useTheme();
     const { t } = useLanguage();

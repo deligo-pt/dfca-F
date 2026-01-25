@@ -1,3 +1,10 @@
+/**
+ * PaymentMethodsScreen
+ * 
+ * Manages the user's saved payment options (Cards, UPI) and provides interfaces
+ * for adding new payment methods.
+ */
+
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -92,7 +99,7 @@ const PaymentMethodsScreen = ({ navigation }) => {
       width: 48,
       height: 48,
       borderRadius: 24,
-      backgroundColor: isDarkMode ? '#2A1A2E' : '#FFF0F6', // Dark pink for dark mode
+      backgroundColor: isDarkMode ? '#2A1A2E' : '#FFF0F6',
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: 16,
@@ -113,7 +120,7 @@ const PaymentMethodsScreen = ({ navigation }) => {
       marginRight: 8,
     },
     defaultBadge: {
-      backgroundColor: isDarkMode ? '#1B2E1B' : '#E8F5E9', // Dark green for dark mode
+      backgroundColor: isDarkMode ? '#1B2E1B' : '#E8F5E9',
       paddingHorizontal: 8,
       paddingVertical: 2,
       borderRadius: 12,
@@ -152,7 +159,7 @@ const PaymentMethodsScreen = ({ navigation }) => {
       width: 40,
       height: 40,
       borderRadius: 20,
-      backgroundColor: isDarkMode ? '#2A2A2A' : '#F8F8F8', // Dark gray for dark mode
+      backgroundColor: isDarkMode ? '#2A2A2A' : '#F8F8F8',
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: 16,
@@ -167,7 +174,7 @@ const PaymentMethodsScreen = ({ navigation }) => {
     infoCard: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: isDarkMode ? '#1B2E1B' : '#E8F5E9', // Dark green for dark mode
+      backgroundColor: isDarkMode ? '#1B2E1B' : '#E8F5E9',
       borderRadius: 12,
       padding: 16,
       marginTop: 8,
@@ -270,7 +277,7 @@ const PaymentMethodsScreen = ({ navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Info */}
+        {/* Security Assurance Info */}
         <View style={styles.infoCard}>
           <Ionicons name="shield-checkmark" size={24} color={colors.success} />
           <Text style={styles.infoText}>{t('paymentInfoSecure')}</Text>

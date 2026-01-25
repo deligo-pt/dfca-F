@@ -4,13 +4,29 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../../utils/LanguageContext';
 import { useTheme } from '../../utils/ThemeContext';
 
+/**
+ * ReferralBanner Component
+ * 
+ * High-visibility promotional banner for the referral program.
+ * Triggers navigation to the Referrals screen.
+ * 
+ * @param {Object} props
+ * @param {Object} props.navigation - Navigation prop.
+ */
 const ReferralBanner = ({ navigation }) => {
   const { colors } = useTheme();
   const { t } = useLanguage();
 
   return (
     <TouchableOpacity
-      style={[styles.referralBanner, { backgroundColor: colors.surface, borderColor: colors.primary, shadowColor: colors.primary }]}
+      style={[
+        styles.referralBanner,
+        {
+          backgroundColor: colors.surface,
+          borderColor: colors.primary,
+          shadowColor: colors.primary
+        }
+      ]}
       onPress={() => navigation.navigate('Referrals')}
       activeOpacity={0.85}
     >
@@ -19,8 +35,12 @@ const ReferralBanner = ({ navigation }) => {
           <Text style={styles.referralEmoji}>🎉</Text>
         </View>
         <View style={styles.referralMiddle}>
-          <Text style={[styles.referralTitle, { color: colors.text.primary }]}>{t('referralBannerTitle')}</Text>
-          <Text style={[styles.referralSubtitle, { color: colors.primary }]}>{t('referralBannerSubtitle')}</Text>
+          <Text style={[styles.referralTitle, { color: colors.text.primary }]}>
+            {t('referralBannerTitle')}
+          </Text>
+          <Text style={[styles.referralSubtitle, { color: colors.primary }]}>
+            {t('referralBannerSubtitle')}
+          </Text>
         </View>
         <View style={styles.referralRight}>
           <Ionicons name="chevron-forward" size={24} color={colors.primary} />

@@ -1,8 +1,14 @@
 import React from 'react';
 import { View, Text, StyleSheet, Image } from 'react-native';
-import { useTheme } from '../../utils/ThemeContext'; // Adjust path as needed
+import { useTheme } from '../../utils/ThemeContext';
 import { useLanguage } from '../../utils/LanguageContext';
 
+/**
+ * ProfileHeader Component
+ * 
+ * Standardized header for the user profile section.
+ * Displays brand logo and localized welcome message.
+ */
 const ProfileHeader = () => {
   const { colors } = useTheme();
   const { t } = useLanguage();
@@ -11,7 +17,7 @@ const ProfileHeader = () => {
     <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
       <View style={styles.headerContent}>
         <Image
-          source={require('../../assets/images/logo.png')} // Adjust path as needed
+          source={require('../../assets/images/logo.png')}
           style={styles.logoImage}
           resizeMode="contain"
         />

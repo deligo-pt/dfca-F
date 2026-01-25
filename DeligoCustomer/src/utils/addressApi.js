@@ -1,7 +1,9 @@
 import { customerApi } from './api';
 
 /**
- * Service for managing delivery addresses.
+ * Address API Utilities
+ * 
+ * Provides methods for managing customer delivery addresses.
  */
 const AddressApi = {
   /**

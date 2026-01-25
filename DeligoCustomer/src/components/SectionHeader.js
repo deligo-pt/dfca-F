@@ -4,6 +4,17 @@ import { spacing, fontSize } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
 
+/**
+ * SectionHeader Component
+ *
+ * Renders a consistent header for content sections (e.g., "Recommended", "Favorites").
+ * Includes a title and an optional "See All" action button to navigate to detailed views.
+ *
+ * @param {Object} props
+ * @param {string} props.title - The section title text.
+ * @param {Function} props.onSeeAll - Handler for the "See All" button interaction.
+ * @param {boolean} props.showSeeAll - Controls visibility of the "See All" button (default: true).
+ */
 const SectionHeader = ({ title, onSeeAll, showSeeAll = true }) => {
   const { colors } = useTheme();
   const { t } = useLanguage();

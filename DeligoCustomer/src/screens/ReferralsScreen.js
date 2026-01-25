@@ -1,3 +1,10 @@
+/**
+ * ReferralsScreen
+ * 
+ * Displays the user's referral code, statistics, and instructions on how the
+ * referral program works, allowing them to share their code with others.
+ */
+
 import React from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Share, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';

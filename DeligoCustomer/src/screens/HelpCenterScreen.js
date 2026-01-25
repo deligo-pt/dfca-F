@@ -5,6 +5,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
 
+/**
+ * HelpCenterScreen
+ * 
+ * Central hub for customer support and FAQs.
+ * Features:
+ * - Searchable help topics and localized FAQ categories.
+ * - Quick access to support channels (Chat, Email, Phone).
+ * - Interactive list of common questions.
+ * 
+ * @param {Object} props
+ * @param {Object} props.navigation - Navigation prop.
+ */
 const HelpCenterScreen = ({ navigation }) => {
   const { t } = useLanguage();
   const { colors } = useTheme();

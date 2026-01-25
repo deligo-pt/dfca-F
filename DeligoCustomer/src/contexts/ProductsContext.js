@@ -1,3 +1,15 @@
+/**
+ * ProductsContext Provider
+ *
+ * Manages product data fetching, caching, and normalization.
+ * Handles API interactions for:
+ * - Retrieving all products with filtering/search (fetchProducts)
+ * - Fetching vendor-specific menus (fetchRestaurantMenu)
+ * - Loading business and product categories (fetchBusinessCategories, fetchProductCategories)
+ * 
+ * Implements robust caching, token refresh/retry logic, and data normalization
+ * to ensure a consistent data shape across the UI.
+ */
 import React, { createContext, useContext, useCallback, useEffect, useState, useRef, useMemo } from 'react';
 import { getAccessToken, getRefreshToken, setAccessToken, setRefreshToken } from '../utils/storage';
 import StorageService from '../utils/storage';
@@ -5,102 +17,122 @@ import { BASE_API_URL, API_ENDPOINTS } from '../constants/config';
 import formatCurrency from '../utils/currency';
 
 const API_URL = `${BASE_API_URL}${API_ENDPOINTS.PRODUCTS.GET_ALL}`;
-// Cache TTL in milliseconds (default 5 minutes)
-const PRODUCTS_CACHE_TTL_MS = 5 * 60 * 1000; // 5 minutes
+
+// Cache TTL: 5 minutes default
+const PRODUCTS_CACHE_TTL_MS = 5 * 60 * 1000;
 
 const ProductsContext = createContext(null);
 
+/**
+ * Hook to access the ProductsContext.
+ * @returns {Object} The products context value.
+ */
 export const useProducts = () => useContext(ProductsContext);
 
+/**
+ * Normalizes raw product data from the API into a consistent internal format.
+ * Handles various legacy data shapes, nested vendor objects, and ID resolution strategies.
+ *
+ * @param {Object} p - The raw product object from the API.
+ * @returns {Object} The normalized product object.
+ */
 export function normalizeProduct(p) {
   const raw = p._raw || p;
 
-  // Handle nested vendorId object structure
-  // API now returns vendorId as an object with businessDetails
+  // --- Vendor Data Extraction ---
+  // API returns vendorId as either a string or a populated object.
   let vendorSource = raw.vendor || {};
   if (raw.vendorId && typeof raw.vendorId === 'object') {
-    // If vendorId is an object, it contains the vendor details
     vendorSource = { ...vendorSource, ...raw.vendorId };
   } else if (raw.vendorId && typeof raw.vendorId === 'string') {
-    // If vendorId is just an ID string, keep it
     vendorSource.vendorId = raw.vendorId;
   }
 
-  // Extract Flattened props from vendorSource (which might be raw.vendor or raw.vendorId)
   const businessDetails = vendorSource.businessDetails || {};
   const businessLocation = vendorSource.businessLocation || {};
 
-  // Robust ID extraction
-  // Prioritize SKU-like IDs if available, else standard IDs
+  // --- ID Resolution ---
+  // Prioritize distinct SKU-like IDs (PROD-...) over generic MongoIds if available
   const idCandidates = [raw.productId, raw._id, raw.id, p._id, p.id];
   let chosenId = null;
+
+  // 1. Look for 'PROD-' format
   for (const c of idCandidates) {
     if (c && typeof c === 'string' && /^PROD-/i.test(c)) { chosenId = c; break; }
   }
-  if (!chosenId) chosenId = idCandidates.find(c => c && typeof c === 'string') || `${Math.random().toString(36).slice(2)}`;
+  // 2. Fallback to any string ID, or generate random if absolutely missing (failsafe)
+  if (!chosenId) {
+    chosenId = idCandidates.find(c => c && typeof c === 'string') || `${Math.random().toString(36).slice(2)}`;
+  }
 
-  // Pricing extraction
+  // --- Pricing ---
   const pricing = raw.pricing || {};
   const price = Number(pricing.price ?? raw.price ?? p.price ?? 0) || 0;
   const discountRaw = pricing.discount ?? raw.discount ?? 0;
-  const taxRaw = pricing.tax ?? raw.tax ?? 0;
+  // tax is unused but extracted for completeness
+  const taxRaw = pricing.tax ?? raw.tax ?? 0; // eslint-disable-line no-unused-vars
   const finalPriceRaw = pricing.finalPrice ?? raw.finalPrice;
-  // Trust backend finalPrice if present, else calc
+
+  // Use backend calculation if valid, otherwise fallback to base price
   let finalPrice = Number(finalPriceRaw);
   if (!Number.isFinite(finalPrice)) finalPrice = price;
 
-  // Extract Vendor Details
+  // --- Vendor Details ---
   const vendorName = vendorSource.businessName || businessDetails.businessName || vendorSource.vendorName || raw.name || raw.productName || p.name || 'Unknown';
-  // Check both businessType (new) and vendorType (old)
-  let vendorType = vendorSource.businessType || businessDetails.businessType || vendorSource.vendorType || '';
 
-  // Just trim and uppercase, do NOT merge different spellings as per user request
-  // FIX: Explicitly correct API typo "RESTAURENT" -> "RESTAURANT"
+  // Normalize vendor/business type
+  let vendorType = vendorSource.businessType || businessDetails.businessType || vendorSource.vendorType || '';
   if (vendorType) {
     vendorType = String(vendorType).toUpperCase().trim();
-    if (vendorType === 'RESTAURENT') vendorType = 'RESTAURANT';
+    if (vendorType === 'RESTAURENT') vendorType = 'RESTAURANT'; // Fix known API typo
   }
 
   const vendorRating = (vendorSource.rating && typeof vendorSource.rating === 'number') ? vendorSource.rating : 0;
   const vendorLat = vendorSource.latitude || businessLocation.latitude;
   const vendorLng = vendorSource.longitude || businessLocation.longitude;
-  // Extract documents if available
   const documents = vendorSource.documents || {};
   const vendorStorePhoto = documents.storePhoto || vendorSource.storePhoto || vendorSource.logo || null;
 
   return {
     _raw: raw,
     id: chosenId,
-    // Fix: Prioritize product images over store photo, and do NOT fallback to storePhoto for product cards logic
+    // Prioritize specific product images, avoid falling back to generic store photo for product thumbs
     image: raw.image || (Array.isArray(raw.images) && raw.images[0]) || null,
     name: raw.name || raw.productName || p.name || 'Unknown',
     categories: Array.isArray(raw.tags) ? raw.tags : (raw.category ? [raw.category] : []),
     rating: (raw.rating && (typeof raw.rating === 'number' ? raw.rating : raw.rating.average)) || vendorRating || 0,
     deliveryTime: raw.deliveryTime || vendorSource.deliveryTime || '',
     distance: raw.distance || '',
-    // Use formatCurrency with the extracted currency
+
+    // Formatting
     deliveryFee: formatCurrency(pricing.currency || raw.currency || '', price),
     offer: (pricing.discount || raw.discount) ? `${pricing.discount || raw.discount}% OFF` : null,
-    // Expose normalized pricing for components to use
+
+    // Normalized numerical values for logic usage
     price: price,
     finalPrice: finalPrice,
     currency: pricing.currency || raw.currency || '',
 
-    // Normalized vendor object
+    // Normalized Vendor Object
     vendor: {
       id: vendorSource._id || vendorSource.vendorId || vendorSource.id,
       vendorName: vendorName,
-      vendorType: vendorType, // Important for classification
+      vendorType: vendorType,
       rating: vendorRating,
       latitude: vendorLat,
       longitude: vendorLng,
       storePhoto: vendorStorePhoto,
       isStoreOpen: businessDetails.isStoreOpen ?? vendorSource.isStoreOpen,
-      address: businessLocation.address // if available
+      address: businessLocation.address
     }
   };
 }
 
+/**
+ * ProductsProvider Component
+ * 
+ * Provides global product state and API methods.
+ */
 export const ProductsProvider = ({ children }) => {
   const [products, setProducts] = useState([]);
   const [lastUpdated, setLastUpdated] = useState(null);
@@ -108,36 +140,27 @@ export const ProductsProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const [params, setParams] = useState({ page: 1, limit: 1000 });
 
-  // Use ref to store params to avoid infinite loops
+  // Use ref for params to avoid infinite loops in dependency arrays
   const paramsRef = useRef(params);
   useEffect(() => {
     paramsRef.current = params;
   }, [params]);
 
+  /**
+   * Main function to fetch all products.
+   * Features:
+   * - Caching: Uses local storage to cache responses for 5 minutes.
+   * - Optimization: Serves cache immediately if fresh, then background updates if forced.
+   * - Resilience: Auto-retries with token refresh on 401 Unauthorized.
+   * - Robustness: handles various header formats and backend quirks.
+   *
+   * @param {Object} overrides - Query parameter overrides (filters, location, etc).
+   */
   const fetchProducts = useCallback(async (overrides = {}) => {
-    // Do not set loading immediately to avoid UI flicker when we can serve cached data.
     setError(null);
-
     try {
-      // Merge current params with overrides without triggering re-renders
+      // Setup query parameters
       const final = { ...paramsRef.current, ...overrides };
-
-      let token = await getAccessToken();
-      // handle tokens stored as objects { accessToken } or { token }
-      if (token && typeof token === 'object') {
-        token = token.accessToken || token.token || token.value || null;
-      }
-      // Redacted debug: show only prefix to avoid leaking full token
-      try {
-        console.debug('[ProductsContext] stored access token:', token ? `${String(token).slice(0, 8)}...` : null);
-      } catch (e) { }
-      const headers = { Accept: 'application/json' };
-      if (token) {
-        // Backend now expects Bearer token
-        const authHeader = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-        headers.Authorization = authHeader;
-      }
-
       const qs = new URLSearchParams();
       if (final.search) qs.set('search', final.search);
       if (final.category) qs.set('category', final.category);
@@ -148,499 +171,354 @@ export const ProductsProvider = ({ children }) => {
       qs.set('page', final.page || 1);
       qs.set('limit', final.limit || 1000);
 
-      // Explicit overrides only - no auto-injection
-      if (final.lat && final.lng) {
-        qs.set('lat', final.lat);
-        qs.set('lng', final.lng);
-      }
-
+      // Construct URL and Cache Key
       const url = `${API_URL}?${qs.toString()}`;
-      console.log('[ProductsContext] Generated URL:', url, 'Params:', JSON.stringify(final));
       const cacheKey = `productsCache:${qs.toString()}`;
-      // Try to read cached full response for this exact query string
+      console.log('[ProductsContext] Fetching:', url);
+
+      // --- Cache Retrieval ---
       let cachedRaw = null;
       try {
         cachedRaw = await StorageService.getItem(cacheKey);
         if (cachedRaw && Array.isArray(cachedRaw.items) && cachedRaw.items.length > 0) {
-          // Use cached data immediately so UI feels static
+          // HIT: Serve cache immediately
           setProducts((cachedRaw.items || []).map(normalizeProduct));
-          // Optionally expose last-updated via debug logs
-          try {
-            const age = cachedRaw.ts ? (Date.now() - cachedRaw.ts) : null;
-            console.debug('[ProductsContext] served cached products, age (ms):', age);
-            if (cachedRaw.ts) setLastUpdated(cachedRaw.ts);
-          } catch (e) { }
+          if (cachedRaw.ts) setLastUpdated(cachedRaw.ts);
         }
-      } catch (e) {
-        // ignore cache read failure
-        cachedRaw = null;
-      }
-      // Determine effective TTL (allow user override stored in storage)
+      } catch (e) { /* ignore cache read errors */ }
+
+      // --- Cache Freshness Check ---
       let effectiveTTL = PRODUCTS_CACHE_TTL_MS;
+      // Allow override from storage (debugging/config)
       try {
         const storedTtl = await StorageService.getItem('PRODUCTS_CACHE_TTL_MS');
-        if (typeof storedTtl === 'number' && !isNaN(storedTtl) && storedTtl > 0) {
-          effectiveTTL = storedTtl;
-        }
-      } catch (e) {
-        console.debug('[ProductsContext] failed to read stored TTL', e);
-      }
+        if (typeof storedTtl === 'number' && !isNaN(storedTtl) && storedTtl > 0) effectiveTTL = storedTtl;
+      } catch (e) { }
 
-      // If cached exists and is fresh (within effectiveTTL) and caller did not force, skip network to save requests
       const cacheAge = cachedRaw && cachedRaw.ts ? (Date.now() - cachedRaw.ts) : Infinity;
       const hadCache = cachedRaw && Array.isArray(cachedRaw.items) && cachedRaw.items.length > 0;
+
+      // If cache is fresh and not forced, skip network
       if (!final.force && hadCache && cacheAge < effectiveTTL) {
-        // Cache is fresh enough, avoid network call
-        // params already updated at start of function
-        // no network request performed, so keep loading=false to avoid flicker
+        console.debug('[ProductsContext] Cache fresh, skipping network');
         return;
       }
-      // helper to perform the GET
-      // If we have cached data, perform network fetch in background (don't set loading)
-      // If we don't have cached data, set loading to true to show spinner while fetching
-      if (!hadCache) setLoading(true);
-      const doGet = async (u, h) => fetch(u, { method: 'GET', headers: h });
 
-      console.debug('[ProductsContext] GET', url, 'headers.Authorization present?', !!headers.Authorization);
-      let res = await doGet(url, headers);
-      // log response body redacted for debugging
-      try {
-        const bodyText = await res.clone().text();
-        console.debug('[ProductsContext] GET status', res.status, 'body:', bodyText ? (bodyText.length > 200 ? bodyText.slice(0, 200) + '...' : bodyText) : '<empty>');
-      } catch (e) {
-        console.debug('[ProductsContext] GET status', res.status, '(no body)');
+      if (!hadCache) setLoading(true);
+
+      // --- Authorization Setup ---
+      let token = await getAccessToken();
+      if (token && typeof token === 'object') token = token.accessToken || token.token || token.value || null;
+
+      const headers = { Accept: 'application/json' };
+      if (token) {
+        headers.Authorization = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
       }
-      // If unauthorized, attempt refresh once
+
+      // --- Network Request ---
+      const doFetch = (u, h) => fetch(u, { method: 'GET', headers: h });
+      let res = await doFetch(url, headers);
+
+      // --- 401 Token Refresh & Retry Logic ---
       if (res.status === 401) {
-        // try to refresh token
+        console.log('[ProductsContext] 401 Unauthorized, attempting to refresh token...');
+
         let refreshToken = await getRefreshToken();
-        try {
-          console.debug('[ProductsContext] stored refresh token present?', !!refreshToken);
-          if (refreshToken && typeof refreshToken === 'string') console.debug('[ProductsContext] stored refresh token prefix:', `${refreshToken.slice(0, 8)}...`);
-        } catch (e) { }
-        // normalize refresh token if stored as object
         if (refreshToken && typeof refreshToken === 'object') {
           refreshToken = refreshToken.refreshToken || refreshToken.token || refreshToken.value || null;
         }
-        if (refreshToken) {
-          try {
-            const refreshUrl = `${BASE_API_URL}${API_ENDPOINTS.AUTH.REFRESH_TOKEN}`;
-            const rres = await fetch(refreshUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-              // some backends expect { refreshToken } or { token } - include both keys to be robust
-              body: JSON.stringify({ refreshToken, token: refreshToken, refresh_token: refreshToken }),
-            });
-            console.debug('[ProductsContext] refresh POST status', rres.status);
-            const rjson = await rres.json().catch(() => null);
-            console.debug('[ProductsContext] refresh response', rjson);
-            if (rres.ok) {
-              // try to read tokens from common locations
-              const newAccess = rjson?.accessToken || rjson?.token || rjson?.data?.accessToken || rjson?.data?.token || rjson?.access_token || null;
-              const newRefresh = rjson?.refreshToken || rjson?.data?.refreshToken || rjson?.refresh_token || null;
-              if (newAccess) {
-                await setAccessToken(newAccess);
-                if (newRefresh) await setRefreshToken(newRefresh);
-                // Try several header formats for the retried GET in case backend expects raw token or custom header
-                const candidates = [];
-                // Bearer form - PRIMARY strategy
-                candidates.push(newAccess.startsWith('Bearer ') ? newAccess : `Bearer ${newAccess}`);
-                // Raw token (no Bearer) as fallback
-                candidates.push(newAccess.startsWith('Bearer ') ? newAccess.substring(7) : newAccess);
-                // Also try x-access-token as a fallback header
-                // We'll attempt Authorization header variants first, then x-access-token
 
-                let retryRes = null;
-                // Try Authorization header variants
-                for (const cand of candidates) {
-                  const tryHeaders = { ...headers, Authorization: cand };
-                  try {
-                    console.debug('[ProductsContext] Retry attempt with Authorization prefix:', cand.startsWith('Bearer ') ? 'Bearer' : 'Raw');
-                    retryRes = await doGet(url, tryHeaders);
-                    const bodyText = await retryRes.clone().text().catch(() => null);
-                    console.debug('[ProductsContext] Retry GET status', retryRes.status, 'body:', bodyText ? (bodyText.length > 200 ? bodyText.slice(0, 200) + '...' : bodyText) : '<empty>');
-                  } catch (e) {
-                    console.debug('[ProductsContext] Retry GET attempt failed', e.message || e);
-                    retryRes = { status: 0 };
-                  }
+        if (refreshToken) {
+          // Attempt refresh endpoint
+          const refreshUrl = `${BASE_API_URL}${API_ENDPOINTS.AUTH.REFRESH_TOKEN}`;
+          const rres = await fetch(refreshUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({ refreshToken, token: refreshToken, refresh_token: refreshToken }),
+          });
+
+          if (rres.ok) {
+            const rjson = await rres.json().catch(() => null);
+            const newAccess = rjson?.accessToken || rjson?.token || rjson?.data?.accessToken || null;
+            const newRefresh = rjson?.refreshToken || rjson?.data?.refreshToken || null;
+
+            if (newAccess) {
+              await setAccessToken(newAccess);
+              if (newRefresh) await setRefreshToken(newRefresh);
+
+              // Re-attempt original request with new token
+              // Try standard Bearer and plain/x-access-token strategies
+              const candidates = [
+                newAccess.startsWith('Bearer ') ? newAccess : `Bearer ${newAccess}`,
+                newAccess.startsWith('Bearer ') ? newAccess.substring(7) : newAccess
+              ];
+
+              let retrySuccess = false;
+              for (const authHeader of candidates) {
+                try {
+                  const retryHeaders = { ...headers, Authorization: authHeader };
+                  const retryRes = await doFetch(url, retryHeaders);
                   if (retryRes.status !== 401) {
                     res = retryRes;
+                    retrySuccess = true;
                     break;
                   }
-                }
-
-                // If still 401, try x-access-token header
-                if (retryRes && retryRes.status === 401) {
-                  const tryHeaders2 = { ...headers };
-                  // remove Authorization if present
-                  delete tryHeaders2.Authorization;
-                  tryHeaders2['x-access-token'] = newAccess;
-                  try {
-                    console.debug('[ProductsContext] Retry attempt with x-access-token');
-                    retryRes = await doGet(url, tryHeaders2);
-                    const bodyText2 = await retryRes.clone().text().catch(() => null);
-                    console.debug('[ProductsContext] Retry GET status (x-access-token)', retryRes.status, 'body:', bodyText2 ? (bodyText2.length > 200 ? bodyText2.slice(0, 200) + '...' : bodyText2) : '<empty>');
-                    if (retryRes.status !== 401) {
-                      res = retryRes;
-                    }
-                  } catch (e) {
-                    console.debug('[ProductsContext] Retry GET x-access-token attempt failed', e.message || e);
-                  }
-                }
-              } else {
-                setError('Refresh failed: no token');
-                setProducts([]);
-                setLoading(false);
-                return;
+                } catch (e) { /* ignore retry fail */ }
               }
-            } else {
-              setError('Refresh failed');
-              setProducts([]);
-              setLoading(false);
-              return;
+
+              if (!retrySuccess) {
+                // Fallback: x-access-token
+                try {
+                  const xHeaders = { ...headers, 'x-access-token': newAccess };
+                  delete xHeaders.Authorization;
+                  const xRes = await doFetch(url, xHeaders);
+                  if (xRes.status !== 401) {
+                    res = xRes;
+                    retrySuccess = true;
+                  }
+                } catch (e) { /* ignore */ }
+              }
             }
-          } catch (refreshErr) {
-            setError(refreshErr.message || refreshErr);
-            setProducts([]);
-            setLoading(false);
-            return;
           }
-        } else {
-          setError('Unauthorized');
-          setProducts([]);
-          setLoading(false);
-          return;
         }
       }
+
+      // --- Final Response Handling ---
       if (res.status === 401) {
         setError('Unauthorized');
-        // keep cached data if available, otherwise clear
         if (!cachedRaw) setProducts([]);
-        setLoading(false);
         return;
       }
+
       if (!res.ok) {
         setError(`HTTP ${res.status}`);
         if (!cachedRaw) setProducts([]);
-        setLoading(false);
         return;
       }
+
       const json = await res.json();
-      // Robust parsing of response structure
+
+      // Extract items from response wrapper
       let items = [];
-      if (Array.isArray(json)) {
-        items = json;
-      } else if (Array.isArray(json.data)) {
-        items = json.data;
-      } else if (Array.isArray(json.products)) {
-        items = json.products;
-      } else if (Array.isArray(json.items)) {
-        items = json.items;
-      } else if (json.data && Array.isArray(json.data.products)) {
-        items = json.data.products;
-      } else if (json.data && Array.isArray(json.data.items)) {
-        items = json.data.items;
-      }
+      if (Array.isArray(json)) items = json;
+      else if (Array.isArray(json.data)) items = json.data;
+      else if (Array.isArray(json.products)) items = json.products;
+      else if (json.data && Array.isArray(json.data.products)) items = json.data.products;
+      else if (Array.isArray(json.items)) items = json.items;
 
-      console.log(`[ProductsContext] Parsed ${items.length} items from API response`);
-
-      // DEBUG: Inspect the first item to see vendor structure
-      if (items.length > 0) {
-        const first = items[0];
-        console.log('[ProductsContext] Valid Product Sample:', JSON.stringify({
-          id: first.id || first._id || first.productId,
-          name: first.name || first.productName,
-          vendorId: first.vendorId,
-          vendor_object: first.vendor,
-          raw_vendorId: first._raw?.vendor?.vendorId || first.vendor?.id || first.vendor?._id
-        }, null, 2));
-      }
-
-      if (items.length === 0) {
-        console.log('[ProductsContext] API returned 0 items. Full response keys:', Object.keys(json));
-      }
-      // helper to determine whether API returned new data compared to cache
+      // Update Cache if data changed
       const isNewData = (cache, freshItems) => {
         if (!cache || !Array.isArray(cache.items)) return true;
-        const cachedIds = new Set((cache.items || []).map(p => p._id || p.productId || p.id));
-        if ((cache.items || []).length !== (freshItems || []).length) return true;
-        for (const it of (freshItems || [])) {
+        if (cache.items.length !== freshItems.length) return true;
+
+        // Simple distinct check on IDs
+        const cachedIds = new Set(cache.items.map(p => p._id || p.productId || p.id));
+        for (const it of freshItems) {
           const id = it._id || it.productId || it.id;
           if (!cachedIds.has(id)) return true;
         }
         return false;
       };
 
-      const newData = isNewData(cachedRaw, items);
-
-      // If forced refresh OR new data detected, update state and cache
-      if (final.force || newData) {
-        try {
-          const ts = Date.now();
-          await StorageService.setItem(cacheKey, { items, meta: json.meta || {}, ts });
-        } catch (e) {
-          console.debug('[ProductsContext] Failed to persist products cache', e);
-        }
+      if (final.force || isNewData(cachedRaw, items)) {
+        await StorageService.setItem(cacheKey, { items, meta: json.meta || {}, ts: Date.now() });
         setProducts(items.map(normalizeProduct));
         setLastUpdated(Date.now());
-      } else {
-        // no new data: leave UI as-is (cached was used earlier);
-        // but still update params so pagination/search state is current
       }
     } catch (err) {
-      setError(err.message || err);
-      // on network error, keep cached products if any
+      console.error('[ProductsContext] Fetch error:', err);
+      setError(err.message || 'Error fetching products');
     } finally {
       setLoading(false);
     }
-  }, []); // Empty deps - using paramsRef.current to avoid infinite loop
+  }, []); // paramsRef dependency ensures stability
 
-  // Fetch specific restaurant menu (direct, no caching for instant updates)
+
+  /**
+   * Fetches the specific menu/products for a given vendor.
+   * Unlike general product fetch, this is uncached (or short-lived) to ensure
+   * latest stock/status availability when viewing a restaurant.
+   *
+   * @param {string} vendorId - The vendor ID to fetch menu for.
+   * @returns {Promise<Array>} Normalized list of products.
+   */
   const fetchRestaurantMenu = useCallback(async (vendorId) => {
     if (!vendorId) return [];
 
-    // Helper to perform fetch
+    // Internal helper to simplify fetch calls
     const doFetch = async (u, h) => fetch(u, { headers: h });
 
     try {
+      // --- Headers Setup ---
       let token = await getAccessToken();
       if (token && typeof token === 'object') token = token.accessToken || token.token || null;
 
       const headers = { Accept: 'application/json' };
       if (token) {
-        // Backend now expects Bearer token
-        const authHeader = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-        headers.Authorization = authHeader;
+        headers.Authorization = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
       }
 
-      // Use the generic products endpoint with a vendor filter
+      // --- URL Construction ---
       const endpoint = API_ENDPOINTS.PRODUCTS.GET_ALL;
       const url = `${BASE_API_URL}${endpoint}?vendor=${vendorId}&limit=100&_t=${Date.now()}`;
+      console.log('[ProductsContext] Fetching menu for:', vendorId);
 
-      console.log('[ProductsContext] Fetching menu for vendor:', vendorId, url);
       let res = await doFetch(url, headers);
 
-      // Handle 401 with retry logic similar to fetchProducts
+      // --- 401 Refresh Logic (Duplicated from fetchProducts for isolation) ---
+      // Note: Ideally, this retry logic should be moved to a shared API utility/interceptor
       if (res.status === 401) {
-        console.log('[ProductsContext] Menu fetch got 401, attempting refresh...');
+        console.log('[ProductsContext] Menu fetch 401, refreshing...');
         let refreshToken = await getRefreshToken();
 
-        // Normalize refresh token
         if (refreshToken && typeof refreshToken === 'object') {
-          refreshToken = refreshToken.refreshToken || refreshToken.token || refreshToken.value || null;
+          refreshToken = refreshToken.refreshToken || refreshToken.token || null;
         }
 
         if (refreshToken) {
-          try {
-            const refreshUrl = `${BASE_API_URL}${API_ENDPOINTS.AUTH.REFRESH_TOKEN}`;
-            const rres = await fetch(refreshUrl, {
-              method: 'POST',
-              headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-              body: JSON.stringify({ refreshToken, token: refreshToken, refresh_token: refreshToken }),
-            });
+          const refreshUrl = `${BASE_API_URL}${API_ENDPOINTS.AUTH.REFRESH_TOKEN}`;
+          const rres = await fetch(refreshUrl, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
+            body: JSON.stringify({ refreshToken, token: refreshToken, refresh_token: refreshToken })
+          });
 
-            if (rres.ok) {
-              const rjson = await rres.json().catch(() => null);
-              const newAccess = rjson?.accessToken || rjson?.token || rjson?.data?.accessToken || rjson?.data?.token || rjson?.access_token || null;
-              const newRefresh = rjson?.refreshToken || rjson?.data?.refreshToken || rjson?.refresh_token || null;
+          if (rres.ok) {
+            const rjson = await rres.json().catch(() => null);
+            const newAccess = rjson?.accessToken || rjson?.token || null;
+            const newRefresh = rjson?.refreshToken || rjson?.refresh_token || null;
 
-              if (newAccess) {
-                await setAccessToken(newAccess);
-                if (newRefresh) await setRefreshToken(newRefresh);
+            if (newAccess) {
+              await setAccessToken(newAccess);
+              if (newRefresh) await setRefreshToken(newRefresh);
 
-                // Retry with new token using robust header candidates
-                console.log('[ProductsContext] Token refreshed, retrying menu fetch');
-
-                const candidates = [];
-                // Bearer form - PRIMARY strategy
-                candidates.push(newAccess.startsWith('Bearer ') ? newAccess : `Bearer ${newAccess}`);
-                // Raw token (no Bearer) as fallback
-                candidates.push(newAccess.startsWith('Bearer ') ? newAccess.substring(7) : newAccess);
-
-                let retryRes = null;
-                // Try Authorization header variants
-                for (const cand of candidates) {
-                  const tryHeaders = { ...headers, Authorization: cand };
-                  try {
-                    console.log('[ProductsContext] Retry attempt with Authorization prefix:', cand.startsWith('Bearer ') ? 'Bearer' : 'Raw');
-                    retryRes = await doFetch(url, tryHeaders);
-                  } catch (e) {
-                    retryRes = { status: 0 };
-                  }
-                  if (retryRes && retryRes.status !== 401) {
-                    res = retryRes;
-                    break;
-                  }
-                }
-
-                // If still 401, try x-access-token header
-                if (retryRes && retryRes.status === 401) {
-                  const tryHeaders2 = { ...headers };
-                  delete tryHeaders2.Authorization;
-                  tryHeaders2['x-access-token'] = newAccess;
-                  try {
-                    console.log('[ProductsContext] Retry attempt with x-access-token');
-                    retryRes = await doFetch(url, tryHeaders2);
-                    if (retryRes.status !== 401) {
-                      res = retryRes;
-                    }
-                  } catch (e) { }
-                }
-              }
-            } else {
-              console.warn('[ProductsContext] Refresh token failed during menu fetch');
+              const retryHeaders = { ...headers, Authorization: newAccess.startsWith('Bearer ') ? newAccess : `Bearer ${newAccess}` };
+              const retryRes = await doFetch(url, retryHeaders);
+              if (retryRes.status !== 401) res = retryRes;
             }
-          } catch (refreshErr) {
-            console.error('[ProductsContext] Refresh error during menu fetch:', refreshErr);
           }
         }
       }
 
       if (!res.ok) {
-        if (res.status === 401) {
-          console.warn('[ProductsContext] Menu fetch failed with 401 (Unauthorized) - returning empty menu');
-          return [];
-        }
+        if (res.status === 401) return []; // Still unauthorized after retry
         console.warn('[ProductsContext] Menu fetch failed:', res.status);
         throw new Error(`Menu fetch failed: ${res.status}`);
       }
 
       const json = await res.json();
-      console.log('[ProductsContext] Raw Menu Response:', JSON.stringify(json).slice(0, 500)); // Log first 500 chars
 
+      // --- Parsing ---
       let items = [];
-      // Robust parsing similar to fetchProducts
       if (Array.isArray(json)) items = json;
-      else if (Array.isArray(json.data)) items = json.data;
-      else if (Array.isArray(json.products)) items = json.products;
-      else if (Array.isArray(json.items)) items = json.items;
+      else if (json.data && Array.isArray(json.data)) items = json.data;
       else if (json.data && Array.isArray(json.data.products)) items = json.data.products;
+      else if (Array.isArray(json.products)) items = json.products;
 
       console.log(`[ProductsContext] Menu fetched: ${items.length} items`);
 
-      // FIX: CLEAR ALL product caches to ensure fresh data on next startup ("native fill")
-      // This forces fetchProducts to do a fresh network call instead of using ANY stale cache
+      // Force update cache logic to prevent stale data conflicts
       try {
-        // 1. Clear ALL product caches using prefix removal - this ensures no cache key mismatch issues
         await StorageService.removeKeysByPrefix('productsCache:');
-        console.log('[ProductsContext] CLEARED ALL product caches - will fetch fresh on next startup');
 
-        // 2. Also update in-memory state immediately with fresh data
+        // Update local state by merging new items into existing cache logic
         const freshNormalized = items.map(normalizeProduct);
         setProducts(prev => {
-          const freshMap = new Map();
-          freshNormalized.forEach(p => freshMap.set(p.id, p));
+          const freshMap = new Map(freshNormalized.map(p => [p.id, p]));
+          // Replace any existing products in state with the fresh ones from this menu
           return prev.map(p => {
-            const normP = normalizeProduct(p);
-            if (freshMap.has(normP.id)) {
-              return freshMap.get(normP.id);
-            }
-            return p;
+            const norm = normalizeProduct(p);
+            return freshMap.has(norm.id) ? freshMap.get(norm.id) : p;
           });
         });
-        console.log('[ProductsContext] Updated in-memory products state');
-
-      } catch (cacheErr) {
-        console.warn('[ProductsContext] Failed to clear cache:', cacheErr);
+      } catch (e) {
+        console.warn('[ProductsContext] Cache clean warning:', e);
       }
 
       return items.map(normalizeProduct);
+
     } catch (err) {
       console.error('[ProductsContext] Error fetching menu:', err);
       throw err;
     }
   }, []);
 
-  // Fetch business categories
+  /**
+   * Fetches business categories (e.g., Grocery, Restaurant, Pharmacy).
+   * @returns {Promise<Array>} List of business categories.
+   */
   const fetchBusinessCategories = useCallback(async () => {
     try {
       const endpoint = API_ENDPOINTS.UTIL.BUSINESS_CATEGORIES;
       const url = `${BASE_API_URL}${endpoint}`;
 
       let token = await getAccessToken();
-      // handle tokens stored as objects { accessToken } or { token }
-      if (token && typeof token === 'object') {
-        token = token.accessToken || token.token || token.value || null;
-      }
+      if (token && typeof token === 'object') token = token.accessToken || token.token || null;
 
       const headers = { Accept: 'application/json' };
-      if (token) {
-        // Backend now expects Bearer token
-        const authHeader = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-        headers.Authorization = authHeader;
-      }
+      if (token) headers.Authorization = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
 
-      const res = await fetch(url, {
-        method: 'GET',
-        headers: headers
-      });
-
-      console.log('[ProductsContext] fetchBusinessCategories status:', res.status);
-
-      if (!res.ok) throw new Error(`Failed to fetch categories: ${res.status}`);
+      const res = await fetch(url, { method: 'GET', headers });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const json = await res.json();
-      console.log('[ProductsContext] fetchBusinessCategories response:', JSON.stringify(json).slice(0, 200));
-
       const items = json.data?.data || [];
-      console.log('[ProductsContext] fetchBusinessCategories items count:', items.length);
 
       return items.map(item => ({
         id: item._id,
         name: item.name,
         slug: item.slug,
-        icon: item.icon, // This is now a URL URL
+        icon: item.icon,
         isActive: item.isActive
       }));
     } catch (err) {
-      console.error('[ProductsContext] Error fetching business categories:', err);
+      console.error('[ProductsContext] Business Categories Error:', err);
       return [];
     }
   }, []);
 
-  // Fetch product categories (Cuisines)
+  /**
+   * Fetches product categories (cuisines, item types).
+   * @returns {Promise<Array>} List of product categories.
+   */
   const fetchProductCategories = useCallback(async () => {
     try {
       const endpoint = API_ENDPOINTS.UTIL.PRODUCT_CATEGORIES;
       const url = `${BASE_API_URL}${endpoint}`;
 
       let token = await getAccessToken();
-      if (token && typeof token === 'object') {
-        token = token.accessToken || token.token || token.value || null;
-      }
+      if (token && typeof token === 'object') token = token.accessToken || token.token || null;
 
       const headers = { Accept: 'application/json' };
-      if (token) {
-        const authHeader = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
-        headers.Authorization = authHeader;
-      }
+      if (token) headers.Authorization = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
 
       const res = await fetch(url, { method: 'GET', headers });
-
-      if (!res.ok) throw new Error(`Failed to fetch product categories: ${res.status}`);
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
 
       const json = await res.json();
       const items = json.data?.data || [];
 
       return items.map(item => ({
         id: item._id,
-        _id: item._id, // Keep _id just in case
+        _id: item._id,
         name: item.name,
         slug: item.slug,
-        icon: item.icon, // URL
-        image: item.icon, // For compatibility with CuisineChip
-        businessCategoryId: item.businessCategoryId, // REQUIRED for filtering
+        icon: item.icon,
+        image: item.icon, // Compatibility alias
+        businessCategoryId: item.businessCategoryId,
         isActive: item.isActive
       }));
     } catch (err) {
-      console.error('[ProductsContext] Error fetching product categories:', err);
+      console.error('[ProductsContext] Product Categories Error:', err);
       return [];
     }
   }, []);
 
-  // initial load
+  /**
+   * Initial mount effect: Start fetching products.
+   * Relies on internal cache logic to avoid redundant network calls.
+   */
   useEffect(() => {
-    // Trigger initial fetch using default params; fetchProducts will serve cache immediately if present
     fetchProducts();
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -651,7 +529,6 @@ export const ProductsProvider = ({ children }) => {
     fetchProducts,
     setProducts,
     params,
-    setParams,
     setParams,
     lastUpdated,
     fetchRestaurantMenu,

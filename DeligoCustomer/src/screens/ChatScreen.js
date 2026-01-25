@@ -5,6 +5,18 @@ import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
 
+/**
+ * ChatScreen
+ * 
+ * Provides a real-time messaging interface for customer support.
+ * Features:
+ * - Real-time message list with auto-scroll.
+ * - Typing indicators and simulated agent responses.
+ * - Input handling for user messages.
+ * 
+ * @param {Object} props
+ * @param {Object} props.navigation - Navigation prop.
+ */
 const ChatScreen = ({ navigation }) => {
   const { t } = useLanguage();
   const { colors, isDarkMode } = useTheme();

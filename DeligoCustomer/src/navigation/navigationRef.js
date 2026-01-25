@@ -1,11 +1,18 @@
+/**
+ * Navigation Reference
+ * 
+ * Provides global access to the navigation container for non-component files using refs.
+ * Useful for navigating from sagas, redux thunks, or outside the React component tree.
+ */
 import { createNavigationContainerRef } from '@react-navigation/native';
 
 export const navigationRef = createNavigationContainerRef();
 
 /**
- * Navigate to a screen programmatically
- * @param {string} name - Screen name
- * @param {object} params - Screen params
+ * Navigates to a specific screen if the navigation container is mounted.
+ * 
+ * @param {string} name - The name of the route to navigate to.
+ * @param {Object} [params] - Optional parameters to pass to the destination route.
  */
 export function navigate(name, params) {
     if (navigationRef.isReady()) {
@@ -14,7 +21,8 @@ export function navigate(name, params) {
 }
 
 /**
- * Go back to previous screen
+ * Navigates back to the previous screen in the stack.
+ * Checks if back navigation is possible before attempting.
  */
 export function goBack() {
     if (navigationRef.isReady() && navigationRef.canGoBack()) {
@@ -23,8 +31,9 @@ export function goBack() {
 }
 
 /**
- * Navigate to order tracking screen
- * @param {string} orderId - Order ID
+ * Specialized navigator for the Order Tracking screen.
+ * 
+ * @param {string} orderId - The ID of the order to track.
  */
 export function navigateToOrder(orderId) {
     if (navigationRef.isReady()) {
@@ -33,7 +42,7 @@ export function navigateToOrder(orderId) {
 }
 
 /**
- * Navigate to notifications screen
+ * Specialized navigator for the Notifications screen.
  */
 export function navigateToNotifications() {
     if (navigationRef.isReady()) {

@@ -1,13 +1,13 @@
 /**
- * @format
+ * Storage Service
+ * 
+ * Abstraction layer over AsyncStorage for type-safe persistence.
+ * Handles serialization/deserialization and provides specific accessors
+ * for sensitive tokens and user session data.
  */
-
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 
-/**
- * A generic storage utility for AsyncStorage.
- */
 const StorageService = {
   /**
    * Get an item from storage.
@@ -71,7 +71,7 @@ const StorageService = {
 
   /**
    * Remove all keys from storage that start with the given prefix.
-   * Useful for clearing product caches stored as `productsCache:<qs>`.
+   * Bulk delete keys by prefix (e.g. cache invalidation)
    */
   async removeKeysByPrefix(prefix) {
     try {
@@ -87,7 +87,7 @@ const StorageService = {
     }
   },
 
-  // Convenience helpers used by the app
+  // --- Typed Accessors ---
   async getAccessToken() {
     return await this.getItem(STORAGE_KEYS.ACCESS_TOKEN);
   },
@@ -112,7 +112,7 @@ const StorageService = {
     return await this.removeItem(STORAGE_KEYS.USER);
   },
 
-  // Refresh token helpers
+  // --- Refresh Token Management ---
   async getRefreshToken() {
     return await this.getItem(STORAGE_KEYS.REFRESH_TOKEN);
   },
@@ -125,7 +125,7 @@ const StorageService = {
     return await this.removeItem(STORAGE_KEYS.REFRESH_TOKEN);
   },
 
-  // Onboarding helpers expected by screens
+  // --- Onboarding State ---
   async setOnboardingCompleted() {
     return await this.setItem(STORAGE_KEYS.ONBOARDING_COMPLETED, true);
   },

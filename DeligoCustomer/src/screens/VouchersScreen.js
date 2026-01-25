@@ -1,3 +1,10 @@
+/**
+ * VouchersScreen
+ * 
+ * Manages the display, selection, and application of vouchers and promo codes.
+ * Supports viewing active/expired coupons and manual code entry.
+ */
+
 import React, { useState, useEffect } from 'react';
 import {
   View,
@@ -33,7 +40,7 @@ const VouchersScreen = ({ navigation, route }) => {
 
   const fetchCoupons = async () => {
     setLoading(true);
-    // Fetch availble coupons from API
+    // Retrieve coupons from backend
     const res = await CouponAPI.getCoupons(vendorId);
     if (res.success && Array.isArray(res.data)) {
       setCoupons(res.data);
@@ -50,8 +57,7 @@ const VouchersScreen = ({ navigation, route }) => {
       navigation.goBack();
       return;
     }
-    // If not in selection mode (e.g. from Profile), maybe just copy code or show detail?
-    // For now, no-op or alert
+    // Handle coupon selection or display details
     Alert.alert(t('couponCode'), `${t('code')}: ${coupon.code}`);
   };
 
@@ -61,7 +67,7 @@ const VouchersScreen = ({ navigation, route }) => {
 
     setVerifying(true);
 
-    // 1. Check if we have this coupon in the fetched list
+    // 1. Verify against locally available coupons
     const foundLocal = coupons.find(c => c.code && c.code.toLowerCase() === code.toLowerCase());
 
     if (foundLocal) {
@@ -70,20 +76,19 @@ const VouchersScreen = ({ navigation, route }) => {
         onSelect(foundLocal);
         navigation.goBack();
       } else {
-        // Just highlight it or show detail?
+        // Notify availability
         Alert.alert(t('success'), t('couponAvailable'));
       }
       return;
     }
 
-    // 2. If not found locally, try to APPLY it directly via API
-    // User indicated 'apply-coupon' handles both check and apply
+    // 2. Attempt server-side validation and application
     const res = await CouponAPI.applyCoupon(code, 'CART', true); // isCode=true
     setVerifying(false);
 
     if (res.success) {
       if (selectionMode && onSelect) {
-        // Pass the Result back, not a coupon object, because we already applied it
+        // return successful code application result
         onSelect(null, res.data);
         navigation.goBack();
       } else {
@@ -95,8 +100,7 @@ const VouchersScreen = ({ navigation, route }) => {
   };
 
   const VoucherCard = ({ voucher }) => {
-    const isExpired = activeTab === 'expired'; // Or check expiry date logic
-    // const isExpired = voucher.isActive === false; 
+    const isExpired = activeTab === 'expired';
 
     return (
       <View style={[styles.voucherCard, isExpired && styles.voucherCardExpired]}>
@@ -141,8 +145,7 @@ const VouchersScreen = ({ navigation, route }) => {
     );
   };
 
-  // Filter local logic if API returns mixed list
-  // Assuming API might return all, so we filter by 'isActive' or similar
+  // Filter coupons by status
   const availableVouchers = coupons.filter(c => c.isActive !== false);
   const expiredVouchers = coupons.filter(c => c.isActive === false);
 

@@ -1,10 +1,30 @@
 import React, { useMemo } from 'react';
-import { useLanguage } from '../../utils/LanguageContext';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
 import { useTheme, darkMapStyle } from '../../utils/ThemeContext';
+import { useLanguage } from '../../utils/LanguageContext';
 
+/**
+ * LocationDetails Component
+ * 
+ * Comprehensive form for location data entry.
+ * Features:
+ * - Map integration (Google Maps) for pin placement.
+ * - Address search and manual field entry.
+ * - Saved address management.
+ * 
+ * @param {Object} props
+ * @param {Object} props.colors - Theme colors.
+ * @param {boolean} props.isMapFullScreen - Fullscreen map toggle.
+ * @param {Function} props.setIsMapFullScreen - State setter.
+ * @param {Object} props.mapRegion - Current map region.
+ * @param {Function} props.setMapRegion - Region setter.
+ * @param {Object} props.markerCoordinate - Pin coordinates.
+ * @param {Function} props.setMarkerCoordinate - Coordinates setter.
+ * @param {Function} props.getCurrentLocation - Geolocation trigger.
+ * @param {Function} props.reverseGeocode - Coordinate to address converter.
+ */
 const LocationDetails = ({
   colors,
   isMapFullScreen,
@@ -608,6 +628,7 @@ const LocationDetails = ({
         </Text>
       </View>
 
+      {/* Full-screen Map Modal for precise pin adjustment */}
       <Modal
         visible={isMapFullScreen}
         animationType="slide"
@@ -900,6 +921,7 @@ const LocationDetails = ({
             </View>
           )}
 
+          {/* Detailed Address Entry Form */}
           <View style={styles.internationalFormSection}>
             <Text style={[styles.formSectionTitle, { color: colors.text.primary }]}>
               {t('addressDetails')}

@@ -1,14 +1,13 @@
 /**
- * @format
+ * Authentication Service
+ * 
+ * Manages user authentication state, session persistence, and token lifecycle.
+ * Handles login, logout, OTP flow, and secure storage of credentials.
  */
-
 import StorageService from './storage';
 import { STORAGE_KEYS } from '../constants/storageKeys';
 import { customerApi } from './api';
 
-/**
- * A service for handling user authentication.
- */
 const AuthService = {
   /**
    * Check if the user has completed onboarding.
@@ -36,20 +35,20 @@ const AuthService = {
    * @returns {Promise<boolean>} True if successful, false otherwise.
    */
   async login(userData, token) {
-    // Only store user if provided (avoid storing undefined)
+    // Verify user object validity
     if (userData !== undefined && userData !== null) {
       await StorageService.setItem(STORAGE_KEYS.USER, userData);
     }
-    // Backwards-compatible: `token` may be access token. Newer flows pass accessToken and refreshToken separately.
+    // Extract access token
     const accessToken = token && typeof token === 'string' ? token : undefined;
-    // If caller passed an object { accessToken, refreshToken }, handle that too
+    // Extract refresh token from object if present
     let refreshToken;
     if (token && typeof token === 'object') {
       refreshToken = token.refreshToken;
     }
 
     if (accessToken !== undefined && accessToken !== null) {
-      // Prefer dedicated helper if available
+      // Persist access token using available storage method
       if (StorageService.setAccessToken) await StorageService.setAccessToken(accessToken);
       else await StorageService.setItem(STORAGE_KEYS.ACCESS_TOKEN, accessToken);
     }
@@ -137,7 +136,7 @@ export const verifyOTP = async (identifier, otp, method = 'mobile') => {
   else if (refreshToken) tokenPayload = { refreshToken };
 
   if (tokenPayload) {
-    // Save token(s); user may be null in some flows
+    // Persist session
     await AuthService.login(user, tokenPayload);
   }
 
@@ -343,7 +342,7 @@ export const logoutUser = async (tokenInput = null) => {
 
     return { success: false, status, message, raw: err };
   } finally {
-    // Clear local storage (token and user) regardless of API result to ensure the app is logged out locally
+    // Clear local storage regardless of API result
     try {
       await AuthService.logout();
     } catch (e) {

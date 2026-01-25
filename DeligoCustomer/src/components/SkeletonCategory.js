@@ -4,6 +4,17 @@ import { useTheme } from '../utils/ThemeContext';
 
 const { width } = Dimensions.get('window');
 
+/**
+ * SkeletonItem Component
+ *
+ * A primitive UI component that creates a pulsing loading effect.
+ * Used as a building block for complex skeleton layouts.
+ *
+ * @param {Object} props
+ * @param {number|string} props.width - Skeleton width.
+ * @param {number|string} props.height - Skeleton height.
+ * @param {Object} [props.style] - Optional style overrides.
+ */
 const SkeletonItem = ({ width, height, style }) => {
     const { colors } = useTheme();
     const opacity = useRef(new Animated.Value(0.3)).current;
@@ -33,7 +44,7 @@ const SkeletonItem = ({ width, height, style }) => {
                 {
                     width,
                     height,
-                    backgroundColor: colors.border, // Using border color as base gray
+                    backgroundColor: colors.border,
                     opacity,
                     borderRadius: 8,
                 },
@@ -43,12 +54,19 @@ const SkeletonItem = ({ width, height, style }) => {
     );
 };
 
+/**
+ * SkeletonCategory Component
+ *
+ * Displays a loading placeholder for the main Category/Home screen.
+ * Simulates the layout of headers, horizontal lists, chips, and vertical lists
+ * to minimize layout shift during data fetching.
+ */
 const SkeletonCategory = () => {
     const { colors } = useTheme();
 
     return (
         <View style={[styles.container, { backgroundColor: colors.background }]}>
-            {/* Header Area Skeleton */}
+            {/* Header Placeholder */}
             <View style={styles.header}>
                 <View style={styles.headerTop}>
                     <SkeletonItem width={120} height={20} />
@@ -59,7 +77,7 @@ const SkeletonCategory = () => {
                 </View>
             </View>
 
-            {/* Business Categories Skeleton (GlovoBubbles) */}
+            {/* Business Categories Placeholder */}
             <View style={styles.section}>
                 <SkeletonItem width={150} height={20} style={{ marginBottom: 15 }} />
                 <View style={styles.horizontalRow}>
@@ -72,7 +90,7 @@ const SkeletonCategory = () => {
                 </View>
             </View>
 
-            {/* Product Categories Skeleton (Cuisines) */}
+            {/* Filter Chips Placeholder */}
             <View style={styles.section}>
                 <SkeletonItem width={180} height={20} style={{ marginBottom: 15 }} />
                 <View style={styles.horizontalRow}>
@@ -84,7 +102,7 @@ const SkeletonCategory = () => {
                 </View>
             </View>
 
-            {/* Restaurants List Skeleton */}
+            {/* Restaurant List Placeholder */}
             <View style={styles.section}>
                 <SkeletonItem width={120} height={20} style={{ marginBottom: 15 }} />
                 {[1, 2, 3].map((i) => (
@@ -106,7 +124,7 @@ const styles = StyleSheet.create({
     container: {
         flex: 1,
         paddingHorizontal: 20,
-        paddingTop: 20, // Adjust based on header height
+        paddingTop: 20,
     },
     header: {
         marginBottom: 30,
@@ -121,8 +139,8 @@ const styles = StyleSheet.create({
     },
     horizontalRow: {
         flexDirection: 'row',
-        justifyContent: 'flex-start', // Align left to match GlovoBubbles
-        gap: 16, // Consistent gap
+        justifyContent: 'flex-start',
+        gap: 16,
     },
     categoryItem: {
         alignItems: 'center',

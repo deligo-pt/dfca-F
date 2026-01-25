@@ -1,15 +1,20 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, TextInput, TouchableOpacity, ScrollView, ActivityIndicator, Keyboard, StatusBar } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { View, Text, StyleSheet, TextInput, FlatList, TouchableOpacity, Image, ActivityIndicator, SafeAreaView, StatusBar, Keyboard, ScrollView } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, fontSize } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
 import { useProducts } from '../contexts/ProductsContext';
-import StorageService from '../utils/storage';
-import RestaurantsList from '../components/Categories/RestaurantsList';
 import ProductSearchResultCard from '../components/ProductSearchResultCard';
-import { BASE_API_URL, API_ENDPOINTS } from '../constants/config';
+import RestaurantsList from '../components/Categories/RestaurantsList';
+import AsyncStorage from '@react-native-async-storage/async-storage';
+
+/**
+ * SearchScreen
+ * 
+ * Provides search functionality for restaurants and dishes, including
+ * filtering by vendor type, sorting, and persistent history.
+ */
 
 const SearchScreen = ({ navigation }) => {
     const { colors, isDarkMode } = useTheme();
@@ -22,7 +27,7 @@ const SearchScreen = ({ navigation }) => {
     const [sortBy, setSortBy] = useState('relevance'); // 'relevance', 'distance', 'rating'
     const inputRef = useRef(null);
 
-    // Initial Load: Focus input & load history & load ALL products for client-side search
+    // Initialize search state and load dependencies
     useEffect(() => {
         const init = async () => {
             // Load all products (limit 2000) so we can filter locally
@@ -37,7 +42,7 @@ const SearchScreen = ({ navigation }) => {
         setTimeout(() => inputRef.current?.focus(), 100);
     }, []);
 
-    // Save recent search interaction
+    // Persist search query to history
     const saveRecentSearch = async (query) => {
         if (!query || !query.trim()) return;
         const newEntry = query.trim();
@@ -46,7 +51,7 @@ const SearchScreen = ({ navigation }) => {
         await StorageService.setItem('recentSearches', updated);
     };
 
-    // Debounce Search UI Feedback (No API call)
+    // Handle typing debouncer
     useEffect(() => {
         if (!searchQuery.trim()) {
             setIsTyping(false);
@@ -55,15 +60,14 @@ const SearchScreen = ({ navigation }) => {
 
         setIsTyping(true);
         const tId = setTimeout(() => {
-            // We rely on useMemo (client-side filtering) now, so no API call here.
-            // Just clear the typing indicator.
+            // Clear typing indicator for client-side filtering
             setIsTyping(false);
         }, 300); // 300ms visual delay for better UX
 
         return () => clearTimeout(tId);
     }, [searchQuery]);
 
-    // Client-side filtering with enhanced deep search matches (Description, Tags, etc.)
+    // Filter items based on query across multiple fields (name, vendor, description, tags)
     const filterBySearchQuery = (items, query) => {
         if (!query || !query.trim()) return items;
         const q = query.toLowerCase().trim();
@@ -125,7 +129,7 @@ const SearchScreen = ({ navigation }) => {
         }
     };
 
-    // Derived: Search Results (Products) with filtering
+    // Compute filtered results based on query, vendor type, and sort order
     const productResults = React.useMemo(() => {
         if (!searchQuery.trim()) return [];
         let filtered = products || [];
@@ -143,15 +147,13 @@ const SearchScreen = ({ navigation }) => {
         return filtered;
     }, [products, searchQuery, selectedVendorType, sortBy]);
 
-    // Derive unique restaurants from product results
-    // Since the API doesn't have a working restaurant endpoint, we extract vendors from products
+    // Extract unique vendors from matching products
     const matchedRestaurants = React.useMemo(() => {
         if (!productResults || productResults.length === 0) return [];
 
         const vendorMap = new Map();
         productResults.forEach((product) => {
-            // "product" here is already normalized by ProductsContext or follows normalized shape
-            // But we check _raw for robustness
+            // Normalize product data
             const pRaw = product._raw || product;
 
             // Prioritize normalized vendor object
@@ -169,8 +171,7 @@ const SearchScreen = ({ navigation }) => {
 
             // Use vendor ID string as key to avoid duplicates
             if (!vendorMap.has(String(vId))) {
-                // Construct vendor object for the card
-                // Ideally use the normalized vendor data
+                // Create vendor object for display
                 const vName = normVendor.vendorName || normVendor.businessName || pRaw.vendor?.vendorName || pRaw.vendorId?.businessDetails?.businessName || 'Unknown';
                 const vImage = normVendor.storePhoto || normVendor.logo || pRaw.vendor?.storePhoto || null;
                 const vType = normVendor.vendorType || normVendor.businessType || pRaw.vendor?.vendorType || '';
@@ -203,7 +204,7 @@ const SearchScreen = ({ navigation }) => {
 
     const matchedDishes = productResults;
 
-    // Derive unique vendor types from all products (for filter chips)
+    // Extract available vendor types for filter chips
     const availableVendorTypes = React.useMemo(() => {
         const vendorTypeMap = new Map();
         (products || []).forEach((product) => {
@@ -243,7 +244,7 @@ const SearchScreen = ({ navigation }) => {
         navigation.navigate('RestaurantDetails', { restaurant: item });
     };
 
-    // Render Logic Helper
+    // Render helper
     const renderContent = () => {
         if (searchQuery.trim().length === 0) {
             // SHOW RECENT SEARCHES

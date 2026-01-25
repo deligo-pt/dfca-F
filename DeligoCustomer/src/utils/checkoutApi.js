@@ -1,7 +1,7 @@
 /**
- * @format
  * Checkout API Service
- * Handles checkout operations
+ * 
+ * Manages checkout session initialization and creation.
  */
 
 import { BASE_API_URL, API_ENDPOINTS } from '../constants/config';
@@ -34,7 +34,7 @@ class CheckoutAPI {
       }
 
       if (token) {
-        // Backend now expects Bearer token
+        // Attach Bearer token
         const authHeader = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
         headers.Authorization = authHeader;
         console.debug('[CheckoutAPI] auth present, mask:', maskToken(authHeader));

@@ -6,22 +6,37 @@ import * as ImageManipulator from 'expo-image-manipulator';
 const { width: SCREEN_WIDTH } = Dimensions.get('window');
 const EDITOR_SIZE = SCREEN_WIDTH - 40;
 
+/**
+ * ImageEditor Component
+ * 
+ * Modal interface for basic image manipulation.
+ * Supports cropping, rotating, and flipping images using gesture controls.
+ * Uses `expo-image-manipulator` for efficient processing.
+ * 
+ * @param {Object} props
+ * @param {boolean} props.visible - Controls modal visibility.
+ * @param {string} props.imageUri - The image source URI.
+ * @param {Function} props.onConfirm - Callback with edited image URI.
+ * @param {Function} props.onCancel - Callback to close editor.
+ * @param {Object} props.colors - Theme colors.
+ */
 const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
   const [cropMode, setCropMode] = useState(false);
   const [editedImageUri, setEditedImageUri] = useState(imageUri);
   const [imageDimensions, setImageDimensions] = useState({ width: 0, height: 0 });
   const [cropArea, setCropArea] = useState(null);
 
-  // Refs for storing initial values during gestures
+  // References for tracking touch gestures without triggering re-renders
   const startDrag = useRef({ x: 0, y: 0 });
   const startResize = useRef({ x: 0, y: 0, width: 0, height: 0 });
   const cropAreaRef = useRef(null);
 
-  // Keep cropAreaRef in sync with cropArea state
+  // Synchronize ref with state for PanResponder access
   useEffect(() => {
     cropAreaRef.current = cropArea;
   }, [cropArea]);
 
+  // Load image dimensions on mount
   useEffect(() => {
     if (imageUri) {
       Image.getSize(
@@ -30,12 +45,13 @@ const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
           setImageDimensions({ width, height });
         },
         (error) => {
-          console.error('Error getting image size:', error);
+          console.error('ImageEditor: Failed to retrieve image dimensions', error);
         }
       );
     }
   }, [imageUri]);
 
+  // Calculate the render position of the image within the editor frame
   const getImageDisplayRect = () => {
     const { width: imgWidth, height: imgHeight } = imageDimensions;
     if (!imgWidth || !imgHeight) return null;
@@ -59,21 +75,19 @@ const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
     try {
       const displayRect = getImageDisplayRect();
       if (!displayRect || !cropArea) {
-        console.error('Display rect or crop area not available');
         return;
       }
 
-      // Convert display crop coordinates to actual image coordinates
+      // Map display coordinates back to original image coordinates
       const { x: displayX, y: displayY, scale } = displayRect;
       const { x: cropX, y: cropY, width: cropWidth, height: cropHeight } = cropArea;
 
-      // Adjust for image offset and scale
       const actualX = (cropX - displayX) / scale;
       const actualY = (cropY - displayY) / scale;
       const actualWidth = cropWidth / scale;
       const actualHeight = cropHeight / scale;
 
-      // Ensure within bounds
+      // Constrain to image bounds to prevent errors
       const { width: imgWidth, height: imgHeight } = imageDimensions;
       const clampedX = Math.max(0, Math.min(actualX, imgWidth - actualWidth));
       const clampedY = Math.max(0, Math.min(actualY, imgHeight - actualHeight));
@@ -98,7 +112,7 @@ const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
       setCropMode(false);
       setCropArea(null);
     } catch (error) {
-      console.error('Crop error:', error);
+      console.error('ImageEditor: Crop operation failed', error);
     }
   };
 
@@ -111,7 +125,7 @@ const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
       );
       setEditedImageUri(result.uri);
     } catch (error) {
-      console.error('Rotate error:', error);
+      console.error('ImageEditor: Rotate operation failed', error);
     }
   };
 
@@ -124,7 +138,7 @@ const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
       );
       setEditedImageUri(result.uri);
     } catch (error) {
-      console.error('Flip error:', error);
+      console.error('ImageEditor: Flip operation failed', error);
     }
   };
 
@@ -142,7 +156,7 @@ const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
     if (!displayRect) return;
 
     const { x: displayX, y: displayY, width: displayWidth, height: displayHeight } = displayRect;
-    const cropSize = Math.min(displayWidth, displayHeight) * 0.8; // 80% of the smaller dimension
+    const cropSize = Math.min(displayWidth, displayHeight) * 0.8;
 
     setCropArea({
       x: displayX + (displayWidth - cropSize) / 2,
@@ -161,7 +175,13 @@ const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
     setCropMode(!cropMode);
   };
 
-  // PanResponder for dragging crop area
+  /**
+   * Gesture Handlers
+   *
+   * Manages drag and resize interactions for the crop selection area.
+   * - dragPanResponder: Moves the entire selection.
+   * - resizePanResponders: Adjust dimensions from specific corners.
+   */
   const dragPanResponder = useRef(
     PanResponder.create({
       onStartShouldSetPanResponder: () => true,
@@ -180,117 +200,41 @@ const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
           y: newY,
         });
       },
-      onPanResponderRelease: () => {},
+      onPanResponderRelease: () => { },
     })
   ).current;
 
-  // PanResponder for top-left corner
-  const topLeftPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        if (!cropAreaRef.current) return;
-        startResize.current = { ...cropAreaRef.current };
-      },
-      onPanResponderMove: (e, gestureState) => {
-        if (!cropAreaRef.current) return;
-        const { dx, dy } = gestureState;
-        const newX = startResize.current.x + dx;
-        const newY = startResize.current.y + dy;
-        const newWidth = Math.max(50, startResize.current.width - dx);
-        const newHeight = Math.max(50, startResize.current.height - dy);
+  // Corner resize handlers
+  const createResizeResponder = (adjustX, adjustY, adjustW, adjustH) => PanResponder.create({
+    onStartShouldSetPanResponder: () => true,
+    onMoveShouldSetPanResponder: () => true,
+    onPanResponderGrant: () => {
+      if (!cropAreaRef.current) return;
+      startResize.current = { ...cropAreaRef.current };
+    },
+    onPanResponderMove: (e, gestureState) => {
+      if (!cropAreaRef.current) return;
+      const { dx, dy } = gestureState;
 
-        setCropArea({
-          ...cropAreaRef.current,
-          x: newX,
-          y: newY,
-          width: newWidth,
-          height: newHeight,
-        });
-      },
-      onPanResponderRelease: () => {},
-    })
-  ).current;
+      const newX = startResize.current.x + (adjustX ? dx : 0);
+      const newY = startResize.current.y + (adjustY ? dy : 0);
+      const newWidth = Math.max(50, startResize.current.width + (adjustW ? dx * adjustW : 0));
+      const newHeight = Math.max(50, startResize.current.height + (adjustH ? dy * adjustH : 0));
 
-  // PanResponder for top-right corner
-  const topRightPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        if (!cropAreaRef.current) return;
-        startResize.current = { ...cropAreaRef.current };
-      },
-      onPanResponderMove: (e, gestureState) => {
-        if (!cropAreaRef.current) return;
-        const { dx, dy } = gestureState;
-        const newY = startResize.current.y + dy;
-        const newWidth = Math.max(50, startResize.current.width + dx);
-        const newHeight = Math.max(50, startResize.current.height - dy);
+      setCropArea({
+        ...cropAreaRef.current,
+        x: newX,
+        y: newY,
+        width: newWidth,
+        height: newHeight,
+      });
+    },
+  });
 
-        setCropArea({
-          ...cropAreaRef.current,
-          y: newY,
-          width: newWidth,
-          height: newHeight,
-        });
-      },
-      onPanResponderRelease: () => {},
-    })
-  ).current;
-
-  // PanResponder for bottom-left corner
-  const bottomLeftPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        if (!cropAreaRef.current) return;
-        startResize.current = { ...cropAreaRef.current };
-      },
-      onPanResponderMove: (e, gestureState) => {
-        if (!cropAreaRef.current) return;
-        const { dx, dy } = gestureState;
-        const newX = startResize.current.x + dx;
-        const newWidth = Math.max(50, startResize.current.width - dx);
-        const newHeight = Math.max(50, startResize.current.height + dy);
-
-        setCropArea({
-          ...cropAreaRef.current,
-          x: newX,
-          width: newWidth,
-          height: newHeight,
-        });
-      },
-      onPanResponderRelease: () => {},
-    })
-  ).current;
-
-  // PanResponder for bottom-right corner
-  const bottomRightPanResponder = useRef(
-    PanResponder.create({
-      onStartShouldSetPanResponder: () => true,
-      onMoveShouldSetPanResponder: () => true,
-      onPanResponderGrant: () => {
-        if (!cropAreaRef.current) return;
-        startResize.current = { ...cropAreaRef.current };
-      },
-      onPanResponderMove: (e, gestureState) => {
-        if (!cropAreaRef.current) return;
-        const { dx, dy } = gestureState;
-        const newWidth = Math.max(50, startResize.current.width + dx);
-        const newHeight = Math.max(50, startResize.current.height + dy);
-
-        setCropArea({
-          ...cropAreaRef.current,
-          width: newWidth,
-          height: newHeight,
-        });
-      },
-      onPanResponderRelease: () => {},
-    })
-  ).current;
+  const topLeftPanResponder = useRef(createResizeResponder(true, true, -1, -1)).current;
+  const topRightPanResponder = useRef(createResizeResponder(false, true, 1, -1)).current;
+  const bottomLeftPanResponder = useRef(createResizeResponder(true, false, -1, 1)).current;
+  const bottomRightPanResponder = useRef(createResizeResponder(false, false, 1, 1)).current;
 
   return (
     <Modal visible={visible} animationType="slide" onRequestClose={onCancel}>
@@ -306,22 +250,20 @@ const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Image Preview */}
+        {/* Editor Canvas */}
         <View style={styles.imageContainer}>
           <Image
             source={{ uri: editedImageUri || imageUri }}
             style={styles.image}
             resizeMode="contain"
             onError={(error) => {
-              console.error('Image load error:', error);
-              // You could show an error message or fallback here
+              console.error('ImageEditor: Render error', error);
             }}
           />
           {cropMode && cropArea && (
             <>
-              {/* Dimmed overlay outside crop area */}
+              {/* Dimmed Background Overlay */}
               <View style={styles.cropOverlay}>
-                {/* Top overlay */}
                 <View style={[styles.overlay, {
                   top: 0,
                   left: 0,
@@ -330,7 +272,6 @@ const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
                   backgroundColor: 'rgba(0,0,0,0.5)',
                   pointerEvents: 'none'
                 }]} />
-                {/* Bottom overlay */}
                 <View style={[styles.overlay, {
                   bottom: 0,
                   left: 0,
@@ -339,7 +280,6 @@ const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
                   backgroundColor: 'rgba(0,0,0,0.5)',
                   pointerEvents: 'none'
                 }]} />
-                {/* Left overlay */}
                 <View style={[styles.overlay, {
                   top: cropArea.y,
                   left: 0,
@@ -348,7 +288,6 @@ const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
                   backgroundColor: 'rgba(0,0,0,0.5)',
                   pointerEvents: 'none'
                 }]} />
-                {/* Right overlay */}
                 <View style={[styles.overlay, {
                   top: cropArea.y,
                   right: 0,
@@ -359,7 +298,7 @@ const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
                 }]} />
               </View>
 
-              {/* Crop rectangle with handles */}
+              {/* Active Crop Rectangle & Handles */}
               <View
                 style={[
                   styles.cropContainer,
@@ -372,7 +311,6 @@ const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
                 ]}
                 {...dragPanResponder.panHandlers}
               >
-                {/* Corner handles */}
                 <View style={[styles.handle, styles.topLeftHandle]} {...topLeftPanResponder.panHandlers} />
                 <View style={[styles.handle, styles.topRightHandle]} {...topRightPanResponder.panHandlers} />
                 <View style={[styles.handle, styles.bottomLeftHandle]} {...bottomLeftPanResponder.panHandlers} />
@@ -382,7 +320,7 @@ const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
           )}
         </View>
 
-        {/* Edit Tools */}
+        {/* Editing Tools Bar */}
         <View style={[styles.toolsContainer, { backgroundColor: colors.surface }]}>
           <View style={styles.toolsRow}>
             <TouchableOpacity
@@ -412,7 +350,7 @@ const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
           {cropMode && (
             <View style={styles.cropOptions}>
               <Text style={[styles.cropOptionsTitle, { color: colors.text.primary }]}>
-                Drag the crop area or use corner handles to resize
+                Adjust selection or use handles to resize
               </Text>
               <View style={styles.cropActions}>
                 <TouchableOpacity
@@ -422,21 +360,21 @@ const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
                     setCropArea(null);
                   }}
                 >
-                  <Text style={[styles.cropButtonText, { color: colors.text.secondary }]}>Cancel Crop</Text>
+                  <Text style={[styles.cropButtonText, { color: colors.text.secondary }]}>Cancel</Text>
                 </TouchableOpacity>
                 <TouchableOpacity
                   style={[styles.cropButton, { backgroundColor: colors.primary }]}
                   onPress={handleCrop}
                   disabled={!cropArea}
                 >
-                  <Text style={[styles.cropButtonText, { color: colors.text.white }]}>Apply Crop</Text>
+                  <Text style={[styles.cropButtonText, { color: colors.text.white }]}>Apply</Text>
                 </TouchableOpacity>
               </View>
             </View>
           )}
         </View>
 
-        {/* Action Buttons */}
+        {/* Global Modal Actions */}
         <View style={styles.actionsContainer}>
           <TouchableOpacity
             style={[styles.actionButton, styles.cancelButton, { borderColor: colors.border }]}
@@ -448,7 +386,7 @@ const ImageEditor = ({ visible, imageUri, onConfirm, onCancel, colors }) => {
             style={[styles.actionButton, styles.confirmButton, { backgroundColor: colors.primary }]}
             onPress={handleConfirm}
           >
-            <Text style={[styles.actionButtonText, { color: colors.text.white }]}>Use Photo</Text>
+            <Text style={[styles.actionButtonText, { color: colors.text.white }]}>Save Changes</Text>
           </TouchableOpacity>
         </View>
       </View>
@@ -484,6 +422,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
     padding: 20,
+    backgroundColor: '#000', // Dark background for better contrast while editing
   },
   image: {
     width: EDITOR_SIZE,
@@ -505,46 +444,41 @@ const styles = StyleSheet.create({
   },
   cropContainer: {
     position: 'absolute',
-    borderWidth: 3,
+    borderWidth: 2,
     borderColor: '#fff',
     borderStyle: 'solid',
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.8,
-    shadowRadius: 3,
-    elevation: 5,
+    shadowOpacity: 0.5,
+    shadowRadius: 4,
+    elevation: 6,
   },
   handle: {
     position: 'absolute',
-    width: 40,
-    height: 40,
+    width: 32,
+    height: 32,
     backgroundColor: '#fff',
-    borderRadius: 20,
-    borderWidth: 3,
-    borderColor: '#007AFF',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 5,
-    justifyContent: 'center',
-    alignItems: 'center',
+    borderRadius: 16,
+    borderWidth: 2,
+    borderColor: '#007AFF', // IOS Blue for drag handles
+    elevation: 6,
+    zIndex: 10,
   },
   topLeftHandle: {
-    left: -20,
-    top: -20,
+    left: -16,
+    top: -16,
   },
   topRightHandle: {
-    right: -20,
-    top: -20,
+    right: -16,
+    top: -16,
   },
   bottomLeftHandle: {
-    left: -20,
-    bottom: -20,
+    left: -16,
+    bottom: -16,
   },
   bottomRightHandle: {
-    right: -20,
-    bottom: -20,
+    right: -16,
+    bottom: -16,
   },
   toolsContainer: {
     paddingVertical: 16,

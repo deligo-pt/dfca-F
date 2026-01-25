@@ -2,6 +2,13 @@ import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
+/**
+ * DeligoProBanner Component
+ * 
+ * Promotional banner for the premium "DeliGo Pro" subscription.
+ * Uses a dark theme with gold accents to signify exclusivity.
+ * Optimized for user engagement with clear value proposition display.
+ */
 const DeligoProBanner = () => {
   return (
     <TouchableOpacity style={styles.proBanner} activeOpacity={0.85}>
@@ -9,6 +16,7 @@ const DeligoProBanner = () => {
         <View style={styles.proIconWrapper}>
           <Ionicons name="diamond" size={28} color="#FFB800" />
         </View>
+
         <View style={styles.proTextContainer}>
           <View style={styles.proTitleRow}>
             <Text style={styles.proTitle}>Try DeliGo Pro</Text>
@@ -16,9 +24,11 @@ const DeligoProBanner = () => {
               <Text style={styles.freeBadgeText}>FREE</Text>
             </View>
           </View>
+
           <Text style={styles.proSubtitle}>Unlimited free delivery + exclusive deals</Text>
           <Text style={styles.proOffer}>🎁 First month free • Save up to €50/month</Text>
         </View>
+
         <Ionicons name="arrow-forward-circle" size={32} color="#FFB800" />
       </View>
     </TouchableOpacity>
@@ -95,3 +105,4 @@ const styles = StyleSheet.create({
 });
 
 export default DeligoProBanner;
+

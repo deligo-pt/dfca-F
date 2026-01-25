@@ -13,6 +13,20 @@ import { customerApi } from '../utils/api';
 import AddressApi from '../utils/addressApi';
 import { getUserId, getUserData } from '../utils/auth';
 
+/**
+ * LocationAddressScreen
+ * 
+ * Manages address entry and location selection.
+ * Features:
+ * - Interactive map for precise pinning.
+ * - Address autocomplete and search.
+ * - Reverse geocoding for coordinate-based addressing.
+ * - Form validation for required address fields.
+ * 
+ * @param {Object} props
+ * @param {Object} props.navigation - Navigation controller.
+ * @param {Object} props.route - Route params (e.g., mode, onSave callback).
+ */
 const LocationAddressScreen = ({ navigation, route }) => {
   const { colors, isDarkMode } = useTheme();
   const { t } = useLanguage();

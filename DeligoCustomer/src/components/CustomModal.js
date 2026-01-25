@@ -1,8 +1,32 @@
 import React, { useMemo } from 'react';
-import { Modal, View, Text, TouchableOpacity, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, Modal, TouchableOpacity } from 'react-native';
 import { useTheme } from '../utils/ThemeContext';
 
-const CustomModal = ({ visible, title, message, onConfirm, onCancel, confirmText = 'OK', cancelText = 'Cancel', onlyConfirm = false }) => {
+/**
+ * CustomModal Component
+ * 
+ * A generalized modal for various alerts and confirmations.
+ * 
+ * @param {Object} props
+ * @param {boolean} props.visible - Modal visibility.
+ * @param {string} [props.title] - Modal title.
+ * @param {string} props.message - Modal body text.
+ * @param {Function} [props.onConfirm] - Confirm action handler.
+ * @param {Function} [props.onCancel] - Cancel/close action handler.
+ * @param {string} [props.confirmText='OK'] - Confirm button label.
+ * @param {string} [props.cancelText='Cancel'] - Cancel button label.
+ * @param {boolean} [props.onlyConfirm=false] - If true, hides the cancel button.
+ */
+const CustomModal = ({
+  visible,
+  title,
+  message,
+  onConfirm,
+  onCancel,
+  confirmText = 'OK',
+  cancelText = 'Cancel',
+  onlyConfirm = false
+}) => {
   const { colors } = useTheme();
 
   const styles = useMemo(() => StyleSheet.create({
@@ -18,12 +42,12 @@ const CustomModal = ({ visible, title, message, onConfirm, onCancel, confirmText
       borderRadius: 16,
       padding: 24,
       alignItems: 'center',
-      // Shadow for iOS
+      // iOS Shadow
       shadowColor: colors.shadow,
       shadowOffset: { width: 0, height: 4 },
       shadowOpacity: 0.15,
       shadowRadius: 12,
-      // Elevation for Android
+      // Android Elevation
       elevation: 8,
       borderWidth: 1,
       borderColor: colors.border,

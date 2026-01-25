@@ -1,3 +1,9 @@
+/**
+ * Screen Exports
+ * 
+ * Central export point for all application screens.
+ * Simplifies imports across navigation and routing files.
+ */
 export { default as OnboardingScreen } from './OnboardingScreen';
 export { default as CategoriesScreen } from './CategoriesScreen';
 export { default as PermissionsScreen } from './PermissionsScreen';

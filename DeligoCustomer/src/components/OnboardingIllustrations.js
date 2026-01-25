@@ -1,7 +1,17 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 
-// Deals Illustration
+/**
+ * OnboardingIllustrations
+ * 
+ * A collection of lightweight, code-drawn vector illustrations for the onboarding flow.
+ * Uses standard React Native `View` primitives to avoid external asset dependencies
+ * and ensure perfect scaling across all device densities.
+ */
+
+// -----------------------------------------------------------------------------
+// DealsIllustration: Gift Box styling for "Offers"
+// -----------------------------------------------------------------------------
 export const DealsIllustration = () => (
   <View style={styles.illustrationContainer}>
     <View style={styles.giftBox}>
@@ -18,7 +28,9 @@ export const DealsIllustration = () => (
   </View>
 );
 
-// Delivery Illustration
+// -----------------------------------------------------------------------------
+// DeliveryIllustration: Truck styling for "Fast Delivery"
+// -----------------------------------------------------------------------------
 export const DeliveryIllustration = () => (
   <View style={styles.illustrationContainer}>
     <View style={styles.deliveryTruck}>
@@ -33,7 +45,9 @@ export const DeliveryIllustration = () => (
   </View>
 );
 
-// Discover Illustration
+// -----------------------------------------------------------------------------
+// DiscoverIllustration: Plate & Cutlery styling for "Discovery"
+// -----------------------------------------------------------------------------
 export const DiscoverIllustration = () => (
   <View style={styles.illustrationContainer}>
     <View style={styles.plateContainer}>
@@ -57,7 +71,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
 
-  // Deals Illustration Styles
+  // --- Deals Styles ---
   giftBox: {
     width: 120,
     height: 120,
@@ -123,7 +137,7 @@ const styles = StyleSheet.create({
     right: 10,
   },
 
-  // Delivery Illustration Styles
+  // --- Delivery Styles ---
   deliveryTruck: {
     width: 180,
     height: 100,
@@ -202,7 +216,7 @@ const styles = StyleSheet.create({
     top: 50,
   },
 
-  // Discover Illustration Styles
+  // --- Discover Styles ---
   plateContainer: {
     width: 150,
     height: 150,

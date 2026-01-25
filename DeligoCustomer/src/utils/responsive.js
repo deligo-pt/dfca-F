@@ -1,6 +1,13 @@
+/**
+ * Responsive Design Utilities
+ * 
+ * Provides scaling functions, breakpoints, and adaptive helpers for
+ * building responsive UIs across different device sizes and types.
+ */
+
 import { Dimensions, Platform, PixelRatio } from 'react-native';
 
-// Get device dimensions
+// Capture physical device dimensions
 const { width: SCREEN_WIDTH, height: SCREEN_HEIGHT } = Dimensions.get('window');
 
 // Device size breakpoints
@@ -8,20 +15,20 @@ export const BREAKPOINTS = {
   small: 375,   // iPhone SE, small Android phones
   medium: 414,  // iPhone 11 Pro Max, standard phones
   large: 768,   // Tablets
-  xlarge: 1024, // Large tablets
+  xlarge: 1024, // Desktop/Large Tablet
 };
 
-// Check device type
+// Device categorization
 export const isSmallDevice = SCREEN_WIDTH < BREAKPOINTS.small;
 export const isMediumDevice = SCREEN_WIDTH >= BREAKPOINTS.small && SCREEN_WIDTH < BREAKPOINTS.large;
 export const isTablet = SCREEN_WIDTH >= BREAKPOINTS.large;
 
 // Responsive scaling functions
 const scale = (size) => (SCREEN_WIDTH / BREAKPOINTS.medium) * size;
-const verticalScale = (size) => (SCREEN_HEIGHT / 812) * size; // Based on iPhone X height
+const verticalScale = (size) => (SCREEN_HEIGHT / 812) * size; // Reference: iPhone X
 const moderateScale = (size, factor = 0.5) => size + (scale(size) - size) * factor;
 
-// Normalize font sizes for different screen densities
+// Normalize font sizes across densities
 export const normalize = (size) => {
   const newSize = moderateScale(size);
   if (Platform.OS === 'ios') {
@@ -52,7 +59,7 @@ export const responsiveFontSize = {
   xxxl: normalize(40),
 };
 
-// Safe area dimensions (accounting for notches, etc.)
+// Viewport percentage helpers
 export const getResponsiveWidth = (percentage) => (SCREEN_WIDTH * percentage) / 100;
 export const getResponsiveHeight = (percentage) => (SCREEN_HEIGHT * percentage) / 100;
 
@@ -77,7 +84,7 @@ export const getAdaptivePadding = () => {
   return responsiveSpacing.md;
 };
 
-// Professional shadow styles
+// Elevation and Shadow presets
 export const shadows = {
   none: {
     shadowColor: 'transparent',
@@ -116,7 +123,7 @@ export const shadows = {
   },
 };
 
-// Professional border radius
+// Standardized border radii
 export const responsiveBorderRadius = {
   sm: moderateScale(6),
   md: moderateScale(10),
@@ -126,7 +133,7 @@ export const responsiveBorderRadius = {
   round: 999,
 };
 
-// Touch target sizes (minimum 44x44 for accessibility)
+// Accessibility touch targets (min 44pt)
 export const touchTargetSize = {
   small: 44,
   medium: 48,
@@ -142,7 +149,7 @@ export const iconSizes = {
   xl: normalize(32),
 };
 
-// Line heights for better readability
+// Typography: Line heights
 export const lineHeights = {
   tight: 1.2,
   normal: 1.5,
@@ -150,7 +157,7 @@ export const lineHeights = {
   loose: 2,
 };
 
-// Letter spacing for professional typography
+// Typography: Letter spacing
 export const letterSpacing = {
   tight: -0.5,
   normal: 0,

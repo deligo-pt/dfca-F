@@ -1,3 +1,10 @@
+/**
+ * TermsOfServiceScreen
+ * 
+ * Displays the application's Terms of Service, including sections on usage,
+ * accounts, payments, and legal disclaimers.
+ */
+
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
 import { useTheme } from '../utils/ThemeContext';

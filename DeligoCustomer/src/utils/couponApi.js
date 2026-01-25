@@ -1,7 +1,7 @@
 /**
- * @format
  * Coupon API Service
- * Handles fetching, verifying, and applying coupons
+ * 
+ * Handles retrieval, validation, and application of coupons and offers.
  */
 
 import { BASE_API_URL, API_ENDPOINTS } from '../constants/config';
@@ -43,10 +43,8 @@ class CouponAPI {
      */
     static async getCoupons(vendorId = null) {
         try {
-            // Use OFFERS list if available in config, fallback to COUPONS.LIST
+            // Fetch offers configuration (fallback to coupons list)
             let url = `${BASE_API_URL}${API_ENDPOINTS.OFFERS?.LIST || API_ENDPOINTS.COUPONS.LIST}`;
-            // Query params if supported by backend
-            // if (vendorId) url += `?vendorId=${vendorId}`; 
 
             const headers = await this.getHeaders();
             console.debug('[CouponAPI] GET', url);
@@ -66,8 +64,7 @@ class CouponAPI {
             // Handle both structures mainly
             const items = data.data?.data || data.data || [];
 
-            // Client-side filter by vendor if API doesn't support it directly yet (safe fallback)
-            // Some global offers might not have vendorId or apply to all
+            // Filter items by vendor if required (client-side fallback)
             const filtered = vendorId
                 ? items.filter(i => !i.vendorId || i.vendorId === vendorId)
                 : items;
@@ -126,7 +123,7 @@ class CouponAPI {
         try {
             const url = `${BASE_API_URL}${API_ENDPOINTS.OFFERS?.GET_APPLICABLE}`;
             if (!url || url.includes('undefined')) {
-                console.warn('[CouponAPI] GET_APPLICABLE endpoint missing');
+                // Feature not available in configuration
                 return { success: false, error: 'Feature not configured' };
             }
 

@@ -1,3 +1,10 @@
+/**
+ * ProfileScreen
+ * 
+ * Central hub for user account management, displaying key profile information
+ * and providing navigation to settings, orders, and support.
+ */
+
 import React, { useState, useRef, useCallback } from 'react';
 import { View, StyleSheet, ScrollView, Animated, RefreshControl, StatusBar } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
@@ -15,7 +22,7 @@ import VouchersCard from '../components/Profile/VouchersCard';
 import ReferralBanner from '../components/Profile/ReferralBanner';
 import LogoutButton from '../components/Profile/LogoutButton';
 import ProfileSection from '../components/Profile/ProfileSection';
-import AppVersionText from '../components/Profile/AppVersionText'; // Import the new AppVersionText component
+import AppVersionText from '../components/Profile/AppVersionText';
 import { useFocusEffect } from '@react-navigation/native';
 
 const ProfileScreen = ({ onLogout, navigation }) => {
@@ -55,7 +62,6 @@ const ProfileScreen = ({ onLogout, navigation }) => {
   };
 
   const handleLogoutPress = () => {
-    // Animate button press
     Animated.sequence([
       Animated.spring(scaleAnim, {
         toValue: 0.95,
@@ -77,7 +83,6 @@ const ProfileScreen = ({ onLogout, navigation }) => {
       async () => {
         setIsLoggingOut(true);
         try {
-          // Use context logout which handles state updates and navigation trigger
           await logout();
 
           if (onLogout) {
@@ -85,7 +90,6 @@ const ProfileScreen = ({ onLogout, navigation }) => {
           }
         } catch (err) {
           console.warn('[ProfileScreen] logout error:', err);
-          // Context logout forces cleanup even on error, so we should be good.
         } finally {
           setIsLoggingOut(false);
           setModalVisible(false);
@@ -117,19 +121,14 @@ const ProfileScreen = ({ onLogout, navigation }) => {
             <RefreshControl refreshing={refreshing} onRefresh={onRefresh} />
           }
         >
-          {/* Header - Scrolls with content */}
           <ProfileHeader />
 
-          {/* User Profile Card */}
           <UserProfileCard user={user} navigation={navigation} />
 
-          {/* Deligo Pro Promotional Banner */}
           <DeligoProBanner />
 
-          {/* Vouchers Card */}
           <VouchersCard navigation={navigation} />
 
-          {/* Your Orders Section */}
           <ProfileSection title={t('orders')}>
             <MenuItem
               iconName="receipt-outline"
@@ -139,7 +138,6 @@ const ProfileScreen = ({ onLogout, navigation }) => {
             />
           </ProfileSection>
 
-          {/* Account Section */}
           <ProfileSection title={t('account')}>
             <MenuItem
               iconName="card-outline"
@@ -161,7 +159,6 @@ const ProfileScreen = ({ onLogout, navigation }) => {
             />
           </ProfileSection>
 
-          {/* More Section */}
           <ProfileSection title={t('more')}>
             <MenuItem
               iconName="location-outline"
@@ -187,10 +184,8 @@ const ProfileScreen = ({ onLogout, navigation }) => {
             />
           </ProfileSection>
 
-          {/* Referral Promotion Banner */}
           <ReferralBanner navigation={navigation} />
 
-          {/* Logout Button */}
           <LogoutButton
             onLogoutPress={handleLogoutPress}
             isLoggingOut={isLoggingOut}
@@ -198,7 +193,6 @@ const ProfileScreen = ({ onLogout, navigation }) => {
             onLogoutSuccess={onLogout}
           />
 
-          {/* App Version */}
           <AppVersionText />
         </ScrollView>
 

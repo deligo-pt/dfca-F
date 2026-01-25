@@ -3,12 +3,22 @@ import { Text, StyleSheet } from 'react-native';
 import { useTheme } from '../../utils/ThemeContext';
 import { useLanguage } from '../../utils/LanguageContext';
 
+/**
+ * AppVersionText Component
+ * 
+ * Displays the current application version.
+ * Typically used in settings or profile footers.
+ * 
+ * @returns {JSX.Element} Rendered text component.
+ */
 const AppVersionText = () => {
   const { colors } = useTheme();
   const { t } = useLanguage();
 
   return (
-    <Text style={[styles.versionText, { color: colors.text.light }]}>{t('version')}</Text>
+    <Text style={[styles.versionText, { color: colors.text.light }]}>
+      {t('version')}
+    </Text>
   );
 };
 

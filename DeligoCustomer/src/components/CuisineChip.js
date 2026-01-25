@@ -3,11 +3,19 @@ import { Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { spacing, fontSize, borderRadius } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
 
-// Helper function to get fallback icon based on cuisine name
+/**
+ * Utility: getFallbackIcon
+ * 
+ * Determines a semantic emoji based on the cuisine name keyword.
+ * Used as a fallback when the backend image fails to load.
+ * 
+ * @param {Object} cuisine - Cuisine data object.
+ * @returns {string} Emoji character.
+ */
 const getFallbackIcon = (cuisine) => {
   const name = (cuisine.name || cuisine.slug || cuisine.id || '').toLowerCase();
 
-  // Match by common cuisine keywords
+  // Keyword matching for cuisine types
   if (name.includes('pizza')) return '🍕';
   if (name.includes('burger')) return '🍔';
   if (name.includes('chinese') || name.includes('noodle')) return '🥡';
@@ -28,27 +36,38 @@ const getFallbackIcon = (cuisine) => {
   if (name.includes('chicken')) return '🍗';
   if (name.includes('seafood') || name.includes('fish')) return '🐟';
 
-  // Default fallback
   return '🍽️';
 };
 
+/**
+ * CuisineChip Component
+ * 
+ * Interactive filter chip for cuisine categories.
+ * Features:
+ * - Smart image fallback to emojis if remote asset fails.
+ * - Visual selection state.
+ * 
+ * @param {Object} props
+ * @param {Object} props.cuisine - Data object (name, icon URL).
+ * @param {Function} props.onPress - Tap handler.
+ * @param {boolean} [props.isSelected=false] - Active state.
+ */
 const CuisineChip = ({ cuisine, onPress, isSelected = false }) => {
   const { colors, isDarkMode } = useTheme();
   const [imageError, setImageError] = React.useState(false);
 
-  // Get the icon from cuisine data
+  // Extract the preferred icon source
   const rawIcon = cuisine.icon || cuisine.image;
 
-  // Validate if icon is a valid URL
+  // Validate the URL format for basic sanity check
   const isValidImageUrl = rawIcon &&
     typeof rawIcon === 'string' &&
     rawIcon.trim().startsWith('http') &&
     rawIcon.trim().length > 15;
 
-  // Get fallback icon
   const fallbackIcon = getFallbackIcon(cuisine);
 
-  // Determine what to display
+  // Determine display strategy: Valid Image -> Fallback Emoji
   const showImage = isValidImageUrl && !imageError;
 
   return (

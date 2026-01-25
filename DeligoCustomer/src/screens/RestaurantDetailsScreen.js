@@ -1,6 +1,8 @@
 /**
- * RestaurantDetailsScreen - Modern Foodpanda-inspired UI
- * Professional restaurant menu with enhanced product modal
+ * RestaurantDetailsScreen
+ * 
+ * Displays restaurant information and menu, allowing users to browse categories,
+ * view product details, and add items to their cart.
  */
 
 import React, { useState, useEffect, useCallback } from 'react';
@@ -66,7 +68,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     }
   }, []);
 
-  // Optimistic local quantity state
+  // Local quantity for UI responsiveness
   const [localQty, setLocalQty] = useState({});
   const getQuantity = (productId) => {
     const q = localQty[productId];
@@ -82,7 +84,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
   const [selectedVariations, setSelectedVariations] = useState({});
 
-  // Add-ons state - used to check if product has addons for info banner
+  // State for active add-ons display
   const [activeAddons, setActiveAddons] = useState([]);
 
   const openProductModal = (product) => {
@@ -116,7 +118,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   // Use ProductsContext
   const { products: allProducts, fetchRestaurantMenu } = useProducts();
 
-  // Determine vendorId using robust check
+  // Resolve vendor ID from various potential data structures
   // Access normalized vendor if available, else raw nested object, else raw flat props
   const normVendor = restaurant.vendor || {};
   const rawVendorObj = restaurant._raw?.vendorId || {};
@@ -133,8 +135,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     null
   );
 
-  // Local state for menu products - filtered initial from global, then updated via explicit fetch
-  // HYBRID: Start with cache so user sees something, then update with fresh data
+  // Menu products state with initial cache and fresh fetch support
   const [menuProducts, setMenuProducts] = useState(
     (allProducts || []).filter((p) => {
       // Use robust vendorId extraction for filtering
@@ -148,7 +149,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const [menuLoading, setMenuLoading] = useState(false);
   const vendorProducts = menuProducts;
 
-  // --- Reverse Geocoding for Location in Header ---
+  // Location resolution
   const [dynamicLocation, setDynamicLocation] = useState(null);
   useEffect(() => {
     let mounted = true;
@@ -219,7 +220,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   });
   const menuCategories = ['All', 'Popular', ...Array.from(derivedCategories)];
 
-  // Fetch menu on focus - ALWAYS get fresh data from API
+  // Fetch fresh menu data on focus
   useFocusEffect(
     useCallback(() => {
       let active = true;
@@ -494,7 +495,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
               <View style={styles.modalBody}>
                 <Text style={[styles.modalTitle, { color: colors.text.primary }]}>{title}</Text>
 
-                {/* REMOVED DUPLICATE DESCRIPTION HERE */}
+
 
                 <View style={styles.modalPriceRow}>
                   {(() => {
@@ -684,8 +685,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
                   try {
                     // Validate Add-on requirements
-                    // DISABLED: User report indicates strict validation blocks intent (backend data mismatch with UX).
-                    // Relaxing client-side check to allow adding to cart. Backend will reject if critical.
+                    // Validation relaxed to prevent blocking valid flows due to backend data mismatch.
                     /*
                     for (const group of activeAddons) {
                       if (group.minSelectable > 0) {
@@ -710,9 +710,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                       .filter(k => k.endsWith('_obj'))
                       .map(k => selectedVariations[k]);
 
-                    // FIX: Backend only supports single variant name (SKU lookup).
-                    // Strategy: Find the option that has a 'sku' field. Use that as the variantName.
-                    // If multiple or none, fallback intelligently.
+                    // Map selection to variant name for backend compatibility.
                     let targetVariantName = null;
 
                     // 1. Look for option with explicit SKU
@@ -927,7 +925,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
           />
         }
       >
-        {/* Vendor Section - Show only vendor name and image */}
+        {/* Vendor Header */}
         <View style={[styles.restaurantCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           <Image
             source={

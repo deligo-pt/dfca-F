@@ -16,6 +16,12 @@ import ImageEditor from '../components/ImageEditor';
 import { useProfile } from '../contexts/ProfileContext';
 import { useLocation } from '../contexts/LocationContext';
 
+/**
+ * EditProfileScreen
+ * 
+ * Manages user profile updates including personal details, profile photo,
+ * and delivery address with map integration.
+ */
 const EditProfileScreen = ({ navigation, route }) => {
   const { t } = useLanguage();
   const { colors, isDarkMode } = useTheme();
@@ -215,7 +221,6 @@ const EditProfileScreen = ({ navigation, route }) => {
       backgroundColor: colors.border,
     },
   }), [colors]);
-  // Use updateProfile from context to ensure global state stays in sync
   const { updateProfile: updateProfileContext } = useProfile();
   const { saveAddress } = useLocation();
 
@@ -224,7 +229,7 @@ const EditProfileScreen = ({ navigation, route }) => {
   const [address, setAddress] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState(null);
-  const [profilePhotoFile, setProfilePhotoFile] = useState(null); // Store the file object for upload
+  const [profilePhotoFile, setProfilePhotoFile] = useState(null);
   const [userData, setUserDataState] = useState(null);
   const [modalVisible, setModalVisible] = useState(false);
   const [modalConfig, setModalConfig] = useState({ title: '', message: '', onConfirm: null, onlyConfirm: false });
@@ -485,7 +490,8 @@ const EditProfileScreen = ({ navigation, route }) => {
         return;
       }
 
-      // Ensure address has all required fields for checkout validation
+      // Validate address completeness
+
       const completeAddress = {
         ...address,
         street: streetAddress,
@@ -501,15 +507,14 @@ const EditProfileScreen = ({ navigation, route }) => {
       // Send the update to the server - pass the file object, not the URI
       const updateResponse = await updateProfile({ address: completeAddress }, profilePhotoFile, userData);
 
-      // After a successful API call, manually update the local user data.
-      // This is more reliable than depending on the API response body.
+      // Refresh local user data to ensure synchronization
       const currentLocalUser = await getUserData();
 
       // Get the updated profile photo URL from server response if available
       const updatedPhotoUrl = updateResponse?.customer?.profilePhoto ||
-                              updateResponse?.profilePhoto ||
-                              profilePhoto ||
-                              currentLocalUser.profilePhoto;
+        updateResponse?.profilePhoto ||
+        profilePhoto ||
+        currentLocalUser.profilePhoto;
 
       console.log('Updated photo URL:', updatedPhotoUrl);
 
@@ -528,9 +533,10 @@ const EditProfileScreen = ({ navigation, route }) => {
       // Save the merged user object back to storage AND update context
       await updateProfileContext(updatedUser);
 
-      // Sync address to LocationContext (local storage) for checkout consistency
+      // Update location context if address has changed
       if (completeAddress) {
-        // Ensure lat/lng are present in correct structure
+        // Fallback to address coordinates if marker is unavailable
+
         const lat = markerCoordinate?.latitude || completeAddress.latitude;
         const lng = markerCoordinate?.longitude || completeAddress.longitude;
 

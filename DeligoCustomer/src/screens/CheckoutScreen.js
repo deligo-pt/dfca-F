@@ -28,12 +28,19 @@ import AddressApi from '../utils/addressApi';
 import { API_ENDPOINTS } from '../constants/config';
 import { getUserId, getUserData } from '../utils/auth';
 
-// Helper component to display location from context
+/**
+ * ConsumerLocationDisplay
+ * 
+ * Displays the current delivery address with appropriate iconography.
+ * 
+ * @param {Object} props
+ * @param {Object} props.colors - Theme colors.
+ * @param {Function} props.t - Localization helper.
+ */
 const ConsumerLocationDisplay = ({ colors, t }) => {
   const { address, detailedAddress, city, postalCode, label } = useLocation();
   const displayAddress = address || t('selectAddress');
 
-  // Construct the full address line
   const details = [
     detailedAddress,
     city,
@@ -60,6 +67,21 @@ const ConsumerLocationDisplay = ({ colors, t }) => {
   );
 };
 
+/**
+ * CheckoutScreen
+ * 
+ * Orchestrates the final order placement process.
+ * Features:
+ * - Address validation and creation.
+ * - Profile completeness checks.
+ * - Integration with Stripe PaymentSheet.
+ * - Order creation via backend API.
+ * - Handling of both cart-based and direct-buy flows.
+ * 
+ * @param {Object} props
+ * @param {Object} props.route - Route params containing initial cart data.
+ * @param {Object} props.navigation - Navigation prop.
+ */
 const CheckoutScreen = ({ route, navigation }) => {
   const { colors, isDarkMode } = useTheme();
   const { t } = useLanguage();

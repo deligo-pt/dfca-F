@@ -2,6 +2,15 @@ import React from 'react';
 import { View, Text, TextInput, StyleSheet } from 'react-native';
 import { colors, spacing, fontSize, borderRadius } from '../theme';
 
+/**
+ * SearchBar Component
+ *
+ * A reusable search input component with consistent styling.
+ * Provides a text input field with an integrated search icon.
+ *
+ * @param {Object} props
+ * @param {string} [props.placeholder] - Placeholder text for the input.
+ */
 const SearchBar = ({ placeholder = "Search for restaurants, cuisines..." }) => {
   return (
     <View style={styles.container}>

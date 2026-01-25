@@ -1,3 +1,10 @@
+/**
+ * Sound Service
+ * 
+ * Manages audio playback for notifications using Expo AV.
+ * Handles audio session configuration, resource management, and playback state.
+ */
+
 import { Audio } from 'expo-av';
 import { InteractionManager } from 'react-native';
 
@@ -11,7 +18,7 @@ const SoundService = {
      */
     playNotificationSound: async (loop = false) => {
         try {
-            // Prevent multiple simultaneous plays
+            // Prevent concurrent playback
             if (isPlaying) {
                 console.log('⏭️ Sound already playing, skipping...');
                 return;
@@ -19,10 +26,10 @@ const SoundService = {
 
             isPlaying = true;
 
-            // Wait for any animations/interactions to complete before playing sound
+            // Defer playback until interactions complete
             InteractionManager.runAfterInteractions(async () => {
                 try {
-                    // Unload existing sound if any
+                    // Release existing audio resources
                     if (soundObject) {
                         try {
                             await soundObject.unloadAsync();
@@ -32,7 +39,7 @@ const SoundService = {
                         soundObject = null;
                     }
 
-                    // Configure audio mode to play even if device is on silent
+                    // Configure audio session for playback in silent mode
                     await Audio.setAudioModeAsync({
                         playsInSilentModeIOS: true,
                         staysActiveInBackground: true,
@@ -47,11 +54,11 @@ const SoundService = {
 
                     soundObject = sound;
 
-                    // Auto-cleanup when sound finishes playing
+                    // Release resources on playback completion
                     sound.setOnPlaybackStatusUpdate((status) => {
                         if (status.didJustFinish && !status.isLooping) {
                             isPlaying = false;
-                            sound.unloadAsync().catch(() => {});
+                            sound.unloadAsync().catch(() => { });
                         }
                     });
 
@@ -60,7 +67,7 @@ const SoundService = {
                     isPlaying = false;
                     console.warn('❌ Failed to play notification sound:', error.message);
                 } finally {
-                    // Reset playing flag after a short delay
+                    // Debounce playback state
                     setTimeout(() => {
                         isPlaying = false;
                     }, 2000);

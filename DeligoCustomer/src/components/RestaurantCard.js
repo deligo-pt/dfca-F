@@ -5,51 +5,67 @@ import { useTheme } from '../utils/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 
+/**
+ * RestaurantCard Component
+ * 
+ * Displays a concise summary of a restaurant/vendor.
+ * Features:
+ * - Status indicators (Open/Closed, Rating, Time).
+ * - Data normalization for consistent display.
+ * - Dynamic location fallback via reverse geocoding.
+ * 
+ * @param {Object} props
+ * @param {Object} props.restaurant - Restaurant/Vendor data.
+ * @param {Function} props.onPress - Interaction handler.
+ */
 const RestaurantCard = ({ restaurant, onPress }) => {
   const { colors, isDarkMode } = useTheme();
 
-  // Accept either a mapped restaurant shape or raw product in restaurant._raw
-  // If 'restaurant' comes from normalizeProduct, it has a 'vendor' object with name/type/etc.
+  // ---------------------------------------------------------------------------
+  // Data Normalization
+  // ---------------------------------------------------------------------------
+  // Consolidates data from potential 'vendor' objects, normalized product shapes,
+  // or raw API responses into a single 'mergedVendor' object for consistent usage.
+
   const refinedVendor = restaurant.vendor || {};
   const p = restaurant && restaurant._raw ? restaurant._raw : restaurant || {};
-
-  // Fallback to raw vendor handling if normalized 'restaurant.vendor' is missing properties
   const rawVendor = p.vendor || {};
   const rawVendorIdObj = (p.vendorId && typeof p.vendorId === 'object') ? p.vendorId : {};
 
-  // Merge sources: refined -> raw.vendorId object -> raw.vendor
   const mergedVendor = {
     ...rawVendor,
     ...rawVendorIdObj,
     ...refinedVendor,
   };
 
-  // Also check businessDetails if present in merged source
   const businessDetails = mergedVendor.businessDetails || {};
 
+  // Resolve visual assets
   const imageUrl = mergedVendor.storePhoto || mergedVendor.logo || (Array.isArray(p.images) && p.images[0]) || null;
   const imageSource = imageUrl ? { uri: imageUrl } : require('../assets/images/logonew.png');
 
-  // Name extraction order: businessName -> vendorName -> product name -> 'Unknown'
+  // Resolve display name: Business name > Vendor name > Product name > Fallback
   const vendorName = mergedVendor.vendorName || businessDetails.businessName || mergedVendor.businessName || p.vendorName || p.name || 'Unknown';
   const isVerified = mergedVendor.isVerified || false;
 
-  // rating normalization (average may be nested)
+  // Resolve ratings
   let ratingValue = null;
   if (typeof mergedVendor.rating === 'number') ratingValue = mergedVendor.rating;
   else if (p.rating && typeof p.rating === 'number') ratingValue = p.rating;
   else if (p.rating && typeof p.rating === 'object' && typeof p.rating.average === 'number') ratingValue = p.rating.average;
 
-  // tags
+  // Resolve tags
   const tags = Array.isArray(p.tags) ? p.tags : (Array.isArray(p.tags) ? p.tags : (p.tags || []));
 
-  // --- Reverse Geocoding for Location ---
+  // ---------------------------------------------------------------------------
+  // Location Logic
+  // ---------------------------------------------------------------------------
   const [dynamicLocation, setDynamicLocation] = React.useState(null);
 
   React.useEffect(() => {
     let mounted = true;
     const fetchLocation = async () => {
-      // If we already have explicit text, skip
+      // Skip if explicit location data exists
       if (mergedVendor.city || mergedVendor.address || mergedVendor.town) return;
 
       const lat = mergedVendor.latitude || p.latitude;
@@ -60,11 +76,9 @@ const RestaurantCard = ({ restaurant, onPress }) => {
           const res = await Location.reverseGeocodeAsync({ latitude: parseFloat(lat), longitude: parseFloat(lng) });
           if (mounted && res && res.length > 0) {
             const addr = res[0];
-            // Get specific area (neighborhood)
             const area = addr.street || addr.district || addr.name || addr.subregion;
-            // Get city
             const city = addr.city || addr.region;
-            // Combine: "Basabo, Dhaka" or just city if no area
+
             if (area && city && area !== city) {
               setDynamicLocation(`${area}, ${city}`);
             } else {
@@ -72,7 +86,7 @@ const RestaurantCard = ({ restaurant, onPress }) => {
             }
           }
         } catch (e) {
-          // ignore geocode errors
+          // Fail silently on geocode errors
         }
       }
     };
@@ -81,14 +95,13 @@ const RestaurantCard = ({ restaurant, onPress }) => {
   }, [mergedVendor.city, mergedVendor.address, p.latitude, p.longitude, mergedVendor.latitude, mergedVendor.longitude]);
 
   const displayLocation = mergedVendor.city || mergedVendor.address || dynamicLocation;
-
   const isStoreOpen = mergedVendor.isStoreOpen === true;
 
   return (
     <TouchableOpacity
       style={[
         styles(colors).card,
-        !isStoreOpen && { backgroundColor: isDarkMode ? '#333' : '#f0f0f0', opacity: 0.9 } // Optional: subtle gray effect for the whole card context
+        !isStoreOpen && { backgroundColor: isDarkMode ? '#333' : '#f0f0f0', opacity: 0.9 }
       ]}
       activeOpacity={0.92}
       onPress={() => {
@@ -98,25 +111,26 @@ const RestaurantCard = ({ restaurant, onPress }) => {
       }}
       disabled={!isStoreOpen}
     >
+      {/* Hero Image Section */}
       <View style={{ position: 'relative' }}>
         <Image
           source={imageSource}
           style={[
             styles(colors).heroImage,
-            !isStoreOpen && { opacity: 0.4 } // Dim the image if closed
+            !isStoreOpen && { opacity: 0.4 }
           ]}
           resizeMode="cover"
         />
 
         {!isStoreOpen && (
-          <View style={[StyleSheet.absoluteFill, { justifyContent: 'center', alignItems: 'center', backgroundColor: 'rgba(0,0,0,0.3)' }]}>
-            <View style={{ backgroundColor: 'rgba(0,0,0,0.7)', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 4 }}>
-              <Text style={{ color: '#fff', fontFamily: 'Poppins-Bold', fontSize: 14 }}>Vendor is closed now</Text>
+          <View style={styles(colors).closedOverlay}>
+            <View style={styles(colors).closedBadge}>
+              <Text style={styles(colors).closedText}>Vendor is closed now</Text>
             </View>
           </View>
         )}
 
-        {/* Floating Rating Badge (Bottom Left) */}
+        {/* Rating Badge */}
         {ratingValue !== null && isStoreOpen && (
           <View style={styles(colors).ratingPill}>
             <Ionicons name="star" size={12} color="#FFC107" />
@@ -124,7 +138,7 @@ const RestaurantCard = ({ restaurant, onPress }) => {
           </View>
         )}
 
-        {/* Floating Delivery Time Badge (Bottom Right) */}
+        {/* Delivery Time Badge */}
         {isStoreOpen && (
           <View style={[styles(colors).deliveryPill]}>
             <Text style={styles(colors).deliveryPillText}>20-30 min</Text>
@@ -132,6 +146,7 @@ const RestaurantCard = ({ restaurant, onPress }) => {
         )}
       </View>
 
+      {/* Info Content */}
       <View style={[styles(colors).infoContainer, !isStoreOpen && { opacity: 0.6 }]}>
         <View style={styles(colors).body}>
           <View style={styles(colors).rowTop}>
@@ -141,7 +156,7 @@ const RestaurantCard = ({ restaurant, onPress }) => {
             </View>
           </View>
 
-          {/* Subtitle Row: Tag • Location with icon */}
+          {/* Meta Data Row */}
           <View style={styles(colors).tagsRow}>
             <Text style={styles(colors).tagText}>
               {tags[0] || 'Food'}
@@ -177,6 +192,23 @@ const styles = (colors) => StyleSheet.create({
     height: 180,
     backgroundColor: colors.border || colors.surfaceVariant || '#f0f0f0',
   },
+  closedOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    justifyContent: 'center',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.3)',
+  },
+  closedBadge: {
+    backgroundColor: 'rgba(0,0,0,0.7)',
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 4,
+  },
+  closedText: {
+    color: '#fff',
+    fontFamily: 'Poppins-Bold',
+    fontSize: 14,
+  },
   infoContainer: {
     paddingVertical: 12,
     paddingHorizontal: 16,
@@ -203,7 +235,6 @@ const styles = (colors) => StyleSheet.create({
     marginRight: 6,
     color: colors.text.primary,
   },
-  verifiedBadge: {},
   ratingPill: {
     position: 'absolute',
     bottom: 12,
@@ -246,9 +277,6 @@ const styles = (colors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     marginTop: 4,
-  },
-  tag: {
-    marginRight: 6,
   },
   tagText: {
     fontSize: 13,

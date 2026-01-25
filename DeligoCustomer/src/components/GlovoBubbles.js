@@ -5,28 +5,39 @@ import { useLanguage } from '../utils/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
+/**
+ * BubbleItem Component
+ * 
+ * Renders a single category as a circular "bubble" item.
+ * Supports visuals via remote URL images or emoji characters.
+ * 
+ * @param {Object} props
+ * @param {Object} props.category - Category data object (id, name, image/icon).
+ * @param {string} props.selectedId - ID of the currently active category.
+ * @param {Function} props.onPress - Selection handler.
+ * @param {Object} props.colors - Theme palette.
+ */
 const BubbleItem = ({ category, selectedId, onPress, colors }) => {
     const [imageError, setImageError] = React.useState(false);
 
-    // Dynamic checks
-    const isSelected = selectedId === category.slug || selectedId === category.id;
-
-    // Safety check for category object
+    // Validate inputs
     if (!category) return null;
 
+    const isSelected = selectedId === category.slug || selectedId === category.id;
     const displayName = category.name || '';
     const iconUrl = category.image || category.icon || null;
 
-    // Determine background color
+    // Theme-aware color derivation
     const backgroundColor = isSelected ? colors.primaryLight : colors.surface;
-    const textColor = isSelected ? colors.white : colors.text.primary;
+    const textColor = isSelected ? colors.white : colors.text.primary; // Note: Label uses primary for active, text.secondary for inactive in styles below
     const iconColor = isSelected ? colors.white : colors.primary;
 
-    // Helper to determine if we should show image or text icon
+    // Icon Strategy:
+    // 1. Remote URL (Http/File) -> Render Image
+    // 2. String is Emoji-like -> Render Text
+    // 3. Fallback -> Render First Letter
     const isImage = iconUrl && !imageError && (typeof iconUrl === 'string' && (iconUrl.startsWith('http') || iconUrl.startsWith('file')));
     const isEmoji = !isImage && typeof iconUrl === 'string' && iconUrl.match(/\p{Emoji}/u);
-
-    // If no icon/image, use first letter
     const fallbackLetter = displayName.charAt(0).toUpperCase();
 
     return (
@@ -66,12 +77,21 @@ const BubbleItem = ({ category, selectedId, onPress, colors }) => {
     );
 };
 
+/**
+ * GlovoBubbles Grid
+ * 
+ * Displays top-level categories in a grid of circular elements.
+ * Optimized for visual exploration of cuisines or store types.
+ * 
+ * @param {Object} props
+ * @param {Array} props.categories - Array of category objects to render.
+ * @param {Function} props.onPress - Callback for category selection.
+ * @param {string} props.selectedId - Currently selected category ID.
+ */
 const GlovoBubbles = ({ categories, onPress, selectedId }) => {
     const { colors } = useTheme();
-    // Intentionally unused if not needed, but keeping hook call stable
     const { t } = useLanguage();
 
-    // Ensure we have an array
     const data = Array.isArray(categories) ? categories : [];
 
     if (data.length === 0) {
@@ -120,7 +140,7 @@ const styles = StyleSheet.create({
         justifyContent: 'flex-start',
     },
     bubbleContainer: {
-        width: (width - 40) / 4, // 4 items per row roughly
+        width: (width - 40) / 4, // Calculate width to fit 4 items per row accounting for padding
         alignItems: 'center',
         marginBottom: 15,
     },
@@ -131,7 +151,7 @@ const styles = StyleSheet.create({
         justifyContent: 'center',
         alignItems: 'center',
         marginBottom: 8,
-        // Shadow for depth
+        // Elevation/Shadow for depth
         shadowColor: "#000",
         shadowOffset: {
             width: 0,
@@ -144,7 +164,7 @@ const styles = StyleSheet.create({
     bubbleImage: {
         width: '60%',
         height: '60%',
-        borderRadius: 10, // Slight rounding for icons
+        borderRadius: 10, // Soften image corners
     },
     bubbleEmoji: {
         textAlign: 'center',

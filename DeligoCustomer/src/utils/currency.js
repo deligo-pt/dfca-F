@@ -1,5 +1,5 @@
 export default function formatCurrency(currencyIgnored, amount) {
-  // FORCE CURRENCY TO EURO as per user request
+  // Enforce EUR currency
   const code = 'EUR';
   const symbols = { EUR: '€' };
   const sym = '€';
@@ -8,9 +8,7 @@ export default function formatCurrency(currencyIgnored, amount) {
   // Keep two decimal places
   let formatted = num.toFixed(2);
 
-  // Replace dot with comma for European style (Portugal)
-  // You might want to make this conditional on locale or currency if the app supports US style too.
-  // Assuming the user wants this generally for the current target market (Portugal/EUR):
+  // Use European decimal format (comma)
   formatted = formatted.replace('.', ',');
 
   if (sym) return `${sym}${formatted}`;

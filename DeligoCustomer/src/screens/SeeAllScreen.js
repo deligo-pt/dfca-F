@@ -1,3 +1,10 @@
+/**
+ * SeeAllScreen
+ * 
+ * Displays a comprehensive list of restaurants or items with filtering options
+ * for vendor type, cuisine, and sorting capabilities.
+ */
+
 import React, { useState, useMemo } from 'react';
 import {
     View,
@@ -22,7 +29,7 @@ const SeeAllScreen = ({ navigation, route }) => {
     const { t } = useLanguage();
     const { currentLocation } = useLocation();
 
-    // Get data passed from CategoriesScreen
+    // Route parameters
     const {
         allItems = [],
         vendorTypes = [],
@@ -30,35 +37,35 @@ const SeeAllScreen = ({ navigation, route }) => {
         title = t('nearYou')
     } = route.params || {};
 
-    // Filter and sort state
+    // State management
     const [selectedVendorType, setSelectedVendorType] = useState(null);
     const [selectedCuisine, setSelectedCuisine] = useState(null);
     const [sortBy, setSortBy] = useState('distance'); // Default to distance
     const [searchQuery, setSearchQuery] = useState('');
 
-    // Deduplicate items by vendor name
+    // Memoized deduplication of items based on vendor ID or name
     const deduplicatedItems = useMemo(() => {
         const map = new Map();
         for (const p of allItems) {
-            // Updated extraction logic for nested vendorId objects
+            // Resolve vendor data from various structures
             const raw = p._raw || p;
             const normVendor = p.vendor || {};
 
-            // Try to find a valid name
+            // Determine display name
             const vendorName = normVendor.vendorName ||
                 normVendor.businessName ||
                 (typeof raw.vendorId === 'object' ? raw.vendorId.businessDetails?.businessName : null) ||
                 raw.vendor?.vendorName ||
                 (p && p.name) || '';
 
-            // Try to find a valid ID for uniqueness
+            // Determine unique ID
             let uniqueId = normVendor.id || normVendor.vendorId;
             if (!uniqueId) {
                 const rawVID = raw.vendorId || raw.vendor?.vendorId;
                 if (typeof rawVID === 'object' && rawVID) uniqueId = rawVID._id || rawVID.id;
                 else uniqueId = rawVID;
             }
-            // Fallback to name as key if ID is missing (legacy behavior)
+            // Fallback key generation
             const key = uniqueId ? String(uniqueId) : String(vendorName || '').trim().toLowerCase();
 
             if (!map.has(key) && key) {
@@ -68,7 +75,7 @@ const SeeAllScreen = ({ navigation, route }) => {
         return Array.from(map.values());
     }, [allItems]);
 
-    // Filter items based on selections
+    // Apply filters (search, vendor type, cuisine) and sort logic
     const filteredItems = useMemo(() => {
         let result = [...deduplicatedItems];
 
@@ -98,7 +105,7 @@ const SeeAllScreen = ({ navigation, route }) => {
             });
         }
 
-        // Parse distance string (e.g., "1.2 km", "500 m") to meters or calculate using params
+        // Haversine distance calculation
         const getDistance = (lat1, lon1, lat2, lon2) => {
             if (!lat1 || !lon1 || !lat2 || !lon2) return Infinity;
             const R = 6371; // Radius of the earth in km

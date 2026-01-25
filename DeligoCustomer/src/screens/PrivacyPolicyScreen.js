@@ -1,3 +1,10 @@
+/**
+ * PrivacyPolicyScreen
+ * 
+ * Displays the application's privacy policy, detailing data collection, usage,
+ * and user rights in compliance with relevant regulations.
+ */
+
 import React from 'react';
 import { View, Text, ScrollView, StyleSheet, TouchableOpacity, StatusBar } from 'react-native';
 import { useTheme } from '../utils/ThemeContext';

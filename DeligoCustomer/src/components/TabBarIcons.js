@@ -1,7 +1,10 @@
 import React from 'react';
 import { View, StyleSheet } from 'react-native';
 
-// Categories Icon - Foodpanda style (4 squares grid)
+/**
+ * CategoriesIcon
+ * Renders a grid icon representing product categories.
+ */
 export const CategoriesIcon = ({ focused, color }) => (
   <View style={styles.iconContainer}>
     <View style={styles.gridContainer}>
@@ -13,7 +16,11 @@ export const CategoriesIcon = ({ focused, color }) => (
   </View>
 );
 
-// Orders Icon - Foodpanda style (receipt/document)
+/**
+ * OrdersIcon
+ * Renders a document icon representing user orders.
+ * Shows detailed lines when active.
+ */
 export const OrdersIcon = ({ focused, color }) => (
   <View style={styles.iconContainer}>
     <View style={[styles.orderDocument, { backgroundColor: focused ? color : 'transparent', borderColor: color, opacity: focused ? 1 : 0.6 }]}>
@@ -35,21 +42,21 @@ export const OrdersIcon = ({ focused, color }) => (
   </View>
 );
 
-// Cart Icon - Professional shopping cart with basket and wheels
+/**
+ * CartIcon
+ * Renders a detailed shopping cart icon with wheels and handle.
+ */
 export const CartIcon = ({ focused, color }) => (
   <View style={styles.iconContainer}>
     <View style={styles.cartWrapper}>
-      {/* Cart basket */}
       <View style={[styles.cartBasket, {
         backgroundColor: focused ? color : 'transparent',
         borderColor: color,
       }]}>
-        {/* Cart handle bar */}
         <View style={[styles.cartHandle, {
           backgroundColor: focused ? '#FFFFFF' : color,
         }]} />
       </View>
-      {/* Cart wheels */}
       <View style={styles.cartWheels}>
         <View style={[styles.cartWheel, {
           backgroundColor: focused ? color : color,
@@ -64,7 +71,10 @@ export const CartIcon = ({ focused, color }) => (
   </View>
 );
 
-// Profile Icon - Foodpanda style (user silhouette)
+/**
+ * ProfileIcon
+ * Renders a user avatar icon.
+ */
 export const ProfileIcon = ({ focused, color }) => (
   <View style={styles.iconContainer}>
     <View style={[styles.profileCircle, { backgroundColor: focused ? color : 'transparent', borderColor: color, opacity: focused ? 1 : 0.6 }]}>
@@ -81,7 +91,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     alignItems: 'center',
   },
-  // Categories Icon (Grid)
+  // Categories Icon Styles
   gridContainer: {
     width: 20,
     height: 20,
@@ -96,7 +106,7 @@ const styles = StyleSheet.create({
     borderRadius: 2.5,
     margin: 0.5,
   },
-  // Orders Icon (Document/Receipt)
+  // Orders Icon Styles
   orderDocument: {
     width: 20,
     height: 24,
@@ -113,7 +123,7 @@ const styles = StyleSheet.create({
     borderRadius: 1,
     marginVertical: 1.5,
   },
-  // Cart Icon (Shopping Cart)
+  // Cart Icon Styles
   cartWrapper: {
     width: 22,
     height: 22,
@@ -151,7 +161,7 @@ const styles = StyleSheet.create({
     height: 4,
     borderRadius: 2,
   },
-  // Profile Icon (User in Circle)
+  // Profile Icon Styles
   profileCircle: {
     width: 24,
     height: 24,
@@ -177,4 +187,5 @@ const styles = StyleSheet.create({
     marginTop: 2,
   },
 });
+
 

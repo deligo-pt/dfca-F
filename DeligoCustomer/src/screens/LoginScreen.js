@@ -27,8 +27,22 @@ import { useTheme } from '../utils/ThemeContext';
 import { setAccessToken } from '../utils/storage';
 import { Ionicons } from '@expo/vector-icons';
 
-const LOGO = require('../assets/images/logo.png'); // Updated Logo
+const LOGO = require('../assets/images/logo.png');
 
+/**
+ * LoginScreen - Main Authentication Entry Point
+ * 
+ * Handles user authentication via mobile number (OTP) or email.
+ * Features:
+ * - Dual login methods (Mobile/Email)
+ * - Country code picker for international support
+ * - Animated UI transitions
+ * - OTP verification flow
+ * - Language selection support
+ * 
+ * @param {Object} props
+ * @param {Object} props.navigation - Navigation prop
+ */
 const LoginScreen = ({ navigation }) => {
   const { login } = useProfile();
   const { fetchProducts } = useProducts();

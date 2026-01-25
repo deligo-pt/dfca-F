@@ -3,13 +3,16 @@ import { View, Image, StyleSheet, Dimensions, StatusBar, Text } from 'react-nati
 
 const { width, height } = Dimensions.get('window');
 
+/**
+ * CustomSplashScreen Component
+ * 
+ * Branded launch screen shown during app initialization.
+ * Consistent with native splash screen theme.
+ */
 export const CustomSplashScreen = () => {
-  console.log('🎨 CustomSplashScreen is rendering with PINK background!');
-
   return (
     <View style={styles.container}>
       <StatusBar backgroundColor="#DC3173" barStyle="light-content" />
-      <Text style={styles.testText}>PINK TEST</Text>
       <Image
         source={require('../assets/splash-icon.png')}
         style={styles.logo}
@@ -24,21 +27,16 @@ const styles = StyleSheet.create({
     flex: 1,
     width: '100%',
     height: '100%',
-    backgroundColor: '#DC3173', // PINK BACKGROUND - SHOULD ALWAYS BE VISIBLE
+    backgroundColor: '#DC3173', // Brand Primary Color
     justifyContent: 'center',
     alignItems: 'center',
-  },
-  testText: {
-    color: '#FFFFFF',
-    fontSize: 24,
-    fontWeight: 'bold',
-    marginBottom: 20,
+    zIndex: 9999, // Ensure it sits on top of any absolute positioned elements
   },
   logo: {
-    width: width * 0.6,
-    height: width * 0.6,
-    maxWidth: 300,
-    maxHeight: 300,
+    width: width * 0.4,
+    height: width * 0.4,
+    maxWidth: 240,
+    maxHeight: 240,
   },
 });
 

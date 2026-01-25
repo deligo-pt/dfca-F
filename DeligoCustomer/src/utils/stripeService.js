@@ -1,5 +1,9 @@
-// Central Stripe helper
-// NOTE: Requires server endpoints to create PaymentIntent and ephemeral key.
+/**
+ * Stripe Payment Service
+ * 
+ * Coordinate PaymentSheet flow using @stripe/stripe-react-native.
+ * Handles PaymentIntent creation, ephemeral key exchange, and payment confirmation.
+ */
 
 import { initPaymentSheet, presentPaymentSheet } from '@stripe/stripe-react-native';
 import StorageService from './storage';
@@ -21,9 +25,9 @@ async function getAuthHeader() {
 }
 
 /**
- * Extract payment intent ID from client secret
- * Format: pi_xxxxxxxxxxxxx_secret_yyyyyyyyyyy
- * Returns: pi_xxxxxxxxxxxxx
+ * Parse PaymentIntent ID from client_secret
+ * Expects: pi_..._secret_...
+ * Returns: pi_...
  */
 export function extractPaymentIntentId(clientSecret) {
   if (!clientSecret) return null;

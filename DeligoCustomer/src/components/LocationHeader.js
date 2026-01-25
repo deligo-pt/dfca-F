@@ -7,6 +7,25 @@ import { useTheme } from '../utils/ThemeContext';
 
 const STATUSBAR_HEIGHT = Platform.OS === 'android' ? StatusBar.currentHeight : 0;
 
+/**
+ * LocationHeader Component
+ * 
+ * Main header for the home screen.
+ * Displays greeting, location selector, notification badge, and search input.
+ * 
+ * @param {Object} props
+ * @param {Object} props.location - Current location data.
+ * @param {string} props.area - Display name of current area.
+ * @param {boolean} props.loading - Loading state for location.
+ * @param {Function} props.onLocationPress - Location selector handler.
+ * @param {Function} props.onSearchPress - Search input handler.
+ * @param {Array} props.categories - List of categories (optional).
+ * @param {Function} props.onCategoryPress - Category press handler.
+ * @param {string} [props.userName] - Display name of user.
+ * @param {Function} props.onProfilePress - Profile button handler.
+ * @param {Function} props.onNotificationPress - Notification button handler.
+ * @param {number} [props.paddingTop=0] - Additional top padding.
+ */
 const LocationHeader = ({
   location,
   area,
@@ -23,7 +42,6 @@ const LocationHeader = ({
   const { colors, isDarkMode } = useTheme();
   const { t } = useLanguage();
 
-  // Time-based greeting
   const getGreeting = () => {
     const hour = new Date().getHours();
     if (hour < 12) return t('goodMorning');
@@ -40,7 +58,7 @@ const LocationHeader = ({
       <View
         style={[styles(colors, isDarkMode).container, { backgroundColor: colors.primary, paddingTop: paddingTop }]}
       >
-        {/* Row 1: Greeting + Profile Icon */}
+        {/* Header Top Row: Greeting & Profile */}
         <View style={styles(colors, isDarkMode).greetingRow}>
           <Text style={styles(colors, isDarkMode).greetingText}>{greeting}</Text>
           <TouchableOpacity
@@ -51,7 +69,7 @@ const LocationHeader = ({
           </TouchableOpacity>
         </View>
 
-        {/* Row 2: Location + Notification */}
+        {/* Header Middle Row: Location Selector & Notifications */}
         <View style={styles(colors, isDarkMode).locationRow}>
           <TouchableOpacity
             style={styles(colors, isDarkMode).locationButton}
@@ -80,7 +98,7 @@ const LocationHeader = ({
           </TouchableOpacity>
         </View>
 
-        {/* Row 3: Floating Search Card */}
+        {/* Header Bottom Row: Search Entry Card */}
         <TouchableOpacity
           style={styles(colors, isDarkMode).searchCard}
           activeOpacity={0.9}
@@ -93,8 +111,6 @@ const LocationHeader = ({
             {t('searchPlaceholderHeader')}
           </Text>
         </TouchableOpacity>
-
-        {/* Row 4: Removed Category Quick Access (Moved to Body) */}
       </View>
     </View>
   );
@@ -105,14 +121,11 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
     position: 'relative',
   },
   container: {
-    // paddingTop handled via prop
     paddingBottom: spacing.md,
     paddingHorizontal: spacing.md,
     borderBottomLeftRadius: 28,
     borderBottomRightRadius: 28,
   },
-
-  // Row 1: Greeting + Profile
   greetingRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -131,8 +144,6 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
   profileButton: {
     marginLeft: spacing.sm,
   },
-
-  // Row 2: Location + Notification
   locationRow: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -177,8 +188,6 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
     borderWidth: 1.5,
     borderColor: colors.primary,
   },
-
-  // Row 3: Floating Search Card
   searchCard: {
     flexDirection: 'row',
     alignItems: 'center',
@@ -192,7 +201,6 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
     shadowOpacity: 0.15,
     shadowRadius: 12,
     elevation: 6,
-    // Glassmorphism effect
     borderWidth: 1,
     borderColor: 'rgba(255, 255, 255, 0.3)',
   },
@@ -211,8 +219,6 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
     fontFamily: 'Poppins-Medium',
     color: colors.text.secondary,
   },
-
-  // Row 4: Category Quick Access
   categoriesScroll: {
     flexGrow: 0,
   },

@@ -1,3 +1,10 @@
+/**
+ * SettingsScreen
+ * 
+ * Configures application settings including theme (dark/light mode), notifications,
+ * location services, and language preferences.
+ */
+
 import React, { useState, useEffect } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Modal, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -17,7 +24,7 @@ const SettingsScreen = ({ navigation }) => {
 
   const [showLanguageModal, setShowLanguageModal] = useState(false);
 
-  // Sync dark mode state with theme context
+  // Synchronize local state with global theme context
   useEffect(() => {
     setSettings(prev => ({ ...prev, darkMode: isDarkMode }));
   }, [isDarkMode]);
@@ -45,7 +52,7 @@ const SettingsScreen = ({ navigation }) => {
     return lang ? lang.name : 'English';
   };
 
-  // Dynamic styles based on theme
+  // Theme-dependent styles
   const styles = StyleSheet.create({
     container: {
       flex: 1,

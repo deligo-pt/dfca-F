@@ -1,15 +1,19 @@
+/**
+ * Toast Configuration
+ * 
+ * Definitions for custom toast notifications.
+ * Configures layout and style for different alert types (Success, Error, Orders).
+ */
 import React from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 
-// Import the app logo for branded notifications
 const AppLogo = require('../assets/images/logo.png');
 
 /**
- * Custom Toast Configuration for Deligo Customer App
- * Provides professional notification toasts like Pathao/Uber with app branding
+ * DeligoToast
+ * Standard branded notification with logo and dismissal.
  */
-
 const DeligoToast = ({ text1, text2, onPress, hide }) => {
     return (
         <TouchableOpacity
@@ -24,12 +28,8 @@ const DeligoToast = ({ text1, text2, onPress, hide }) => {
                 <Image source={AppLogo} style={styles.logoImage} resizeMode="contain" />
             </View>
             <View style={styles.textContainer}>
-                <Text style={styles.title} numberOfLines={1}>
-                    {text1}
-                </Text>
-                <Text style={styles.message} numberOfLines={2}>
-                    {text2}
-                </Text>
+                <Text style={styles.title} numberOfLines={1}>{text1}</Text>
+                <Text style={styles.message} numberOfLines={2}>{text2}</Text>
             </View>
             <TouchableOpacity
                 style={styles.closeButton}
@@ -42,6 +42,10 @@ const DeligoToast = ({ text1, text2, onPress, hide }) => {
     );
 };
 
+/**
+ * OrderToast
+ * Notification style for active order updates, encouraging user interaction.
+ */
 const OrderToast = ({ text1, text2, onPress, hide }) => {
     return (
         <TouchableOpacity
@@ -56,12 +60,8 @@ const OrderToast = ({ text1, text2, onPress, hide }) => {
                 <Image source={AppLogo} style={styles.logoImage} resizeMode="contain" />
             </View>
             <View style={styles.textContainer}>
-                <Text style={styles.title} numberOfLines={1}>
-                    {text1}
-                </Text>
-                <Text style={styles.message} numberOfLines={2}>
-                    {text2}
-                </Text>
+                <Text style={styles.title} numberOfLines={1}>{text1}</Text>
+                <Text style={styles.message} numberOfLines={2}>{text2}</Text>
             </View>
             <View style={styles.tapHint}>
                 <Text style={styles.tapHintText}>Tap to view</Text>
@@ -71,7 +71,10 @@ const OrderToast = ({ text1, text2, onPress, hide }) => {
     );
 };
 
-
+/**
+ * SuccessToast
+ * Green-themed feedback for positive actions.
+ */
 const SuccessToast = ({ text1, text2, hide }) => {
     return (
         <View style={[styles.toastContainer, styles.successToast]}>
@@ -79,19 +82,17 @@ const SuccessToast = ({ text1, text2, hide }) => {
                 <Ionicons name="checkmark-circle" size={24} color="#FFFFFF" />
             </View>
             <View style={styles.textContainer}>
-                <Text style={styles.title} numberOfLines={1}>
-                    {text1}
-                </Text>
-                {text2 && (
-                    <Text style={styles.message} numberOfLines={2}>
-                        {text2}
-                    </Text>
-                )}
+                <Text style={styles.title} numberOfLines={1}>{text1}</Text>
+                {text2 && <Text style={styles.message} numberOfLines={2}>{text2}</Text>}
             </View>
         </View>
     );
 };
 
+/**
+ * ErrorToast
+ * Red-themed feedback for errors or warnings.
+ */
 const ErrorToast = ({ text1, text2, hide }) => {
     return (
         <View style={[styles.toastContainer, styles.errorToast]}>
@@ -99,19 +100,16 @@ const ErrorToast = ({ text1, text2, hide }) => {
                 <Ionicons name="alert-circle" size={24} color="#FFFFFF" />
             </View>
             <View style={styles.textContainer}>
-                <Text style={styles.title} numberOfLines={1}>
-                    {text1}
-                </Text>
-                {text2 && (
-                    <Text style={styles.message} numberOfLines={2}>
-                        {text2}
-                    </Text>
-                )}
+                <Text style={styles.title} numberOfLines={1}>{text1}</Text>
+                {text2 && <Text style={styles.message} numberOfLines={2}>{text2}</Text>}
             </View>
         </View>
     );
 };
 
+/**
+ * Toast configuration map for react-native-toast-message.
+ */
 export const toastConfig = {
     deligoToast: (props) => <DeligoToast {...props} />,
     orderToast: (props) => <OrderToast {...props} />,

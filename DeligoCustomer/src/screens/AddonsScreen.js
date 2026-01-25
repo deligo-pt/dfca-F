@@ -1,27 +1,28 @@
-/**
- * AddonsScreen - Select add-ons for a cart item
- * Shown after product is added to cart, allows user to customize with extras
- */
-
 import React, { useState, useEffect } from 'react';
-import {
-  View,
-  Text,
-  StyleSheet,
-  ScrollView,
-  TouchableOpacity,
-  ActivityIndicator,
-  StatusBar,
-} from 'react-native';
+import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView, ActivityIndicator } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
-import { fetchAddonGroups } from '../utils/addonApi';
-import formatCurrency from '../utils/currency';
-import CartAPI from '../utils/cartApi';
 import { useCart } from '../contexts/CartContext';
+import { fetchAddonGroups } from '../utils/addonApi';
+import CartAPI from '../utils/cartApi';
+import formatCurrency from '../utils/currency';
 
+/**
+ * AddonsScreen
+ * 
+ * Manages product customization via addons and modifiers.
+ * Features:
+ * - Dynamic fetching of addon groups based on product configuration.
+ * - Enforcement of selection rules (Single vs Multi-select, min/max limits).
+ * - Real-time price calculation updates.
+ * - Direct integration with CartContext for modifying line items.
+ * 
+ * @param {Object} props
+ * @param {Object} props.route - Route parameters containing product context.
+ * @param {Object} props.navigation - Navigation controller.
+ */
 const AddonsScreen = ({ route, navigation }) => {
   const { colors, isDarkMode } = useTheme();
   const { t } = useLanguage();
@@ -175,7 +176,7 @@ const AddonsScreen = ({ route, navigation }) => {
     } catch (error) {
       console.error('[AddonsScreen] Failed to save addons:', error);
       // Still refresh cart and go back, addons are optional
-      await fetchCart({ force: true }).catch(() => {});
+      await fetchCart({ force: true }).catch(() => { });
       navigation.goBack();
     } finally {
       setSaving(false);
