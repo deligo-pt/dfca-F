@@ -130,8 +130,9 @@ const styles = StyleSheet.create({
         paddingHorizontal: 5
     },
     title: {
-        fontSize: 18,
-        fontWeight: 'bold',
+        fontSize: 20,
+        fontWeight: '700',
+        fontFamily: 'Poppins-Bold',
         textAlign: 'left',
     },
     grid: {
