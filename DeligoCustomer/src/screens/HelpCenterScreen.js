@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Linking, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -21,6 +21,9 @@ const HelpCenterScreen = ({ navigation }) => {
   const { t } = useLanguage();
   const { colors } = useTheme();
   const [searchQuery, setSearchQuery] = useState('');
+
+  // Memoize styles to ensure theme updates are handled efficiently
+  const styles = useMemo(() => createStyles(colors), [colors]);
 
   const faqCategories = [
     { id: 1, icon: 'help-circle-outline', title: t('faqs'), description: t('findAnswers') },
@@ -46,154 +49,12 @@ const HelpCenterScreen = ({ navigation }) => {
     }
   };
 
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 20,
-      paddingVertical: 16,
-      backgroundColor: colors.background,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    backButton: {
-      width: 40,
-      height: 40,
-      justifyContent: 'center',
-    },
-    headerText: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: colors.text.primary,
-      fontFamily: 'Poppins-SemiBold',
-      flex: 1,
-      textAlign: 'center',
-    },
-    placeholder: {
-      width: 40,
-    },
-    content: {
-      padding: 16,
-      paddingBottom: 24,
-    },
-    searchContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      borderRadius: 12,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      marginBottom: 24,
-      borderWidth: 1,
-      backgroundColor: colors.surface,
-      borderColor: colors.border,
-    },
-    searchInput: {
-      flex: 1,
-      fontSize: 16,
-      fontFamily: 'Poppins-Regular',
-      marginLeft: 12,
-      color: colors.text.primary,
-    },
-    section: {
-      marginBottom: 24,
-    },
-    sectionTitle: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: colors.text.primary,
-      fontFamily: 'Poppins-SemiBold',
-      marginBottom: 12,
-    },
-    quickActionCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      borderRadius: 16,
-      padding: 16,
-      marginBottom: 12,
-      borderWidth: 1,
-      backgroundColor: colors.surface,
-      borderColor: colors.border,
-    },
-    quickActionIcon: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: 16,
-    },
-    quickActionContent: {
-      flex: 1,
-    },
-    quickActionTitle: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: colors.text.primary,
-      fontFamily: 'Poppins-SemiBold',
-      marginBottom: 2,
-    },
-    quickActionSubtitle: {
-      fontSize: 13,
-      color: colors.text.secondary,
-      fontFamily: 'Poppins-Regular',
-    },
-    categoryCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      borderRadius: 16,
-      padding: 16,
-      marginBottom: 12,
-      borderWidth: 1,
-      backgroundColor: colors.surface,
-      borderColor: colors.border,
-    },
-    categoryIconContainer: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      backgroundColor: colors.background === '#FFFFFF' ? '#FFF0F6' : 'rgba(220, 49, 115, 0.15)',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: 16,
-    },
-    categoryContent: {
-      flex: 1,
-    },
-    categoryTitle: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: colors.text.primary,
-      fontFamily: 'Poppins-SemiBold',
-      marginBottom: 2,
-    },
-    categoryDescription: {
-      fontSize: 13,
-      color: colors.text.secondary,
-      fontFamily: 'Poppins-Regular',
-    },
-    questionCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      borderRadius: 12,
-      padding: 16,
-      marginBottom: 8,
-      borderWidth: 1,
-      backgroundColor: colors.surface,
-      borderColor: colors.border,
-    },
-    questionText: {
-      flex: 1,
-      fontSize: 15,
-      color: colors.text.primary,
-      fontFamily: 'Poppins-Regular',
-      marginLeft: 12,
-    },
-  });
+  const handleCategoryPress = (category) => {
+    if (category.id === 1) { // FAQs
+      navigation.navigate('FAQs');
+    }
+    // Handle other categories if needed
+  };
 
   return (
     <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={["top"]}>
@@ -243,7 +104,11 @@ const HelpCenterScreen = ({ navigation }) => {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('browseTopics')}</Text>
           {faqCategories.map(category => (
-            <TouchableOpacity key={category.id} style={[styles.categoryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+            <TouchableOpacity
+              key={category.id}
+              style={[styles.categoryCard, { backgroundColor: colors.surface, borderColor: colors.border }]}
+              onPress={() => handleCategoryPress(category)}
+            >
               <View style={styles.categoryIconContainer}>
                 <Ionicons name={category.icon} size={24} color={colors.primary} />
               </View>
@@ -287,5 +152,154 @@ const HelpCenterScreen = ({ navigation }) => {
     </SafeAreaView>
   );
 };
+
+const createStyles = (colors) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+  },
+  headerText: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text.primary,
+    fontFamily: 'Poppins-SemiBold',
+    flex: 1,
+    textAlign: 'center',
+  },
+  placeholder: {
+    width: 40,
+  },
+  content: {
+    padding: 16,
+    paddingBottom: 24,
+  },
+  searchContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    marginBottom: 24,
+    borderWidth: 1,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+  },
+  searchInput: {
+    flex: 1,
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    marginLeft: 12,
+    color: colors.text.primary,
+  },
+  section: {
+    marginBottom: 24,
+  },
+  sectionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text.primary,
+    fontFamily: 'Poppins-SemiBold',
+    marginBottom: 12,
+  },
+  quickActionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+  },
+  quickActionIcon: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  quickActionContent: {
+    flex: 1,
+  },
+  quickActionTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text.primary,
+    fontFamily: 'Poppins-SemiBold',
+    marginBottom: 2,
+  },
+  quickActionSubtitle: {
+    fontSize: 13,
+    color: colors.text.secondary,
+    fontFamily: 'Poppins-Regular',
+  },
+  categoryCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 12,
+    borderWidth: 1,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+  },
+  categoryIconContainer: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.background === '#FFFFFF' ? '#FFF0F6' : 'rgba(220, 49, 115, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 16,
+  },
+  categoryContent: {
+    flex: 1,
+  },
+  categoryTitle: {
+    fontSize: 16,
+    fontWeight: '600',
+    color: colors.text.primary,
+    fontFamily: 'Poppins-SemiBold',
+    marginBottom: 2,
+  },
+  categoryDescription: {
+    fontSize: 13,
+    color: colors.text.secondary,
+    fontFamily: 'Poppins-Regular',
+  },
+  questionCard: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    borderRadius: 12,
+    padding: 16,
+    marginBottom: 8,
+    borderWidth: 1,
+    backgroundColor: colors.surface,
+    borderColor: colors.border,
+  },
+  questionText: {
+    flex: 1,
+    fontSize: 15,
+    color: colors.text.primary,
+    fontFamily: 'Poppins-Regular',
+    marginLeft: 12,
+  },
+});
 
 export default HelpCenterScreen;

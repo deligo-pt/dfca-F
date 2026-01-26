@@ -23,6 +23,7 @@ import {
     NotificationsScreen,
     SettingsScreen,
     HelpCenterScreen,
+    FAQsScreen,
     ChatScreen,
     CartDetailScreen,
     SeeAllScreen,
@@ -112,6 +113,7 @@ export default function RootNavigator() {
                 <Stack.Screen name="Notifications" component={NotificationsScreen} />
                 <Stack.Screen name="Settings" component={SettingsScreen} />
                 <Stack.Screen name="HelpCenter" component={HelpCenterScreen} />
+                <Stack.Screen name="FAQs" component={FAQsScreen} />
                 <Stack.Screen name="Chat" component={ChatScreen} />
             </Stack.Navigator>
 

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, KeyboardAvoidingView, Platform, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -20,6 +20,10 @@ import { useTheme } from '../utils/ThemeContext';
 const ChatScreen = ({ navigation }) => {
   const { t } = useLanguage();
   const { colors, isDarkMode } = useTheme();
+
+  // Memoize styles to ensure theme updates are handled efficiently
+  const styles = useMemo(() => createStyles(colors), [colors]);
+
   const [messages, setMessages] = useState([
     {
       id: 1,
@@ -94,182 +98,6 @@ const ChatScreen = ({ navigation }) => {
       <Text style={styles.messageTime}>{formatTime(item.timestamp)}</Text>
     </View>
   );
-
-  const styles = StyleSheet.create({
-    container: {
-      flex: 1,
-      backgroundColor: colors.background,
-    },
-    header: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      justifyContent: 'space-between',
-      paddingHorizontal: 20,
-      paddingVertical: 16,
-      backgroundColor: colors.background,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
-    },
-    backButton: {
-      width: 40,
-      height: 40,
-      justifyContent: 'center',
-      alignItems: 'center',
-    },
-    headerContent: {
-      flex: 1,
-      alignItems: 'center',
-    },
-    headerTitle: {
-      fontSize: 18,
-      fontWeight: '600',
-      color: colors.text.primary,
-      fontFamily: 'Poppins-SemiBold',
-    },
-    headerSubtitle: {
-      fontSize: 14,
-      color: colors.text.secondary,
-      fontFamily: 'Poppins-Regular',
-      marginTop: 2,
-    },
-    onlineIndicator: {
-      flexDirection: 'row',
-      alignItems: 'center',
-    },
-    onlineDot: {
-      width: 8,
-      height: 8,
-      borderRadius: 4,
-      backgroundColor: colors.success,
-      marginRight: 6,
-    },
-    onlineText: {
-      fontSize: 12,
-      color: colors.success,
-      fontFamily: 'Poppins-Medium',
-    },
-    chatContainer: {
-      flex: 1,
-    },
-    messagesList: {
-      flex: 1,
-      padding: 16,
-    },
-    messagesContent: {
-      paddingBottom: 16,
-    },
-    messageContainer: {
-      marginBottom: 16,
-      maxWidth: '80%',
-    },
-    userMessageContainer: {
-      alignSelf: 'flex-end',
-      alignItems: 'flex-end',
-    },
-    supportMessageContainer: {
-      alignSelf: 'flex-start',
-      alignItems: 'flex-start',
-    },
-    messageBubble: {
-      borderRadius: 18,
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      maxWidth: '100%',
-    },
-    userMessageBubble: {
-      backgroundColor: colors.primary,
-      borderBottomRightRadius: 4,
-    },
-    supportMessageBubble: {
-      backgroundColor: colors.surface,
-      borderBottomLeftRadius: 4,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    messageText: {
-      fontSize: 16,
-      fontFamily: 'Poppins-Regular',
-      lineHeight: 22,
-    },
-    userMessageText: {
-      color: colors.background,
-    },
-    supportMessageText: {
-      color: colors.text.primary,
-    },
-    messageTime: {
-      fontSize: 11,
-      fontFamily: 'Poppins-Regular',
-      marginTop: 4,
-      color: colors.text.secondary,
-    },
-    typingIndicator: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 8,
-      maxWidth: '60%',
-    },
-    typingBubble: {
-      backgroundColor: colors.surface,
-      borderRadius: 18,
-      borderBottomLeftRadius: 4,
-      paddingHorizontal: 16,
-      paddingVertical: 10,
-      borderWidth: 1,
-      borderColor: colors.border,
-    },
-    typingText: {
-      fontSize: 14,
-      color: colors.text.secondary,
-      fontFamily: 'Poppins-Regular',
-    },
-    typingDots: {
-      flexDirection: 'row',
-      marginLeft: 8,
-    },
-    typingDot: {
-      width: 4,
-      height: 4,
-      borderRadius: 2,
-      backgroundColor: colors.text.secondary,
-      marginHorizontal: 2,
-    },
-    inputContainer: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      backgroundColor: colors.background,
-      borderTopWidth: 1,
-      borderTopColor: colors.border,
-    },
-    input: {
-      flex: 1,
-      borderRadius: 24,
-      paddingHorizontal: 16,
-      paddingVertical: 12,
-      backgroundColor: colors.surface,
-      color: colors.text.primary,
-      fontFamily: 'Poppins-Regular',
-      fontSize: 16,
-      marginRight: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-      maxHeight: 100,
-    },
-    sendButton: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      backgroundColor: colors.primary,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    sendButtonDisabled: {
-      backgroundColor: colors.text.light,
-    },
-  });
 
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
@@ -356,5 +184,181 @@ const ChatScreen = ({ navigation }) => {
     </SafeAreaView>
   );
 };
+
+const createStyles = (colors) => StyleSheet.create({
+  container: {
+    flex: 1,
+    backgroundColor: colors.background,
+  },
+  header: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 16,
+    backgroundColor: colors.background,
+    borderBottomWidth: 1,
+    borderBottomColor: colors.border,
+  },
+  backButton: {
+    width: 40,
+    height: 40,
+    justifyContent: 'center',
+    alignItems: 'center',
+  },
+  headerContent: {
+    flex: 1,
+    alignItems: 'center',
+  },
+  headerTitle: {
+    fontSize: 18,
+    fontWeight: '600',
+    color: colors.text.primary,
+    fontFamily: 'Poppins-SemiBold',
+  },
+  headerSubtitle: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    fontFamily: 'Poppins-Regular',
+    marginTop: 2,
+  },
+  onlineIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  onlineDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.success,
+    marginRight: 6,
+  },
+  onlineText: {
+    fontSize: 12,
+    color: colors.success,
+    fontFamily: 'Poppins-Medium',
+  },
+  chatContainer: {
+    flex: 1,
+  },
+  messagesList: {
+    flex: 1,
+    padding: 16,
+  },
+  messagesContent: {
+    paddingBottom: 16,
+  },
+  messageContainer: {
+    marginBottom: 16,
+    maxWidth: '80%',
+  },
+  userMessageContainer: {
+    alignSelf: 'flex-end',
+    alignItems: 'flex-end',
+  },
+  supportMessageContainer: {
+    alignSelf: 'flex-start',
+    alignItems: 'flex-start',
+  },
+  messageBubble: {
+    borderRadius: 18,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    maxWidth: '100%',
+  },
+  userMessageBubble: {
+    backgroundColor: colors.primary,
+    borderBottomRightRadius: 4,
+  },
+  supportMessageBubble: {
+    backgroundColor: colors.surface,
+    borderBottomLeftRadius: 4,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  messageText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    lineHeight: 22,
+  },
+  userMessageText: {
+    color: colors.background,
+  },
+  supportMessageText: {
+    color: colors.text.primary,
+  },
+  messageTime: {
+    fontSize: 11,
+    fontFamily: 'Poppins-Regular',
+    marginTop: 4,
+    color: colors.text.secondary,
+  },
+  typingIndicator: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 8,
+    maxWidth: '60%',
+  },
+  typingBubble: {
+    backgroundColor: colors.surface,
+    borderRadius: 18,
+    borderBottomLeftRadius: 4,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderWidth: 1,
+    borderColor: colors.border,
+  },
+  typingText: {
+    fontSize: 14,
+    color: colors.text.secondary,
+    fontFamily: 'Poppins-Regular',
+  },
+  typingDots: {
+    flexDirection: 'row',
+    marginLeft: 8,
+  },
+  typingDot: {
+    width: 4,
+    height: 4,
+    borderRadius: 2,
+    backgroundColor: colors.text.secondary,
+    marginHorizontal: 2,
+  },
+  inputContainer: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: colors.background,
+    borderTopWidth: 1,
+    borderTopColor: colors.border,
+  },
+  input: {
+    flex: 1,
+    borderRadius: 24,
+    paddingHorizontal: 16,
+    paddingVertical: 12,
+    backgroundColor: colors.surface,
+    color: colors.text.primary,
+    fontFamily: 'Poppins-Regular',
+    fontSize: 16,
+    marginRight: 12,
+    borderWidth: 1,
+    borderColor: colors.border,
+    maxHeight: 100,
+  },
+  sendButton: {
+    width: 48,
+    height: 48,
+    borderRadius: 24,
+    backgroundColor: colors.primary,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  sendButtonDisabled: {
+    backgroundColor: colors.text.light,
+  },
+});
 
 export default ChatScreen;
