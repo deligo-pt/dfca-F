@@ -52,6 +52,10 @@ const HelpCenterScreen = ({ navigation }) => {
   const handleCategoryPress = (category) => {
     if (category.id === 1) { // FAQs
       navigation.navigate('FAQs');
+    } else if (category.id === 2) { // Order Issues
+      navigation.navigate('OrderIssues');
+    } else if (category.id === 3) { // Payment & Refunds
+      navigation.navigate('PaymentRefunds');
     }
     // Handle other categories if needed
   };
@@ -124,32 +128,52 @@ const HelpCenterScreen = ({ navigation }) => {
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('popularQuestions')}</Text>
 
-          <TouchableOpacity style={[styles.questionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Ionicons name="help-circle-outline" size={20} color={colors.primary} />
-            <Text style={[styles.questionText, { color: colors.text.primary }]}>{t('howTrackOrder')}</Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.text.light} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.questionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Ionicons name="help-circle-outline" size={20} color={colors.primary} />
-            <Text style={[styles.questionText, { color: colors.text.primary }]}>{t('cancelOrder')}</Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.text.light} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.questionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Ionicons name="help-circle-outline" size={20} color={colors.primary} />
-            <Text style={[styles.questionText, { color: colors.text.primary }]}>{t('deliveryCharges')}</Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.text.light} />
-          </TouchableOpacity>
-
-          <TouchableOpacity style={[styles.questionCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-            <Ionicons name="help-circle-outline" size={20} color={colors.primary} />
-            <Text style={[styles.questionText, { color: colors.text.primary }]}>{t('applyVoucherQuestion')}</Text>
-            <Ionicons name="chevron-forward" size={18} color={colors.text.light} />
-          </TouchableOpacity>
+          <FAQItem
+            question={t('howTrackOrder')}
+            answer={t('howTrackOrderAnswer')}
+            colors={colors}
+          />
+          <FAQItem
+            question={t('cancelOrder')}
+            answer={t('cancelOrderAnswer')}
+            colors={colors}
+          />
+          <FAQItem
+            question={t('deliveryCharges')}
+            answer={t('deliveryChargesAnswer')}
+            colors={colors}
+          />
+          <FAQItem
+            question={t('applyVoucherQuestion')}
+            answer={t('applyVoucherAnswer')}
+            colors={colors}
+          />
         </View>
       </ScrollView>
     </SafeAreaView>
+  );
+};
+
+const FAQItem = ({ question, answer, colors }) => {
+  const [expanded, setExpanded] = useState(false);
+
+  return (
+    <View style={[styles.questionCardContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+      <TouchableOpacity
+        style={styles.questionHeader}
+        onPress={() => setExpanded(!expanded)}
+        activeOpacity={0.7}
+      >
+        <Ionicons name="help-circle-outline" size={20} color={colors.primary} />
+        <Text style={[styles.questionText, { color: colors.text.primary }]}>{question}</Text>
+        <Ionicons name={expanded ? "chevron-up" : "chevron-down"} size={18} color={colors.text.light} />
+      </TouchableOpacity>
+      {expanded && (
+        <View style={styles.answerContainer}>
+          <Text style={[styles.answerText, { color: colors.text.secondary }]}>{answer}</Text>
+        </View>
+      )}
+    </View>
   );
 };
 
@@ -283,22 +307,32 @@ const createStyles = (colors) => StyleSheet.create({
     color: colors.text.secondary,
     fontFamily: 'Poppins-Regular',
   },
-  questionCard: {
-    flexDirection: 'row',
-    alignItems: 'center',
+  questionCardContainer: {
     borderRadius: 12,
-    padding: 16,
     marginBottom: 8,
     borderWidth: 1,
-    backgroundColor: colors.surface,
-    borderColor: colors.border,
+    overflow: 'hidden',
+  },
+  questionHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: 16,
   },
   questionText: {
     flex: 1,
     fontSize: 15,
-    color: colors.text.primary,
     fontFamily: 'Poppins-Regular',
     marginLeft: 12,
+  },
+  answerContainer: {
+    paddingHorizontal: 16,
+    paddingBottom: 16,
+    paddingLeft: 48, // Align with text
+  },
+  answerText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    lineHeight: 20,
   },
 });
 
