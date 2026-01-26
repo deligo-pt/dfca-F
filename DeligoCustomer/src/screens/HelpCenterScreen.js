@@ -132,21 +132,25 @@ const HelpCenterScreen = ({ navigation }) => {
             question={t('howTrackOrder')}
             answer={t('howTrackOrderAnswer')}
             colors={colors}
+            styles={styles}
           />
           <FAQItem
             question={t('cancelOrder')}
             answer={t('cancelOrderAnswer')}
             colors={colors}
+            styles={styles}
           />
           <FAQItem
             question={t('deliveryCharges')}
             answer={t('deliveryChargesAnswer')}
             colors={colors}
+            styles={styles}
           />
           <FAQItem
             question={t('applyVoucherQuestion')}
             answer={t('applyVoucherAnswer')}
             colors={colors}
+            styles={styles}
           />
         </View>
       </ScrollView>
@@ -154,7 +158,7 @@ const HelpCenterScreen = ({ navigation }) => {
   );
 };
 
-const FAQItem = ({ question, answer, colors }) => {
+const FAQItem = ({ question, answer, colors, styles }) => {
   const [expanded, setExpanded] = useState(false);
 
   return (
