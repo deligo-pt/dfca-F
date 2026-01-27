@@ -259,7 +259,8 @@ const LocationAddressScreen = ({ navigation, route }) => {
         try {
           const payload = {
             deliveryAddress: {
-              street: detailedAddress ? `${detailedAddress}, ${streetAddress}` : streetAddress,
+              street: streetAddress,
+              detailedAddress: detailedAddress,
               city: city,
               state: state,
               country: country,
@@ -307,7 +308,8 @@ const LocationAddressScreen = ({ navigation, route }) => {
               const targetAddr = {
                 latitude: markerCoordinate?.latitude,
                 longitude: markerCoordinate?.longitude,
-                street: detailedAddress ? `${detailedAddress}, ${streetAddress}` : streetAddress,
+                street: streetAddress,
+                detailedAddress: detailedAddress,
                 address: streetAddress
               };
 

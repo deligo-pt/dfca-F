@@ -14,7 +14,8 @@ const API_BASE_URLS = {
   // development: 'http://localhost:5000',  // iOS Simulator
 
   // Deployment Targets
-  staging: 'https://deligo-food-backend.vercel.app',
+  // staging: 'https://deligo-food-backend.vercel.app',
+  staging: 'https://deligo-food-delivery-server.vercel.app',
   production: 'https://api.deligo.com',
 };
 

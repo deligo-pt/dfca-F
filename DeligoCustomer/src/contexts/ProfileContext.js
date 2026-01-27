@@ -230,7 +230,11 @@ export const ProfileProvider = ({ children }) => {
             updateProfile,
             checkAuthStatus,
             completeOnboarding,
-            fetchUserProfile
+            fetchUserProfile,
+            setUserData: async (data) => {
+                setUser(data);
+                await import('../utils/auth').then(mod => mod.saveUserData(data));
+            }
         }}>
             {children}
         </ProfileContext.Provider>

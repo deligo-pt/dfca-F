@@ -221,7 +221,7 @@ const EditProfileScreen = ({ navigation, route }) => {
       backgroundColor: colors.border,
     },
   }), [colors]);
-  const { updateProfile: updateProfileContext } = useProfile();
+  const { setUserData } = useProfile();
   const { saveAddress } = useLocation();
 
   const [email, setEmail] = useState('');
@@ -266,6 +266,7 @@ const EditProfileScreen = ({ navigation, route }) => {
   const [isLoadingLocation, setIsLoadingLocation] = useState(false);
   const [searchLocation, setSearchLocation] = useState('');
   const [streetAddress, setStreetAddress] = useState(defaultAddress.street);
+  const [detailedAddress, setDetailedAddress] = useState('');
   const [city, setCity] = useState(defaultAddress.city);
   const [postalCode, setPostalCode] = useState(defaultAddress.postalCode);
   const [stateField, setStateField] = useState(defaultAddress.state);
@@ -277,6 +278,7 @@ const EditProfileScreen = ({ navigation, route }) => {
   const constructAddressFromFields = () => {
     const newAddress = {
       street: streetAddress || '',
+      detailedAddress: detailedAddress || '',
       city: city || '',
       state: stateField || 'Dhaka Division',
       country: countryField || 'Bangladesh',
@@ -338,6 +340,7 @@ const EditProfileScreen = ({ navigation, route }) => {
           longitude: addr.longitude || defaultAddress.longitude,
         });
         setStreetAddress(addr.street || defaultAddress.street);
+        setDetailedAddress(addr.detailedAddress || '');
         setCity(addr.city || defaultAddress.city);
         setStateField(addr.state || defaultAddress.state);
         setCountryField(addr.country || defaultAddress.country);
@@ -368,6 +371,7 @@ const EditProfileScreen = ({ navigation, route }) => {
         longitude: addr.longitude || defaultAddress.longitude,
       });
       setStreetAddress(addr.street || defaultAddress.street);
+      setDetailedAddress(addr.detailedAddress || '');
       setCity(addr.city || defaultAddress.city);
       setStateField(addr.state || defaultAddress.state);
       setCountryField(addr.country || defaultAddress.country);
@@ -495,6 +499,7 @@ const EditProfileScreen = ({ navigation, route }) => {
       const completeAddress = {
         ...address,
         street: streetAddress,
+        detailedAddress: detailedAddress,
         city: city,
         state: stateField || address.state || 'Dhaka Division',
         country: countryField || address.country || 'Bangladesh',
@@ -530,8 +535,8 @@ const EditProfileScreen = ({ navigation, route }) => {
         profilePhoto: updatedPhotoUrl,
       };
 
-      // Save the merged user object back to storage AND update context
-      await updateProfileContext(updatedUser);
+      // Save the merged user object back to storage AND update context (optimistic update)
+      await setUserData(updatedUser);
 
       // Update location context if address has changed
       if (completeAddress) {
@@ -542,7 +547,7 @@ const EditProfileScreen = ({ navigation, route }) => {
 
         await saveAddress({
           address: streetAddress,
-          detailedAddress: city,
+          detailedAddress: detailedAddress,
           city: city,
           postalCode: postalCode,
           state: completeAddress.state || 'Dhaka Division',
@@ -686,8 +691,10 @@ const EditProfileScreen = ({ navigation, route }) => {
           latitude: lat,
           longitude: lng,
 
+          longitude: lng,
           geoAccuracy: 5,
           label: label,
+          detailedAddress: detailedAddress,
         };
 
         setAddress(updatedAddress);
@@ -740,6 +747,7 @@ const EditProfileScreen = ({ navigation, route }) => {
           longitude,
           geoAccuracy: 5,
           label: label,
+          detailedAddress: detailedAddress || prev?.detailedAddress || '',
         }));
       }
     } catch (error) {
@@ -749,6 +757,11 @@ const EditProfileScreen = ({ navigation, route }) => {
 
   const setStreetAddressWithConstruct = (value) => {
     setStreetAddress(value);
+    setTimeout(constructAddressFromFields, 0);
+  };
+
+  const setDetailedAddressWithConstruct = (value) => {
+    setDetailedAddress(value);
     setTimeout(constructAddressFromFields, 0);
   };
 
@@ -978,6 +991,8 @@ const EditProfileScreen = ({ navigation, route }) => {
                   setSearchLocation={setSearchLocation}
                   streetAddress={streetAddress}
                   setStreetAddress={setStreetAddressWithConstruct}
+                  detailedAddress={detailedAddress}
+                  setDetailedAddress={setDetailedAddressWithConstruct}
                   city={city}
                   setCity={setCityWithConstruct}
                   postalCode={postalCode}
