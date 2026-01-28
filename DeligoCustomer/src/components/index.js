@@ -22,6 +22,7 @@ export { default as CartList } from './CartList';
 export { default as CustomModal } from './CustomModal';
 export { default as CustomSplashScreen } from './CustomSplashScreen';
 export { default as GlovoBubbles } from './GlovoBubbles';
+export { default as PromoCarousel } from './PromoCarousel';
 export { default as ImageEditor } from './ImageEditor';
 export { default as NotificationOverlay } from './NotificationOverlay';
 export { default as NotificationPopup } from './NotificationPopup';

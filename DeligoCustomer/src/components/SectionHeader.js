@@ -42,9 +42,12 @@ const styles = (colors) => StyleSheet.create({
     marginBottom: spacing.md,
   },
   title: {
-    fontSize: fontSize.xl,
+    fontSize: 22, // Explicitly set for consistency across devices (was fontSize.xl)
     fontFamily: 'Poppins-Bold',
     color: colors.text.primary,
+    letterSpacing: 0.5, // Subtle spacing for headings
+    includeFontPadding: false, // Fix Android vertical alignment
+    lineHeight: 28,
   },
   seeAll: {
     fontSize: fontSize.sm,

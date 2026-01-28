@@ -26,6 +26,7 @@ import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
 import { setAccessToken } from '../utils/storage';
 import { Ionicons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 
 const LOGO = require('../assets/images/logo.png');
 
@@ -67,13 +68,42 @@ const LoginScreen = ({ navigation }) => {
   const modalOnConfirmRef = React.useRef(null);
   const cardAnim = React.useRef(new Animated.Value(0)).current;
 
+  const logoScale = React.useRef(new Animated.Value(0)).current;
+  const logoPulse = React.useRef(new Animated.Value(1)).current;
+
   React.useEffect(() => {
-    Animated.timing(cardAnim, {
-      toValue: 1,
-      duration: 600,
-      easing: Easing.out(Easing.exp),
-      useNativeDriver: true,
-    }).start();
+    // Entrance animations
+    Animated.parallel([
+      Animated.timing(cardAnim, {
+        toValue: 1,
+        duration: 800,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.exp),
+      }),
+      Animated.spring(logoScale, {
+        toValue: 1,
+        friction: 6,
+        useNativeDriver: true,
+      }),
+    ]).start();
+
+    // Continuous breathing animation
+    Animated.loop(
+      Animated.sequence([
+        Animated.timing(logoPulse, {
+          toValue: 1.05,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+        Animated.timing(logoPulse, {
+          toValue: 1,
+          duration: 1500,
+          easing: Easing.inOut(Easing.ease),
+          useNativeDriver: true,
+        }),
+      ])
+    ).start();
   }, []);
 
   const showModal = (title, message, onConfirm = null, onlyConfirm = true) => {
@@ -113,10 +143,10 @@ const LoginScreen = ({ navigation }) => {
       // If API responded with success flag, proceed to OTP screen/modal
       if (sendRes && (sendRes.success === true || sendRes.success === 'true')) {
         setIsOtpSent(true);
+        const successMsg = loginMethod === 'mobile' ? t('otpSentMobile') : t('otpSentEmail');
         showModal(
           t('otpSent'),
-          // prefer server message if provided otherwise fallback to generic
-          sendRes.message || t('checkOTP'),
+          successMsg,
           () => setModalVisible(false)
         );
       } else {
@@ -214,182 +244,217 @@ const LoginScreen = ({ navigation }) => {
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
       <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        barStyle="light-content"
         backgroundColor="transparent"
         translucent={true}
         animated={true}
       />
-      <KeyboardAvoidingView style={{ flex: 1, backgroundColor: colors.background }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
-        <View style={styles.container}>
-          {/* Top Decorative Background */}
-          <View style={[styles.topShape, { backgroundColor: colors.primary }]} />
-          <View style={[styles.topShapeSmall, { backgroundColor: colors.primary }]} />
-          <ScrollView
-            contentContainerStyle={styles.scrollContent}
-            keyboardShouldPersistTaps="handled"
-            showsVerticalScrollIndicator={false}
-            style={{ backgroundColor: colors.background }}
-          >
-            {/* Header & Logo */}
+      <KeyboardAvoidingView style={{ flex: 1 }} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
+        {/* Main Background is Primary Pink */}
+        <View style={[styles.container, { backgroundColor: colors.primary }]}>
+          {/* Top Section: Logo & Welcome (Fixed) */}
+          <SafeAreaView style={styles.topSection}>
             <View style={styles.headerContainer}>
-              <View style={styles.logoWrapper}>
-                <Image source={LOGO} style={styles.logoImage} resizeMode="contain" />
-              </View>
+              {/* Logo: Simple White Tint, No Box Shadow anymore as per "split" design often uses clean logo on solid color */}
+              <Animated.View style={{
+                transform: [
+                  { scale: logoScale },
+                  { scale: logoPulse }
+                ],
+                marginBottom: 16,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 4 },
+                shadowOpacity: 0.2,
+                shadowRadius: 8,
+                elevation: 5
+              }}>
+                <Image
+                  source={LOGO}
+                  style={styles.logoImage}
+                  resizeMode="contain"
+                />
+              </Animated.View>
+
+              <Text style={styles.appTitle}>DeliGo</Text>
+            </View>
+          </SafeAreaView>
+
+          {/* Bottom Sheet: White Background, Rounded Top */}
+          <View style={[styles.bottomSheet, { backgroundColor: colors.background }]}>
+            <ScrollView
+              contentContainerStyle={styles.scrollContent}
+              keyboardShouldPersistTaps="handled"
+              showsVerticalScrollIndicator={false}
+            >
               <Text style={[styles.welcomeText, { color: colors.text.primary }]}>
-                {isOtpSent ? t('verifyOTP') : t('deligo')}
+                {isOtpSent ? t('verifyOTP') : t('welcomeBack')}
               </Text>
               <Text style={[styles.subText, { color: colors.text.secondary }]}>
-                {isOtpSent ? t('enterCodeSent') : t('loginOrSignup')}
+                {isOtpSent ? t('enterCodeSent') : t('loginOrCreateAccount')}
               </Text>
-            </View>
 
-            {/* Form Section - Clean, No Card */}
-            <Animated.View style={[styles.formContainer, { opacity: cardAnim, transform: [{ translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [50, 0] }) }] }]}>
+              {/* Form Section - Clean, No Card */}
+              <Animated.View style={[styles.formContainer, { opacity: cardAnim, transform: [{ translateY: cardAnim.interpolate({ inputRange: [0, 1], outputRange: [50, 0] }) }] }]}>
 
-              {/* Tabs */}
-              {!isOtpSent && (
-                <View style={[styles.tabContainer, { borderBottomColor: colors.border }]}>
-                  <TouchableOpacity
-                    onPress={() => loginMethod !== 'mobile' && handleChangeMethod()}
-                    style={[styles.tabItem, loginMethod === 'mobile' && styles.tabItemActive, { borderBottomColor: loginMethod === 'mobile' ? colors.primary : 'transparent' }]}
-                  >
-                    <Text style={[styles.tabLabel, { color: loginMethod === 'mobile' ? colors.primary : colors.text.secondary }]}>{t('mobile')}</Text>
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={() => loginMethod !== 'email' && handleChangeMethod()}
-                    style={[styles.tabItem, loginMethod === 'email' && styles.tabItemActive, { borderBottomColor: loginMethod === 'email' ? colors.primary : 'transparent' }]}
-                  >
-                    <Text style={[styles.tabLabel, { color: loginMethod === 'email' ? colors.primary : colors.text.secondary }]}>{t('email')}</Text>
-                  </TouchableOpacity>
-                </View>
-              )}
+                {/* Tabs */}
+                {!isOtpSent && (
+                  <View style={[styles.tabContainer, { borderBottomColor: colors.border }]}>
+                    <TouchableOpacity
+                      onPress={() => loginMethod !== 'mobile' && handleChangeMethod()}
+                      style={[styles.tabItem, loginMethod === 'mobile' && styles.tabItemActive, { borderBottomColor: loginMethod === 'mobile' ? colors.primary : 'transparent' }]}
+                    >
+                      <Text style={[styles.tabLabel, { color: loginMethod === 'mobile' ? colors.primary : colors.text.secondary }]}>{t('mobile')}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      onPress={() => loginMethod !== 'email' && handleChangeMethod()}
+                      style={[styles.tabItem, loginMethod === 'email' && styles.tabItemActive, { borderBottomColor: loginMethod === 'email' ? colors.primary : 'transparent' }]}
+                    >
+                      <Text style={[styles.tabLabel, { color: loginMethod === 'email' ? colors.primary : colors.text.secondary }]}>{t('email')}</Text>
+                    </TouchableOpacity>
+                  </View>
+                )}
 
-              {/* Inputs */}
-              {!isOtpSent ? (
-                <View style={styles.inputsSection}>
-                  {loginMethod === 'mobile' ? (
-                    <View style={[styles.inputGroup, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                      <View style={styles.countryBtn}>
-                        <CountryPicker
-                          countryCode={countryCode}
-                          withFilter
-                          withFlag
-                          withCallingCode
-                          onSelect={country => {
-                            setCountryCode(country.cca2);
-                            setCountry(country);
-                          }}
+                {/* Inputs */}
+                {!isOtpSent ? (
+                  <View style={styles.inputsSection}>
+                    {loginMethod === 'mobile' ? (
+                      <View style={[styles.inputGroup, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                        <View style={styles.countryBtn}>
+                          <CountryPicker
+                            countryCode={countryCode}
+                            withFilter
+                            withFlag
+                            withCallingCode
+                            onSelect={country => {
+                              setCountryCode(country.cca2);
+                              setCountry(country);
+                            }}
+                          />
+                          <Text style={[styles.callingCode, { color: colors.text.primary }]}>+{country ? country.callingCode[0] : '351'}</Text>
+                          <Ionicons name="chevron-down" size={12} color={colors.text.secondary} style={{ marginLeft: 4 }} />
+                        </View>
+                        <View style={[styles.dividerVertical, { backgroundColor: colors.border }]} />
+                        <TextInput
+                          style={[styles.inputField, { color: colors.text.primary }]}
+                          placeholder={t('mobileNumber')}
+                          placeholderTextColor={colors.text.secondary}
+                          value={identifier}
+                          onChangeText={setIdentifier}
+                          keyboardType="phone-pad"
+                          selectionColor={colors.primary}
+                          autoCapitalize="none"
                         />
-                        <Text style={[styles.callingCode, { color: colors.text.primary }]}>+{country ? country.callingCode[0] : '351'}</Text>
-                        <Ionicons name="chevron-down" size={12} color={colors.text.secondary} style={{ marginLeft: 4 }} />
                       </View>
-                      <View style={[styles.dividerVertical, { backgroundColor: colors.border }]} />
-                      <TextInput
-                        style={[styles.inputField, { color: colors.text.primary }]}
-                        placeholder={t('mobileNumber')}
-                        placeholderTextColor={colors.text.secondary}
-                        value={identifier}
-                        onChangeText={setIdentifier}
-                        keyboardType="phone-pad"
-                        selectionColor={colors.primary}
-                        autoCapitalize="none"
-                      />
-                    </View>
-                  ) : (
-                    <View style={[styles.inputGroup, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-                      <Ionicons name="mail-outline" size={20} color={colors.text.secondary} style={styles.inputIcon} />
-                      <TextInput
-                        style={[styles.inputField, { color: colors.text.primary }]}
-                        placeholder={t('emailAddress')}
-                        placeholderTextColor={colors.text.secondary}
-                        value={identifier}
-                        onChangeText={setIdentifier}
-                        keyboardType="email-address"
-                        selectionColor={colors.primary}
-                        autoCapitalize="none"
-                      />
-                    </View>
-                  )}
-
-                  <TouchableOpacity
-                    style={[styles.primaryButton, { backgroundColor: colors.primary }, isLoading && { opacity: 0.7 }]}
-                    onPress={handleSendOtp}
-                    disabled={isLoading}
-                    activeOpacity={0.8}
-                  >
-                    {isLoading ? (
-                      <ActivityIndicator color="#FFF" />
                     ) : (
-                      <Text style={styles.primaryButtonText}>{t('sendOTP')}</Text>
+                      <View style={[styles.inputGroup, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                        <Ionicons name="mail-outline" size={20} color={colors.text.secondary} style={styles.inputIcon} />
+                        <TextInput
+                          style={[styles.inputField, { color: colors.text.primary }]}
+                          placeholder={t('emailAddress')}
+                          placeholderTextColor={colors.text.secondary}
+                          value={identifier}
+                          onChangeText={setIdentifier}
+                          keyboardType="email-address"
+                          selectionColor={colors.primary}
+                          autoCapitalize="none"
+                        />
+                      </View>
                     )}
-                  </TouchableOpacity>
-                </View>
-              ) : (
-                <View style={styles.inputsSection}>
-                  <Text style={[styles.otpReviewText, { color: colors.text.secondary }]}>
-                    {t('sentCodeTo')} <Text style={{ color: colors.text.primary, fontWeight: '700' }}>{loginMethod === 'mobile' ? `+${country ? country.callingCode[0] : '351'} ${identifier}` : identifier}</Text>
-                  </Text>
 
-                  <View style={{ marginBottom: 24 }}>
-                    <OTPInput
-                      length={loginMethod === 'mobile' ? 6 : 4}
-                      value={otp}
-                      onChangeText={setOtp}
+                    <TouchableOpacity
+                      style={[styles.primaryButton, isLoading && { opacity: 0.7 }]}
+                      onPress={handleSendOtp}
                       disabled={isLoading}
-                    />
+                      activeOpacity={0.8}
+                    >
+                      <LinearGradient
+                        colors={[colors.primary, '#FF69B4']} // Gradient from primary to a lighter pink
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={styles.gradientButton}
+                      >
+                        {isLoading ? (
+                          <ActivityIndicator color="#FFF" />
+                        ) : (
+                          <Text style={styles.primaryButtonText}>{t('sendOTP')}</Text>
+                        )}
+                      </LinearGradient>
+                    </TouchableOpacity>
                   </View>
+                ) : (
+                  <View style={styles.inputsSection}>
+                    <Text style={[styles.otpReviewText, { color: colors.text.secondary }]}>
+                      {t('sentCodeTo')} <Text style={{ color: colors.text.primary, fontWeight: '700' }}>{loginMethod === 'mobile' ? `+${country ? country.callingCode[0] : '351'} ${identifier}` : identifier}</Text>
+                    </Text>
 
-                  <TouchableOpacity
-                    style={[styles.primaryButton, { backgroundColor: colors.primary }, isLoading && { opacity: 0.7 }]}
-                    onPress={handleVerifyOtp}
-                    disabled={isLoading}
-                    activeOpacity={0.8}
-                  >
-                    {isLoading ? (
-                      <ActivityIndicator color="#FFF" />
-                    ) : (
-                      <Text style={styles.primaryButtonText}>{t('verifyOTPButton')}</Text>
-                    )}
-                  </TouchableOpacity>
+                    <View style={{ marginBottom: 24 }}>
+                      <OTPInput
+                        length={loginMethod === 'mobile' ? 6 : 4}
+                        value={otp}
+                        onChangeText={setOtp}
+                        disabled={isLoading}
+                      />
+                    </View>
 
-                  <View style={styles.otpActions}>
-                    <TouchableOpacity onPress={handleResendOtp} disabled={isLoading}>
-                      <Text style={[styles.actionLink, { color: colors.primary }]}>{t('resend')}</Text>
+                    <TouchableOpacity
+                      style={[styles.primaryButton, isLoading && { opacity: 0.7 }]}
+                      onPress={handleVerifyOtp}
+                      disabled={isLoading}
+                      activeOpacity={0.8}
+                    >
+                      <LinearGradient
+                        colors={[colors.primary, '#FF69B4']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 1 }}
+                        style={styles.gradientButton}
+                      >
+                        {isLoading ? (
+                          <ActivityIndicator color="#FFF" />
+                        ) : (
+                          <Text style={styles.primaryButtonText}>{t('verifyOTPButton')}</Text>
+                        )}
+                      </LinearGradient>
                     </TouchableOpacity>
 
-                    <TouchableOpacity onPress={() => setIsOtpSent(false)} disabled={isLoading}>
-                      <Text style={[styles.actionLink, { color: colors.text.secondary }]}>{t('change')}</Text>
+                    <View style={styles.otpActions}>
+                      <TouchableOpacity onPress={handleResendOtp} disabled={isLoading}>
+                        <Text style={[styles.actionLink, { color: colors.primary }]}>{t('resend')}</Text>
+                      </TouchableOpacity>
+
+                      <TouchableOpacity onPress={() => setIsOtpSent(false)} disabled={isLoading}>
+                        <Text style={[styles.actionLink, { color: colors.text.secondary }]}>{t('change')}</Text>
+                      </TouchableOpacity>
+                    </View>
+                  </View>
+                )}
+
+                {/* Language Selection - Minimal */}
+                <TouchableOpacity
+                  style={styles.langCapsule}
+                  onPress={() => setShowLanguageModal(true)}
+                >
+                  <Ionicons name="globe-outline" size={16} color={colors.text.secondary} />
+                  <Text style={[styles.langText, { color: colors.text.secondary }]}>{language === 'en' ? t('english') : t('portuguese')}</Text>
+                  <Ionicons name="chevron-down" size={14} color={colors.text.secondary} />
+                </TouchableOpacity>
+
+                {/* Footer Links */}
+                <View style={styles.footerRow}>
+                  <Text style={[styles.footerNote, { color: colors.text.secondary }]}>{t('byContinuing')}</Text>
+                  <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' }}>
+                    <TouchableOpacity onPress={() => navigation.navigate('TermsOfService')}>
+                      <Text style={[styles.footerLink, { color: colors.primary }]}>{t('termsOfService')}</Text>
+                    </TouchableOpacity>
+                    <Text style={[styles.footerNote, { color: colors.text.secondary }]}> {t('and')} </Text>
+                    <TouchableOpacity onPress={() => navigation.navigate('PrivacyPolicy')}>
+                      <Text style={[styles.footerLink, { color: colors.primary }]}>{t('privacyPolicy')}</Text>
                     </TouchableOpacity>
                   </View>
                 </View>
-              )}
+              </Animated.View>
 
-              {/* Language Selection - Minimal */}
-              <TouchableOpacity
-                style={styles.langCapsule}
-                onPress={() => setShowLanguageModal(true)}
-              >
-                <Ionicons name="globe-outline" size={16} color={colors.text.secondary} />
-                <Text style={[styles.langText, { color: colors.text.secondary }]}>{language === 'en' ? 'English' : 'Português'}</Text>
-                <Ionicons name="chevron-down" size={14} color={colors.text.secondary} />
-              </TouchableOpacity>
-
-              {/* Footer Links */}
-              <View style={styles.footerRow}>
-                <Text style={[styles.footerNote, { color: colors.text.secondary }]}>{t('byContinuing')}</Text>
-                <View style={{ flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center' }}>
-                  <TouchableOpacity onPress={() => navigation.navigate('TermsOfService')}>
-                    <Text style={[styles.footerLink, { color: colors.primary }]}>{t('termsOfService')}</Text>
-                  </TouchableOpacity>
-                  <Text style={[styles.footerNote, { color: colors.text.secondary }]}> & </Text>
-                  <TouchableOpacity onPress={() => navigation.navigate('PrivacyPolicy')}>
-                    <Text style={[styles.footerLink, { color: colors.primary }]}>{t('privacyPolicy')}</Text>
-                  </TouchableOpacity>
-                </View>
-              </View>
-            </Animated.View>
-
-          </ScrollView>
+            </ScrollView>
+          </View>
 
           {/* Modals */}
           <CustomModal
@@ -459,57 +524,65 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  topShape: {
-    position: 'absolute',
-    top: -150,
-    right: -100,
-    width: 400,
-    height: 400,
-    borderRadius: 200,
-    opacity: 0.1,
+  topSection: {
+    flex: 0,
+    alignItems: 'center',
+    justifyContent: 'center',
+    paddingTop: Platform.OS === 'android' ? 40 : 0,
+    paddingBottom: 20,
+    zIndex: 1,
   },
-  topShapeSmall: {
-    position: 'absolute',
-    top: 50,
-    left: -60,
-    width: 200,
-    height: 200,
-    borderRadius: 100,
-    opacity: 0.05,
+  bottomSheet: {
+    flex: 1,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
+    overflow: 'hidden',
+    paddingTop: 30,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -10 }, // Shadow pulsing upwards
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 20,
   },
   scrollContent: {
     flexGrow: 1,
     paddingHorizontal: 24,
-    paddingTop: 80,
     paddingBottom: 40,
   },
   headerContainer: {
     alignItems: 'center',
-    marginBottom: 40,
-  },
-  logoWrapper: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 8,
-    marginBottom: 20,
+    marginTop: 10,
   },
   logoImage: {
-    width: 140,
-    height: 140,
+    width: 90,
+    height: 90,
+    borderRadius: 20, // Modern curve for the icon itself
+    backgroundColor: '#fff', // Ensure white background for the icon if png is transparent
+  },
+  appTitle: {
+    fontSize: 28, // Larger
+    fontFamily: 'Poppins-Bold',
+    color: '#FFF',
+    includeFontPadding: false,
+    textShadowColor: 'rgba(0, 0, 0, 0.2)', // Subtle text shadow for pop
+    textShadowOffset: { width: 0, height: 2 },
+    textShadowRadius: 4,
   },
   welcomeText: {
     fontSize: 28,
     fontFamily: 'Poppins-Bold',
     marginBottom: 8,
-    textAlign: 'center',
+    textAlign: 'left', // Aligned left like the reference
   },
   subText: {
     fontSize: 16,
     fontFamily: 'Poppins-Regular',
-    textAlign: 'center',
-    opacity: 0.8,
+    textAlign: 'left',
+    opacity: 0.6,
+    marginBottom: 30,
+  },
+  formContainer: {
+    width: '100%',
   },
   formContainer: {
     borderBottomColor: '#EEE',
@@ -571,15 +644,20 @@ const styles = StyleSheet.create({
   },
   primaryButton: {
     height: 56,
-    borderRadius: 28, // Pill shape
+    borderRadius: 28,
+    shadowColor: '#FF1493', // Matching pink shadow
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.3,
+    shadowRadius: 16,
+    elevation: 8,
+    marginTop: 10,
+    overflow: 'hidden', // Required for gradient
+  },
+  gradientButton: {
+    width: '100%',
+    height: '100%',
     justifyContent: 'center',
     alignItems: 'center',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 8 },
-    shadowOpacity: 0.2,
-    shadowRadius: 16,
-    elevation: 6,
-    marginTop: 10,
   },
   primaryButtonText: {
     color: '#FFF',

@@ -1011,11 +1011,20 @@ const EditProfileScreen = ({ navigation, route }) => {
                   setLabel={setLabel}
                 />
               ) : (
-                <View style={styles.inputContainer}>
-                  <Ionicons name="location-outline" size={20} color={colors.text.secondary} />
-                  <Text style={styles.input}>
-                    {`${address.street || ''}${address.street ? ', ' : ''}${address.city || ''}${address.state ? ', ' : ''}${address.state || ''}${address.postalCode ? ' - ' : ''}${address.postalCode || ''}${address.country ? ', ' : ''}${address.country || ''}`}
-                  </Text>
+                <View style={[styles.inputContainer, { flexDirection: 'column', alignItems: 'flex-start', paddingVertical: 12 }]}>
+                  <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+                    <Ionicons name="location-outline" size={20} color={colors.text.secondary} style={{ marginTop: 2, marginRight: 8 }} />
+                    <View style={{ flex: 1 }}>
+                      {address.detailedAddress ? (
+                        <Text style={[styles.input, { marginLeft: 0, fontFamily: 'Poppins-SemiBold', marginBottom: 2 }]}>
+                          {address.detailedAddress}
+                        </Text>
+                      ) : null}
+                      <Text style={[styles.input, { marginLeft: 0 }]}>
+                        {`${address.street || ''}${address.street ? ', ' : ''}${address.city || ''}${address.state ? ', ' : ''}${address.state || ''}${address.postalCode ? ' - ' : ''}${address.postalCode || ''}${address.country ? ', ' : ''}${address.country || ''}`}
+                      </Text>
+                    </View>
+                  </View>
                 </View>
               )
             ) : (

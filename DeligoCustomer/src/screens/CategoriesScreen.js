@@ -11,6 +11,7 @@ import {
     SectionHeader,
     StickySearchHeader,
     SkeletonCategory,
+    PromoCarousel,
 } from '../components';
 import GlovoBubbles from '../components/GlovoBubbles';
 import Category from '../components/Categories/CuisinesList';
@@ -845,6 +846,11 @@ const CategoriesScreen = ({ navigation }) => {
                         paddingTop={insets.top}
                     />
 
+                    {/* Promotional Banner Carousel */}
+                    <PromoCarousel
+                        onPress={(promo) => console.log('Promo pressed:', promo.title)}
+                    />
+
                     {/* Glovo-Style "Super App" Bubbles */}
                     <GlovoBubbles
                         categories={displayCategories}
@@ -854,7 +860,7 @@ const CategoriesScreen = ({ navigation }) => {
 
                     {/* Categories Section - filtered by selected Business Category */}
                     <SectionHeader
-                        title={selectedVendorType ? t('categories') : t('browseByCategory')}
+                        title={t('exploreCategories')}
                         showSeeAll={false}
                     />
 

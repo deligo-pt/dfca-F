@@ -41,8 +41,8 @@ const ConsumerLocationDisplay = ({ colors, t }) => {
   const { address, detailedAddress, city, postalCode, label } = useLocation();
   const displayAddress = address || t('selectAddress');
 
-  const details = [
-    detailedAddress,
+  // Filter out redundant parts for the secondary line
+  const locationDetails = [
     city,
     postalCode
   ].filter(part => part && part.trim()).join(', ');
@@ -54,12 +54,21 @@ const ConsumerLocationDisplay = ({ colors, t }) => {
       </View>
       <View style={styles(colors).addressDetails}>
         <Text style={styles(colors).addressType}>{label || t('home')}</Text>
+
+        {/* Show Detailed Address (Apt/Floor) prominently if available */}
+        {detailedAddress ? (
+          <Text style={[styles(colors).addressFull, { fontFamily: 'Poppins-SemiBold', color: colors.text.primary, marginBottom: 2 }]}>
+            {detailedAddress}
+          </Text>
+        ) : null}
+
         <Text style={styles(colors).addressFull}>
           {displayAddress}
         </Text>
-        {details ? (
+
+        {locationDetails ? (
           <Text style={[styles(colors).addressFull, { fontSize: 13, color: colors.text.secondary, marginTop: 2 }]}>
-            {details}
+            {locationDetails}
           </Text>
         ) : null}
       </View>

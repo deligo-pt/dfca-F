@@ -1,15 +1,13 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet, Dimensions } from 'react-native';
+import { View, Text, TouchableOpacity, Image, StyleSheet, ScrollView } from 'react-native';
 import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
-
-const { width } = Dimensions.get('window');
 
 /**
  * BubbleItem Component
  * 
  * Renders a single category as a circular "bubble" item.
- * Supports visuals via remote URL images or emoji characters.
+ * Updated Style: Swiggy-like (Large circle, flat, image full cover).
  * 
  * @param {Object} props
  * @param {Object} props.category - Category data object (id, name, image/icon).
@@ -29,8 +27,6 @@ const BubbleItem = ({ category, selectedId, onPress, colors }) => {
 
     // Theme-aware color derivation
     const backgroundColor = isSelected ? colors.primaryLight : colors.surface;
-    const textColor = isSelected ? colors.white : colors.text.primary; // Note: Label uses primary for active, text.secondary for inactive in styles below
-    const iconColor = isSelected ? colors.white : colors.primary;
 
     // Icon Strategy:
     // 1. Remote URL (Http/File) -> Render Image
@@ -50,8 +46,9 @@ const BubbleItem = ({ category, selectedId, onPress, colors }) => {
                 styles.bubbleCircle,
                 {
                     backgroundColor: backgroundColor,
-                    borderColor: isSelected ? colors.primary : colors.border,
-                    borderWidth: isSelected ? 0 : 1
+                    // Subtle border only if selected to highlight, otherwise clean
+                    borderColor: isSelected ? colors.primary : 'transparent',
+                    borderWidth: isSelected ? 2 : 0
                 }
             ]}>
                 {isImage ? (
@@ -62,14 +59,14 @@ const BubbleItem = ({ category, selectedId, onPress, colors }) => {
                         resizeMode="cover"
                     />
                 ) : (
-                    <Text style={[styles.bubbleEmoji, { fontSize: isEmoji ? 24 : 20, color: iconColor }]}>
+                    <Text style={[styles.bubbleEmoji, { fontSize: isEmoji ? 32 : 28, color: colors.primary }]}>
                         {isEmoji ? iconUrl : fallbackLetter}
                     </Text>
                 )}
             </View>
             <Text
-                numberOfLines={1}
-                style={[styles.bubbleText, { color: isSelected ? colors.primary : colors.text.secondary, fontWeight: isSelected ? '700' : '500' }]}
+                numberOfLines={2}
+                style={[styles.bubbleText, { color: isSelected ? colors.primary : colors.text.primary, fontWeight: isSelected ? '700' : '500' }]}
             >
                 {displayName}
             </Text>
@@ -78,10 +75,10 @@ const BubbleItem = ({ category, selectedId, onPress, colors }) => {
 };
 
 /**
- * GlovoBubbles Grid
+ * GlovoBubbles (Horizontal List)
  * 
- * Displays top-level categories in a grid of circular elements.
- * Optimized for visual exploration of cuisines or store types.
+ * Displays top-level categories in a horizontal scrolling list.
+ * Optimized for Swiggy-like "What's on your mind?" visual discovery.
  * 
  * @param {Object} props
  * @param {Array} props.categories - Array of category objects to render.
@@ -102,10 +99,18 @@ const GlovoBubbles = ({ categories, onPress, selectedId }) => {
         <View style={styles.container}>
             <View style={styles.header}>
                 <Text style={[styles.title, { color: colors.text.primary }]}>
-                    {t('exploreCategories') || 'Explore Categories'}
+                    {t('shopOnDeliGo')}
                 </Text>
             </View>
-            <View style={styles.grid}>
+
+            <ScrollView
+                horizontal={true}
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+                decelerationRate="fast"
+                snapToInterval={90} // approximate width + margin
+                snapToAlignment="start"
+            >
                 {data.map((category, index) => (
                     <BubbleItem
                         key={category.id || category.slug || index}
@@ -115,7 +120,7 @@ const GlovoBubbles = ({ categories, onPress, selectedId }) => {
                         colors={colors}
                     />
                 ))}
-            </View>
+            </ScrollView>
         </View>
     );
 };
@@ -123,58 +128,56 @@ const GlovoBubbles = ({ categories, onPress, selectedId }) => {
 const styles = StyleSheet.create({
     container: {
         paddingVertical: 15,
-        paddingHorizontal: 15,
+        // No horizontal padding on container so scroll goes edge-to-edge
     },
     header: {
-        marginBottom: 10,
-        paddingHorizontal: 5
+        marginBottom: 15,
+        paddingHorizontal: 20 // Align title with general app padding
     },
     title: {
         fontSize: 20,
         fontWeight: '700',
         fontFamily: 'Poppins-Bold',
         textAlign: 'left',
+        letterSpacing: 0.5,
     },
-    grid: {
-        flexDirection: 'row',
-        flexWrap: 'wrap',
-        justifyContent: 'flex-start',
+    scrollContent: {
+        paddingHorizontal: 15, // Initial padding for the first item
+        paddingBottom: 5,      // Space for any potential shadow clipping
     },
     bubbleContainer: {
-        width: (width - 40) / 4, // Calculate width to fit 4 items per row accounting for padding
+        width: 100,          // Widened to fit RESTAURANT
         alignItems: 'center',
-        marginBottom: 15,
+        marginRight: 4,     // Spacing between items
     },
     bubbleCircle: {
-        width: 65,
-        height: 65,
-        borderRadius: 32.5,
+        width: 74,
+        height: 74,
+        borderRadius: 37,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 8,
-        // Elevation/Shadow for depth
-        shadowColor: "#000",
-        shadowOffset: {
-            width: 0,
-            height: 2,
-        },
-        shadowOpacity: 0.1,
-        shadowRadius: 3.84,
-        elevation: 3,
+        marginBottom: 10,
+        backgroundColor: '#f5f5f5', // Fallback color
+        overflow: 'hidden', // Ensure image stays inside circle
     },
     bubbleImage: {
-        width: '60%',
-        height: '60%',
-        borderRadius: 10, // Soften image corners
+        width: '100%',
+        height: '100%',
     },
     bubbleEmoji: {
         textAlign: 'center',
     },
     bubbleText: {
-        fontSize: 12,
+        fontSize: 12, // Industry standard min
+        lineHeight: 16,
         textAlign: 'center',
         width: '100%',
-        paddingHorizontal: 2
+        paddingHorizontal: 0,
+        fontFamily: 'Poppins-Bold',
+        color: '#000000',
+        marginTop: 6,
+        textTransform: 'uppercase',
+        letterSpacing: 0,
     }
 });
 

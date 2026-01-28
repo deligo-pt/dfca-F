@@ -1,5 +1,5 @@
 import React from 'react';
-import { Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { Text, StyleSheet, TouchableOpacity, Image, View } from 'react-native';
 import { spacing, fontSize, borderRadius } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
 
@@ -43,9 +43,7 @@ const getFallbackIcon = (cuisine) => {
  * CuisineChip Component
  * 
  * Interactive filter chip for cuisine categories.
- * Features:
- * - Smart image fallback to emojis if remote asset fails.
- * - Visual selection state.
+ * Updated Style: Circular Vertical (Swiggy Dosa Style).
  * 
  * @param {Object} props
  * @param {Object} props.cuisine - Data object (name, icon URL).
@@ -69,24 +67,41 @@ const CuisineChip = ({ cuisine, onPress, isSelected = false }) => {
 
   // Determine display strategy: Valid Image -> Fallback Emoji
   const showImage = isValidImageUrl && !imageError;
+  const backgroundColor = isSelected ? colors.primaryLight : '#f5f5f5';
 
   return (
     <TouchableOpacity
-      style={[styles(colors, isDarkMode).container, isSelected && styles(colors, isDarkMode).selected]}
+      style={styles(colors, isDarkMode).container}
       onPress={onPress}
       activeOpacity={0.7}
     >
-      {showImage ? (
-        <Image
-          source={{ uri: rawIcon }}
-          style={styles(colors, isDarkMode).chipImage}
-          resizeMode="contain"
-          onError={() => setImageError(true)}
-        />
-      ) : (
-        <Text style={styles(colors, isDarkMode).icon}>{fallbackIcon}</Text>
-      )}
-      <Text style={[styles(colors, isDarkMode).name, isSelected && styles(colors, isDarkMode).selectedText]}>{cuisine.name}</Text>
+      <View style={[
+        styles(colors, isDarkMode).imageContainer,
+        {
+          backgroundColor: backgroundColor,
+          borderColor: isSelected ? colors.primary : 'transparent',
+          borderWidth: isSelected ? 2 : 0
+        }
+      ]}>
+        {showImage ? (
+          <Image
+            source={{ uri: rawIcon }}
+            style={styles(colors, isDarkMode).chipImage}
+            resizeMode="cover"
+            onError={() => setImageError(true)}
+          />
+        ) : (
+          <Text style={[styles(colors, isDarkMode).emojiIcon, { color: colors.primary }]}>
+            {fallbackIcon}
+          </Text>
+        )}
+      </View>
+      <Text
+        numberOfLines={2}
+        style={[styles(colors, isDarkMode).name, isSelected && styles(colors, isDarkMode).selectedText]}
+      >
+        {cuisine.name}
+      </Text>
     </TouchableOpacity>
   );
 };
@@ -95,37 +110,38 @@ export default CuisineChip;
 
 const styles = (colors, isDarkMode) => StyleSheet.create({
   container: {
-    flexDirection: 'row',
+    width: 85,          // Fixed width for vertical column alignment
     alignItems: 'center',
-    backgroundColor: isDarkMode ? colors.surface : (colors.surfaceVariant || '#F0F2F5'),
-    borderRadius: borderRadius.round,
-    paddingHorizontal: spacing.md,
-    paddingVertical: 8,
-    marginRight: spacing.sm,
-    borderWidth: isDarkMode ? 1 : 0,
-    borderColor: colors.border,
+    marginRight: 4,
   },
-  selected: {
-    backgroundColor: colors.primary,
-    borderWidth: 0,
+  imageContainer: {
+    width: 74,          // Large circular image
+    height: 74,
+    borderRadius: 37,
+    justifyContent: 'center',
+    alignItems: 'center',
+    marginBottom: 8,
+    overflow: 'hidden',
   },
-  icon: {
-    marginRight: spacing.xs,
+  emojiIcon: {
+    fontSize: 28,
   },
   chipImage: {
-    width: 20,
-    height: 20,
-    marginRight: spacing.xs,
+    width: '100%',
+    height: '100%',
   },
   name: {
     color: colors.text.primary,
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Medium',
-    fontWeight: '500',
+    fontSize: 12, // Industry Standard
+    fontFamily: 'Poppins-SemiBold',
+    fontWeight: '600',
+    textAlign: 'center',
+    width: '100%',
+    lineHeight: 16,
+    marginTop: 6,
+    textTransform: 'uppercase',
   },
   selectedText: {
-    color: colors.text.white || '#FFFFFF',
-    fontFamily: 'Poppins-SemiBold',
+    color: colors.primary,
   },
 });
-
