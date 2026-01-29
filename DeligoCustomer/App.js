@@ -14,6 +14,7 @@ import { OrdersProvider } from './src/contexts/OrdersContext';
 import { LocationProvider } from './src/contexts/LocationContext';
 import { ProfileProvider } from './src/contexts/ProfileContext';
 import { NotificationProvider } from './src/contexts/NotificationContext';
+import { SocketProvider } from './src/contexts/SocketContext';
 import * as SystemUI from 'expo-system-ui';
 import { StripeProvider } from '@stripe/stripe-react-native';
 import RootNavigator from './src/navigation/RootNavigator';
@@ -167,15 +168,17 @@ export default function App() {
           <LanguageProvider>
             <ProfileProvider>
               <NotificationProvider>
-                <LocationProvider>
-                  <ProductsProvider>
-                    <CartProvider>
-                      <OrdersProvider>
-                        <AppContent />
-                      </OrdersProvider>
-                    </CartProvider>
-                  </ProductsProvider>
-                </LocationProvider>
+                <SocketProvider>
+                  <LocationProvider>
+                    <ProductsProvider>
+                      <CartProvider>
+                        <OrdersProvider>
+                          <AppContent />
+                        </OrdersProvider>
+                      </CartProvider>
+                    </ProductsProvider>
+                  </LocationProvider>
+                </SocketProvider>
               </NotificationProvider>
             </ProfileProvider>
           </LanguageProvider>

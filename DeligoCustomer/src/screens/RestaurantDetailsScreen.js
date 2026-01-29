@@ -25,6 +25,7 @@ import {
 import { useFocusEffect } from '@react-navigation/native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { spacing, fontSize, borderRadius } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
 import { useProducts } from '../contexts/ProductsContext';
@@ -419,7 +420,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
             <View style={{ marginTop: 4 }}>
               {discount > 0 ? (
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
                   <Text style={[styles.menuItemPrice, { color: colors.primary, marginRight: 6 }]}>
                     {formatCurrency(currency, finalPrice)}
                   </Text>
@@ -480,62 +481,71 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
         <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
           <TouchableOpacity style={{ flex: 1 }} onPress={closeProductModal} />
           <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
-            <ScrollView showsVerticalScrollIndicator={false}>
-              {/* Close Button */}
-              <TouchableOpacity style={styles.modalCloseBtn} onPress={closeProductModal}>
-                <Ionicons name="close-circle" size={32} color={colors.text.secondary} />
-              </TouchableOpacity>
-
-              {/* Images */}
-              {images.length > 0 && (
+            {/* Image Section */}
+            <View style={{ position: 'relative' }}>
+              {images.length > 0 ? (
                 <Image source={{ uri: images[0] }} style={styles.modalImage} resizeMode="cover" />
-              )}
+              ) : null}
+              <LinearGradient
+                colors={['transparent', 'rgba(255,255,255,1)']}
+                style={styles.imageOverlay}
+              />
+              <TouchableOpacity style={styles.modalCloseBtn} onPress={closeProductModal}>
+                <Ionicons name="close" size={24} color="#000" />
+              </TouchableOpacity>
+            </View>
 
+            <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
               {/* Content */}
               <View style={styles.modalBody}>
-                <Text style={[styles.modalTitle, { color: colors.text.primary }]}>{title}</Text>
+                <Text style={styles.modalTitle}>{title}</Text>
 
-
-
-                <View style={styles.modalPriceRow}>
+                <View style={styles.modalPriceContainer}>
                   {(() => {
                     // 1. Determine Base Price (Variation or Product)
-                    // Use pricing.price from API (not raw.price which may be undefined)
                     const productPrice = raw.pricing?.price ?? raw.price ?? 0;
-                    // Check selected variation for override
                     const selectedVarKey = Object.keys(selectedVariations).find(k => k.endsWith('_obj'));
                     let effectiveBase = productPrice;
                     if (selectedVarKey && selectedVariations[selectedVarKey]?.price) {
                       effectiveBase = Number(selectedVariations[selectedVarKey].price);
                     }
 
-                    // 2. Totals (addons are added on separate screen now)
+                    // 2. Totals
                     const originalTotal = effectiveBase;
                     const discountPercent = raw.pricing?.discount || 0;
                     const discountAmount = (effectiveBase * discountPercent) / 100;
                     const finalTotal = originalTotal - discountAmount;
 
                     return (
-                      <>
+                      <View style={{ flexDirection: 'row', alignItems: 'baseline', flexWrap: 'wrap' }}>
+                        {/* Current/Discounted Price */}
+                        <Text style={styles.modalPrice}>
+                          {formatCurrency(currency, finalTotal)}
+                        </Text>
+
+                        {/* Discount Badge */}
                         {discountPercent > 0 && (
-                          <Text style={[styles.modalPriceOriginal, { color: colors.text.secondary, textDecorationLine: 'line-through', marginRight: 8 }]}>
+                          <View style={styles.modalBadge}>
+                            <Text style={styles.modalBadgeText}>{discountPercent}% OFF</Text>
+                          </View>
+                        )}
+
+                        {/* Original Price (strikethrough) */}
+                        {discountPercent > 0 && (
+                          <Text style={styles.modalPriceOriginal}>
                             {formatCurrency(currency, originalTotal)}
                           </Text>
                         )}
-                        <Text style={[styles.modalPrice, { color: colors.primary }]}>
-                          {formatCurrency(currency, finalTotal)}
-                        </Text>
-                        {discountPercent > 0 && (
-                          <View style={[styles.modalBadge, { backgroundColor: colors.primary, paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }]}>
-                            <Text style={[styles.modalBadgeText, { fontSize: 14, fontWeight: 'bold', color: '#fff' }]}>{discountPercent}% OFF</Text>
-                          </View>
-                        )}
-                      </>
+                      </View>
                     );
                   })()}
                 </View>
 
-                <Text style={[styles.modalDescription, { color: colors.text.secondary }]}>{raw.description}</Text>
+                <Text style={styles.modalDescription}>
+                  {description || t('noDescription')}
+                </Text>
+
+
               </View>
 
               {/* Add-ons Info Banner - Addons will be selected on separate screen */}
@@ -608,263 +618,272 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                 </View>
               )}
 
-              {/* Quantity Controls */}
-              <View style={styles.modalQuantitySection}>
-                <Text style={[styles.modalQuantityLabel, { color: colors.text.primary }]}>{t('quantity') || 'Quantity'}</Text>
-                <View style={[styles.modalQuantityControl, { borderColor: colors.border }]}>
-                  <TouchableOpacity
-                    style={[styles.modalQuantityBtn, { backgroundColor: quantity > 0 ? colors.background : colors.border }]}
-                    onPress={() => {
-                      if (quantity > 0) {
-                        setLocalQty(prev => ({ ...prev, [activeProduct.id]: Math.max(0, quantity - 1) }));
-                      }
-                    }}
-                    disabled={quantity === 0}
-                  >
-                    <Ionicons name="remove" size={20} color={quantity > 0 ? colors.primary : colors.text.light} />
-                  </TouchableOpacity>
-                  <Text style={[styles.modalQuantityText, { color: colors.text.primary }]}>{quantity}</Text>
-                  <TouchableOpacity
-                    style={[styles.modalQuantityBtn, { backgroundColor: colors.primary }]}
-                    onPress={() => {
-                      setLocalQty(prev => ({ ...prev, [activeProduct.id]: quantity + 1 }));
-                    }}
-                  >
-                    <Ionicons name="add" size={20} color="#fff" />
-                  </TouchableOpacity>
-                </View>
-              </View>
-
             </ScrollView>
 
             {/* Footer */}
-            <View style={[styles.modalFooter, { backgroundColor: colors.surface, borderTopColor: colors.border }]}>
-              <TouchableOpacity
-                style={[
-                  styles.modalAddToCartBtn,
-                  {
-                    backgroundColor: (quantity > 0 && !addingToCart) ? colors.primary : colors.border,
-                    opacity: (quantity > 0 && !addingToCart) ? 1 : 0.5
-                  }
-                ]}
-                onPress={async () => {
-                  // Prevent double-tap
-                  if (addingToCart) return;
+            <View style={[styles.modalFooter, { backgroundColor: colors.surface, paddingBottom: Math.max(20, insets.bottom + 10) }]}>
+              <View style={{ backgroundColor: colors.primary + '05', borderRadius: borderRadius.xl, padding: spacing.md }}>
 
-                  // Validate quantity first
-                  if (quantity === 0) {
-                    setAlertConfig({
-                      title: t('error') || 'Error',
-                      message: t('pleaseAddQuantity') || 'Please add at least 1 item'
-                    });
-                    setAlertVisible(true);
-                    return;
-                  }
+                {/* Quantity Controls - Row Layout (Label Left, Controls Right) */}
+                <View style={[styles.modalQuantitySection, { marginBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+                  <Text style={styles.modalQuantityLabel}>{t('quantity') || 'Quantity'}</Text>
 
-                  // Enhanced validation: Check if product has variations and ALL are selected
-                  const variations = raw.variations || raw.options || [];
+                  <View style={styles.modalQuantityControl}>
+                    <TouchableOpacity
+                      style={[styles.modalQuantityBtn, { backgroundColor: colors.primary }]}
+                      onPress={() => {
+                        if (quantity > 0) {
+                          setLocalQty(prev => ({ ...prev, [activeProduct.id]: Math.max(0, quantity - 1) }));
+                        }
+                      }}
+                      disabled={quantity === 0}
+                    >
+                      <Ionicons name="remove" size={22} color="#fff" />
+                    </TouchableOpacity>
+                    <Text style={styles.modalQuantityText}>{quantity}</Text>
+                    <TouchableOpacity
+                      style={[styles.modalQuantityBtn, { backgroundColor: colors.primary }]}
+                      onPress={() => {
+                        setLocalQty(prev => ({ ...prev, [activeProduct.id]: quantity + 1 }));
+                      }}
+                    >
+                      <Ionicons name="add" size={22} color="#fff" />
+                    </TouchableOpacity>
+                  </View>
+                </View>
 
-                  if (variations.length > 0) {
-                    // Check if ANY variation is not selected
-                    // RELAXED: User requested optional variants. Only enforce if 'required' is explicitly true.
-                    // If your data doesn't have 'required' property, this loop effectively becomes optional.
-                    const unselectedRequired = variations.filter(v => v.required && !selectedVariations[v.name || v.title || v.id]);
+                <TouchableOpacity
+                  activeOpacity={0.9}
+                  style={{
+                    borderRadius: 16,
+                    opacity: (quantity > 0) ? 1 : 0.5
+                  }}
+                  onPress={async () => {
+                    // Prevent double-tap
+                    if (addingToCart) return;
 
-                    if (unselectedRequired.length > 0) {
+                    // Validate quantity first
+                    if (quantity === 0) {
                       setAlertConfig({
-                        title: t('selectionRequired') || 'Selection Required',
-                        message: `${t('pleaseSelect') || 'Please select'}: ${unselectedRequired[0].name || unselectedRequired[0].title || 'a variation'}`
+                        title: t('error') || 'Error',
+                        message: t('pleaseAddQuantity') || 'Please add at least 1 item'
                       });
                       setAlertVisible(true);
                       return;
                     }
-                  }
 
-                  // Start loading
-                  setAddingToCart(true);
+                    // Enhanced validation: Check if product has variations and ALL are selected
+                    const variations = raw.variations || raw.options || [];
 
-                  try {
-                    // Validate Add-on requirements
-                    // Validation relaxed to prevent blocking valid flows due to backend data mismatch.
-                    /*
-                    for (const group of activeAddons) {
-                      if (group.minSelectable > 0) {
-                        const groupSelections = selectedAddons[group._id] || {};
-                        // Check total items count for "select X items" requirement
-                        const totalCount = Object.values(groupSelections).reduce((s, o) => s + (o.quantity || 0), 0);
-          
-                        if (totalCount < group.minSelectable) {
-                          setAlertConfig({
-                            title: t('selectionRequired') || 'Selection Required',
-                            message: `${t('pleaseSelect') || 'Please select at least'} ${group.minSelectable} ${t('from') || 'from'} ${group.title || group.name}`
-                          });
-                          setAlertVisible(true);
-                          return;
-                        }
-                      }
-                    }
-                    */
+                    if (variations.length > 0) {
+                      // Check if ANY variation is not selected
+                      // RELAXED: User requested optional variants. Only enforce if 'required' is explicitly true.
+                      // If your data doesn't have 'required' property, this loop effectively becomes optional.
+                      const unselectedRequired = variations.filter(v => v.required && !selectedVariations[v.name || v.title || v.id]);
 
-                    // Retrieve detailed objects for selections
-                    const selectedObjs = Object.keys(selectedVariations)
-                      .filter(k => k.endsWith('_obj'))
-                      .map(k => selectedVariations[k]);
-
-                    // Map selection to variant name for backend compatibility.
-                    let targetVariantName = null;
-
-                    // 1. Look for option with explicit SKU
-                    const skuOption = selectedObjs.find(o => o.sku);
-                    if (skuOption) {
-                      targetVariantName = skuOption.label || skuOption.name || skuOption.value;
-                    }
-                    // 2. If no SKU, check for "Size" or "Variations" (common primary attributes)
-                    else {
-                      // Fallback: don't join with commas. Just pick the first significant one.
-                      // Ideally we'd pick the one that affects price the most? 
-                      // For now, pick the first one to avoid "A, B" errors.
-                      const firstOpt = selectedObjs[0];
-                      if (firstOpt) targetVariantName = firstOpt.label || firstOpt.name || firstOpt.value;
-                    }
-
-                    const variantName = targetVariantName || null;
-
-                    // Check if product has addon groups
-                    const addonGroupIds = raw.addonGroups || [];
-                    const hasAddons = addonGroupIds.length > 0;
-
-                    // Payload for cart - addons will be handled on separate screen
-                    const payload = {
-                      variantName: variantName,
-                      options: selectedVariations,
-                      addons: [] // Don't send addons here, let AddonsScreen handle it
-                    };
-
-                    // Add the product to cart first (without addons)
-                    const result = await addItem(activeProduct, quantity, payload);
-
-                    if (result && !result.success) {
-                      // Check for different vendor error
-                      if (result.error === 'DIFFERENT_VENDOR') {
-                        // Helper to safely fallback if t(key) returns key
-                        const safeT = (key, fallback) => {
-                          const val = t(key);
-                          return val === key ? fallback : val;
-                        };
-
+                      if (unselectedRequired.length > 0) {
                         setAlertConfig({
-                          title: safeT('startNewBasket', 'Start new basket?'),
-                          message: safeT('clearCartConfirm', 'Your cart contains items from another restaurant. Do you want to clear it and add this item?'),
-                          buttons: [
-                            {
-                              text: safeT('cancel', 'Cancel'),
-                              style: 'cancel',
-                              onPress: () => console.log('Cancelled new basket')
-                            },
-                            {
-                              text: safeT('clearAndAdd', 'Clear & Add'),
-                              onPress: async () => {
-                                try {
-                                  // Clear all carts directly
-                                  await clearAllCarts();
-                                  // Wait a tick for state to update
-                                  setTimeout(async () => {
-                                    // Retry adding
-                                    const retry = await addItem(activeProduct, quantity, payload);
-                                    if (retry && !retry.success) {
-                                      setAlertConfig({
-                                        title: safeT('error', 'Error'),
-                                        message: retry.message || safeT('addToCartFailed', 'Failed to add item')
-                                      });
-                                      setAlertVisible(true);
-                                    } else {
-                                      // Success path - same as below
-                                      closeProductModal();
-                                      if (hasAddons) {
-                                        // ... navigate to addons
-                                        setTimeout(() => {
-                                          const mongoProductId = raw._id || activeProduct._raw?._id || activeProduct.id;
-                                          navigation.navigate('Addons', {
-                                            product: { name: raw.name || activeProduct.name, id: mongoProductId },
-                                            productId: mongoProductId,
-                                            variantName: variantName,
-                                            addonGroupIds: addonGroupIds,
-                                            currency: raw.pricing?.currency || 'EUR'
-                                          });
-                                        }, 300);
-                                      }
-                                    }
-                                  }, 100);
-                                } catch (e) {
-                                  console.error('Failed to clear and add:', e);
-                                }
-                              }
-                            }
-                          ]
+                          title: t('selectionRequired') || 'Selection Required',
+                          message: `${t('pleaseSelect') || 'Please select'}: ${unselectedRequired[0].name || unselectedRequired[0].title || 'a variation'}`
                         });
                         setAlertVisible(true);
-                        return; // Stop execution, wait for user input
+                        return;
                       }
-                      console.warn('[RestaurantDetails] Add to cart failed:', result);
-                      throw new Error(result.message || 'Failed to add to cart');
                     }
 
-                    closeProductModal();
+                    // Start loading
+                    setAddingToCart(true);
 
-                    // If product has addons, navigate to AddonsScreen
-                    if (hasAddons) {
-                      // Small delay to ensure modal is closed
-                      setTimeout(() => {
-                        // Use MongoDB _id for productId since backend looks up items by _id
-                        const mongoProductId = raw._id || activeProduct._raw?._id || activeProduct.id;
+                    try {
+                      // Validate Add-on requirements
+                      // Validation relaxed to prevent blocking valid flows due to backend data mismatch.
+                      /*
+                      for (const group of activeAddons) {
+                        if (group.minSelectable > 0) {
+                          const groupSelections = selectedAddons[group._id] || {};
+                          // Check total items count for "select X items" requirement
+                          const totalCount = Object.values(groupSelections).reduce((s, o) => s + (o.quantity || 0), 0);
+            
+                          if (totalCount < group.minSelectable) {
+                            setAlertConfig({
+                              title: t('selectionRequired') || 'Selection Required',
+                              message: `${t('pleaseSelect') || 'Please select at least'} ${group.minSelectable} ${t('from') || 'from'} ${group.title || group.name}`
+                            });
+                            setAlertVisible(true);
+                            return;
+                          }
+                        }
+                      }
+                      */
 
-                        navigation.navigate('Addons', {
-                          product: {
-                            name: raw.name || activeProduct.name,
-                            id: mongoProductId,
-                          },
-                          productId: mongoProductId,
-                          variantName: variantName,
-                          addonGroupIds: addonGroupIds,
-                          currency: raw.pricing?.currency || 'EUR'
-                        });
-                      }, 300);
+                      // Retrieve detailed objects for selections
+                      const selectedObjs = Object.keys(selectedVariations)
+                        .filter(k => k.endsWith('_obj'))
+                        .map(k => selectedVariations[k]);
+
+                      // Map selection to variant name for backend compatibility.
+                      let targetVariantName = null;
+
+                      // 1. Look for option with explicit SKU
+                      const skuOption = selectedObjs.find(o => o.sku);
+                      if (skuOption) {
+                        targetVariantName = skuOption.label || skuOption.name || skuOption.value;
+                      }
+                      // 2. If no SKU, check for "Size" or "Variations" (common primary attributes)
+                      else {
+                        // Fallback: don't join with commas. Just pick the first significant one.
+                        // Ideally we'd pick the one that affects price the most? 
+                        // For now, pick the first one to avoid "A, B" errors.
+                        const firstOpt = selectedObjs[0];
+                        if (firstOpt) targetVariantName = firstOpt.label || firstOpt.name || firstOpt.value;
+                      }
+
+                      const variantName = targetVariantName || null;
+
+                      // Check if product has addon groups
+                      const addonGroupIds = raw.addonGroups || [];
+                      const hasAddons = addonGroupIds.length > 0;
+
+                      // Payload for cart - addons will be handled on separate screen
+                      const payload = {
+                        variantName: variantName,
+                        options: selectedVariations,
+                        addons: [] // Don't send addons here, let AddonsScreen handle it
+                      };
+
+                      // Add the product to cart first (without addons)
+                      const result = await addItem(activeProduct, quantity, payload);
+
+                      if (result && !result.success) {
+                        // Check for different vendor error
+                        if (result.error === 'DIFFERENT_VENDOR') {
+                          // Helper to safely fallback if t(key) returns key
+                          const safeT = (key, fallback) => {
+                            const val = t(key);
+                            return val === key ? fallback : val;
+                          };
+
+                          setAlertConfig({
+                            title: safeT('startNewBasket', 'Start new basket?'),
+                            message: safeT('clearCartConfirm', 'Your cart contains items from another restaurant. Do you want to clear it and add this item?'),
+                            buttons: [
+                              {
+                                text: safeT('cancel', 'Cancel'),
+                                style: 'cancel',
+                                onPress: () => console.log('Cancelled new basket')
+                              },
+                              {
+                                text: safeT('clearAndAdd', 'Clear & Add'),
+                                onPress: async () => {
+                                  try {
+                                    // Clear all carts directly
+                                    await clearAllCarts();
+                                    // Wait a tick for state to update
+                                    setTimeout(async () => {
+                                      // Retry adding
+                                      const retry = await addItem(activeProduct, quantity, payload);
+                                      if (retry && !retry.success) {
+                                        setAlertConfig({
+                                          title: safeT('error', 'Error'),
+                                          message: retry.message || safeT('addToCartFailed', 'Failed to add item')
+                                        });
+                                        setAlertVisible(true);
+                                      } else {
+                                        // Success path - same as below
+                                        closeProductModal();
+                                        if (hasAddons) {
+                                          // ... navigate to addons
+                                          setTimeout(() => {
+                                            const mongoProductId = raw._id || activeProduct._raw?._id || activeProduct.id;
+                                            navigation.navigate('Addons', {
+                                              product: { name: raw.name || activeProduct.name, id: mongoProductId },
+                                              productId: mongoProductId,
+                                              variantName: variantName,
+                                              addonGroupIds: addonGroupIds,
+                                              currency: raw.pricing?.currency || 'EUR'
+                                            });
+                                          }, 300);
+                                        }
+                                      }
+                                    }, 100);
+                                  } catch (e) {
+                                    console.error('Failed to clear and add:', e);
+                                  }
+                                }
+                              }
+                            ]
+                          });
+                          setAlertVisible(true);
+                          return; // Stop execution, wait for user input
+                        }
+                        console.warn('[RestaurantDetails] Add to cart failed:', result);
+                        throw new Error(result.message || 'Failed to add to cart');
+                      }
+
+                      closeProductModal();
+
+                      // If product has addons, navigate to AddonsScreen
+                      if (hasAddons) {
+                        // Small delay to ensure modal is closed
+                        setTimeout(() => {
+                          // Use MongoDB _id for productId since backend looks up items by _id
+                          const mongoProductId = raw._id || activeProduct._raw?._id || activeProduct.id;
+
+                          navigation.navigate('Addons', {
+                            product: {
+                              name: raw.name || activeProduct.name,
+                              id: mongoProductId,
+                            },
+                            productId: mongoProductId,
+                            variantName: variantName,
+                            addonGroupIds: addonGroupIds,
+                            currency: raw.pricing?.currency || 'EUR'
+                          });
+                        }, 300);
+                      }
+                    } catch (error) {
+                      console.error('[RestaurantDetails] Add to cart error:', error);
+                      setAlertConfig({
+                        title: t('error') || 'Error',
+                        // Show actual error message if available, otherwise fallback
+                        message: error.message || t('addToCartFailed') || 'Failed to add item to cart'
+                      });
+                      setAlertVisible(true);
+                    } finally {
+                      setAddingToCart(false);
                     }
-                  } catch (error) {
-                    console.error('[RestaurantDetails] Add to cart error:', error);
-                    setAlertConfig({
-                      title: t('error') || 'Error',
-                      // Show actual error message if available, otherwise fallback
-                      message: error.message || t('addToCartFailed') || 'Failed to add item to cart'
-                    });
-                    setAlertVisible(true);
-                  } finally {
-                    setAddingToCart(false);
-                  }
-                }}
-                disabled={isUpdating || addingToCart || quantity === 0}
-              >
-                {addingToCart ? (
-                  <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
-                ) : (
-                  <Ionicons name="cart" size={20} color={quantity > 0 ? "#fff" : colors.text.light} style={{ marginRight: 8 }} />
-                )}
-                <Text style={[styles.modalAddToCartText, { color: quantity > 0 ? '#fff' : colors.text.light }]}>
-                  {addingToCart
-                    ? (t('adding') || 'Adding...')
-                    : quantity > 0
-                      ? (() => {
-                        // Calculate total based on finalPrice (includes discount)
-                        const base = raw.pricing?.finalPrice ?? raw.finalPrice ?? price ?? 0;
-                        const total = base * quantity;
+                  }}
+                  disabled={isUpdating || addingToCart || quantity === 0}
+                >
+                  <LinearGradient
+                    colors={(quantity > 0) ? ['#EC407A', '#D81B60'] : ['#E0E0E0', '#BDBDBD']}
+                    start={{ x: 0, y: 0 }}
+                    end={{ x: 1, y: 0 }}
+                    style={styles.modalAddToCartBtn}
+                  >
+                    {addingToCart ? (
+                      <ActivityIndicator size="small" color="#fff" style={{ marginRight: 10 }} />
+                    ) : (
+                      <Ionicons name="cart" size={22} color={quantity > 0 ? "#fff" : colors.text.light} style={{ marginRight: 10 }} />
+                    )}
+                    <Text style={[styles.modalAddToCartText, { color: quantity > 0 ? '#fff' : colors.text.light }]}>
+                      {addingToCart
+                        ? (t('adding') || 'Adding...')
+                        : quantity > 0
+                          ? (() => {
+                            // Calculate total based on finalPrice (includes discount)
+                            const base = raw.pricing?.finalPrice ?? raw.finalPrice ?? price ?? 0;
+                            const total = base * quantity;
 
-                        return `${t('add') || 'Add'} ${quantity} ${t('for') || 'for'} ${formatCurrency(currency, total)}`;
-                      })()
-                      : (t('addToCart') || 'Add to cart')
-                  }
-                </Text>
-              </TouchableOpacity>
-            </View>
+                            return `${t('addToCart') || 'Add to cart'} • ${formatCurrency(currency, total)}`;
+                          })()
+                          : (t('addToCart') || 'Add to cart')
+                      }
+                    </Text>
+                  </LinearGradient>
+                </TouchableOpacity>
+              </View>
+            </View >
           </View >
         </View >
       </Modal >
@@ -1080,14 +1099,14 @@ const styles = StyleSheet.create({
   },
   restaurantCard: {
     margin: spacing.md,
-    borderRadius: borderRadius.xl,
+    borderRadius: 16,
     borderWidth: 1,
     overflow: 'hidden',
-    elevation: 3,
+    elevation: 2,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
+    shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
-    shadowRadius: 8,
+    shadowRadius: 4,
   },
   restaurantImage: {
     width: '100%',
@@ -1177,14 +1196,14 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     padding: spacing.md,
-    borderRadius: borderRadius.lg,
+    borderRadius: 16,
     marginBottom: spacing.md,
     borderWidth: 1,
-    elevation: 2,
+    elevation: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
-    shadowRadius: 3,
+    shadowRadius: 2,
   },
   menuItemContent: {
     flexDirection: 'row',
@@ -1193,7 +1212,7 @@ const styles = StyleSheet.create({
   menuItemImage: {
     width: 80,
     height: 80,
-    borderRadius: borderRadius.md,
+    borderRadius: 12,
     marginRight: spacing.md,
   },
   menuItemInfo: {
@@ -1338,96 +1357,128 @@ const styles = StyleSheet.create({
   },
   modalCloseBtn: {
     position: 'absolute',
-    top: spacing.md,
-    right: spacing.md,
+    top: 10,
+    right: 10,
     zIndex: 10,
-    backgroundColor: 'rgba(255,255,255,0.9)',
+    backgroundColor: '#F5F5F5',
     borderRadius: 20,
+    padding: 8,
+    elevation: 6,
+    shadowColor: '#000',
+    shadowOpacity: 0.3,
+    shadowRadius: 6,
   },
   modalImage: {
     width: '100%',
-    height: 250,
+    height: 280, // Taller for better product showcase
+    borderTopLeftRadius: borderRadius.xxl,
+    borderTopRightRadius: borderRadius.xxl,
+  },
+  imageOverlay: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 60,
   },
   modalBody: {
     padding: spacing.lg,
   },
   modalTitle: {
-    fontSize: fontSize.xxl,
+    fontSize: 26,
     fontFamily: 'Poppins-Bold',
-    marginBottom: spacing.sm,
+    marginBottom: 12,
+    color: '#1A1A2E',
+    letterSpacing: -0.5,
   },
   modalDescription: {
-    fontSize: fontSize.md,
+    fontSize: 14,
     fontFamily: 'Poppins-Regular',
-    lineHeight: 22,
+    lineHeight: 26,
+    color: '#757575',
+    marginBottom: 24,
+  },
+  modalPriceContainer: {
     marginBottom: spacing.md,
   },
-  modalPriceRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    paddingVertical: spacing.md,
-    borderTopWidth: 1,
-    borderBottomWidth: 1,
-    marginBottom: spacing.md,
-  },
-  modalPriceLabel: {
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-Regular',
-  },
+  // modalPriceLabel removed
   modalPrice: {
-    fontSize: fontSize.xl,
+    fontSize: 28,
     fontFamily: 'Poppins-Bold',
+    color: '#E91E63',
+    marginRight: 4,
+  },
+  modalPriceOriginal: {
+    fontSize: 18,
+    fontFamily: 'Poppins-Regular',
+    textDecorationLine: 'line-through',
+    color: '#9E9E9E',
+    marginLeft: 8,
+    opacity: 0.35,
+  },
+  modalBadge: {
+    backgroundColor: '#E91E63',
+    paddingHorizontal: 4,
+    paddingVertical: 1,
+    borderRadius: 4,
+  },
+  modalBadgeText: {
+    color: '#fff',
+    fontSize: 12,
+    fontWeight: 'bold',
   },
   modalQuantitySection: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    marginBottom: 0,
   },
   modalQuantityLabel: {
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-SemiBold',
+    fontSize: 18,
+    fontFamily: 'Poppins-Medium',
+    marginBottom: 0,
+    color: '#1A1A2E',
   },
   modalQuantityControl: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: borderRadius.full,
+    justifyContent: 'space-between',
+    borderRadius: 12,
     borderWidth: 1,
+    borderColor: '#E0E0E0',
+    backgroundColor: '#FFFFFF',
     padding: 4,
   },
   modalQuantityBtn: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    width: 48,
+    height: 48,
+    borderRadius: 10,
     alignItems: 'center',
     justifyContent: 'center',
   },
   modalQuantityText: {
-    marginHorizontal: spacing.md,
-    fontSize: fontSize.lg,
+    fontSize: 20,
     fontFamily: 'Poppins-Bold',
-    minWidth: 32,
+    minWidth: 50,
     textAlign: 'center',
+    color: '#1A1A2E',
   },
   modalFooter: {
     padding: spacing.md,
-    borderTopWidth: 1,
+    paddingBottom: spacing.lg,
   },
   modalAddToCartBtn: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: spacing.md,
-    borderRadius: borderRadius.full,
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
+    paddingVertical: 18,
+    borderRadius: 16,
+    elevation: 1,
+    shadowColor: '#E91E63',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.1,
+    shadowRadius: 2,
   },
   modalAddToCartText: {
     color: '#fff',
-    fontSize: fontSize.lg,
+    fontSize: 18,
     fontFamily: 'Poppins-Bold',
   },
   modalOriginalPrice: {

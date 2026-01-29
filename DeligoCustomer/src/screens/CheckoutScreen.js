@@ -111,7 +111,7 @@ const CheckoutScreen = ({ route, navigation }) => {
   const [appliedOffer, setAppliedOffer] = useState(null);
 
   // Get real cart data from CartContext
-  const { getVendorCart } = useCart();
+  const { getVendorCart, clearVendorCartAndSync } = useCart();
   const { products } = useProducts();
   const vendorId = cartData?.vendorId;
   const cart = getVendorCart(vendorId);
@@ -384,42 +384,75 @@ const CheckoutScreen = ({ route, navigation }) => {
 
       if (isCartPurchase) {
         // CART PURCHASE
-        checkoutPayload.useCart = true;
-        // SPECIAL CASE: If we have an applied offer, we MUST send items with offerCode
-        // even if it's a cart purchase, if the backend supports overriding cart items
-        if (appliedOffer && appliedOffer.code) {
-          const itemsWithOffer = (cartData?.items || []).map(it => {
-            const rawId = it.productId || it.product?.id || it.product?._id || it.id || it._id;
-            return {
-              productId: (rawId && rawId.includes('|')) ? rawId.split('|')[0] : rawId,
-              quantity: it.quantity || 1,
-              offerCode: appliedOffer.code,
-              // Also pass addons/options if needed, though usually just ID/Qty is enough for backend calculation unless it's a dynamic price
-              // If backend requires them to validate price:
-              // addons: it.addons,
-              // options: it.options 
-            };
-          });
-          checkoutPayload.items = itemsWithOffer;
+        // Force manual mode to bypass broken backend Cart->Summary conversion
+        checkoutPayload.useCart = false;
 
-          // CRITICAL: When sending specific items (especially with offerCode), disable useCart
-          // to force the backend to calculate based on THESE items, not the server-side cart.
-          checkoutPayload.useCart = false;
-        }
+        // Construct items payload explicitly from context cart
+        let calculatedSubtotal = 0;
+
+        const itemsPayload = Object.keys(cart.items || {}).map(key => {
+          const it = cart.items[key];
+          const rawId = it.product?.id || it.product?._id || it.productId || key;
+
+          // Calculate item subtotal for payload
+          const price = Number(it.product?.price || it.price || 0);
+          const qty = Number(it.quantity || 1);
+          const addonsCost = (it.addons || []).reduce((s, a) => s + Number(a.price || 0), 0);
+          const itemTotal = (price + addonsCost) * qty;
+          calculatedSubtotal += itemTotal;
+
+          return {
+            productId: (rawId && rawId.includes('|')) ? rawId.split('|')[0] : rawId,
+            quantity: qty,
+            offerCode: appliedOffer?.code,
+            addons: it.addons,
+            options: it.options,
+            variantName: it.variantName || it.selectedVariation,
+            price: price,
+            itemTotal: itemTotal
+          };
+        });
+        checkoutPayload.items = itemsPayload;
+
+        // SHOTGUN STRATEGY: Send all possible naming conventions to satisfy backend validation
+        checkoutPayload.subtotal = calculatedSubtotal;
+        checkoutPayload.subTotal = calculatedSubtotal;
+        checkoutPayload.total = calculatedSubtotal;
+        checkoutPayload.totalPrice = calculatedSubtotal;
+        checkoutPayload.cartTotal = calculatedSubtotal;
+        checkoutPayload.amount = calculatedSubtotal;
+
       } else {
         // DIRECT PURCHASE (Buy Now / Reorder / etc)
         // Extract items from cartData params
+        let calculatedSubtotal = 0;
+
         const directItems = (cartData?.items || []).map(it => {
           const rawId = it.productId || it.product?.id || it.product?._id || it.id || it._id;
+
+          const price = Number(it.price || it.product?.price || 0);
+          const qty = Number(it.quantity || 1);
+          const itemTotal = price * qty;
+          calculatedSubtotal += itemTotal;
+
           return {
             productId: (rawId && rawId.includes('|')) ? rawId.split('|')[0] : rawId, // Ensure productId is set and clean
-            quantity: it.quantity || 1,
-            offerCode: appliedOffer?.code // Inject offerCode
+            quantity: qty,
+            offerCode: appliedOffer?.code, // Inject offerCode
+            price: price,
+            itemTotal: itemTotal
           };
         });
         checkoutPayload.items = directItems;
+
+        checkoutPayload.subtotal = calculatedSubtotal;
+        checkoutPayload.subTotal = calculatedSubtotal;
+        checkoutPayload.total = calculatedSubtotal;
+        checkoutPayload.totalPrice = calculatedSubtotal;
         // Don't send useCart
       }
+
+      console.log('[CheckoutScreen] Layout Dump:', JSON.stringify(checkoutPayload));
 
       // Aggressive Cleanup: Ensure no nested address objects confuse the backend
       if (typeof checkoutPayload.deliveryAddress === 'object') {
@@ -556,6 +589,15 @@ const CheckoutScreen = ({ route, navigation }) => {
     return sum + unitTax * (it.quantity || 0);
   }, 0);
 
+  // Calculate display subtotal using finalPrice (price after tax and discount)
+  // MOVED UP to be available for logs
+  const displaySubtotal = cartItems.reduce((sum, it) => {
+    // Match CartDetail logic: Addons are flat cost per line item
+    const addonsCost = (it.addons || []).reduce((aSum, a) => aSum + (Number(a.price || 0) * Number(a.quantity || 1)), 0);
+    const itemTotal = (it.finalPrice || it.price || 0) * (it.quantity || 0);
+    return sum + itemTotal + addonsCost;
+  }, 0);
+
   // Fees and promo discount
   const deliveryFee = cartData?.deliveryFee || 0;
   const serviceFee = cartData?.serviceFee || 0;
@@ -605,14 +647,6 @@ const CheckoutScreen = ({ route, navigation }) => {
     return sum + unitTax * (it.quantity || 0);
   }, 0);
   const total = subtotalAfterDiscount + taxAmount;
-
-  // Calculate display subtotal using finalPrice (price after tax and discount)
-  const displaySubtotal = cartItems.reduce((sum, it) => {
-    // Match CartDetail logic: Addons are flat cost per line item
-    const addonsCost = (it.addons || []).reduce((aSum, a) => aSum + (Number(a.price || 0) * Number(a.quantity || 1)), 0);
-    const itemTotal = (it.finalPrice || it.price || 0) * (it.quantity || 0);
-    return sum + itemTotal + addonsCost;
-  }, 0);
 
   // Debug: Log checkoutResponse to verify it's being populated
   console.debug('[CheckoutScreen] Render - checkoutResponse:', checkoutResponse, 'local total:', total);
@@ -804,7 +838,14 @@ const CheckoutScreen = ({ route, navigation }) => {
 
     console.debug('[CheckoutScreen] Order created successfully:', orderRes.data);
 
-    // Step 3: Show success and navigate to orders
+    // Step 3: Clear Cart & Show Success
+    // Since we forced useCart=false, we must manually clear the cart now.
+    if (vendorId) {
+      clearVendorCartAndSync(vendorId).catch(err => {
+        console.warn('[CheckoutScreen] Failed to clear cart after order:', err);
+      });
+    }
+
     setIsProcessing(false);
     setShowSuccessModal(true);
 

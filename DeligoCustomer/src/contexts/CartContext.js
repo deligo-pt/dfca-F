@@ -687,6 +687,16 @@ export const CartProvider = ({ children }) => {
       const res = await CartAPI.deleteItems(itemsToDelete);
 
       if (!res.success) {
+        // Debug log to ensure we see exactly what we're getting
+        console.log('[Cart] clearVendorCartAndSync result:', res);
+
+        // If 404, it means cart is already empty on server, so local clear is valid.
+        // Don't rollback if the server says it's already gone.
+        if (res.status == 404 || (typeof res.error === 'string' && res.error.includes('not found'))) {
+          console.debug('[Cart] Server cart already empty (404), keeping local clear.');
+          return { success: true };
+        }
+
         console.warn('[Cart] Clear failed, rolling back', res);
         setState(prev => {
           const carts = { ...(prev.carts || {}) };

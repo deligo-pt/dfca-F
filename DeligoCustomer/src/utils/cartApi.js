@@ -205,10 +205,16 @@ class CartAPI {
 
       if (!response.ok) {
         const errorMessage = responseData?.message || responseData?.error || 'Failed to delete items';
-        console.error('Cart API - Delete items error:', {
-          status: response.status,
-          data: responseData
-        });
+
+        if (response.status === 404) {
+          console.debug('Cart API - Delete items 404 (already empty):', { status: response.status });
+        } else {
+          console.error('Cart API - Delete items error:', {
+            status: response.status,
+            data: responseData
+          });
+        }
+
         return { success: false, error: errorMessage, status: response.status };
       }
 
