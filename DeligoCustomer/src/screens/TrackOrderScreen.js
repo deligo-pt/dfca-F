@@ -536,32 +536,51 @@ const TrackOrderScreen = ({ route, navigation }) => {
         if (orderDeliveryCoords) {
           if (active) setUserLocation(orderDeliveryCoords);
         } else {
-          // 3. Fallback: Request Device Location
-          const { status } = await Location.requestForegroundPermissionsAsync();
-          if (status !== 'granted') {
-            console.log('Permission to access location was denied');
-            // Fallback default
-            const defaultCoords = { latitude: 23.745038, longitude: 90.4395245 };
-            if (active) setUserLocation(defaultCoords);
-          } else {
-            // Get current location (with timeout)
-            try {
-              // Promise.race to prevent hanging
-              const locationPromise = Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-              const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject('Timeout'), 5000));
-              const location = await Promise.race([locationPromise, timeoutPromise]);
-
-              if (active) {
-                setUserLocation({
-                  latitude: location.coords.latitude,
-                  longitude: location.coords.longitude,
-                });
+          // 3. Fallback: Try Geocoding the address string
+          try {
+            if (orderData.deliveryAddress && orderData.deliveryAddress !== 'Delivery address') {
+              console.log('[TrackOrder] Geocoding address:', orderData.deliveryAddress);
+              const geocoded = await Location.geocodeAsync(orderData.deliveryAddress);
+              if (geocoded && geocoded.length > 0) {
+                const geoCoords = { latitude: geocoded[0].latitude, longitude: geocoded[0].longitude };
+                if (active) {
+                  setUserLocation(geoCoords);
+                  orderDeliveryCoords = geoCoords; // Update local var for downstream logic
+                }
               }
-            } catch (e) {
-              console.warn('Location fetch timed out or failed, using fallback');
-              if (active) {
-                // Default fallback if GPS fails
-                setUserLocation({ latitude: 23.745038, longitude: 90.4395245 });
+            }
+          } catch (e) {
+            console.warn('[TrackOrder] Geocoding failed:', e);
+          }
+
+          // 4. Ultimate Fallback: Request Device Location (only if geocoding failed)
+          if (!orderDeliveryCoords) {
+            const { status } = await Location.requestForegroundPermissionsAsync();
+            if (status !== 'granted') {
+              console.log('Permission to access location was denied');
+              // Fallback default
+              const defaultCoords = { latitude: 23.745038, longitude: 90.4395245 };
+              if (active) setUserLocation(defaultCoords);
+            } else {
+              // Get current location (with timeout)
+              try {
+                // Promise.race to prevent hanging
+                const locationPromise = Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject('Timeout'), 5000));
+                const location = await Promise.race([locationPromise, timeoutPromise]);
+
+                if (active) {
+                  setUserLocation({
+                    latitude: location.coords.latitude,
+                    longitude: location.coords.longitude,
+                  });
+                }
+              } catch (e) {
+                console.warn('Location fetch timed out or failed, using fallback');
+                if (active) {
+                  // Default fallback if GPS fails
+                  setUserLocation({ latitude: 23.745038, longitude: 90.4395245 });
+                }
               }
             }
           }
@@ -707,6 +726,13 @@ const TrackOrderScreen = ({ route, navigation }) => {
     }
   }, [driverLocation, restaurantLocation, userLocation]);
 
+  // Reset map layout state when switching fullscreen mode
+  useEffect(() => {
+    setMapLayout(false);
+    // We might also want to reset mapRef if possible, but refs are mutable.
+    // The key is to force the layout check again.
+  }, [isMapFullscreen]);
+
   // Adjust map viewport
   useEffect(() => {
     if (mapReady && mapLayout && mapRef.current && routeCoordinates.length > 0) {
@@ -784,7 +810,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
             longitudeDelta: 0.02,
           }}
           customMapStyle={isDarkMode ? darkMapStyle : []}
-          showsUserLocation={true}
+          showsUserLocation={false}
           showsMyLocationButton={false}
           showsCompass={true}
           loadingEnabled={true}
@@ -831,13 +857,14 @@ const TrackOrderScreen = ({ route, navigation }) => {
           {userLocation && (
             <Marker
               coordinate={userLocation}
-              title={t('yourLocation')}
+              title={t('deliveryAddress') || "Delivery Address"}
               description={orderData.deliveryAddress}
             >
               <View style={styles.customMarker}>
-                <View style={styles.userMarker}>
-                  <Ionicons name="location" size={24} color={colors.primary} />
+                <View style={[styles.userMarker, { backgroundColor: colors.primary }]}>
+                  <Ionicons name="home" size={20} color="#FFF" />
                 </View>
+                <View style={styles.markerTail} />
               </View>
             </Marker>
           )}
@@ -1259,10 +1286,16 @@ const TrackOrderScreen = ({ route, navigation }) => {
                   longitudeDelta: 0.02,
                 }}
                 customMapStyle={isDarkMode ? darkMapStyle : []}
-                showsUserLocation={true}
+                showsUserLocation={false}
                 showsMyLocationButton={false}
                 showsCompass={true}
                 loadingEnabled={true}
+                onLayout={(e) => {
+                  const { width, height } = e.nativeEvent.layout;
+                  if (width > 50 && height > 50) {
+                    setMapLayout(true);
+                  }
+                }}
               >
                 {/* Restaurant Marker */}
                 {restaurantLocation && (
@@ -1304,9 +1337,10 @@ const TrackOrderScreen = ({ route, navigation }) => {
                     description={orderData.deliveryAddress}
                   >
                     <View style={styles.customMarker}>
-                      <View style={styles.userMarker}>
-                        <Ionicons name="location" size={24} color={colors.primary} />
+                      <View style={[styles.userMarker, { backgroundColor: colors.primary }]}>
+                        <Ionicons name="home" size={20} color="#FFF" />
                       </View>
+                      <View style={styles.markerTail} />
                     </View>
                   </Marker>
                 )}
