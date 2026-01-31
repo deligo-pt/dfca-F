@@ -1,5 +1,5 @@
 import React, { useState, useEffect } from 'react';
-import { View, StyleSheet, TouchableOpacity, Text, Alert, StatusBar, Modal } from 'react-native';
+import { View, StyleSheet, TouchableOpacity, Text, Alert, StatusBar, Modal, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import * as Location from 'expo-location';
@@ -89,6 +89,8 @@ const LocationAddressScreen = ({ navigation, route }) => {
     setModalConfig(prev => ({ ...prev, visible: false }));
     if (callback) callback();
   };
+
+  const [isSaving, setIsSaving] = useState(false);
 
   useEffect(() => {
     (async () => {
@@ -242,6 +244,7 @@ const LocationAddressScreen = ({ navigation, route }) => {
   const handleSave = async () => {
     if (!validate()) return;
 
+    setIsSaving(true);
     try {
       const addressData = {
         address: streetAddress,
@@ -427,6 +430,8 @@ const LocationAddressScreen = ({ navigation, route }) => {
     } catch (err) {
       console.error('[LocationAddressScreen] handleSave error:', err);
       showModal(t('error'), t('unexpectedError'));
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -492,10 +497,15 @@ const LocationAddressScreen = ({ navigation, route }) => {
           paddingBottom: Math.max(16, insets.bottom + 16)
         }]}>
           <TouchableOpacity
-            style={[styles.saveButton, { backgroundColor: colors.primary }]}
+            style={[styles.saveButton, { backgroundColor: colors.primary, opacity: isSaving ? 0.7 : 1 }]}
             onPress={handleSave}
+            disabled={isSaving}
           >
-            <Text style={styles.saveButtonText}>{t('save')}</Text>
+            {isSaving ? (
+              <ActivityIndicator color="#fff" size="small" />
+            ) : (
+              <Text style={styles.saveButtonText}>{t('save')}</Text>
+            )}
           </TouchableOpacity>
         </View>
       )}

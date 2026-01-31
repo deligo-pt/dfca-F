@@ -16,9 +16,12 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
  * filtering by vendor type, sorting, and persistent history.
  */
 
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
+
 const SearchScreen = ({ navigation }) => {
     const { colors, isDarkMode } = useTheme();
     const { t } = useLanguage();
+    const insets = useSafeAreaInsets();
     const { products, loading: productsLoading, fetchProducts } = useProducts();
     const [searchQuery, setSearchQuery] = useState('');
     const [recentSearches, setRecentSearches] = useState([]);
@@ -383,7 +386,7 @@ const SearchScreen = ({ navigation }) => {
     };
 
     return (
-        <SafeAreaView style={styles(colors, isDarkMode).safeArea}>
+        <View style={[styles(colors, isDarkMode).safeArea, { paddingTop: insets.top + 10 }]}>
             <StatusBar
                 barStyle={isDarkMode ? 'light-content' : 'dark-content'}
                 backgroundColor="transparent"
@@ -493,7 +496,7 @@ const SearchScreen = ({ navigation }) => {
             <View style={{ flex: 1 }}>
                 {renderContent()}
             </View>
-        </SafeAreaView>
+        </View>
     );
 };
 

@@ -25,6 +25,7 @@ export { default as SearchScreen } from './SearchScreen';
 // Account Related Screens
 export { default as EditProfileScreen } from './EditProfileScreen';
 export { default as VouchersScreen } from './VouchersScreen';
+export { default as FavoriteOrdersScreen } from './FavoriteOrdersScreen';
 export { default as SavedAddressesScreen } from './SavedAddressesScreen';
 export { default as PaymentMethodsScreen } from './PaymentMethodsScreen';
 export { default as ReferralsScreen } from './ReferralsScreen';

@@ -50,7 +50,7 @@ const FAQsScreen = ({ navigation }) => {
                 {
                     id: 'q3',
                     question: 'What payment methods do you accept?',
-                    answer: 'We accept major credit/debit cards (Visa, Mastercard), digital wallets (Apple Pay, Google Pay), and cash on delivery in select areas.'
+                    answer: 'We accept major credit/debit cards (Visa, Mastercard) and digital wallets (Apple Pay, Google Pay).'
                 },
                 {
                     id: 'q4',

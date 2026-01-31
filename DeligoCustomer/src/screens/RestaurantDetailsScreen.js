@@ -498,7 +498,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
             <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
               {/* Content */}
               <View style={styles.modalBody}>
-                <Text style={styles.modalTitle}>{title}</Text>
+                <Text style={[styles.modalTitle, { color: colors.text.primary }]}>{title}</Text>
 
                 <View style={styles.modalPriceContainer}>
                   {(() => {
@@ -541,7 +541,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                   })()}
                 </View>
 
-                <Text style={styles.modalDescription}>
+                <Text style={[styles.modalDescription, { color: colors.text.secondary }]}>
                   {description || t('noDescription')}
                 </Text>
 
@@ -621,12 +621,12 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
             </ScrollView>
 
             {/* Footer */}
-            <View style={[styles.modalFooter, { backgroundColor: colors.surface, paddingBottom: Math.max(20, insets.bottom + 10) }]}>
+            <View style={[styles.modalFooter, { backgroundColor: colors.surface, paddingBottom: Math.max(16, insets.bottom) }]}>
               <View style={{ backgroundColor: colors.primary + '05', borderRadius: borderRadius.xl, padding: spacing.md }}>
 
                 {/* Quantity Controls - Row Layout (Label Left, Controls Right) */}
                 <View style={[styles.modalQuantitySection, { marginBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-                  <Text style={styles.modalQuantityLabel}>{t('quantity') || 'Quantity'}</Text>
+                  <Text style={[styles.modalQuantityLabel, { color: colors.text.primary }]}>{t('quantity') || 'Quantity'}</Text>
 
                   <View style={styles.modalQuantityControl}>
                     <TouchableOpacity
@@ -640,7 +640,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                     >
                       <Ionicons name="remove" size={22} color="#fff" />
                     </TouchableOpacity>
-                    <Text style={styles.modalQuantityText}>{quantity}</Text>
+                    <Text style={[styles.modalQuantityText, { color: colors.text.primary }]}>{quantity}</Text>
                     <TouchableOpacity
                       style={[styles.modalQuantityBtn, { backgroundColor: colors.primary }]}
                       onPress={() => {
@@ -1388,14 +1388,12 @@ const styles = StyleSheet.create({
     fontSize: 26,
     fontFamily: 'Poppins-Bold',
     marginBottom: 12,
-    color: '#1A1A2E',
     letterSpacing: -0.5,
   },
   modalDescription: {
     fontSize: 14,
     fontFamily: 'Poppins-Regular',
     lineHeight: 26,
-    color: '#757575',
     marginBottom: 24,
   },
   modalPriceContainer: {
@@ -1434,7 +1432,6 @@ const styles = StyleSheet.create({
     fontSize: 18,
     fontFamily: 'Poppins-Medium',
     marginBottom: 0,
-    color: '#1A1A2E',
   },
   modalQuantityControl: {
     flexDirection: 'row',
@@ -1458,11 +1455,11 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Bold',
     minWidth: 50,
     textAlign: 'center',
-    color: '#1A1A2E',
   },
   modalFooter: {
-    padding: spacing.md,
-    paddingBottom: spacing.lg,
+    paddingHorizontal: spacing.md,
+    paddingTop: spacing.md,
+    paddingBottom: spacing.md,
   },
   modalAddToCartBtn: {
     flexDirection: 'row',

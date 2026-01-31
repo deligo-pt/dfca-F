@@ -7,50 +7,29 @@ const { width } = Dimensions.get('window');
 
 const MOCK_PROMOS = [
     {
-        id: 1,
-        title: 'Food In 15 Mins!',
-        subtitle: 'Fresh, hot & crisp delights for you.',
-        brand: 'Bolt ⚡',
-        cta: 'ORDER NOW',
-        image: 'https://images.unsplash.com/photo-1512058564366-18510be2db19?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Fried Rice/Bowl
-        bgColor: '#5D1F46', // Deep purple from reference
+        _id: '1',
+        sponsorName: 'Amana Group Ltd.',
+        sponsorType: 'Ads',
+        // High-res food spread, 1080x500 crop
+        image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?ixlib=rb-1.2.1&auto=format&fit=crop&w=1080&h=500&q=80',
+        isActive: true
     },
     {
-        id: 2,
+        id: 2, // Legacy support
         title: 'Free Delivery',
         subtitle: 'On your first 3 orders.',
         brand: 'DeliGo Pro',
         cta: 'JOIN NOW',
-        image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Food Spread
-        bgColor: '#1A4D2E', // Dark Green
+        image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
+        bgColor: '#1A4D2E',
     },
     {
-        id: 3,
-        title: 'Sweet Cravings?',
-        subtitle: 'Get 20% off all desserts.',
-        brand: 'Sugar Rush',
-        cta: 'TREAT YOURSELF',
-        image: 'https://images.unsplash.com/photo-1578985545062-69928b1d9587?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Chocolate Cake
-        bgColor: '#C2185B', // Pink/Berry
-    },
-    {
-        id: 4,
-        title: 'Burger Mania',
-        subtitle: 'Buy 1 Get 1 Free today!',
-        brand: 'Grill Master',
-        cta: 'GRAB DEAL',
-        image: 'https://images.unsplash.com/photo-1568901346375-23c9450c58cd?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Burger
-        bgColor: '#E65100', // Deep Orange
-    },
-    {
-        id: 5,
-        title: 'Healthy Eats',
-        subtitle: 'Fresh salads & power bowls.',
-        brand: 'Green Life',
-        cta: 'ORDER NOW',
-        image: 'https://images.unsplash.com/photo-1512621776951-a57141f2eefd?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80', // Salad
-        bgColor: '#2E7D32', // Leaf Green
-    },
+        _id: '3',
+        sponsorName: 'Coca Cola',
+        sponsorType: 'Ads',
+        image: 'https://images.unsplash.com/photo-1554866585-cd94860890b7?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80',
+        isActive: true
+    }
 ];
 
 const PromoCarousel = ({ promos = MOCK_PROMOS, onPress }) => {
@@ -72,7 +51,7 @@ const PromoCarousel = ({ promos = MOCK_PROMOS, onPress }) => {
                 });
                 setCurrentIndex(nextIndex);
             }
-        }, 5000); // 5 seconds (Industry Standard for readability)
+        }, 5000);
 
         return () => clearInterval(timer);
     }, [currentIndex, promos.length]);
@@ -102,46 +81,74 @@ const PromoCarousel = ({ promos = MOCK_PROMOS, onPress }) => {
                 scrollEventThrottle={16}
                 style={{ flexGrow: 0 }}
             >
-                {promos.map((promo) => (
-                    <TouchableOpacity
-                        key={promo.id}
-                        style={[styles.card, { backgroundColor: promo.bgColor || colors.primary }]}
-                        onPress={() => onPress && onPress(promo)}
-                        activeOpacity={0.9}
-                    >
-                        <View style={styles.content}>
-                            <View style={styles.textContainer}>
-                                <Text style={styles.brand}>{promo.brand}</Text>
-                                <Text style={styles.title} numberOfLines={2}>
-                                    {promo.title}
-                                </Text>
-                                <Text style={styles.subtitle} numberOfLines={2}>
-                                    {promo.subtitle}
-                                </Text>
+                {promos.map((promo, index) => {
+                    // Check if it's a pure image ad (Ads type or missing title)
+                    const isPureImage = promo.sponsorType === 'Ads' || !promo.title;
+                    const imageUrl = promo.image || promo.banner; // Fallback
+                    const bgColor = promo.bgColor || colors.primary;
 
-                                <TouchableOpacity style={styles.ctaButton} onPress={() => onPress && onPress(promo)}>
-                                    <Text style={styles.ctaText}>{promo.cta}</Text>
-                                </TouchableOpacity>
-                            </View>
-
-                            <View style={styles.imageContainer}>
+                    return (
+                        <TouchableOpacity
+                            key={promo.id || promo._id || index}
+                            style={[styles.card, { backgroundColor: isPureImage ? '#fff' : bgColor }]}
+                            onPress={() => onPress && onPress(promo)}
+                            activeOpacity={0.9}
+                        >
+                            {isPureImage ? (
+                                // Pure Image Layout
                                 <Image
-                                    source={{ uri: promo.image }}
-                                    style={styles.image}
+                                    source={{ uri: imageUrl }}
+                                    style={styles.fullImage}
                                     resizeMode="cover"
                                 />
-                            </View>
-                        </View>
-                    </TouchableOpacity>
-                ))}
+                            ) : (
+                                // Standard Layout with Text Overlay
+                                <View style={styles.content}>
+                                    <View style={styles.textContainer}>
+                                        <Text style={styles.brand}>{promo.brand || promo.sponsorName}</Text>
+                                        <Text style={styles.title} numberOfLines={2}>
+                                            {promo.title}
+                                        </Text>
+                                        <Text style={styles.subtitle} numberOfLines={2}>
+                                            {promo.subtitle}
+                                        </Text>
+
+                                        {promo.cta && (
+                                            <TouchableOpacity style={styles.ctaButton} onPress={() => onPress && onPress(promo)}>
+                                                <Text style={styles.ctaText}>{promo.cta}</Text>
+                                            </TouchableOpacity>
+                                        )}
+                                    </View>
+
+                                    <View style={styles.imageContainer}>
+                                        <Image
+                                            source={{ uri: imageUrl }}
+                                            style={styles.image}
+                                            resizeMode="cover"
+                                        />
+                                    </View>
+                                </View>
+                            )}
+
+                            {/* Sponsor Type Badge */}
+                            {(promo.sponsorType || promo.label) && (
+                                <View style={styles.sponsorBadge}>
+                                    <Text style={styles.sponsorText}>
+                                        {promo.sponsorType || promo.label}
+                                    </Text>
+                                </View>
+                            )}
+                        </TouchableOpacity>
+                    );
+                })}
             </ScrollView>
-        </View>
+        </View >
     );
 };
 
 const styles = StyleSheet.create({
     wrapper: {
-        marginBottom: spacing.xs, // Reduced margin
+        marginBottom: spacing.xs,
     },
     container: {
         paddingHorizontal: 16,
@@ -149,9 +156,9 @@ const styles = StyleSheet.create({
         paddingBottom: spacing.sm,
     },
     card: {
-        width: width * 0.88, // 88% width to allow peeking
+        width: width * 0.88,
         height: 160,
-        marginRight: 12, // Gap between cards
+        marginRight: 12,
         borderRadius: 20,
         overflow: 'hidden',
         elevation: 4,
@@ -159,6 +166,26 @@ const styles = StyleSheet.create({
         shadowOffset: { width: 0, height: 4 },
         shadowOpacity: 0.2,
         shadowRadius: 5,
+    },
+    fullImage: {
+        width: '100%',
+        height: '100%',
+    },
+    sponsorBadge: {
+        position: 'absolute',
+        top: 12,
+        right: 12,
+        backgroundColor: 'rgba(0,0,0,0.6)',
+        paddingHorizontal: 8,
+        paddingVertical: 4,
+        borderRadius: 12,
+        zIndex: 10,
+    },
+    sponsorText: {
+        color: '#fff',
+        fontSize: 10,
+        fontFamily: 'Poppins-Medium',
+        textTransform: 'uppercase',
     },
     content: {
         flex: 1,

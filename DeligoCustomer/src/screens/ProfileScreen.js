@@ -12,14 +12,15 @@ import { useTheme } from '../utils/ThemeContext';
 import { getUserData } from '../utils/auth';
 import { useProfile } from '../contexts/ProfileContext';
 import StorageService from '../utils/storage';
+import CouponAPI from '../utils/couponApi';
 import CustomModal from '../components/CustomModal';
 import { useLanguage } from '../utils/LanguageContext';
 import MenuItem from '../components/Profile/MenuItem';
 import ProfileHeader from '../components/Profile/ProfileHeader';
 import UserProfileCard from '../components/Profile/UserProfileCard';
-import DeligoProBanner from '../components/Profile/DeligoProBanner';
+
 import VouchersCard from '../components/Profile/VouchersCard';
-import ReferralBanner from '../components/Profile/ReferralBanner';
+
 import LogoutButton from '../components/Profile/LogoutButton';
 import ProfileSection from '../components/Profile/ProfileSection';
 import AppVersionText from '../components/Profile/AppVersionText';
@@ -40,11 +41,15 @@ const ProfileScreen = ({ onLogout, navigation }) => {
   const [refreshing, setRefreshing] = useState(false);
 
   // Animation values for logout button
+  const [voucherCount, setVoucherCount] = useState(0);
+
+  // Animation values for logout button
   const scaleAnim = useRef(new Animated.Value(1)).current;
 
   useFocusEffect(
     useCallback(() => {
       loadUserData();
+      fetchVoucherCount();
     }, [])
   );
 
@@ -53,12 +58,43 @@ const ProfileScreen = ({ onLogout, navigation }) => {
     setUser(JSON.parse(JSON.stringify(userData)));
   };
 
+  const fetchVoucherCount = async () => {
+    try {
+      const res = await CouponAPI.getCoupons();
+      if (res.success && Array.isArray(res.data)) {
+        // Filter only active vouchers
+        const active = res.data.filter(c => c.isActive !== false);
+        setVoucherCount(active.length);
+      }
+    } catch (err) {
+      console.warn('Failed to fetch voucher count', err);
+    }
+  };
+
   const showModal = (title, message, onConfirm = null, onlyConfirm = false) => {
     setModalTitle(title);
     setModalMessage(message);
     setModalOnConfirm(() => onConfirm);
     setModalOnlyConfirm(onlyConfirm);
     setModalVisible(true);
+  };
+
+  const handleLockedFeature = () => {
+    const title = t('lockedFeatureTitle');
+    const message = t('lockedFeatureMessage');
+
+    // Fallback if translation returns the key itself
+    const displayTitle = title === 'lockedFeatureTitle' ? 'Unlock Exclusive Features' : title;
+    const displayMessage = message === 'lockedFeatureMessage'
+      ? 'Use the app regularly and place more orders to unlock and enjoy these exclusive features.'
+      : message;
+
+    showModal(
+      displayTitle,
+      displayMessage,
+      () => setModalVisible(false),
+      true // onlyConfirm
+    );
   };
 
   const handleLogoutPress = () => {
@@ -102,6 +138,7 @@ const ProfileScreen = ({ onLogout, navigation }) => {
   const onRefresh = async () => {
     setRefreshing(true);
     await loadUserData();
+    fetchVoucherCount();
     setRefreshing(false);
   };
 
@@ -125,9 +162,9 @@ const ProfileScreen = ({ onLogout, navigation }) => {
 
           <UserProfileCard user={user} navigation={navigation} />
 
-          <DeligoProBanner />
 
-          <VouchersCard navigation={navigation} />
+
+          <VouchersCard navigation={navigation} count={voucherCount} />
 
           <ProfileSection title={t('orders')}>
             <MenuItem
@@ -148,7 +185,7 @@ const ProfileScreen = ({ onLogout, navigation }) => {
               iconName="gift-outline"
               title={t('referrals')}
               subtitle={t('earnRewards')}
-              onPress={() => navigation.navigate('Referrals')}
+              onPress={handleLockedFeature}
             />
             <MenuItem
               iconName="star-outline"
@@ -156,6 +193,7 @@ const ProfileScreen = ({ onLogout, navigation }) => {
               subtitle={t('exclusiveBenefits')}
               showDivider={false}
               iconColor="#FFB800"
+              onPress={handleLockedFeature}
             />
           </ProfileSection>
 
@@ -165,7 +203,11 @@ const ProfileScreen = ({ onLogout, navigation }) => {
               title={t('savedAddresses')}
               onPress={() => navigation.navigate('SavedAddresses')}
             />
-            <MenuItem iconName="heart-outline" title={t('favoriteOrders')} />
+            <MenuItem
+              iconName="heart-outline"
+              title={t('favoriteOrders')}
+              onPress={() => navigation.navigate('FavoriteOrders')}
+            />
             <MenuItem
               iconName="notifications-outline"
               title={t('notifications')}
@@ -184,7 +226,7 @@ const ProfileScreen = ({ onLogout, navigation }) => {
             />
           </ProfileSection>
 
-          <ReferralBanner navigation={navigation} />
+
 
           <LogoutButton
             onLogoutPress={handleLogoutPress}
@@ -205,7 +247,7 @@ const ProfileScreen = ({ onLogout, navigation }) => {
           }}
           onCancel={() => setModalVisible(false)}
           onlyConfirm={modalOnlyConfirm}
-          confirmText={t('logout')}
+          confirmText={modalOnlyConfirm ? 'OK' : t('logout')}
           cancelText={t('cancel')}
         />
       </View>

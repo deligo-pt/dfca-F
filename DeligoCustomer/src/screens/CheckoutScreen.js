@@ -942,7 +942,7 @@ const CheckoutScreen = ({ route, navigation }) => {
                 onSelect: (selectedAddr) => {
                   // Map API address to LocationContext format
                   const locAddr = {
-                    address: selectedAddr.street,
+                    address: selectedAddr.street || selectedAddr.address,
                     detailedAddress: selectedAddr.detailedAddress || '',
                     city: selectedAddr.city,
                     postalCode: selectedAddr.postalCode,
@@ -958,7 +958,7 @@ const CheckoutScreen = ({ route, navigation }) => {
                 },
                 selectedId: user?.deliveryAddresses?.find(a =>
                   (a.latitude === currentLocation?.latitude && a.longitude === currentLocation?.longitude) ||
-                  (a.street === address)
+                  (a.street === address || a.address === address)
                 )?._id
               })}
             >

@@ -19,6 +19,7 @@ import {
   Platform,
   Modal,
   StatusBar,
+  BackHandler,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -27,8 +28,11 @@ import { spacing, fontSize, borderRadius } from '../theme';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme, darkMapStyle } from '../utils/ThemeContext';
+import { useSocket } from '../contexts/SocketContext';
 
 const { height } = Dimensions.get('window');
+
+import { customerApi } from '../utils/api';
 
 // Format address object to string
 const formatAddress = (addr) => {
@@ -85,6 +89,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
   const [restaurantLocation, setRestaurantLocation] = useState(null);
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [mapReady, setMapReady] = useState(false);
+  const [mapLayout, setMapLayout] = useState(false);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
 
   // Normalize order data structure
@@ -144,6 +149,65 @@ const TrackOrderScreen = ({ route, navigation }) => {
     }
     restaurantName = restaurantName || 'Restaurant';
 
+    // Extract vendor coordinates
+    let restaurantCoords = null;
+    const vendorObj = typeof data.vendorId === 'object' ? data.vendorId : (typeof data.vendor === 'object' ? data.vendor : null);
+
+    // 1. Check top-level fully populated vendor object
+    if (vendorObj) {
+      if (typeof vendorObj.latitude === 'number' && typeof vendorObj.longitude === 'number') {
+        restaurantCoords = { latitude: vendorObj.latitude, longitude: vendorObj.longitude };
+      } else if (vendorObj.location && Array.isArray(vendorObj.location.coordinates)) {
+        restaurantCoords = {
+          latitude: vendorObj.location.coordinates[1],
+          longitude: vendorObj.location.coordinates[0]
+        };
+      } else if (vendorObj.businessLocation && vendorObj.businessLocation.coordinates) {
+        restaurantCoords = {
+          latitude: vendorObj.businessLocation.coordinates[1],
+          longitude: vendorObj.businessLocation.coordinates[0]
+        };
+      } else if (vendorObj.businessLocation && typeof vendorObj.businessLocation.latitude === 'number') {
+        restaurantCoords = {
+          latitude: vendorObj.businessLocation.latitude,
+          longitude: vendorObj.businessLocation.longitude
+        };
+      }
+    }
+
+    // 2. Fallback: Check inside the first ordered item (product -> vendor populates often happen here)
+    if (!restaurantCoords && data.items && data.items.length > 0) {
+      const firstItem = data.items[0];
+      // item might be the product itself or have productId populated
+      const product = firstItem.productId || firstItem;
+
+      if (product && typeof product === 'object') {
+        const productVendor = product.vendorId;
+        if (productVendor && typeof productVendor === 'object') {
+          if (productVendor.businessLocation && typeof productVendor.businessLocation.latitude === 'number') {
+            restaurantCoords = {
+              latitude: productVendor.businessLocation.latitude,
+              longitude: productVendor.businessLocation.longitude
+            };
+          } else if (productVendor.location && Array.isArray(productVendor.location.coordinates)) {
+            restaurantCoords = {
+              latitude: productVendor.location.coordinates[1],
+              longitude: productVendor.location.coordinates[0]
+            };
+          }
+          // If we found vendor info here, we can also fix the name if missing
+          if (!restaurantName || restaurantName === 'Restaurant') {
+            restaurantName = productVendor.businessDetails?.businessName || productVendor.businessName || 'Restaurant';
+          }
+        }
+      }
+    }
+
+    // 3. Last resort fallback
+    if (!restaurantCoords && data.restaurantLocation) {
+      restaurantCoords = data.restaurantLocation;
+    }
+
     // Extract delivery partner info if available
     let driverName = t('awaitingDriver') || 'Awaiting driver';
     let driverPhone = '';
@@ -175,7 +239,8 @@ const TrackOrderScreen = ({ route, navigation }) => {
       restaurantName: restaurantName,
       restaurantAddress: data.restaurantAddress || '',
       restaurantPhone: data.restaurantPhone || '',
-      restaurantImage: data.restaurantImage || '�️',
+      restaurantImage: data.restaurantImage || '🍽️',
+      restaurantCoordinates: restaurantCoords,
       items: normalizedItems,
       itemsText: itemsText,
       subtotal: data.totalPrice || calculatedSubtotal || 0, // Item subtotal (before delivery charge)
@@ -354,6 +419,29 @@ const TrackOrderScreen = ({ route, navigation }) => {
     }
   };
 
+  // Handle back navigation
+  const handleBack = () => {
+    if (navigation.canGoBack()) {
+      navigation.goBack();
+    } else {
+      // If no history (e.g. from notification), go appropriately
+      navigation.reset({
+        index: 0,
+        routes: [{ name: 'Main' }],
+      });
+    }
+    return true;
+  };
+
+  // Hardware Back Button Handler
+  useEffect(() => {
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      handleBack
+    );
+    return () => backHandler.remove();
+  }, []);
+
   // Handle driver messaging
   const handleMessageDriver = () => {
     Alert.alert(
@@ -428,148 +516,189 @@ const TrackOrderScreen = ({ route, navigation }) => {
 
   // Initialize location services
   useEffect(() => {
+    let active = true;
     (async () => {
       try {
-        // Check if order has delivery coordinates
-        const orderDeliveryCoords = order?.deliveryAddress?.latitude && order?.deliveryAddress?.longitude
-          ? {
-            latitude: order.deliveryAddress.latitude,
-            longitude: order.deliveryAddress.longitude,
+        // 1. Try to get coordinates from Order Delivery Address
+        let orderDeliveryCoords = null;
+        if (order?.deliveryAddress) {
+          const da = order.deliveryAddress;
+          if (da.latitude && da.longitude) {
+            orderDeliveryCoords = { latitude: da.latitude, longitude: da.longitude };
+          } else if (da.location && Array.isArray(da.location.coordinates)) {
+            orderDeliveryCoords = { latitude: da.location.coordinates[1], longitude: da.location.coordinates[0] };
+          } else if (da.coordinates && Array.isArray(da.coordinates)) {
+            orderDeliveryCoords = { latitude: da.coordinates[1], longitude: da.coordinates[0] };
           }
-          : null;
-
-        const { status } = await Location.requestForegroundPermissionsAsync();
-        if (status !== 'granted') {
-          console.log('Permission to access location was denied');
-          // Use order delivery coordinates if available, otherwise fallback
-          const defaultCoords = orderDeliveryCoords || {
-            latitude: 23.745038, // Dhaka fallback
-            longitude: 90.4395245,
-          };
-          setUserLocation(defaultCoords);
-
-          // Restaurant location offset from delivery
-          const restaurantCoords = {
-            latitude: defaultCoords.latitude + 0.01,
-            longitude: defaultCoords.longitude + 0.008,
-          };
-          setRestaurantLocation(restaurantCoords);
-
-          // Driver between restaurant and delivery
-          const driverCoords = {
-            latitude: defaultCoords.latitude + 0.005,
-            longitude: defaultCoords.longitude + 0.004,
-          };
-          setDriverLocation(driverCoords);
-
-          setRouteCoordinates([restaurantCoords, driverCoords, defaultCoords]);
-          return;
         }
 
-        // If we have order delivery coordinates, use them as user location
-        // Otherwise get current device location
-        let userCoords;
+        // 2. If valid delivery coords, use them immediately (Fastest)
         if (orderDeliveryCoords) {
-          userCoords = orderDeliveryCoords;
+          if (active) setUserLocation(orderDeliveryCoords);
         } else {
-          const location = await Location.getCurrentPositionAsync({
-            accuracy: Location.Accuracy.Balanced,
-          });
-          userCoords = {
-            latitude: location.coords.latitude,
-            longitude: location.coords.longitude,
-          };
+          // 3. Fallback: Request Device Location
+          const { status } = await Location.requestForegroundPermissionsAsync();
+          if (status !== 'granted') {
+            console.log('Permission to access location was denied');
+            // Fallback default
+            const defaultCoords = { latitude: 23.745038, longitude: 90.4395245 };
+            if (active) setUserLocation(defaultCoords);
+          } else {
+            // Get current location (with timeout)
+            try {
+              // Promise.race to prevent hanging
+              const locationPromise = Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
+              const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject('Timeout'), 5000));
+              const location = await Promise.race([locationPromise, timeoutPromise]);
+
+              if (active) {
+                setUserLocation({
+                  latitude: location.coords.latitude,
+                  longitude: location.coords.longitude,
+                });
+              }
+            } catch (e) {
+              console.warn('Location fetch timed out or failed, using fallback');
+              if (active) {
+                // Default fallback if GPS fails
+                setUserLocation({ latitude: 23.745038, longitude: 90.4395245 });
+              }
+            }
+          }
         }
-        setUserLocation(userCoords);
 
-        // Set restaurant location (offset from delivery address)
-        const restaurantCoords = {
-          latitude: userCoords.latitude + 0.01,
-          longitude: userCoords.longitude + 0.008,
-        };
-        setRestaurantLocation(restaurantCoords);
+        // --- Restaurant & Driver Logic (Depends on knowing where the "User/Destination" is) ---
+        // We need a reference point. If setUserLocation hasn't run yet, we need a temp var.
+        const destCoords = orderDeliveryCoords || (active ? userLocation : null) || { latitude: 23.745038, longitude: 90.4395245 };
 
-        // Set initial driver location (between restaurant and user)
+        // Set restaurant location from real data or fallback
+        const realRestCoords = orderData.restaurantCoordinates || restaurantLocation;
+        let finalRestCoords = realRestCoords;
+
+        if (realRestCoords) {
+          if (active) setRestaurantLocation(realRestCoords);
+        } else {
+          // Fallback offset if still no restaurant coords
+          finalRestCoords = {
+            latitude: destCoords.latitude + 0.01,
+            longitude: destCoords.longitude + 0.008,
+          };
+          if (active) setRestaurantLocation(finalRestCoords);
+        }
+
+        // Set initial driver location (Mock: between restaurant and user)
         const driverCoords = {
-          latitude: userCoords.latitude + 0.005,
-          longitude: userCoords.longitude + 0.004,
+          latitude: (finalRestCoords.latitude + destCoords.latitude) / 2,
+          longitude: (finalRestCoords.longitude + destCoords.longitude) / 2,
         };
-        setDriverLocation(driverCoords);
+        if (active) setDriverLocation(driverCoords);
 
         // Create route coordinates
-        setRouteCoordinates([restaurantCoords, driverCoords, userCoords]);
-      } catch (error) {
-        console.error('Error getting location:', error);
-        // Use order delivery coordinates if available, otherwise fallback
-        const defaultCoords = order?.deliveryAddress?.latitude && order?.deliveryAddress?.longitude
-          ? {
-            latitude: order.deliveryAddress.latitude,
-            longitude: order.deliveryAddress.longitude,
-          }
-          : {
-            latitude: 23.745038,
-            longitude: 90.4395245,
-          };
-        setUserLocation(defaultCoords);
-
-        const restaurantCoords = {
-          latitude: defaultCoords.latitude + 0.01,
-          longitude: defaultCoords.longitude + 0.008,
-        };
-        setRestaurantLocation(restaurantCoords);
-
-        const driverCoords = {
-          latitude: defaultCoords.latitude + 0.005,
-          longitude: defaultCoords.longitude + 0.004,
-        };
-        setDriverLocation(driverCoords);
-
-        setRouteCoordinates([restaurantCoords, driverCoords, defaultCoords]);
-      }
-    })();
-  }, [order]);
-
-  // Simulate driver progression
-  useEffect(() => {
-    if (!userLocation || !driverLocation) return;
-
-    const interval = setInterval(() => {
-      setDriverLocation((prevLocation) => {
-        if (!prevLocation || !userLocation) return prevLocation;
-
-        // Calculate direction towards user
-        const latDiff = userLocation.latitude - prevLocation.latitude;
-        const lngDiff = userLocation.longitude - prevLocation.longitude;
-
-        // Move driver closer to user (simulate movement)
-        const newLat = prevLocation.latitude + latDiff * 0.02; // Move 2% closer each update
-        const newLng = prevLocation.longitude + lngDiff * 0.02;
-
-        // Check if driver is very close to user
-        const distance = Math.sqrt(
-          Math.pow(userLocation.latitude - newLat, 2) +
-          Math.pow(userLocation.longitude - newLng, 2)
-        );
-
-        if (distance < 0.001) {
-          // Driver has arrived
-          setCurrentStatus('delivered');
-          clearInterval(interval);
-          return userLocation;
-        } else if (distance < 0.003) {
-          // Driver is nearby
-          setCurrentStatus('nearby');
+        if (active) {
+          setRouteCoordinates([finalRestCoords, driverCoords, destCoords]);
         }
 
-        return {
-          latitude: newLat,
-          longitude: newLng,
-        };
-      });
-    }, 3000); // Update every 3 seconds
+      } catch (error) {
+        console.error('Error initializing map:', error);
+        // Absolute fail-safe
+        if (active) {
+          const defaultCoords = { latitude: 23.745038, longitude: 90.4395245 };
+          setUserLocation(defaultCoords);
+          setRestaurantLocation({ latitude: defaultCoords.latitude + 0.01, longitude: defaultCoords.longitude + 0.008 });
+        }
+      }
+    })();
+    return () => { active = false; };
+  }, [order, orderData.restaurantCoordinates]);
 
-    return () => clearInterval(interval);
-  }, [userLocation, driverLocation]);
+  // Fetch vendor details if needed
+  useEffect(() => {
+    const fetchVendorDetails = async () => {
+      // Check if we need to fetch vendor (if only ID string is present and we don't have coords)
+      const vid = order?.vendorId;
+      if (vid && typeof vid === 'string' && !orderData.restaurantCoordinates && !restaurantLocation) {
+        try {
+          // Try fetching full vendor profile
+          const res = await customerApi.get(`/vendors/${vid}`);
+          if (res.data && res.data.success) {
+            const vendor = res.data.data;
+            let coords = null;
+            if (vendor.latitude && vendor.longitude) {
+              coords = { latitude: vendor.latitude, longitude: vendor.longitude };
+            } else if (vendor.location && Array.isArray(vendor.location.coordinates)) {
+              coords = {
+                latitude: vendor.location.coordinates[1],
+                longitude: vendor.location.coordinates[0]
+              };
+            } else if (vendor.businessLocation && vendor.businessLocation.coordinates) {
+              coords = {
+                latitude: vendor.businessLocation.coordinates[1],
+                longitude: vendor.businessLocation.coordinates[0]
+              };
+            }
+
+            if (coords) {
+              console.log('[TrackOrder] Fetched real vendor coords:', coords);
+              setRestaurantLocation(coords);
+
+              // Update route to include this new point
+              if (userLocation) {
+                const start = coords;
+                const end = userLocation;
+                // Driver in middle
+                const driver = {
+                  latitude: (start.latitude + end.latitude) / 2,
+                  longitude: (start.longitude + end.longitude) / 2
+                };
+                setDriverLocation(driver);
+                setRouteCoordinates([start, driver, end]);
+              }
+            }
+          }
+        } catch (err) {
+          console.warn('[TrackOrder] Failed to fetch vendor details:', err);
+        }
+      }
+    };
+    fetchVendorDetails();
+  }, [order?.vendorId, orderData.restaurantCoordinates]);
+
+  // Socket Integration
+  const { socket, joinRoom, leaveRoom, isConnected } = useSocket();
+
+  // Initialize socket listeners
+  useEffect(() => {
+    if (!order?._id || !socket || !isConnected) return;
+
+    // Join the specific order room
+    joinRoom('join-order-tracking', { orderId: order._id });
+
+    // Listen for live location updates
+    const handleLocationUpdate = (data) => {
+      console.log('[TrackOrder] Received live location:', data);
+      if (data && data.latitude && data.longitude) {
+        setDriverLocation({
+          latitude: Number(data.latitude),
+          longitude: Number(data.longitude)
+        });
+      }
+    };
+
+    socket.on('delivery-location-live', handleLocationUpdate);
+
+    return () => {
+      socket.off('delivery-location-live', handleLocationUpdate);
+      // Optional: Leave room if backend supports it
+      // leaveRoom('leave-order-tracking', { orderId: order._id });
+    };
+  }, [order?._id, socket, joinRoom, isConnected]);
+
+  /*
+  // Simulate driver progression (DISABLED for Live Tracking)
+  useEffect(() => {
+    // ... simulation code ...
+  }, []);
+  */
 
   // Update route coordinates
   useEffect(() => {
@@ -580,7 +709,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
 
   // Adjust map viewport
   useEffect(() => {
-    if (mapReady && mapRef.current && routeCoordinates.length > 0) {
+    if (mapReady && mapLayout && mapRef.current && routeCoordinates.length > 0) {
       const timeoutId = setTimeout(() => {
         // Double-check mapRef is still valid
         if (mapRef.current && routeCoordinates.length > 0) {
@@ -597,7 +726,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
 
       return () => clearTimeout(timeoutId);
     }
-  }, [mapReady, routeCoordinates]);
+  }, [mapReady, mapLayout, routeCoordinates]);
 
   useEffect(() => {
     // Simulate order progress
@@ -659,6 +788,12 @@ const TrackOrderScreen = ({ route, navigation }) => {
           showsMyLocationButton={false}
           showsCompass={true}
           loadingEnabled={true}
+          onLayout={(e) => {
+            const { width, height } = e.nativeEvent.layout;
+            if (width > 50 && height > 50) {
+              setMapLayout(true);
+            }
+          }}
         >
           {/* Restaurant Marker */}
           {restaurantLocation && (

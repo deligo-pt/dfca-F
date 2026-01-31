@@ -21,7 +21,8 @@ import {
   Image,
   ActivityIndicator,
   RefreshControl,
-  StatusBar
+  StatusBar,
+  BackHandler
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
@@ -227,6 +228,19 @@ const OrdersScreen = ({ navigation }) => {
 
   useEffect(() => {
     fetchOrders();
+
+    const backAction = () => {
+      // If we are on Orders tab, pressing back should probably go to Home tab
+      navigation.navigate('Main');
+      return true; // Prevent default behavior (which causes the crash if no history)
+    };
+
+    const backHandler = BackHandler.addEventListener(
+      'hardwareBackPress',
+      backAction
+    );
+
+    return () => backHandler.remove();
   }, []);
 
   // Update orders with business names when products change (in case products load after orders)

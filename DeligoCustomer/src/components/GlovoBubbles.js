@@ -85,7 +85,7 @@ const BubbleItem = ({ category, selectedId, onPress, colors }) => {
  * @param {Function} props.onPress - Callback for category selection.
  * @param {string} props.selectedId - Currently selected category ID.
  */
-const GlovoBubbles = ({ categories, onPress, selectedId }) => {
+const GlovoBubbles = ({ categories, onPress, selectedId, showTitle = true }) => {
     const { colors } = useTheme();
     const { t } = useLanguage();
 
@@ -97,11 +97,13 @@ const GlovoBubbles = ({ categories, onPress, selectedId }) => {
 
     return (
         <View style={styles.container}>
-            <View style={styles.header}>
-                <Text style={[styles.title, { color: colors.text.primary }]}>
-                    {t('shopOnDeliGo')}
-                </Text>
-            </View>
+            {showTitle && (
+                <View style={styles.header}>
+                    <Text style={[styles.title, { color: colors.text.primary }]}>
+                        {t('shopOnDeliGo')}
+                    </Text>
+                </View>
+            )}
 
             <ScrollView
                 horizontal={true}

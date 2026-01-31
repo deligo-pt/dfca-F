@@ -13,7 +13,7 @@ import { useLanguage } from '../../utils/LanguageContext';
  * @param {Object} props
  * @param {Object} props.navigation - Navigation prop.
  */
-const VouchersCard = ({ navigation }) => {
+const VouchersCard = ({ navigation, count }) => {
   const { colors } = useTheme();
   const { t } = useLanguage();
 
@@ -29,10 +29,12 @@ const VouchersCard = ({ navigation }) => {
 
         <Text style={[styles.voucherText, { color: colors.text.primary }]}>{t('vouchers')}</Text>
 
-        {/* Badge indicating the number of available vouchers (Currently static '0', connect to state) */}
-        <View style={[styles.voucherBadge, { backgroundColor: colors.primary }]}>
-          <Text style={styles.voucherBadgeText}>0</Text>
-        </View>
+        {/* Badge indicating the number of available vouchers */}
+        {count > 0 && (
+          <View style={[styles.voucherBadge, { backgroundColor: colors.primary }]}>
+            <Text style={styles.voucherBadgeText}>{count}</Text>
+          </View>
+        )}
 
         <Ionicons name="chevron-forward" size={20} color={colors.text.light} />
       </TouchableOpacity>

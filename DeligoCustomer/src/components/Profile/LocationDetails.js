@@ -477,9 +477,9 @@ const LocationDetails = ({
     },
     fullScreenControls: {
       position: 'absolute',
-      top: 16,
-      left: 16,
-      right: 16,
+      top: 50, // Moved down for status bar
+      left: 20,
+      right: 20,
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'flex-start',
@@ -488,14 +488,14 @@ const LocationDetails = ({
     fullScreenButton: {
       flexDirection: 'row',
       alignItems: 'center',
-      paddingVertical: 12,
+      paddingVertical: 10,
       paddingHorizontal: 16,
-      borderRadius: 12,
-      shadowColor: colors.shadow,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.15,
-      shadowRadius: 6,
-      elevation: 6,
+      borderRadius: 25, // More rounded pill shape
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 4,
       backgroundColor: colors.surface,
     },
     fullScreenButtonText: {
@@ -503,66 +503,69 @@ const LocationDetails = ({
       fontWeight: '600',
       fontFamily: 'Poppins-SemiBold',
       marginLeft: 8,
-      color: colors.primary,
+      color: colors.text.primary, // Neutral text color
     },
     fullScreenRightControls: {
       alignItems: 'flex-end',
+      gap: 12,
     },
     fullScreenIconButton: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
+      width: 44,
+      height: 44,
+      borderRadius: 22,
       justifyContent: 'center',
       alignItems: 'center',
-      shadowColor: colors.shadow,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.15,
-      shadowRadius: 6,
-      elevation: 6,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      elevation: 4,
       backgroundColor: colors.surface,
     },
     fullScreenZoomButtons: {
-      marginTop: 12,
+      marginTop: 0, // Handled by gap
+      gap: 12, // Consistent gap
     },
     fullScreenConfirmContainer: {
       position: 'absolute',
-      bottom: 24,
-      left: 16,
-      right: 16,
+      bottom: 40,
+      left: 20,
+      right: 20,
       zIndex: 10,
+      alignItems: 'center',
     },
     fullScreenConfirmButton: {
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
+      width: '100%',
       paddingVertical: 16,
-      paddingHorizontal: 24,
-      borderRadius: 14,
-      shadowColor: colors.shadow,
-      shadowOffset: { width: 0, height: 4 },
-      shadowOpacity: 0.25,
-      shadowRadius: 10,
-      elevation: 10,
+      borderRadius: 16,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 8 },
+      shadowOpacity: 0.3,
+      shadowRadius: 16,
+      elevation: 8,
       backgroundColor: colors.primary,
     },
     fullScreenConfirmText: {
       fontSize: 16,
       fontWeight: '700',
       fontFamily: 'Poppins-Bold',
-      color: colors.text.white,
-      marginLeft: 10,
+      color: '#fff',
+      marginLeft: 8,
     },
     labelButton: {
       flex: 1,
       flexDirection: 'row',
       alignItems: 'center',
       justifyContent: 'center',
-      paddingVertical: 10,
+      paddingVertical: 12, // Slightly taller
       backgroundColor: colors.surface,
       borderWidth: 1,
       borderColor: colors.border,
-      borderRadius: 8,
-      gap: 6,
+      borderRadius: 12, // More rounded
+      gap: 8,
     },
     labelButtonText: {
       fontSize: 14,
@@ -570,44 +573,46 @@ const LocationDetails = ({
       color: colors.text.secondary,
     },
     savedAddressesSection: {
-      marginTop: 20,
-      marginBottom: 20,
+      marginTop: 24,
+      marginBottom: 24,
     },
     savedAddressCard: {
       backgroundColor: colors.surface,
-      padding: 12,
-      borderRadius: 12,
-      width: 160,
+      padding: 16,
+      borderRadius: 16,
+      width: 170, // Slightly wider
       borderWidth: 1,
       borderColor: colors.border,
+      marginRight: 12, // Spacing between cards
       shadowColor: colors.shadow,
-      shadowOffset: { width: 0, height: 1 },
+      shadowOffset: { width: 0, height: 2 },
       shadowOpacity: 0.05,
-      shadowRadius: 2,
+      shadowRadius: 4,
       elevation: 2,
     },
     savedAddressIcon: {
-      width: 36,
-      height: 36,
-      borderRadius: 18,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
       alignItems: 'center',
       justifyContent: 'center',
-      marginBottom: 8,
+      marginBottom: 12,
       backgroundColor: colors.primary + '15',
     },
     savedAddressLabel: {
-      fontSize: 14,
+      fontSize: 15,
       fontFamily: 'Poppins-SemiBold',
-      marginBottom: 2,
+      marginBottom: 4,
       color: colors.text.primary,
     },
     savedAddressText: {
-      fontSize: 12,
+      fontSize: 13,
       color: colors.text.secondary,
-      marginBottom: 1,
+      marginBottom: 2,
+      lineHeight: 18,
     },
     savedAddressSubText: {
-      fontSize: 11,
+      fontSize: 12,
       color: colors.text.light,
     },
   }), [colors, isDarkMode]);
@@ -649,7 +654,7 @@ const LocationDetails = ({
             }}
             showsUserLocation={locationPermission}
             showsMyLocationButton={false}
-            showsCompass={true}
+            showsCompass={false} // Custom compass/controls
             showsBuildings={true}
             showsPointsOfInterest={true}
             zoomEnabled={true}
@@ -661,7 +666,7 @@ const LocationDetails = ({
 
           <View style={styles.fullScreenPin} pointerEvents="none">
             <View style={[styles.fullScreenPinCircle, { backgroundColor: colors.primary }]}>
-              <Ionicons name="business" size={22} color={colors.text.white} />
+              <Ionicons name="location" size={28} color={colors.text.white} />
             </View>
             <View style={[styles.fullScreenPinStem, { backgroundColor: colors.primary }]} />
             <View style={styles.fullScreenPinShadow} />
@@ -669,16 +674,16 @@ const LocationDetails = ({
 
           <View style={styles.fullScreenControls}>
             <TouchableOpacity
-              style={[styles.fullScreenButton, { backgroundColor: colors.surface }]}
+              style={[styles.fullScreenButton]}
               onPress={() => setIsMapFullScreen(false)}
             >
-              <Ionicons name="contract" size={20} color={colors.primary} />
-              <Text style={[styles.fullScreenButtonText, { color: colors.primary }]}>{t('exitFullScreen')}</Text>
+              <Ionicons name="arrow-back" size={20} color={colors.text.primary} />
+              <Text style={styles.fullScreenButtonText}>{t('back')}</Text>
             </TouchableOpacity>
 
             <View style={styles.fullScreenRightControls}>
               <TouchableOpacity
-                style={[styles.fullScreenIconButton, { backgroundColor: colors.surface }]}
+                style={[styles.fullScreenIconButton]}
                 onPress={() => {
                   if (!isLoadingLocation) {
                     getCurrentLocation();
@@ -689,13 +694,13 @@ const LocationDetails = ({
                 {isLoadingLocation ? (
                   <ActivityIndicator size="small" color={colors.primary} />
                 ) : (
-                  <Ionicons name="navigate" size={22} color={colors.primary} />
+                  <Ionicons name="locate" size={22} color={colors.primary} />
                 )}
               </TouchableOpacity>
 
               <View style={styles.fullScreenZoomButtons}>
                 <TouchableOpacity
-                  style={[styles.fullScreenIconButton, { backgroundColor: colors.surface, marginBottom: 8 }]}
+                  style={[styles.fullScreenIconButton]}
                   onPress={() => {
                     setMapRegion(prev => ({
                       ...prev,
@@ -707,7 +712,7 @@ const LocationDetails = ({
                   <Ionicons name="add" size={22} color={colors.primary} />
                 </TouchableOpacity>
                 <TouchableOpacity
-                  style={[styles.fullScreenIconButton, { backgroundColor: colors.surface }]}
+                  style={[styles.fullScreenIconButton]}
                   onPress={() => {
                     setMapRegion(prev => ({
                       ...prev,
@@ -726,6 +731,7 @@ const LocationDetails = ({
             <TouchableOpacity
               style={[styles.fullScreenConfirmButton, {
                 backgroundColor: markerCoordinate ? colors.primary : colors.border,
+                opacity: (!markerCoordinate || isLoadingLocation) ? 0.8 : 1
               }]}
               onPress={async () => {
                 if (markerCoordinate) {
@@ -737,12 +743,11 @@ const LocationDetails = ({
             >
               {isLoadingLocation ? (
                 <>
-                  <ActivityIndicator size="small" color={colors.text.white} />
-                  <Text style={styles.fullScreenConfirmText}>{t('gettingAddress')}</Text>
+                  <ActivityIndicator size="small" color="#fff" />
+                  <Text style={styles.fullScreenConfirmText}>{t('locating')}...</Text>
                 </>
               ) : (
                 <>
-                  <Ionicons name="checkmark-circle" size={24} color={colors.text.white} />
                   <Text style={styles.fullScreenConfirmText}>{t('confirmLocation')}</Text>
                 </>
               )}
@@ -860,14 +865,14 @@ const LocationDetails = ({
 
               <View style={styles.mapPreviewPin} pointerEvents="none">
                 <View style={[styles.mapPreviewPinCircle, { backgroundColor: colors.primary }]}>
-                  <Ionicons name="business" size={18} color={colors.text.white} />
+                  <Ionicons name="location" size={24} color={colors.text.white} />
                 </View>
                 <View style={[styles.mapPreviewPinStem, { backgroundColor: colors.primary }]} />
               </View>
 
               <View style={styles.mapPreviewOverlay}>
                 <View style={[styles.mapPreviewExpandButton, { backgroundColor: colors.primary }]}>
-                  <Ionicons name="expand" size={18} color={colors.text.white} />
+                  <Ionicons name="expand" size={16} color={colors.text.white} />
                   <Text style={styles.mapPreviewExpandText}>{t('tapToExpandMap')}</Text>
                 </View>
               </View>
@@ -1139,10 +1144,10 @@ const LocationDetails = ({
           {/* Saved Addresses List */}
           {savedAddresses && savedAddresses.length > 0 && (
             <View style={styles.savedAddressesSection}>
-              <Text style={[styles.formSectionTitle, { color: colors.text.primary, paddingHorizontal: 16, marginBottom: 12 }]}>
+              <Text style={[styles.formSectionTitle, { color: colors.text.primary, paddingHorizontal: 16, marginBottom: 16 }]}>
                 {t('savedAddresses')}
               </Text>
-              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16, gap: 12 }}>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ paddingHorizontal: 16 }}>
                 {savedAddresses.map((addr) => (
                   <TouchableOpacity
                     key={addr.id}
@@ -1152,13 +1157,13 @@ const LocationDetails = ({
                     <View style={[styles.savedAddressIcon, { backgroundColor: colors.primary + '15' }]}>
                       <Ionicons
                         name={(addr.label === 'Work' || addr.label === t('work')) ? 'briefcase' : (addr.label === 'Other' || addr.label === t('other')) ? 'location' : 'home'}
-                        size={20}
+                        size={22}
                         color={colors.primary}
                       />
                     </View>
                     <View>
                       <Text style={[styles.savedAddressLabel, { color: colors.text.primary }]}>{addr.label}</Text>
-                      <Text style={styles.savedAddressText} numberOfLines={1}>{addr.address}</Text>
+                      <Text style={styles.savedAddressText} numberOfLines={2}>{addr.address}</Text>
                       <Text style={styles.savedAddressSubText} numberOfLines={1}>{addr.city}</Text>
                     </View>
                   </TouchableOpacity>

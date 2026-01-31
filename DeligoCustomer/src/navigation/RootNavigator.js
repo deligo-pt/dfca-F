@@ -17,6 +17,7 @@ import {
     CheckoutScreen,
     EditProfileScreen,
     VouchersScreen,
+    FavoriteOrdersScreen,
     SavedAddressesScreen,
     PaymentMethodsScreen,
     ReferralsScreen,
@@ -109,6 +110,7 @@ export default function RootNavigator() {
                 {/* Profile & Settings Group */}
                 <Stack.Screen name="EditProfile" component={EditProfileScreen} />
                 <Stack.Screen name="Vouchers" component={VouchersScreen} />
+                <Stack.Screen name="FavoriteOrders" component={FavoriteOrdersScreen} />
                 <Stack.Screen name="SavedAddresses" component={SavedAddressesScreen} />
                 <Stack.Screen name="PaymentMethods" component={PaymentMethodsScreen} />
                 <Stack.Screen name="Referrals" component={ReferralsScreen} />

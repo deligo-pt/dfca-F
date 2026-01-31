@@ -6,11 +6,12 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Modal, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Modal, StatusBar, Alert } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
+import CustomModal from '../components/CustomModal';
 
 const SettingsScreen = ({ navigation }) => {
   const { language, changeLanguage, t } = useLanguage();
@@ -23,6 +24,7 @@ const SettingsScreen = ({ navigation }) => {
   });
 
   const [showLanguageModal, setShowLanguageModal] = useState(false);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
 
   // Synchronize local state with global theme context
   useEffect(() => {
@@ -45,6 +47,10 @@ const SettingsScreen = ({ navigation }) => {
   const handleLanguageSelect = async (lang) => {
     await changeLanguage(lang.code);
     setShowLanguageModal(false);
+  };
+
+  const handleDeleteAccount = () => {
+    setDeleteModalVisible(true);
   };
 
   const getCurrentLanguageName = () => {
@@ -345,7 +351,7 @@ const SettingsScreen = ({ navigation }) => {
               icon="trash-outline"
               title={t('deleteAccount')}
               subtitle={t('permanentlyDelete')}
-              onPress={() => { }}
+              onPress={handleDeleteAccount}
               hasChevron={false}
             />
           </View>
@@ -402,6 +408,16 @@ const SettingsScreen = ({ navigation }) => {
           </View>
         </TouchableOpacity>
       </Modal>
+
+      <CustomModal
+        visible={deleteModalVisible}
+        title={t('deleteAccount')}
+        message={t('deleteAccountMessage') || 'Please contact support.'}
+        onConfirm={() => setDeleteModalVisible(false)}
+        onCancel={() => setDeleteModalVisible(false)}
+        onlyConfirm={true}
+        confirmText="OK"
+      />
     </SafeAreaView>
   );
 };

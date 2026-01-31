@@ -881,7 +881,7 @@ const CategoriesScreen = ({ navigation }) => {
                         title={searchQuery ? `${t('searchResults')} (${(products || []).length})` : t('nearYou')}
                         onSeeAll={!searchQuery ? () => navigation.navigate('SeeAll', {
                             allItems: sourceProducts,
-                            vendorTypes: vendorTypes,
+                            vendorTypes: displayCategories,
                             availableCuisines: cuisinesFromProducts,
                             title: t('nearYou')
                         }) : undefined}

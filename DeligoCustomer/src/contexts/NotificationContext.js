@@ -40,6 +40,7 @@ export const NotificationProvider = ({ children }) => {
   const [latestNotification, setLatestNotification] = useState(null);
   const [showPopup, setShowPopup] = useState(false);
   const [isInitialized, setIsInitialized] = useState(false);
+  const lastFetchRef = React.useRef(0);
 
   const { isAuthenticated } = useProfile();
 
@@ -146,46 +147,57 @@ export const NotificationProvider = ({ children }) => {
   /**
    * Handle authentication changes: fetch notifications and ensure FCM token is registered with backend.
    */
+  /**
+   * Fetch notifications when user logs in.
+   * Separate effect to avoid re-fetching when initialization completes.
+   */
   useEffect(() => {
     if (isAuthenticated) {
       fetchNotifications();
-
-      if (isInitialized) {
-        (async () => {
-          try {
-            const permission = await firebaseNotificationService.checkPermission();
-            console.log('[NotificationContext] Permission status:', permission);
-
-            if (permission !== 'granted') {
-              console.log('[NotificationContext] Requesting permission...');
-              const granted = await firebaseNotificationService.requestPermission();
-              if (!granted) {
-                console.log('[NotificationContext] Permission denied');
-                return;
-              }
-            }
-
-            const token = await firebaseNotificationService.getToken();
-            if (token) {
-              console.log('[NotificationContext] Registering token...');
-              const result = await firebaseNotificationService.registerTokenWithBackend(token);
-
-              if (result) console.log('[NotificationContext] Backend registration successful');
-              else console.warn('[NotificationContext] Backend registration failed/incomplete');
-            } else {
-              console.warn('[NotificationContext] Failed to retrieve FCM token');
-            }
-          } catch (error) {
-            console.error('[NotificationContext] Token registration error:', error);
-          }
-        })();
-      }
     } else {
       // Clear state on logout
       setNotifications([]);
       setUnreadCount(0);
     }
-  }, [isAuthenticated, isInitialized, fetchNotifications]);
+  }, [isAuthenticated, fetchNotifications]);
+
+  /**
+   * Handle FCM token registration when service is ready.
+   */
+  useEffect(() => {
+    if (isAuthenticated && isInitialized) {
+      (async () => {
+        try {
+          const permission = await firebaseNotificationService.checkPermission();
+          console.log('[NotificationContext] Permission status:', permission);
+
+          if (permission !== 'granted') {
+            console.log('[NotificationContext] Requesting permission...');
+            const granted = await firebaseNotificationService.requestPermission();
+            if (!granted) {
+              console.log('[NotificationContext] Permission denied');
+              return;
+            }
+          }
+
+          const token = await firebaseNotificationService.getToken();
+          if (token) {
+            console.log('[NotificationContext] Registering token...');
+            // Check if token already registered to avoid redundant calls or check local storage?
+            // For now, just register to ensure backend is in sync.
+            const result = await firebaseNotificationService.registerTokenWithBackend(token);
+
+            if (result) console.log('[NotificationContext] Backend registration successful');
+            else console.warn('[NotificationContext] Backend registration failed/incomplete');
+          } else {
+            console.warn('[NotificationContext] Failed to retrieve FCM token');
+          }
+        } catch (error) {
+          console.error('[NotificationContext] Token registration error:', error);
+        }
+      })();
+    }
+  }, [isAuthenticated, isInitialized]);
 
   /**
    * Re-fetch notifications when the application returns to the foreground.
@@ -205,6 +217,15 @@ export const NotificationProvider = ({ children }) => {
    * @returns {Promise<Array>} The list of notifications.
    */
   const fetchNotifications = useCallback(async () => {
+    const now = Date.now();
+    // Throttle fetches to max once every 5 seconds to prevent 429 errors
+    if (now - lastFetchRef.current < 5000) {
+      console.log('[NotificationContext] Skipping fetch, throttled');
+      return [];
+    }
+
+    lastFetchRef.current = now;
+
     try {
       const data = await firebaseNotificationService.fetchNotifications();
       setNotifications(data);

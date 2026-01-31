@@ -21,8 +21,9 @@ import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
 import { spacing, fontSize, borderRadius } from '../theme';
-import RestaurantCard from '../components/RestaurantCard';
 import { useLocation } from '../contexts/LocationContext';
+import GlovoBubbles from '../components/GlovoBubbles';
+import RestaurantCard from '../components/RestaurantCard';
 
 const SeeAllScreen = ({ navigation, route }) => {
     const { colors } = useTheme();
@@ -90,18 +91,30 @@ const SeeAllScreen = ({ navigation, route }) => {
 
         // Vendor type filter
         if (selectedVendorType) {
+            const target = selectedVendorType.toLowerCase().trim();
             result = result.filter(item => {
                 const vt = item._raw?.vendor?.vendorType || item.vendor?.vendorType;
-                return String(vt).trim() === selectedVendorType;
+                return vt && String(vt).toLowerCase().trim().includes(target);
             });
         }
 
         // Cuisine filter
         if (selectedCuisine) {
+            const target = selectedCuisine.toLowerCase().trim();
             result = result.filter(item => {
                 const cat = item._raw?.category || item.category ||
                     (Array.isArray(item.tags) ? item.tags[0] : null);
-                return String(cat).trim() === selectedCuisine;
+
+                // Check simple string category
+                if (cat && typeof cat === 'string') {
+                    return cat.toLowerCase().trim().includes(target);
+                }
+                // Check if tags array contains target
+                if (Array.isArray(item.categories)) {
+                    return item.categories.some(c => String(c).toLowerCase().includes(target));
+                }
+
+                return false;
             });
         }
 
@@ -149,12 +162,17 @@ const SeeAllScreen = ({ navigation, route }) => {
     };
 
     const toggleVendorType = (vt) => {
-        setSelectedVendorType(prev => prev === vt ? null : vt);
+        // Use name/slug for easier filtering
+        const val = vt.slug || vt.name || vt.id;
+        const safeVal = val ? String(val).toLowerCase().trim() : null;
+        setSelectedVendorType(prev => prev === safeVal ? null : safeVal);
         setSelectedCuisine(null); // Reset cuisine when vendor changes
     };
 
     const toggleCuisine = (c) => {
-        setSelectedCuisine(prev => prev === c ? null : c);
+        const val = c.slug || c.name || c.id;
+        const safeVal = val ? String(val).toLowerCase().trim() : null;
+        setSelectedCuisine(prev => prev === safeVal ? null : safeVal);
     };
 
     const renderItem = ({ item }) => (
@@ -203,34 +221,19 @@ const SeeAllScreen = ({ navigation, route }) => {
                 )}
             </View>
 
-            {/* Vendor Type Filter Chips */}
+            {/* Vendor Type Filter Chips - Replaced with GlovoBubbles */}
             {vendorTypes.length > 0 && (
-                <View style={{ height: 50, marginBottom: 4 }}>
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.filterRow}
-                    >
-                        {vendorTypes.map((vt) => (
-                            <TouchableOpacity
-                                key={vt.id}
-                                style={[
-                                    styles.filterChip,
-                                    { backgroundColor: selectedVendorType === vt.id ? colors.primary : colors.surface }
-                                ]}
-                                onPress={() => toggleVendorType(vt.id)}
-                            >
-                                <Text style={[
-                                    styles.filterChipText,
-                                    { color: selectedVendorType === vt.id ? '#fff' : colors.text.primary }
-                                ]}>
-                                    {vt.name}
-                                </Text>
-                            </TouchableOpacity>
-                        ))}
-                    </ScrollView>
+                <View style={{ marginBottom: 4 }}>
+                    <GlovoBubbles
+                        categories={vendorTypes}
+                        selectedId={selectedVendorType}
+                        onPress={(cat) => toggleVendorType(cat)}
+                        showTitle={false}
+                    />
                 </View>
             )}
+
+
 
             {/* Sort Options */}
             <View style={styles.sortRow}>
@@ -362,9 +365,14 @@ const styles = StyleSheet.create({
         flexDirection: 'row',
     },
     sortButton: {
-        padding: spacing.xs,
+        width: 36,
+        height: 36,
+        justifyContent: 'center',
+        alignItems: 'center',
         marginLeft: spacing.xs,
-        borderRadius: borderRadius.sm,
+        borderRadius: 18,
+        backgroundColor: '#F5F5F5', // Light gray background
+        // shadow/elevation for depth
     },
     listContent: {
         paddingHorizontal: spacing.md,

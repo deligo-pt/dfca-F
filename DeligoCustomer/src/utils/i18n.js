@@ -29,6 +29,7 @@ export const translations = {
     mAgo: 'm ago',
     hAgo: 'h ago',
     searchPlaceholderHeader: 'Search restaurants, cuisines, dishes...',
+    awaitingDriver: 'Awaiting Driver',
 
     // Navigation
     home: 'Home',
@@ -277,6 +278,7 @@ export const translations = {
     searchBusinessAddress: 'Search for your business address...',
     work: 'Work',
     other: 'Other',
+    primary: 'Primary',
     // Generic buttons / placeholders
     ok: 'OK',
     noAddress: 'No address provided',
@@ -362,7 +364,13 @@ export const translations = {
     exclusiveBenefits: 'Exclusive benefits and discounts',
     savedAddresses: 'Saved Addresses',
     favoriteOrders: 'Favorite Orders',
+    noFavorites: 'No favorite orders yet. ❤️',
+    addFavoritesHint: 'Save your favorite restaurants to order quickly next time!',
+    exploreRestaurants: 'Explore Restaurants',
+    lockedFeatureTitle: 'Unlock Exclusive Features',
+    lockedFeatureMessage: 'Use the app regularly and place more orders to unlock and enjoy these exclusive features.',
     notifications: 'Notifications',
+    deleteAccountMessage: 'Please contact support.',
     noNotifications: 'No Notifications',
     noNotificationsDesc: "You're all caught up! Check back later for updates.",
     markAllRead: 'Mark all read',
@@ -433,6 +441,7 @@ export const translations = {
     appSettings: 'App Settings',
     darkMode: 'Dark Mode',
     switchDarkTheme: 'Switch to dark theme',
+    manageNotifications: 'Manage Notifications',
     locationServices: 'Location Services',
     allowLocation: 'Allow location access',
     language: 'Language',
@@ -584,6 +593,7 @@ export const translations = {
     mAgo: 'm atrás',
     hAgo: 'h atrás',
     searchPlaceholderHeader: 'Pesquisar restaurantes, cozinhas, pratos...',
+    awaitingDriver: 'Aguardando Entregador',
 
     // Navigation
     home: 'Início',
@@ -862,7 +872,13 @@ export const translations = {
     exclusiveBenefits: 'Benefícios e descontos exclusivos',
     savedAddresses: 'Endereços Guardados',
     favoriteOrders: 'Pedidos Favoritos',
+    noFavorites: 'Nenhum pedido favorito ainda. ❤️',
+    addFavoritesHint: 'Guarde os seus restaurantes favoritos para pedir rapidamente na próxima vez!',
+    exploreRestaurants: 'Explorar Restaurantes',
+    lockedFeatureTitle: 'Desbloquear Recursos Exclusivos',
+    lockedFeatureMessage: 'Use o aplicativo regularmente e faça mais pedidos para desbloquear e aproveitar esses recursos exclusivos.',
     notifications: 'Notificações',
+    deleteAccountMessage: 'Por favor contacte o suporte.',
     noNotifications: 'Sem Notificações',
     noNotificationsDesc: 'Está tudo em dia! Volte mais tarde para ver atualizações.',
     markAllRead: 'Marcar tudo como lido',
@@ -1004,6 +1020,8 @@ export const translations = {
     // Settings Screen
     appSettings: 'Definições da Aplicação',
     darkMode: 'Modo Escuro',
+    switchDarkTheme: 'Alternar para tema escuro',
+    manageNotifications: 'Gerir Notificações',
     language: 'Idioma',
     selectLanguage: 'Selecionar Idioma',
     english: 'English',
