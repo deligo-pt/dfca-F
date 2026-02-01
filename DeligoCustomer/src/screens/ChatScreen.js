@@ -1,6 +1,6 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, TouchableOpacity, TextInput, FlatList, KeyboardAvoidingView, Platform, StatusBar, ActivityIndicator, Alert, Image } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import * as ImagePicker from 'expo-image-picker';
 import { useLanguage } from '../utils/LanguageContext';
@@ -41,7 +41,8 @@ const ChatScreen = ({ navigation }) => {
   const typingTimeoutRef = useRef(null);
 
   // Memoize styles
-  const styles = useMemo(() => createStyles(colors), [colors]);
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => createStyles(colors, insets), [colors, insets]);
 
   // 1. Initialize Conversation & User
   useEffect(() => {
@@ -536,7 +537,7 @@ const ChatScreen = ({ navigation }) => {
   );
 };
 
-const createStyles = (colors) => StyleSheet.create({
+const createStyles = (colors, insets) => StyleSheet.create({
   container: {
     flex: 1,
     backgroundColor: colors.background,
@@ -715,7 +716,8 @@ const createStyles = (colors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
+    paddingTop: 12,
+    paddingBottom: Platform.OS === 'android' ? Math.max(20, insets?.bottom + 12) : Math.max(12, insets?.bottom),
     backgroundColor: colors.background,
     borderTopWidth: 1,
     borderTopColor: colors.border,

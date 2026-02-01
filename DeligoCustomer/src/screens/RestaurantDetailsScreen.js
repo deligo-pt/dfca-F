@@ -280,7 +280,9 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   // Update add/remove with optimistic updates and animation
   const addToCart = async (item, options = {}) => {
     const current = getQuantity(item.id);
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (!productModalVisible) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    }
     setLocalQty((prev) => ({ ...prev, [item.id]: current + 1 }));
     setUpdatingProductId(item.id);
     await addItem(item, 1, options);
@@ -290,7 +292,9 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const removeFromCart = async (item) => {
     const current = getQuantity(item.id);
     if (current <= 0) return;
-    LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    if (!productModalVisible) {
+      LayoutAnimation.configureNext(LayoutAnimation.Presets.easeInEaseOut);
+    }
     setLocalQty((prev) => ({ ...prev, [item.id]: Math.max(0, current - 1) }));
     setUpdatingProductId(item.id);
     await cartUpdateQuantity(item.id, -1);
@@ -495,7 +499,11 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
               </TouchableOpacity>
             </View>
 
-            <ScrollView contentContainerStyle={{ paddingBottom: 100 }} showsVerticalScrollIndicator={false}>
+            <ScrollView
+              style={{ flexShrink: 1 }}
+              contentContainerStyle={{ paddingBottom: 220 }} // Large padding to clear the absolute footer completely
+              showsVerticalScrollIndicator={false}
+            >
               {/* Content */}
               <View style={styles.modalBody}>
                 <Text style={[styles.modalTitle, { color: colors.text.primary }]}>{title}</Text>
@@ -620,8 +628,17 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
             </ScrollView>
 
-            {/* Footer */}
-            <View style={[styles.modalFooter, { backgroundColor: colors.surface, paddingBottom: Math.max(16, insets.bottom) }]}>
+            {/* Footer - Absolute Positioned to guarantee visibility */}
+            <View style={[styles.modalFooter, {
+              position: 'absolute',
+              bottom: 0,
+              left: 0,
+              right: 0,
+              backgroundColor: colors.surface,
+              borderTopWidth: 1,
+              borderTopColor: colors.border,
+              paddingBottom: Platform.OS === 'android' ? Math.max(24, insets.bottom + 20) : Math.max(16, insets.bottom)
+            }]}>
               <View style={{ backgroundColor: colors.primary + '05', borderRadius: borderRadius.xl, padding: spacing.md }}>
 
                 {/* Quantity Controls - Row Layout (Label Left, Controls Right) */}
@@ -644,6 +661,21 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                     <TouchableOpacity
                       style={[styles.modalQuantityBtn, { backgroundColor: colors.primary }]}
                       onPress={() => {
+                        const currentCartQty = itemsMap?.[activeProduct.id]?.quantity || 0;
+                        const maxStock = raw.stock?.quantity;
+
+                        // Check if stock info is available
+                        if (maxStock !== undefined && maxStock !== null) {
+                          if ((currentCartQty + quantity + 1) > maxStock) {
+                            setAlertConfig({
+                              title: t('maxComplete') || 'Max Quantity Reached',
+                              message: `${t('only') || 'Only'} ${maxStock} ${t('itemsAvailable') || 'items available'} (${currentCartQty} ${t('inCart') || 'in cart'})`
+                            });
+                            setAlertVisible(true);
+                            return;
+                          }
+                        }
+
                         setLocalQty(prev => ({ ...prev, [activeProduct.id]: quantity + 1 }));
                       }}
                     >
@@ -866,20 +898,23 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                     ) : (
                       <Ionicons name="cart" size={22} color={quantity > 0 ? "#fff" : colors.text.light} style={{ marginRight: 10 }} />
                     )}
-                    <Text style={[styles.modalAddToCartText, { color: quantity > 0 ? '#fff' : colors.text.light }]}>
-                      {addingToCart
-                        ? (t('adding') || 'Adding...')
-                        : quantity > 0
-                          ? (() => {
-                            // Calculate total based on finalPrice (includes discount)
-                            const base = raw.pricing?.finalPrice ?? raw.finalPrice ?? price ?? 0;
-                            const total = base * quantity;
+                    {/* Fixed width container for text to prevent layout jitter */}
+                    <View style={{ minWidth: 200, alignItems: 'center' }}>
+                      <Text style={[styles.modalAddToCartText, { color: quantity > 0 ? '#fff' : colors.text.light }]}>
+                        {addingToCart
+                          ? (t('adding') || 'Adding...')
+                          : quantity > 0
+                            ? (() => {
+                              // Calculate total based on finalPrice (includes discount)
+                              const base = raw.pricing?.finalPrice ?? raw.finalPrice ?? price ?? 0;
+                              const total = base * quantity;
 
-                            return `${t('addToCart') || 'Add to cart'} • ${formatCurrency(currency, total)}`;
-                          })()
-                          : (t('addToCart') || 'Add to cart')
-                      }
-                    </Text>
+                              return `${t('addToCart') || 'Add to cart'} • ${formatCurrency(currency, total)}`;
+                            })()
+                            : (t('addToCart') || 'Add to cart')
+                        }
+                      </Text>
+                    </View>
                   </LinearGradient>
                 </TouchableOpacity>
               </View>
@@ -1348,7 +1383,8 @@ const styles = StyleSheet.create({
   modalCard: {
     borderTopLeftRadius: borderRadius.xxl,
     borderTopRightRadius: borderRadius.xxl,
-    maxHeight: '90%',
+    maxHeight: '85%', // Reduced to ensure footer visible on all devices
+    overflow: 'hidden', // Ensure content doesn't bleed out
     elevation: 8,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: -4 },
@@ -1465,7 +1501,8 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'center',
-    paddingVertical: 18,
+    height: 56, // FIXED height for stability
+    paddingVertical: 0,
     borderRadius: 16,
     elevation: 1,
     shadowColor: '#E91E63',

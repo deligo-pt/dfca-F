@@ -98,6 +98,9 @@ export const translations = {
     extrasAvailable: 'Customize your order',
     addExtrasAfterCart: 'Choose toppings & extras in the next step',
     loadingAddons: 'Loading extras...',
+    maxComplete: 'Max Quantity Reached',
+    only: 'Only',
+    itemsAvailable: 'items available',
 
     // Cart
     cart: 'Cart',
@@ -712,6 +715,9 @@ export const translations = {
     extrasAvailable: 'Personalize o seu pedido',
     addExtrasAfterCart: 'Escolha extras e complementos no próximo passo',
     loadingAddons: 'A carregar extras...',
+    maxComplete: 'Quantidade Máxima Atingida',
+    only: 'Apenas',
+    itemsAvailable: 'itens disponíveis',
 
     // Cart
     cart: 'Carrinho',
