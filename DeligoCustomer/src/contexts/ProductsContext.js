@@ -123,7 +123,8 @@ export function normalizeProduct(p) {
       longitude: vendorLng,
       storePhoto: vendorStorePhoto,
       isStoreOpen: businessDetails.isStoreOpen ?? vendorSource.isStoreOpen,
-      address: businessLocation.address
+      address: businessLocation.address,
+      deliveryTime: raw.deliveryTime || vendorSource.deliveryTime || ''
     }
   };
 }

@@ -154,6 +154,21 @@ const NotificationsScreen = ({ navigation }) => {
     });
   };
 
+  const formatNotificationText = (text) => {
+    if (!text) return '';
+    return text
+      .replace(/PICKED_UP/g, 'Picked Up')
+      .replace(/ON_THE_WAY/g, 'On The Way')
+      .replace(/READY_FOR_PICKUP/g, 'Ready For Pickup')
+      .replace(/ACCEPTED/g, 'Accepted')
+      .replace(/PREPARING/g, 'Preparing')
+      .replace(/DELIVERED/g, 'Delivered')
+      .replace(/COMPLETED/g, 'Completed')
+      .replace(/CANCELED/g, 'Canceled')
+      .replace(/REJECTED/g, 'Rejected')
+      .replace(/PENDING/g, 'Pending');
+  };
+
   const filteredNotifications = notifications.filter((notification) => {
     switch (activeFilter) {
       case 'unread':
@@ -248,11 +263,11 @@ const NotificationsScreen = ({ navigation }) => {
         <View style={styles.textContainer}>
           <View style={styles.headerRow}>
             <Text style={[styles.title, !item.isRead && styles.unreadTitle]} numberOfLines={1}>
-              {item.title}
+              {formatNotificationText(item.title)}
             </Text>
             <Text style={styles.time}>{getTimeAgo(item.createdAt)}</Text>
           </View>
-          <Text style={styles.message} numberOfLines={2}>{item.message}</Text>
+          <Text style={styles.message} numberOfLines={2}>{formatNotificationText(item.message)}</Text>
           {item.type && (
             <View style={[styles.typeTag, { backgroundColor: config.color + '15' }]}>
               <Text style={[styles.typeTagText, { color: config.color }]}>
@@ -303,7 +318,7 @@ const NotificationsScreen = ({ navigation }) => {
 
             {/* Content */}
             <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
-              {selectedNotification.title}
+              {formatNotificationText(selectedNotification.title)}
             </Text>
 
             <Text style={[styles.modalDate, { color: colors.text.light }]}>
@@ -314,7 +329,7 @@ const NotificationsScreen = ({ navigation }) => {
 
             <ScrollView style={styles.modalBody} showsVerticalScrollIndicator={false}>
               <Text style={[styles.modalMessage, { color: colors.text.secondary }]}>
-                {selectedNotification.message}
+                {formatNotificationText(selectedNotification.message)}
               </Text>
 
               {selectedNotification.data && Object.keys(selectedNotification.data).length > 0 && (
@@ -325,7 +340,7 @@ const NotificationsScreen = ({ navigation }) => {
                         {key.replace(/([A-Z])/g, ' $1').replace(/^./, str => str.toUpperCase())}
                       </Text>
                       <Text style={[styles.modalDataValue, { color: colors.text.primary }]}>
-                        {value}
+                        {formatNotificationText(String(value))}
                       </Text>
                     </View>
                   ))}

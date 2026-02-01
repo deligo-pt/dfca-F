@@ -102,6 +102,11 @@ export const API_ENDPOINTS = {
     HISTORY: '/orders/history',
   },
 
+  // --- Ratings ---
+  RATINGS: {
+    CREATE: '/ratings/create-rating',
+  },
+
   // --- Cart Operations ---
   CART: {
     GET: '/carts/view-cart',
@@ -151,6 +156,14 @@ export const API_ENDPOINTS = {
     SETTINGS: '/notifications/settings',
     UPDATE_SETTINGS: '/notifications/settings/update',
   },
+
+  // --- Support Chat ---
+  CHAT: {
+    INIT: '/support/conversation',
+    LIST: '/support/conversations',
+    MESSAGES: '/support/conversations/:room/messages',
+    READ: '/support/conversations/:room/read',
+  }
 };
 
 /**

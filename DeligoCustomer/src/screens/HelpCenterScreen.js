@@ -20,7 +20,6 @@ import { useTheme } from '../utils/ThemeContext';
 const HelpCenterScreen = ({ navigation }) => {
   const { t } = useLanguage();
   const { colors } = useTheme();
-  const [searchQuery, setSearchQuery] = useState('');
 
   // Memoize styles to ensure theme updates are handled efficiently
   const styles = useMemo(() => createStyles(colors), [colors]);
@@ -56,6 +55,8 @@ const HelpCenterScreen = ({ navigation }) => {
       navigation.navigate('OrderIssues');
     } else if (category.id === 3) { // Payment & Refunds
       navigation.navigate('PaymentRefunds');
+    } else if (category.id === 4) { // Account & Profile
+      navigation.navigate('AccountProfileHelp');
     }
     // Handle other categories if needed
   };
@@ -77,17 +78,7 @@ const HelpCenterScreen = ({ navigation }) => {
       </View>
 
       <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        {/* Search Bar */}
-        <View style={[styles.searchContainer, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-          <Ionicons name="search" size={20} color={colors.text.light} />
-          <TextInput
-            style={[styles.searchInput, { color: colors.text.primary }]}
-            placeholder={t('howCanWeHelp')}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            placeholderTextColor={colors.text.light}
-          />
-        </View>
+
 
         <View style={styles.section}>
           <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('contactSupport')}</Text>

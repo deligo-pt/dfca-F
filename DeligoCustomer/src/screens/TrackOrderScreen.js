@@ -20,6 +20,7 @@ import {
   Modal,
   StatusBar,
   BackHandler,
+  ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
@@ -29,10 +30,12 @@ import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme, darkMapStyle } from '../utils/ThemeContext';
 import { useSocket } from '../contexts/SocketContext';
+import { API_ENDPOINTS } from '../constants/config';
 
 const { height } = Dimensions.get('window');
 
 import { customerApi } from '../utils/api';
+import OrderRatingModal from '../components/OrderRatingModal';
 
 // Format address object to string
 const formatAddress = (addr) => {
@@ -57,7 +60,13 @@ const TrackOrderScreen = ({ route, navigation }) => {
   const { t, language } = useLanguage();
   const { colors, isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
-  const { order } = route.params || {};
+
+  const { order: paramOrder, orderId: paramOrderId } = route.params || {};
+  const [fetchedOrder, setFetchedOrder] = useState(null);
+  const [loading, setLoading] = useState(!paramOrder && !!paramOrderId);
+
+  const order = fetchedOrder || paramOrder;
+  const orderId = order?._id || paramOrderId;
 
   // Map API status to internal stage
   const mapOrderStatusToStage = (status) => {
@@ -91,10 +100,103 @@ const TrackOrderScreen = ({ route, navigation }) => {
   const [mapReady, setMapReady] = useState(false);
   const [mapLayout, setMapLayout] = useState(false);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
+  const [showRatingModal, setShowRatingModal] = useState(false);
+
+  // Trigger rating automatically when order is delivered
+  useEffect(() => {
+    if (currentStatus === 'delivered') {
+      // Small delay to ensure user sees the "Delivered" status update first
+      const timer = setTimeout(() => {
+        setShowRatingModal(true);
+      }, 2000);
+      return () => clearTimeout(timer);
+    }
+  }, [currentStatus]);
+
+  // Skeleton Animation
+  const skeletonOpacity = useRef(new Animated.Value(0.3)).current;
+
+  useEffect(() => {
+    if (loading) {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(skeletonOpacity, {
+            toValue: 1,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+          Animated.timing(skeletonOpacity, {
+            toValue: 0.3,
+            duration: 800,
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    }
+  }, [loading]);
+
+  const SkeletonBlock = ({ style }) => (
+    <Animated.View
+      style={[
+        {
+          backgroundColor: isDarkMode ? '#2C2C2C' : '#E0E0E0',
+          opacity: skeletonOpacity,
+          borderRadius: borderRadius.md,
+        },
+        style,
+      ]}
+    />
+  );
+
+  // Fetch order details if needed
+  useEffect(() => {
+    let isActive = true;
+
+    const fetchOrderDetails = async () => {
+      // If we don't have the order object, but we have an ID, fetch it
+      if (!paramOrder && paramOrderId) {
+        try {
+          if (isActive) setLoading(true);
+          console.log('[TrackOrder] Fetching order details for ID:', paramOrderId);
+
+          // Use the GET_BY_ID endpoint
+          const url = API_ENDPOINTS.ORDERS.GET_BY_ID.replace(':id', paramOrderId);
+          const response = await customerApi.get(url);
+
+          if (isActive) {
+            if (response && response.success && response.data) {
+              console.log('[TrackOrder] Order fetched successfully');
+              setFetchedOrder(response.data);
+              // Update status immediately after fetch
+              setCurrentStatus(mapOrderStatusToStage(response.data.orderStatus));
+            } else {
+              console.warn('[TrackOrder] Failed to fetch order or no data returned');
+              Alert.alert(t('error'), t('orderNotFound') || 'Order not found', [
+                { text: 'OK', onPress: () => navigation.goBack() }
+              ]);
+            }
+          }
+        } catch (error) {
+          console.error('[TrackOrder] Error fetching order:', error);
+          if (isActive) {
+            Alert.alert(t('error'), t('failedToLoadOrder') || 'Failed to load order details', [
+              { text: 'OK', onPress: () => navigation.goBack() }
+            ]);
+          }
+        } finally {
+          if (isActive) setLoading(false);
+        }
+      }
+    };
+
+    fetchOrderDetails();
+
+    return () => { isActive = false; };
+  }, [paramOrderId, paramOrder]);
 
   // Normalize order data structure
   const normalizeOrderData = (data) => {
-    if (!data) return null;
+    if (!data) return {}; // Return empty object instead of null to match fallback behavior
 
     // Extract order items with proper names
     const normalizedItems = (data.items || []).map((item) => {
@@ -268,45 +370,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
     };
   };
 
-  // Default mock data
-  const defaultMockData = {
-    id: '1',
-    orderNumber: '#DLG-2024-1234',
-    orderDate: 'Oct 26, 2025',
-    orderTime: '2:45 PM',
-    restaurantName: 'Burger King',
-    restaurantAddress: '123 Main Street, Downtown District',
-    restaurantPhone: '+1 (555) 123-4567',
-    restaurantImage: '🍔',
-    items: [
-      { name: 'Double Whopper Meal', quantity: 1, price: 12.99 },
-      { name: 'Chicken Royale', quantity: 1, price: 8.99 },
-      { name: 'Large Fries', quantity: 2, price: 3.49 },
-      { name: 'Coca Cola (500ml)', quantity: 2, price: 2.49 }
-    ],
-    itemsText: ['Double Whopper Meal', 'Chicken Royale', 'Large Fries x2', 'Coca Cola x2'],
-    subtotal: 31.45,
-    deliveryFee: 2.99,
-    serviceFee: 1.99,
-    discount: 5.00,
-    totalAmount: 31.43,
-    estimatedTime: '20-25 min',
-    estimatedArrival: '3:10 PM',
-    deliveryAddress: '456 Park Avenue, Apartment 5B, 2nd Floor',
-    deliveryLandmark: 'Near Central Park',
-    deliveryInstructions: 'Please ring the bell twice',
-    driverName: 'Michael Rodriguez',
-    driverPhone: '+1 (555) 987-6543',
-    driverRating: 4.9,
-    driverTotalDeliveries: 1247,
-    vehicleType: 'Motorcycle',
-    vehicleNumber: 'DLG-8845',
-    vehicleColor: 'Red',
-    paymentMethod: 'Credit Card •••• 4242',
-    promoCode: 'SAVE5',
-  };
-
-  const orderData = normalizeOrderData(order) || defaultMockData;
+  const orderData = normalizeOrderData(order || {});
 
   const orderStages = useMemo(() => [
     {
@@ -967,9 +1031,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
     <View style={styles.progressContainer}>
       <View style={styles.progressHeader}>
         <Text style={styles.progressTitle}>{t('orderStatus')}</Text>
-        <TouchableOpacity>
-          <Text style={styles.viewDetailsText}>{t('viewDetails')}</Text>
-        </TouchableOpacity>
+
       </View>
 
       {/* Progress Bar */}
@@ -2253,6 +2315,67 @@ const TrackOrderScreen = ({ route, navigation }) => {
     },
   }), [colors]);
 
+  if (loading) {
+    return (
+      <SafeAreaView style={styles.container} edges={['top']}>
+        <StatusBar
+          barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+          backgroundColor="transparent"
+          translucent={true}
+        />
+        {/* Header Skeleton */}
+        <View style={styles.header}>
+          <SkeletonBlock style={{ width: 40, height: 40, borderRadius: 20 }} />
+          <SkeletonBlock style={{ width: 140, height: 24, borderRadius: 4 }} />
+          <SkeletonBlock style={{ width: 40, height: 40, borderRadius: 20 }} />
+        </View>
+
+        <ScrollView style={styles.scrollView} contentContainerStyle={styles.scrollContent}>
+          {/* Map Skeleton */}
+          <SkeletonBlock style={{ width: '100%', height: height * 0.35, borderRadius: 0, marginBottom: spacing.md }} />
+
+          {/* Driver/Status Skeleton */}
+          <View style={{ paddingHorizontal: spacing.md }}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: spacing.md }}>
+              <SkeletonBlock style={{ width: 120, height: 24, borderRadius: 4 }} />
+              <SkeletonBlock style={{ width: 80, height: 20, borderRadius: 4 }} />
+            </View>
+
+            {/* Driver Card Placeholder */}
+            <View style={{ padding: spacing.md, borderWidth: 1, borderColor: isDarkMode ? '#333' : '#eee', borderRadius: borderRadius.lg, marginBottom: spacing.lg }}>
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <SkeletonBlock style={{ width: 50, height: 50, borderRadius: 25, marginRight: spacing.md }} />
+                <View style={{ gap: 6 }}>
+                  <SkeletonBlock style={{ width: 140, height: 20, borderRadius: 4 }} />
+                  <SkeletonBlock style={{ width: 100, height: 16, borderRadius: 4 }} />
+                </View>
+              </View>
+            </View>
+
+            <SkeletonBlock style={{ width: '100%', height: 2, marginBottom: spacing.lg }} />
+
+            {/* Progress Steps Skeleton */}
+            <View style={{ gap: 24, marginBottom: spacing.xl }}>
+              {[1, 2, 3].map(i => (
+                <View key={i} style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <SkeletonBlock style={{ width: 32, height: 32, borderRadius: 16, marginRight: spacing.md }} />
+                  <View style={{ gap: 6 }}>
+                    <SkeletonBlock style={{ width: 160, height: 18, borderRadius: 4 }} />
+                    <SkeletonBlock style={{ width: 100, height: 14, borderRadius: 4 }} />
+                  </View>
+                </View>
+              ))}
+            </View>
+
+            {/* Order Summary Skeleton */}
+            <SkeletonBlock style={{ width: 140, height: 24, borderRadius: 4, marginBottom: spacing.md }} />
+            <SkeletonBlock style={{ width: '100%', height: 180, borderRadius: borderRadius.lg }} />
+          </View>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.container} edges={['top']}>
       <StatusBar
@@ -2296,14 +2419,28 @@ const TrackOrderScreen = ({ route, navigation }) => {
         <View style={[styles.bottomActionsInline, {
           marginBottom: Math.max(spacing.md, insets.bottom + spacing.sm)
         }]}>
-          <TouchableOpacity style={styles.cancelButton}>
-            <Text style={styles.cancelButtonText}>{t('cancelOrder')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.supportButton}>
+
+          <TouchableOpacity
+            style={styles.supportButton}
+            onPress={() => navigation.navigate('HelpCenter')}
+          >
             <Ionicons name="headset" size={20} color={colors.text.white} />
             <Text style={styles.supportButtonText}>{t('support')}</Text>
           </TouchableOpacity>
         </View>
+
+        {/* Rate Order Button (Visible only when Delivered) */}
+        {currentStatus === 'delivered' && (
+          <View style={{ paddingHorizontal: spacing.md, marginTop: spacing.sm }}>
+            <TouchableOpacity
+              style={[styles.supportButton, { backgroundColor: colors.secondary, marginTop: 0 }]} // Using secondary color or gold for rating
+              onPress={() => setShowRatingModal(true)}
+            >
+              <Ionicons name="star" size={20} color={colors.text.white} />
+              <Text style={styles.supportButtonText}>{t('rateOrder') || 'Rate Order'}</Text>
+            </TouchableOpacity>
+          </View>
+        )}
 
         {/* Bottom Spacing for safe area and tab bar */}
         <View style={{ height: Math.max(80, insets.bottom + 80) }} />
@@ -2311,6 +2448,23 @@ const TrackOrderScreen = ({ route, navigation }) => {
 
       {/* Fullscreen Map Modal */}
       {renderFullscreenMap()}
+
+      {/* Rating Modal */}
+      <OrderRatingModal
+        visible={showRatingModal}
+        onClose={() => setShowRatingModal(false)}
+        orderId={orderData.id}
+        restaurantName={orderData.restaurantName}
+        driverName={
+          orderData.driverName !== t('awaitingDriver')
+            ? orderData.driverName
+            : (currentStatus === 'delivered' ? (t('deliveryRider') || 'Delivery Partner') : null)
+        }
+        onRatingSuccess={() => {
+          // Optionally navigate away or refresh
+          // navigation.goBack();
+        }}
+      />
     </SafeAreaView>
   );
 };

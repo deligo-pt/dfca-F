@@ -36,5 +36,6 @@ export { default as FAQsScreen } from './FAQsScreen';
 export { default as ChatScreen } from './ChatScreen';
 export { default as OrderIssuesScreen } from './OrderIssuesScreen';
 export { default as PaymentRefundsScreen } from './PaymentRefundsScreen';
+export { default as AccountProfileHelpScreen } from './AccountProfileHelpScreen';
 
 

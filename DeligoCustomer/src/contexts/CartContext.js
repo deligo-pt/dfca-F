@@ -138,8 +138,8 @@ function normalizeProductForCart(p) {
     vendorId,
     vendorName: vendorName || null,
     vendorImage: vendor.storePhoto || vendor.logo || vendor.image || raw.vendorImage || raw.storePhoto || null,
-    vendorRating: vendor.rating,
-    vendorDeliveryTime: vendor.deliveryTime,
+    vendorRating: (p.rating !== undefined && p.rating !== null) ? p.rating : (vendor.rating || vendor.averageRating || raw.vendorRating || (vendorId && typeof vendorId === 'object' ? vendorId.rating : null) || 0),
+    vendorDeliveryTime: p.deliveryTime || vendor.deliveryTime || vendor.estimatedDeliveryTime || raw.vendorDeliveryTime || (vendorId && typeof vendorId === 'object' ? vendorId.deliveryTime : null) || null,
     _raw: raw,
   };
 }
@@ -471,31 +471,43 @@ export const CartProvider = ({ children }) => {
       setSyncing(true);
 
       // Extract variation data needed for identification on backend
+      // Extract variation data directly from current state
       let variantName = null;
-      setState(prev => {
-        const carts = prev.carts || {};
-        for (const vkey of Object.keys(carts)) {
-          const cart = carts[vkey];
-          if (cart.items && cart.items[canonicalKey]) {
-            const item = cart.items[canonicalKey];
-            variantName = item.selectedVariation;
+      let realProductId = canonicalKey; // Default to key if lookup fails (fallback)
 
-            if (!variantName && item.product) {
-              const product = item.product;
-              if (product.variantName) {
-                variantName = product.variantName;
-              } else if (product._raw?.variantName) {
-                variantName = product._raw.variantName;
-              }
-            }
-            break;
+      const carts = state.carts || {};
+      for (const vkey of Object.keys(carts)) {
+        const cart = carts[vkey];
+        if (cart.items && cart.items[canonicalKey]) {
+          const item = cart.items[canonicalKey];
+          // Normalize variant name (handle object vs string)
+          const rawVariant = item.selectedVariation;
+          if (rawVariant && typeof rawVariant === 'object') {
+            variantName = rawVariant.name || rawVariant.variantName || null;
+          } else {
+            variantName = rawVariant;
           }
+
+          // Extract the actual product ID from the item
+          if (item.product && item.product.id) {
+            realProductId = item.product.id;
+          }
+
+          if (!variantName && item.product) {
+            const product = item.product;
+            if (product.variantName) {
+              variantName = product.variantName;
+            } else if (product._raw?.variantName) {
+              variantName = product._raw.variantName;
+            }
+          }
+          break;
         }
-        return prev;
-      });
+      }
 
       const action = delta > 0 ? 'increment' : 'decrement';
-      const res = await CartAPI.activateItem(canonicalKey, Math.abs(delta), action, variantName);
+      // Use the actual product ID, not the internal composite key
+      const res = await CartAPI.activateItem(realProductId, Math.abs(delta), action, variantName);
 
       if (!res.success) {
         console.warn('[Cart] API Sync Failed:', res);
@@ -926,8 +938,8 @@ export const CartProvider = ({ children }) => {
             vendorId: vendorKey,
             vendorName: normalized.vendorName || rawProd.vendorName || rawProd.vendor?.vendorName || '',
             vendorImage: normalized.vendorImage || 'https://via.placeholder.com/60',
-            vendorRating: normalized.vendorRating || '4.5',
-            vendorDeliveryTime: normalized.vendorDeliveryTime || '30-40 min',
+            vendorRating: normalized.vendorRating ?? null,
+            vendorDeliveryTime: normalized.vendorDeliveryTime || null,
             items: {},
             appliedPromo: null,
             deliveryInstructions: ''

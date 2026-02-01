@@ -57,6 +57,8 @@ const RestaurantCard = ({ restaurant, onPress }) => {
   // Resolve tags
   const tags = Array.isArray(p.tags) ? p.tags : (Array.isArray(p.tags) ? p.tags : (p.tags || []));
 
+  const deliveryTime = mergedVendor.deliveryTime || p.deliveryTime || null;
+
   // ---------------------------------------------------------------------------
   // Location Logic
   // ---------------------------------------------------------------------------
@@ -141,7 +143,7 @@ const RestaurantCard = ({ restaurant, onPress }) => {
         {/* Delivery Time Badge */}
         {isStoreOpen && (
           <View style={[styles(colors).deliveryPill]}>
-            <Text style={styles(colors).deliveryPillText}>20-30 min</Text>
+            <Text style={styles(colors).deliveryPillText}>{deliveryTime || 'Standard'}</Text>
           </View>
         )}
       </View>

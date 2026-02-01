@@ -133,12 +133,14 @@ export default function CartDetail({ vendorId, navigation }) {
   // Resolve Vendor Details (Context > Cart > Item fallback)
   const firstItem = items.length > 0 ? items[0] : null;
   let pcVendor = null;
+  let pcProduct = null;
 
   // Try extracting vendor info from the first product's metadata
   if (products && products.length > 0 && firstItem) {
     const pId = firstItem.product.id || firstItem.product._id;
     const match = products.find(p => p.id === pId || p._id === pId);
     if (match) {
+      pcProduct = match;
       pcVendor = match.vendor || match._raw?.vendor;
     }
   }
@@ -158,14 +160,15 @@ export default function CartDetail({ vendorId, navigation }) {
         String(rv._id) === vid;
     });
     if (match) {
+      pcProduct = match; // technically this product belongs to the vendor so its delivery time *might* be relevant
       pcVendor = match.vendor || match._raw?.vendor;
     }
   }
 
   const finalVendorName = (pcVendor?.vendorName || pcVendor?.name) || (products && products.find(p => p.vendor?.vendorId === vendorId)?.name) || (cart.vendorName && !['Store', 'Vendor'].includes(cart.vendorName) ? cart.vendorName : null) || firstItem?.product?._raw?.vendor?.vendorName || t('vendor');
   const finalVendorImage = pcVendor?.storePhoto || pcVendor?.logo || pcVendor?.image || cart.vendorImage || firstItem?.product?.image || null;
-  const finalVendorRating = cart.vendorRating || pcVendor?.rating || firstItem?.product?._raw?.vendor?.rating || '4.5';
-  const finalDeliveryTime = cart.vendorDeliveryTime || pcVendor?.deliveryTime || firstItem?.product?._raw?.vendor?.deliveryTime || '30-40 min';
+  const finalVendorRating = cart.vendorRating ?? pcVendor?.rating ?? firstItem?.product?._raw?.vendor?.rating ?? pcProduct?.rating ?? null;
+  const finalDeliveryTime = cart.vendorDeliveryTime || pcVendor?.deliveryTime || firstItem?.product?._raw?.vendor?.deliveryTime || pcProduct?.deliveryTime || null;
 
   const handleUpdateQuantity = async (itemId, delta) => {
     const action = delta > 0 ? 'add' : 'remove';
@@ -230,11 +233,19 @@ export default function CartDetail({ vendorId, navigation }) {
           <View style={{ flex: 1, marginLeft: spacing.md }}>
             <Text style={[styles.vendorName, { color: colors.text.primary }]} numberOfLines={1}>{finalVendorName || t('vendor')}</Text>
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-              <Ionicons name="star" size={14} color="#FFA000" />
-              <Text style={{ color: colors.text.secondary, fontSize: 13, marginLeft: 4 }}>{finalVendorRating}</Text>
-              <Text style={{ color: colors.text.light, marginHorizontal: 8 }}>•</Text>
-              <Ionicons name="time-outline" size={14} color={colors.text.secondary} />
-              <Text style={{ color: colors.text.secondary, fontSize: 13, marginLeft: 4 }}>{finalDeliveryTime}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF8E1', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginRight: 8 }}>
+                <Ionicons name="star" size={12} color="#FFA000" />
+                <Text style={{ color: '#FFA000', fontSize: 12, fontFamily: 'Poppins-Bold', marginLeft: 4 }}>
+                  {finalVendorRating !== null && finalVendorRating !== undefined ? Number(finalVendorRating).toFixed(1) : (t('new') || 'New')}
+                </Text>
+              </View>
+
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: colors.background, paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                <Ionicons name="time-outline" size={14} color={colors.text.secondary} />
+                <Text style={{ color: colors.text.secondary, fontSize: 12, marginLeft: 4, fontFamily: 'Poppins-Regular' }}>
+                  {finalDeliveryTime || 'Standard'}
+                </Text>
+              </View>
             </View>
           </View>
         </View>

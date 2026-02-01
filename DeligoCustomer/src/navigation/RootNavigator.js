@@ -31,7 +31,8 @@ import {
     SearchScreen,
     PermissionsScreen,
     OrderIssuesScreen,
-    PaymentRefundsScreen
+    PaymentRefundsScreen,
+    AccountProfileHelpScreen
 } from '../screens';
 import { BottomTabNavigator } from './index'; // assuming index.js exports BottomTabNavigator or directly from './BottomTabNavigator'
 
@@ -121,6 +122,7 @@ export default function RootNavigator() {
                 <Stack.Screen name="Chat" component={ChatScreen} />
                 <Stack.Screen name="OrderIssues" component={OrderIssuesScreen} />
                 <Stack.Screen name="PaymentRefunds" component={PaymentRefundsScreen} />
+                <Stack.Screen name="AccountProfileHelp" component={AccountProfileHelpScreen} />
             </Stack.Navigator>
 
             {/* Global Overlays */}

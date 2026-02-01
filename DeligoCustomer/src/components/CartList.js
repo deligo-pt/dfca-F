@@ -143,7 +143,7 @@ export default function CartList({ navigation }) {
           cart.vendorDeliveryTime ||
           pcVendor?.deliveryTime ||
           firstItem?._raw?.vendor?.deliveryTime ||
-          '30-40 min';
+          null;
 
         const isMenuOpen = menuForVendor === cart.vendorId;
 
@@ -186,10 +186,19 @@ export default function CartList({ navigation }) {
                   </Text>
 
                   <View style={styles.deliveryRow}>
-                    <MaterialCommunityIcons name="moped" size={14} color={colors.primary} style={{ marginRight: 4 }} />
-                    <Text style={[styles.deliveryText, { color: colors.text.secondary }]}>
-                      {finalDeliveryTime}
-                    </Text>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12 }}>
+                      <Ionicons name="star" size={12} color="#FFA000" />
+                      <Text style={{ color: colors.text.primary, fontSize: 12, fontFamily: 'Poppins-Bold', marginLeft: 4 }}>
+                        {pcVendor && pcVendor.rating !== undefined && pcVendor.rating !== null ? Number(pcVendor.rating).toFixed(1) : (t('new') || 'New')}
+                      </Text>
+                    </View>
+
+                    <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                      <MaterialCommunityIcons name="moped" size={14} color={colors.primary} style={{ marginRight: 4 }} />
+                      <Text style={[styles.deliveryText, { color: colors.text.secondary }]}>
+                        {finalDeliveryTime || 'Standard'}
+                      </Text>
+                    </View>
                   </View>
                 </View>
               </View>
