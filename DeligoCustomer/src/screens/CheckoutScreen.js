@@ -403,6 +403,8 @@ const CheckoutScreen = ({ route, navigation }) => {
 
           return {
             productId: (rawId && rawId.includes('|')) ? rawId.split('|')[0] : rawId,
+            product: (rawId && rawId.includes('|')) ? rawId.split('|')[0] : rawId, // Backend might expect 'product'
+            id: (rawId && rawId.includes('|')) ? rawId.split('|')[0] : rawId,      // Backend might expect 'id'
             quantity: qty,
             offerCode: appliedOffer?.code,
             addons: it.addons,
@@ -413,6 +415,9 @@ const CheckoutScreen = ({ route, navigation }) => {
           };
         });
         checkoutPayload.items = itemsPayload;
+        checkoutPayload.cartItems = itemsPayload; // Backend alias?
+        checkoutPayload.products = itemsPayload;  // Backend alias?
+        checkoutPayload.orderItems = itemsPayload;// Backend alias?
 
         // SHOTGUN STRATEGY: Send all possible naming conventions to satisfy backend validation
         checkoutPayload.subtotal = calculatedSubtotal;
@@ -437,6 +442,8 @@ const CheckoutScreen = ({ route, navigation }) => {
 
           return {
             productId: (rawId && rawId.includes('|')) ? rawId.split('|')[0] : rawId, // Ensure productId is set and clean
+            product: (rawId && rawId.includes('|')) ? rawId.split('|')[0] : rawId,   // Alias
+            id: (rawId && rawId.includes('|')) ? rawId.split('|')[0] : rawId,        // Alias
             quantity: qty,
             offerCode: appliedOffer?.code, // Inject offerCode
             price: price,
@@ -444,6 +451,9 @@ const CheckoutScreen = ({ route, navigation }) => {
           };
         });
         checkoutPayload.items = directItems;
+        checkoutPayload.cartItems = directItems; // Alias
+        checkoutPayload.products = directItems;  // Alias
+        checkoutPayload.orderItems = directItems;// Alias
 
         checkoutPayload.subtotal = calculatedSubtotal;
         checkoutPayload.subTotal = calculatedSubtotal;

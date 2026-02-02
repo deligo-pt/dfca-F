@@ -1,19 +1,12 @@
-import React from 'react';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Image, Dimensions } from 'react-native';
 import { useTheme } from '../utils/ThemeContext';
-import { spacing, borderRadius } from '../theme';
+import { spacing } from '../theme';
+import sponsorshipApi from '../utils/sponsorshipApi';
 
 const { width } = Dimensions.get('window');
 
 const MOCK_PROMOS = [
-    {
-        _id: '1',
-        sponsorName: 'Amana Group Ltd.',
-        sponsorType: 'Ads',
-        // High-res food spread, 1080x500 crop
-        image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?ixlib=rb-1.2.1&auto=format&fit=crop&w=1080&h=500&q=80',
-        isActive: true
-    },
     {
         id: 2, // Legacy support
         title: 'Free Delivery',
@@ -22,25 +15,79 @@ const MOCK_PROMOS = [
         cta: 'JOIN NOW',
         image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?ixlib=rb-1.2.1&auto=format&fit=crop&w=800&q=80',
         bgColor: '#1A4D2E',
-    },
-    {
-        _id: '3',
-        sponsorName: 'Coca Cola',
-        sponsorType: 'Ads',
-        image: 'https://images.unsplash.com/photo-1554866585-cd94860890b7?ixlib=rb-1.2.1&auto=format&fit=crop&w=1200&q=80',
-        isActive: true
     }
 ];
 
-const PromoCarousel = ({ promos = MOCK_PROMOS, onPress }) => {
+const PromoCarousel = ({ promos: propPromos = [], onPress, refreshTrigger = 0 }) => {
     const { colors } = useTheme();
-    const scrollRef = React.useRef(null);
-    const [currentIndex, setCurrentIndex] = React.useState(0);
+    const scrollRef = useRef(null);
+    const [currentIndex, setCurrentIndex] = useState(0);
+    const [apiPromos, setApiPromos] = useState([]);
+    const [loading, setLoading] = useState(true);
 
-    React.useEffect(() => {
+    useEffect(() => {
+        const fetchSponsorships = async () => {
+            try {
+                const data = await sponsorshipApi.getAllSponsorships();
+                const now = new Date();
+
+                const validSponsorships = data.filter(item => {
+                    const startDate = new Date(item.startDate);
+                    const endDate = new Date(item.endDate);
+                    return item.isActive && !item.isDeleted && now >= startDate && now <= endDate;
+                }).map(item => ({
+                    _id: item._id,
+                    sponsorName: item.sponsorName,
+                    sponsorType: item.sponsorType,
+                    image: item.bannerImage,
+                    isActive: item.isActive,
+                    // Default values for layout compatibility
+                    title: '',
+                    brand: item.sponsorName,
+                    subtitle: '',
+                    bgColor: colors.primary
+                }));
+
+                setApiPromos(validSponsorships);
+            } catch (error) {
+                console.error("Failed to load sponsorships", error);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchSponsorships();
+    }, [colors.primary, refreshTrigger]);
+
+    const finalPromos = useMemo(() => {
+        const combined = [...apiPromos];
+        // Only add prop promos if they are passed and different from default MOCK (or if we want to fallback)
+        // Adjusting logic: if API has data, show API. If props passed, append?
+        // Let's simplified: API data + Props (if provided explicitely)
+        // If propPromos is MOCK_PROMOS, and we have API data, ignore MOCK.
+        // If we have API data, we display it.
+
+        if (propPromos !== MOCK_PROMOS && propPromos.length > 0) {
+            combined.push(...propPromos);
+        } else if (combined.length === 0 && loading) {
+            // While loading, maybe show nothing or keep empty
+        } else if (combined.length === 0) {
+            // If API returned nothing and no props passed, maybe show MOCK?
+            // User requested "it will get data from this api", so probably expects only API data.
+            // But strict fallback might be safer. Let's return empty if no API data to be clean.
+            return [];
+        }
+
+        return combined;
+    }, [apiPromos, propPromos, loading]);
+
+
+    useEffect(() => {
+        if (finalPromos.length === 0) return;
+
         const timer = setInterval(() => {
             let nextIndex = currentIndex + 1;
-            if (nextIndex >= promos.length) {
+            if (nextIndex >= finalPromos.length) {
                 nextIndex = 0;
             }
 
@@ -54,7 +101,7 @@ const PromoCarousel = ({ promos = MOCK_PROMOS, onPress }) => {
         }, 5000);
 
         return () => clearInterval(timer);
-    }, [currentIndex, promos.length]);
+    }, [currentIndex, finalPromos.length]);
 
 
     const snapInterval = (width * 0.88) + 12; // Card width + margin
@@ -67,6 +114,8 @@ const PromoCarousel = ({ promos = MOCK_PROMOS, onPress }) => {
             setCurrentIndex(index);
         }
     };
+
+    if (!loading && finalPromos.length === 0) return null;
 
     return (
         <View style={styles.wrapper}>
@@ -81,7 +130,7 @@ const PromoCarousel = ({ promos = MOCK_PROMOS, onPress }) => {
                 scrollEventThrottle={16}
                 style={{ flexGrow: 0 }}
             >
-                {promos.map((promo, index) => {
+                {finalPromos.map((promo, index) => {
                     // Check if it's a pure image ad (Ads type or missing title)
                     const isPureImage = promo.sponsorType === 'Ads' || !promo.title;
                     const imageUrl = promo.image || promo.banner; // Fallback

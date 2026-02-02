@@ -718,16 +718,40 @@ const CategoriesScreen = ({ navigation }) => {
         }
     }, []);
 
+    // PromoCarousel refresh trigger
+    const [promoRefreshTrigger, setPromoRefreshTrigger] = useState(0);
+
     // Pull-to-refresh handler (calls fetchProducts with force to bypass TTL)
     const handleRefresh = async () => {
         try {
             setRefreshing(true);
-            await fetchProducts({
+            setPromoRefreshTrigger(prev => prev + 1);
+
+            // Refresh products with force flag
+            const productsPromise = fetchProducts({
                 page: 1,
                 vendorType: selectedVendorType || undefined,
                 category: selectedCuisine || undefined,
                 force: true
             });
+
+            // Refresh categories
+            const categoriesPromise = (async () => {
+                if (fetchBusinessCategories) {
+                    const cats = await fetchBusinessCategories();
+                    if (cats && cats.length > 0) setApiCategories(cats);
+                }
+            })();
+
+            const productCategoriesPromise = (async () => {
+                if (fetchProductCategories) {
+                    const pcats = await fetchProductCategories();
+                    if (pcats && pcats.length > 0) setApiProductCategories(pcats);
+                }
+            })();
+
+            await Promise.all([productsPromise, categoriesPromise, productCategoriesPromise]);
+
         } catch (e) {
             console.debug('handleRefresh failed', e);
         } finally {
@@ -849,6 +873,7 @@ const CategoriesScreen = ({ navigation }) => {
                     {/* Promotional Banner Carousel */}
                     <PromoCarousel
                         onPress={(promo) => console.log('Promo pressed:', promo.title)}
+                        refreshTrigger={promoRefreshTrigger}
                     />
 
                     {/* Glovo-Style "Super App" Bubbles */}

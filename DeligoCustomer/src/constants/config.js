@@ -163,6 +163,11 @@ export const API_ENDPOINTS = {
     LIST: '/support/conversations',
     MESSAGES: '/support/conversations/:room/messages',
     READ: '/support/conversations/:room/read',
+  },
+
+  // --- Sponsorships ---
+  SPONSORSHIPS: {
+    GET_ALL: '/sponsorships',
   }
 };
 

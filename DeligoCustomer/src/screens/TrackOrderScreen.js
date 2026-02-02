@@ -101,6 +101,45 @@ const TrackOrderScreen = ({ route, navigation }) => {
   const [mapLayout, setMapLayout] = useState(false);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [driverEta, setDriverEta] = useState(null);
+
+  // Calculate ETA based on distance
+  useEffect(() => {
+    if (driverLocation && userLocation) {
+      const getDistanceFromLatLonInKm = (lat1, lon1, lat2, lon2) => {
+        const R = 6371; // Radius of the earth in km
+        const dLat = deg2rad(lat2 - lat1);
+        const dLon = deg2rad(lon2 - lon1);
+        const a =
+          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+          Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+          Math.sin(dLon / 2) * Math.sin(dLon / 2);
+        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+        const d = R * c; // Distance in km
+        return d;
+      };
+
+      const deg2rad = (deg) => {
+        return deg * (Math.PI / 180);
+      };
+
+      const dist = getDistanceFromLatLonInKm(
+        driverLocation.latitude,
+        driverLocation.longitude,
+        userLocation.latitude,
+        userLocation.longitude
+      );
+
+      // Assume average city speed of 20 km/h + 2 mins buffer
+      // Time = Distance / Speed
+      const speedKmH = 20;
+      const hours = dist / speedKmH;
+      const minutes = Math.ceil(hours * 60) + 2;
+
+      // If very close, say 1 min
+      setDriverEta(minutes < 1 ? 1 : minutes);
+    }
+  }, [driverLocation, userLocation]);
 
   // Trigger rating automatically when order is delivered
   useEffect(() => {
@@ -324,7 +363,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
       } else if (partner.name) {
         driverName = partner.name;
       }
-      driverPhone = partner.phone || partner.phoneNumber || '';
+      driverPhone = partner.phone || partner.phoneNumber || partner.contactNumber || '';
       driverRating = partner.rating || 0;
       vehicleType = partner.vehicleType || partner.vehicle?.type || '';
       vehicleNumber = partner.vehicleNumber || partner.vehicle?.number || '';
@@ -701,10 +740,28 @@ const TrackOrderScreen = ({ route, navigation }) => {
       const vid = order?.vendorId;
       if (vid && typeof vid === 'string' && !orderData.restaurantCoordinates && !restaurantLocation) {
         try {
-          // Try fetching full vendor profile
-          const res = await customerApi.get(`/vendors/${vid}`);
-          if (res.data && res.data.success) {
-            const vendor = res.data.data;
+          // Since /restaurants/:id (404) and /vendors/:id (401) are problematic,
+          // we fetch 1 product from this vendor which usually contains the populated vendor details.
+          const url = `${API_ENDPOINTS.PRODUCTS.GET_ALL}?vendor=${vid}&limit=1`;
+          const res = await customerApi.get(url);
+
+          let vendor = null;
+          if (res.data) {
+            // Handle various response structures
+            const list = Array.isArray(res.data) ? res.data :
+              (res.data.data && Array.isArray(res.data.data)) ? res.data.data :
+                (res.data.products && Array.isArray(res.data.products)) ? res.data.products :
+                  (res.data.data && res.data.data.products && Array.isArray(res.data.data.products)) ? res.data.data.products : [];
+
+            if (list.length > 0) {
+              // Used populated vendor object from product
+              const p = list[0];
+              if (p.vendorId && typeof p.vendorId === 'object') vendor = p.vendorId;
+              else if (p.vendor && typeof p.vendor === 'object') vendor = p.vendor;
+            }
+          }
+
+          if (vendor) {
             let coords = null;
             if (vendor.latitude && vendor.longitude) {
               coords = { latitude: vendor.latitude, longitude: vendor.longitude };
@@ -1145,6 +1202,12 @@ const TrackOrderScreen = ({ route, navigation }) => {
               <Text style={styles.vehicleDot}>•</Text>
               <Text style={styles.vehicleColor}>{orderData.vehicleColor}</Text>
             </View>
+            {orderData.driverPhone ? (
+              <View style={styles.vehicleInfo}>
+                <Ionicons name="call" size={12} color={colors.text.light} />
+                <Text style={styles.vehicleNumber}>{orderData.driverPhone}</Text>
+              </View>
+            ) : null}
           </View>
         </View>
 
@@ -1177,7 +1240,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
         <View style={styles.statusDivider} />
         <View style={styles.statusItem}>
           <Ionicons name="speedometer" size={16} color={colors.info} />
-          <Text style={styles.statusText}>~3 {t('minAway')}</Text>
+          <Text style={styles.statusText}>~{driverEta || '...'} {t('minAway')}</Text>
         </View>
       </View>
     </View>

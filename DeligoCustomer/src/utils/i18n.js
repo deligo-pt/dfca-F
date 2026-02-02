@@ -61,6 +61,7 @@ export const translations = {
     exploreCategories: "What's on your mind?",
     shopOnDeliGo: "Shop On DeliGo",
     noVendorsFound: "No vendors found",
+    noRestaurantsFound: "No vendors found",
     popularRestaurants: 'Popular Restaurants',
     nearYou: 'Near You',
     nearbyRestaurants: 'Nearby Restaurants',
@@ -574,7 +575,7 @@ export const translations = {
     changesToTerms: '4. Changes to Terms',
     changesToTermsText: 'We may update these terms at any time. Continued use of the app means you accept the new terms.',
     contactUs: '5. Contact Us',
-    contactUsText: 'For questions, contact support@deligo.com.',
+    contactUsText: 'For questions, contact contact@deligo.pt.',
 
     // Privacy Policy
     privacyPolicyTitle: 'Privacy Policy',
@@ -678,6 +679,7 @@ export const translations = {
     exploreCategories: 'Em que está a pensar?',
     shopOnDeliGo: 'Comprar na DeliGo',
     noVendorsFound: 'Nenhum parceiro encontrado',
+    noRestaurantsFound: 'Nenhum vendedor encontrado',
     popularRestaurants: 'Restaurantes Populares',
     nearYou: 'Perto de Você',
     nearbyRestaurants: 'Restaurantes Próximos',
@@ -1106,7 +1108,7 @@ export const translations = {
     changesToTerms: '4. Mudanças nos Termos',
     changesToTermsText: 'Podemos atualizar estes termos a qualquer momento.',
     contactUs: '5. Contacte-nos',
-    contactUsText: 'Para perguntas, entre em contato com support@deligo.com.',
+    contactUsText: 'Para perguntas, entre em contato com contact@deligo.pt.',
 
     // Privacy Policy
     privacyPolicyTitle: 'Política de Privacidade',

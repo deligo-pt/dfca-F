@@ -27,17 +27,19 @@ export const SocketProvider = ({ children }) => {
             }
 
             // CRITICAL: Vercel required configuration
-            // 1. Define your URL (Must match Vendor App's active env)
-            const BASE_URL = 'https://deligo-food-backend.vercel.app';
+            // Use the centralized BASE_URL from config
+            const BASE_URL = API_CONFIG.BASE_URL;
 
             console.debug('[Socket] Connecting to:', BASE_URL);
 
             const newSocket = io(BASE_URL, {
                 auth: { token },
-                transports: ['polling'], // CRITICAL: Vercel does not support websockets initially, must use polling
+                // Allow websocket upgrade if supported, but start with polling for Vercel compatibility
+                transports: ['polling', 'websocket'],
                 reconnection: true,
-                reconnectionAttempts: 10,
-                reconnectionDelay: 1000,
+                reconnectionAttempts: 20,
+                reconnectionDelay: 2000,
+                timeout: 20000,
                 forceNew: true,
             });
 

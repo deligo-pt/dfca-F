@@ -33,13 +33,13 @@ const HelpCenterScreen = ({ navigation }) => {
 
   const quickActions = [
     { id: 1, icon: 'chatbubbles-outline', title: t('liveChat'), subtitle: t('chatWithSupport'), color: colors.primary },
-    { id: 2, icon: 'mail-outline', title: t('emailUs'), subtitle: 'support@deligo.com', color: colors.info },
+    { id: 2, icon: 'mail-outline', title: t('emailUs'), subtitle: 'contact@deligo.pt', color: colors.info },
     { id: 3, icon: 'call-outline', title: t('callUs'), subtitle: '+351 920 136 680', color: colors.success },
   ];
 
   const handleQuickAction = (action) => {
     if (action.id === 2) {
-      Linking.openURL('mailto:support@deligo.com');
+      Linking.openURL('mailto:contact@deligo.pt');
     } else if (action.id === 3) {
       Linking.openURL('tel:+351920136680');
     } else {
