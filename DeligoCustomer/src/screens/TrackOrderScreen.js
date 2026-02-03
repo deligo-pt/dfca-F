@@ -72,16 +72,23 @@ const TrackOrderScreen = ({ route, navigation }) => {
   const mapOrderStatusToStage = (status) => {
     const statusMap = {
       'PENDING': 'preparing',
-      'ACCEPTED': 'ready',
-      'AWAITING_PARTNER': 'ready',
+      'ACCEPTED': 'preparing',
+      'PREPARING': 'preparing',
+      'AWAITING_PARTNER': 'preparing',
+      'REASSIGNMENT_NEEDED': 'preparing',
+
+      'READY_FOR_PICKUP': 'ready',
       'DISPATCHING': 'ready',
-      'ASSIGNED': 'picked_up',
-      'REASSIGNMENT_NEEDED': 'ready',
+      'ASSIGNED': 'ready',
+
       'PICKED_UP': 'picked_up',
+
       'ON_THE_WAY': 'on_the_way',
-      'NEARBY': 'nearby',
+
+      'NEARBY': 'nearby', // Internal or computed, keeping just in case
+
       'DELIVERED': 'delivered',
-      'CANCELED': 'delivered',
+      'CANCELED': 'delivered', // Show full progress for history/completion state
       'REJECTED': 'delivered',
     };
     return statusMap[status?.toUpperCase()] || 'preparing';
@@ -102,6 +109,8 @@ const TrackOrderScreen = ({ route, navigation }) => {
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [driverEta, setDriverEta] = useState(null);
+  const [callModalVisible, setCallModalVisible] = useState(false);
+  const [callTarget, setCallTarget] = useState({ name: '', phone: '', cleanPhone: '', type: '' });
 
   // Calculate ETA based on distance
   useEffect(() => {
@@ -373,25 +382,25 @@ const TrackOrderScreen = ({ route, navigation }) => {
     const calculatedSubtotal = normalizedItems.reduce((sum, item) => sum + (item.subtotal || 0), 0);
 
     return {
-      id: data._id || data.id || '1',
-      orderNumber: data.orderId || `#${data._id?.slice(-8) || 'ORDER'}`,
+      id: data._id || data.id || '',
+      orderNumber: data.orderId || (data._id ? `#${data._id.slice(-8)}` : ''),
       orderDate: orderDate,
       orderTime: orderTime,
       restaurantName: restaurantName,
       restaurantAddress: data.restaurantAddress || '',
       restaurantPhone: data.restaurantPhone || '',
-      restaurantImage: data.restaurantImage || '🍽️',
+      restaurantImage: data.restaurantImage || '',
       restaurantCoordinates: restaurantCoords,
       items: normalizedItems,
       itemsText: itemsText,
-      subtotal: data.totalPrice || calculatedSubtotal || 0, // Item subtotal (before delivery charge)
+      subtotal: data.totalPrice || calculatedSubtotal || 0,
       deliveryFee: data.deliveryCharge || 0,
       serviceFee: data.serviceFee || 0,
       discount: data.discount || 0,
-      totalAmount: data.subTotal || data.totalAmount || 0, // Final amount (with delivery charge)
-      estimatedTime: data.estimatedDeliveryTime || '20-30 min',
+      totalAmount: data.subTotal || data.totalAmount || 0,
+      estimatedTime: data.estimatedDeliveryTime || '',
       estimatedArrival: data.estimatedArrival || '',
-      deliveryAddress: deliveryAddrStr || 'Delivery address',
+      deliveryAddress: deliveryAddrStr || '',
       deliveryLandmark: data.deliveryAddress?.landmark || '',
       deliveryInstructions: data.remarks || data.deliveryInstructions || '',
       driverName: driverName,
@@ -401,9 +410,9 @@ const TrackOrderScreen = ({ route, navigation }) => {
       vehicleType: vehicleType,
       vehicleNumber: vehicleNumber,
       vehicleColor: data.vehicleColor || '',
-      paymentMethod: data.paymentMethod || 'N/A',
+      paymentMethod: data.paymentMethod || '',
       paymentStatus: data.paymentStatus || '',
-      orderStatus: data.orderStatus || 'PENDING',
+      orderStatus: data.orderStatus || '',
       promoCode: data.couponId?.code || '',
       isOtpVerified: data.isOtpVerified || false,
     };
@@ -457,69 +466,48 @@ const TrackOrderScreen = ({ route, navigation }) => {
   ], [language]);
 
   // Handle driver call
-  const handleCallDriver = async () => {
-    const phoneNumber = orderData.driverPhone.replace(/\D/g, ''); // Remove non-numeric characters
-    const phoneUrl = Platform.OS === 'ios' ? `telprompt:${phoneNumber}` : `tel:${phoneNumber}`;
+  const handleCallDriver = () => {
+    const phoneNumber = orderData.driverPhone ? orderData.driverPhone.replace(/\D/g, '') : '';
 
-    try {
-      const supported = await Linking.canOpenURL(phoneUrl);
-      if (supported) {
-        Alert.alert(
-          t('callDriver'),
-          `${t('callDriver')} ${orderData.driverName}?\n${orderData.driverPhone}`,
-          [
-            {
-              text: t('cancel'),
-              style: 'cancel',
-            },
-            {
-              text: t('call'),
-              onPress: async () => {
-                await Linking.openURL(phoneUrl);
-              },
-            },
-          ]
-        );
-      } else {
-        Alert.alert(t('error'), t('unableToCall'));
-      }
-    } catch (error) {
-      Alert.alert(t('error'), t('unableToInitiate'));
-      console.error('Call error:', error);
+    if (!phoneNumber) {
+      Alert.alert(t('error'), t('phoneNotAvailable') || 'Phone number not available');
+      return;
     }
+
+    setCallTarget({
+      name: orderData.driverName,
+      phone: orderData.driverPhone,
+      cleanPhone: phoneNumber,
+      type: 'driver'
+    });
+    setCallModalVisible(true);
   };
 
   // Handle restaurant call
-  const handleCallRestaurant = async () => {
-    const phoneNumber = orderData.restaurantPhone.replace(/\D/g, '');
-    const phoneUrl = Platform.OS === 'ios' ? `telprompt:${phoneNumber}` : `tel:${phoneNumber}`;
+  const handleCallRestaurant = () => {
+    const phoneNumber = orderData.restaurantPhone ? orderData.restaurantPhone.replace(/\D/g, '') : '';
 
-    try {
-      const supported = await Linking.canOpenURL(phoneUrl);
-      if (supported) {
-        Alert.alert(
-          t('callRestaurant'),
-          `${t('call')} ${orderData.restaurantName}?\n${orderData.restaurantPhone}`,
-          [
-            {
-              text: t('cancel'),
-              style: 'cancel',
-            },
-            {
-              text: t('call'),
-              onPress: async () => {
-                await Linking.openURL(phoneUrl);
-              },
-            },
-          ]
-        );
-      } else {
-        Alert.alert(t('error'), t('unableToCall'));
-      }
-    } catch (error) {
-      Alert.alert(t('error'), t('unableToInitiate'));
-      console.error('Call error:', error);
+    if (!phoneNumber) {
+      Alert.alert(t('error'), t('phoneNotAvailable') || 'Phone number not available');
+      return;
     }
+
+    setCallTarget({
+      name: orderData.restaurantName,
+      phone: orderData.restaurantPhone,
+      cleanPhone: phoneNumber,
+      type: 'restaurant'
+    });
+    setCallModalVisible(true);
+  };
+
+  const confirmCall = () => {
+    setCallModalVisible(false);
+    const phoneUrl = Platform.OS === 'ios' ? `telprompt:${callTarget.cleanPhone}` : `tel:${callTarget.cleanPhone}`;
+    Linking.openURL(phoneUrl).catch((err) => {
+      console.error('Call error:', err);
+      Alert.alert(t('error'), t('unableToCall'));
+    });
   };
 
   // Handle back navigation
@@ -617,16 +605,16 @@ const TrackOrderScreen = ({ route, navigation }) => {
     );
   };
 
-  // Initialize location services
+  // Initialize location services - REAL DATA ONLY, no fallbacks
   useEffect(() => {
     let active = true;
     (async () => {
       try {
-        // 1. Try to get coordinates from Order Delivery Address
+        // 1. Get coordinates from Order Delivery Address (REAL DATA ONLY)
         let orderDeliveryCoords = null;
         if (order?.deliveryAddress) {
           const da = order.deliveryAddress;
-          if (da.latitude && da.longitude) {
+          if (typeof da.latitude === 'number' && typeof da.longitude === 'number') {
             orderDeliveryCoords = { latitude: da.latitude, longitude: da.longitude };
           } else if (da.location && Array.isArray(da.location.coordinates)) {
             orderDeliveryCoords = { latitude: da.location.coordinates[1], longitude: da.location.coordinates[0] };
@@ -635,99 +623,89 @@ const TrackOrderScreen = ({ route, navigation }) => {
           }
         }
 
-        // 2. If valid delivery coords, use them immediately (Fastest)
+        // 2. If valid delivery coords from order, use them
         if (orderDeliveryCoords) {
+          console.log('[TrackOrder] Using real delivery coordinates from order:', orderDeliveryCoords);
           if (active) setUserLocation(orderDeliveryCoords);
         } else {
-          // 3. Fallback: Try Geocoding the address string
-          try {
-            if (orderData.deliveryAddress && orderData.deliveryAddress !== 'Delivery address') {
+          // Try geocoding the address string if we have a real address
+          if (orderData.deliveryAddress && orderData.deliveryAddress !== 'Delivery address' && orderData.deliveryAddress.trim() !== '') {
+            try {
               console.log('[TrackOrder] Geocoding address:', orderData.deliveryAddress);
               const geocoded = await Location.geocodeAsync(orderData.deliveryAddress);
               if (geocoded && geocoded.length > 0) {
                 const geoCoords = { latitude: geocoded[0].latitude, longitude: geocoded[0].longitude };
+                console.log('[TrackOrder] Geocoded delivery address:', geoCoords);
                 if (active) {
                   setUserLocation(geoCoords);
-                  orderDeliveryCoords = geoCoords; // Update local var for downstream logic
+                  orderDeliveryCoords = geoCoords;
                 }
+              } else {
+                console.warn('[TrackOrder] Geocoding returned no results');
               }
+            } catch (e) {
+              console.warn('[TrackOrder] Geocoding failed:', e);
             }
-          } catch (e) {
-            console.warn('[TrackOrder] Geocoding failed:', e);
-          }
-
-          // 4. Ultimate Fallback: Request Device Location (only if geocoding failed)
-          if (!orderDeliveryCoords) {
-            const { status } = await Location.requestForegroundPermissionsAsync();
-            if (status !== 'granted') {
-              console.log('Permission to access location was denied');
-              // Fallback default
-              const defaultCoords = { latitude: 23.745038, longitude: 90.4395245 };
-              if (active) setUserLocation(defaultCoords);
-            } else {
-              // Get current location (with timeout)
-              try {
-                // Promise.race to prevent hanging
-                const locationPromise = Location.getCurrentPositionAsync({ accuracy: Location.Accuracy.Balanced });
-                const timeoutPromise = new Promise((_, reject) => setTimeout(() => reject('Timeout'), 5000));
-                const location = await Promise.race([locationPromise, timeoutPromise]);
-
-                if (active) {
-                  setUserLocation({
-                    latitude: location.coords.latitude,
-                    longitude: location.coords.longitude,
-                  });
-                }
-              } catch (e) {
-                console.warn('Location fetch timed out or failed, using fallback');
-                if (active) {
-                  // Default fallback if GPS fails
-                  setUserLocation({ latitude: 23.745038, longitude: 90.4395245 });
-                }
-              }
-            }
+          } else {
+            console.warn('[TrackOrder] No delivery address available in order');
           }
         }
 
-        // --- Restaurant & Driver Logic (Depends on knowing where the "User/Destination" is) ---
-        // We need a reference point. If setUserLocation hasn't run yet, we need a temp var.
-        const destCoords = orderDeliveryCoords || (active ? userLocation : null) || { latitude: 23.745038, longitude: 90.4395245 };
-
-        // Set restaurant location from real data or fallback
-        const realRestCoords = orderData.restaurantCoordinates || restaurantLocation;
-        let finalRestCoords = realRestCoords;
+        // --- Restaurant Location (REAL DATA ONLY) ---
+        const realRestCoords = orderData.restaurantCoordinates;
 
         if (realRestCoords) {
+          console.log('[TrackOrder] Using real restaurant coordinates:', realRestCoords);
           if (active) setRestaurantLocation(realRestCoords);
         } else {
-          // Fallback offset if still no restaurant coords
-          finalRestCoords = {
-            latitude: destCoords.latitude + 0.01,
-            longitude: destCoords.longitude + 0.008,
-          };
-          if (active) setRestaurantLocation(finalRestCoords);
+          console.warn('[TrackOrder] No restaurant coordinates available - will attempt to fetch from vendor API');
+          // Don't set any fallback - leave null
         }
 
-        // Set initial driver location (Mock: between restaurant and user)
-        const driverCoords = {
-          latitude: (finalRestCoords.latitude + destCoords.latitude) / 2,
-          longitude: (finalRestCoords.longitude + destCoords.longitude) / 2,
-        };
-        if (active) setDriverLocation(driverCoords);
+        // --- Driver Location (REAL DATA ONLY from order or socket) ---
+        const partner = order?.deliveryPartnerId;
+        if (partner && typeof partner === 'object') {
+          let partnerCoords = null;
+          if (partner.location && Array.isArray(partner.location.coordinates)) {
+            partnerCoords = {
+              latitude: partner.location.coordinates[1],
+              longitude: partner.location.coordinates[0]
+            };
+          } else if (typeof partner.latitude === 'number' && typeof partner.longitude === 'number') {
+            partnerCoords = { latitude: partner.latitude, longitude: partner.longitude };
+          } else if (partner.currentLocation) {
+            const cl = partner.currentLocation;
+            if (Array.isArray(cl.coordinates)) {
+              partnerCoords = { latitude: cl.coordinates[1], longitude: cl.coordinates[0] };
+            } else if (typeof cl.latitude === 'number') {
+              partnerCoords = { latitude: cl.latitude, longitude: cl.longitude };
+            }
+          }
 
-        // Create route coordinates
+          if (partnerCoords) {
+            console.log('[TrackOrder] Using real driver coordinates from order:', partnerCoords);
+            if (active) setDriverLocation(partnerCoords);
+          } else {
+            console.log('[TrackOrder] Driver assigned but no location data - waiting for socket updates');
+          }
+        } else {
+          console.log('[TrackOrder] No delivery partner assigned yet');
+        }
+
+        // Create route coordinates only with available real data
         if (active) {
-          setRouteCoordinates([finalRestCoords, driverCoords, destCoords]);
+          const routePoints = [];
+          if (realRestCoords) routePoints.push(realRestCoords);
+          if (driverLocation) routePoints.push(driverLocation);
+          if (orderDeliveryCoords) routePoints.push(orderDeliveryCoords);
+          if (routePoints.length > 0) {
+            setRouteCoordinates(routePoints);
+          }
         }
 
       } catch (error) {
-        console.error('Error initializing map:', error);
-        // Absolute fail-safe
-        if (active) {
-          const defaultCoords = { latitude: 23.745038, longitude: 90.4395245 };
-          setUserLocation(defaultCoords);
-          setRestaurantLocation({ latitude: defaultCoords.latitude + 0.01, longitude: defaultCoords.longitude + 0.008 });
-        }
+        console.error('[TrackOrder] Error initializing map:', error);
+        // No fallback - just log the error
       }
     })();
     return () => { active = false; };
@@ -781,18 +759,8 @@ const TrackOrderScreen = ({ route, navigation }) => {
               console.log('[TrackOrder] Fetched real vendor coords:', coords);
               setRestaurantLocation(coords);
 
-              // Update route to include this new point
-              if (userLocation) {
-                const start = coords;
-                const end = userLocation;
-                // Driver in middle
-                const driver = {
-                  latitude: (start.latitude + end.latitude) / 2,
-                  longitude: (start.longitude + end.longitude) / 2
-                };
-                setDriverLocation(driver);
-                setRouteCoordinates([start, driver, end]);
-              }
+              // Update route will be handled by the useEffect dependent on restaurantLocation
+              // if (userLocation) { ... } REMOVED fake driver location logic
             }
           }
         } catch (err) {
@@ -806,44 +774,79 @@ const TrackOrderScreen = ({ route, navigation }) => {
   // Socket Integration
   const { socket, joinRoom, leaveRoom, isConnected } = useSocket();
 
-  // Initialize socket listeners
+  // Initialize socket listeners for live driver tracking
   useEffect(() => {
-    if (!order?._id || !socket || !isConnected) return;
+    if (!order?._id || !socket || !isConnected) {
+      console.log('[TrackOrder] Socket not ready or no order:', {
+        orderId: order?._id,
+        socketConnected: !!socket,
+        isConnected
+      });
+      return;
+    }
+
+    console.log('[TrackOrder] Setting up live tracking for order:', order._id);
 
     // Join the specific order room
     joinRoom('join-order-tracking', { orderId: order._id });
 
-    // Listen for live location updates
+    // Listen for live location updates from delivery partner
     const handleLocationUpdate = (data) => {
-      console.log('[TrackOrder] Received live location:', data);
-      if (data && data.latitude && data.longitude) {
-        setDriverLocation({
+      console.log('[TrackOrder] 📍 Received live driver location:', data);
+      if (data && (data.latitude !== undefined) && (data.longitude !== undefined)) {
+        const newLocation = {
           latitude: Number(data.latitude),
           longitude: Number(data.longitude)
-        });
+        };
+        console.log('[TrackOrder] Updating driver marker to:', newLocation);
+        setDriverLocation(newLocation);
+      } else {
+        console.warn('[TrackOrder] Received invalid location data:', data);
+      }
+    };
+
+    // Listen for order status updates
+    const handleOrderUpdate = (data) => {
+      console.log('[TrackOrder] 📦 Received order update:', data);
+      if (data && data.orderStatus) {
+        const newStage = mapOrderStatusToStage(data.orderStatus);
+        console.log('[TrackOrder] Status changed to:', data.orderStatus, '-> stage:', newStage);
+        setCurrentStatus(newStage);
       }
     };
 
     socket.on('delivery-location-live', handleLocationUpdate);
+    socket.on('order-status-update', handleOrderUpdate);
+    socket.on('order-updated', handleOrderUpdate); // Alternative event name
 
     return () => {
+      console.log('[TrackOrder] Cleaning up socket listeners');
       socket.off('delivery-location-live', handleLocationUpdate);
+      socket.off('order-status-update', handleOrderUpdate);
+      socket.off('order-updated', handleOrderUpdate);
       // Optional: Leave room if backend supports it
       // leaveRoom('leave-order-tracking', { orderId: order._id });
     };
   }, [order?._id, socket, joinRoom, isConnected]);
 
-  /*
-  // Simulate driver progression (DISABLED for Live Tracking)
-  useEffect(() => {
-    // ... simulation code ...
-  }, []);
-  */
 
-  // Update route coordinates
+
+  // Update route coordinates - works with or without driver location
   useEffect(() => {
-    if (restaurantLocation && driverLocation && userLocation) {
-      setRouteCoordinates([restaurantLocation, driverLocation, userLocation]);
+    if (restaurantLocation && userLocation) {
+      if (driverLocation) {
+        // Full route: Restaurant -> Driver -> User
+        setRouteCoordinates([restaurantLocation, driverLocation, userLocation]);
+      } else {
+        // No driver yet: Restaurant -> User
+        setRouteCoordinates([restaurantLocation, userLocation]);
+      }
+    } else if (restaurantLocation) {
+      // Only restaurant available
+      setRouteCoordinates([restaurantLocation]);
+    } else if (userLocation) {
+      // Only user location available
+      setRouteCoordinates([userLocation]);
     }
   }, [driverLocation, restaurantLocation, userLocation]);
 
@@ -902,17 +905,22 @@ const TrackOrderScreen = ({ route, navigation }) => {
   };
 
   const renderMapPlaceholder = () => {
-    // If location data is not ready, show loading state
-    if (!userLocation) {
+    // If no location data available at all, show unavailable message
+    if (!userLocation && !restaurantLocation) {
       return (
         <View style={styles.mapContainer}>
           <View style={[styles.map, styles.mapLoading]}>
-            <Ionicons name="map-outline" size={48} color={colors.text.light} />
-            <Text style={styles.mapLoadingText}>{t('loadingMap')}</Text>
+            <Ionicons name="location-outline" size={48} color={colors.text.light} />
+            <Text style={[styles.mapLoadingText, { color: colors.text.secondary }]}>
+              {t('locationUnavailable') || 'Location data unavailable'}
+            </Text>
           </View>
         </View>
       );
     }
+
+    // Determine which location to center the map on
+    const centerLocation = userLocation || restaurantLocation;
 
     return (
       <View style={styles.mapContainer}>
@@ -925,8 +933,8 @@ const TrackOrderScreen = ({ route, navigation }) => {
             console.error('MapView Error:', error);
           }}
           initialRegion={{
-            latitude: userLocation.latitude,
-            longitude: userLocation.longitude,
+            latitude: centerLocation.latitude,
+            longitude: centerLocation.longitude,
             latitudeDelta: 0.02,
             longitudeDelta: 0.02,
           }}
@@ -1174,11 +1182,13 @@ const TrackOrderScreen = ({ route, navigation }) => {
     <View style={styles.driverContainer}>
       <View style={styles.driverHeader}>
         <Text style={styles.sectionTitle}>{t('deliveryRider')}</Text>
-        <View style={styles.driverStats}>
-          <Text style={styles.driverStatsText}>
-            {orderData.driverTotalDeliveries}+ {t('deliveries')}
-          </Text>
-        </View>
+        {orderData.driverTotalDeliveries > 0 && (
+          <View style={styles.driverStats}>
+            <Text style={styles.driverStatsText}>
+              {orderData.driverTotalDeliveries}+ {t('deliveries')}
+            </Text>
+          </View>
+        )}
       </View>
 
       <View style={styles.driverCard}>
@@ -1191,17 +1201,33 @@ const TrackOrderScreen = ({ route, navigation }) => {
           </View>
           <View style={styles.driverInfo}>
             <Text style={styles.driverName}>{orderData.driverName}</Text>
-            <View style={styles.driverRating}>
-              <Ionicons name="star" size={14} color="#FFD700" />
-              <Text style={styles.driverRatingText}>{orderData.driverRating}</Text>
-              <Text style={styles.driverVehicle}>• {orderData.vehicleType}</Text>
-            </View>
-            <View style={styles.vehicleInfo}>
-              <Ionicons name="car-sport" size={12} color={colors.text.light} />
-              <Text style={styles.vehicleNumber}>{orderData.vehicleNumber}</Text>
-              <Text style={styles.vehicleDot}>•</Text>
-              <Text style={styles.vehicleColor}>{orderData.vehicleColor}</Text>
-            </View>
+            {(orderData.driverRating > 0 || orderData.vehicleType) && (
+              <View style={styles.driverRating}>
+                {orderData.driverRating > 0 && (
+                  <>
+                    <Ionicons name="star" size={14} color="#FFD700" />
+                    <Text style={styles.driverRatingText}>{orderData.driverRating}</Text>
+                  </>
+                )}
+                {orderData.vehicleType && (
+                  <Text style={styles.driverVehicle}>{orderData.driverRating > 0 ? '• ' : ''}{orderData.vehicleType}</Text>
+                )}
+              </View>
+            )}
+            {(orderData.vehicleNumber || orderData.vehicleColor) && (
+              <View style={styles.vehicleInfo}>
+                <Ionicons name="car-sport" size={12} color={colors.text.light} />
+                {orderData.vehicleNumber && (
+                  <Text style={styles.vehicleNumber}>{orderData.vehicleNumber}</Text>
+                )}
+                {orderData.vehicleNumber && orderData.vehicleColor && (
+                  <Text style={styles.vehicleDot}>•</Text>
+                )}
+                {orderData.vehicleColor && (
+                  <Text style={styles.vehicleColor}>{orderData.vehicleColor}</Text>
+                )}
+              </View>
+            )}
             {orderData.driverPhone ? (
               <View style={styles.vehicleInfo}>
                 <Ionicons name="call" size={12} color={colors.text.light} />
@@ -1231,18 +1257,24 @@ const TrackOrderScreen = ({ route, navigation }) => {
         </View>
       </View>
 
-      {/* Driver Status */}
-      <View style={styles.driverStatusBar}>
-        <View style={styles.statusItem}>
-          <Ionicons name="navigate" size={16} color={colors.success} />
-          <Text style={styles.statusText}>{t('headingToYou')}</Text>
+      {/* Driver Status - only show if we have real data */}
+      {driverLocation && (
+        <View style={styles.driverStatusBar}>
+          <View style={styles.statusItem}>
+            <Ionicons name="navigate" size={16} color={colors.success} />
+            <Text style={styles.statusText}>{t('headingToYou')}</Text>
+          </View>
+          {driverEta && (
+            <>
+              <View style={styles.statusDivider} />
+              <View style={styles.statusItem}>
+                <Ionicons name="speedometer" size={16} color={colors.info} />
+                <Text style={styles.statusText}>~{driverEta} {t('minAway')}</Text>
+              </View>
+            </>
+          )}
         </View>
-        <View style={styles.statusDivider} />
-        <View style={styles.statusItem}>
-          <Ionicons name="speedometer" size={16} color={colors.info} />
-          <Text style={styles.statusText}>~{driverEta || '...'} {t('minAway')}</Text>
-        </View>
-      </View>
+      )}
     </View>
   );
 
@@ -2376,6 +2408,75 @@ const TrackOrderScreen = ({ route, navigation }) => {
       fontFamily: 'Poppins-SemiBold',
       color: colors.text.white,
     },
+    // Call Modal Styles
+    modalOverlay: {
+      flex: 1,
+      justifyContent: 'center',
+      alignItems: 'center',
+      backgroundColor: 'rgba(0, 0, 0, 0.5)',
+    },
+    modalContent: {
+      width: '80%',
+      borderRadius: borderRadius.xl,
+      padding: spacing.xl,
+      alignItems: 'center',
+    },
+    modalIconContainer: {
+      width: 64,
+      height: 64,
+      borderRadius: 32,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: spacing.lg,
+    },
+    modalTitle: {
+      fontSize: fontSize.xl,
+      fontFamily: 'Poppins-Bold',
+      marginBottom: spacing.sm,
+      textAlign: 'center',
+    },
+    modalSubtitle: {
+      fontSize: fontSize.md,
+      fontFamily: 'Poppins-Regular',
+      marginBottom: spacing.xs,
+      textAlign: 'center',
+    },
+    modalPhone: {
+      fontSize: fontSize.lg,
+      fontFamily: 'Poppins-SemiBold',
+      marginBottom: spacing.xl,
+      textAlign: 'center',
+    },
+    modalActions: {
+      flexDirection: 'row',
+      width: '100%',
+      justifyContent: 'space-between',
+      gap: spacing.md,
+    },
+    modalButtonSecondary: {
+      flex: 1,
+      paddingVertical: spacing.md,
+      borderRadius: borderRadius.lg,
+      borderWidth: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    modalButtonSecondaryText: {
+      fontSize: fontSize.md,
+      fontFamily: 'Poppins-SemiBold',
+    },
+    modalButtonPrimary: {
+      flex: 1,
+      paddingVertical: spacing.md,
+      borderRadius: borderRadius.lg,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    modalButtonPrimaryText: {
+      fontSize: fontSize.md,
+      fontFamily: 'Poppins-SemiBold',
+      color: colors.text.white,
+    },
   }), [colors]);
 
   if (loading) {
@@ -2511,6 +2612,44 @@ const TrackOrderScreen = ({ route, navigation }) => {
 
       {/* Fullscreen Map Modal */}
       {renderFullscreenMap()}
+
+      {/* Call Confirmation Modal */}
+      <Modal
+        visible={callModalVisible}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setCallModalVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={[styles.modalContent, { backgroundColor: isDarkMode ? '#1E1E1E' : '#FFFFFF' }]}>
+            <View style={[styles.modalIconContainer, { backgroundColor: colors.primary + '20' }]}>
+              <Ionicons name="call" size={32} color={colors.primary} />
+            </View>
+            <Text style={[styles.modalTitle, { color: colors.text.primary }]}>
+              {callTarget.type === 'driver' ? t('callDriver') : t('callRestaurant')}
+            </Text>
+            <Text style={[styles.modalSubtitle, { color: colors.text.secondary }]}>
+              {t('call')} <Text style={{ fontWeight: 'bold', color: colors.text.primary }}>{callTarget.name}</Text>?
+            </Text>
+            <Text style={[styles.modalPhone, { color: colors.text.secondary }]}>{callTarget.phone}</Text>
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={[styles.modalButtonSecondary, { borderColor: colors.border }]}
+                onPress={() => setCallModalVisible(false)}
+              >
+                <Text style={[styles.modalButtonSecondaryText, { color: colors.text.primary }]}>{t('cancel')}</Text>
+              </TouchableOpacity>
+              <TouchableOpacity
+                style={[styles.modalButtonPrimary, { backgroundColor: colors.primary }]}
+                onPress={confirmCall}
+              >
+                <Text style={styles.modalButtonPrimaryText}>{t('call')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
 
       {/* Rating Modal */}
       <OrderRatingModal

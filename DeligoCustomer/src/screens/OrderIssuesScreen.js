@@ -61,8 +61,9 @@ const OrderIssuesScreen = ({ navigation }) => {
         // Navigate to a detail view or directly to chat with this order context
         // For now, let's show a "Select Issue" modal or simple list
         // But since we want to keep it simple as per plan:
-        navigation.navigate('Chat', {
-            initialMessage: `I have an issue with my order #${order.orderId || order._id?.slice(-6)}`
+        // But since we want to keep it simple as per plan:
+        navigation.navigate('LiveChat', {
+            issueType: `Issue with order #${order.orderId || order._id?.slice(-6)}`
         });
     };
 

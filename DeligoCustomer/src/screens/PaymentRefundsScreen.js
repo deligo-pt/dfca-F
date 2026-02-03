@@ -17,8 +17,9 @@ const PaymentRefundsScreen = ({ navigation }) => {
 
     const handleTopicPress = (topic) => {
         // Navigate to Chat with specific initial message based on topic
-        navigation.navigate('Chat', {
-            initialMessage: `I have a question about: ${topic.title}`
+        // Navigate to Chat with specific initial message based on topic
+        navigation.navigate('LiveChat', {
+            issueType: `Payment Question: ${topic.title}`
         });
     };
 

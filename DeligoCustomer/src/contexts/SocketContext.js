@@ -26,21 +26,26 @@ export const SocketProvider = ({ children }) => {
                 token = token.accessToken || token.token || token.value;
             }
 
-            // CRITICAL: Vercel required configuration
-            // Use the centralized BASE_URL from config
             const BASE_URL = API_CONFIG.BASE_URL;
 
             console.debug('[Socket] Connecting to:', BASE_URL);
 
             const newSocket = io(BASE_URL, {
                 auth: { token },
-                // Allow websocket upgrade if supported, but start with polling for Vercel compatibility
+
+                // Allow both transports to maximize compatibility
                 transports: ['polling', 'websocket'],
+                upgrade: true,
+
+                path: '/socket.io',
+
                 reconnection: true,
                 reconnectionAttempts: 20,
                 reconnectionDelay: 2000,
-                timeout: 20000,
+                timeout: 30000,
+
                 forceNew: true,
+                autoConnect: true,
             });
 
             newSocket.on('connect', () => {
@@ -54,9 +59,20 @@ export const SocketProvider = ({ children }) => {
             });
 
             newSocket.on('connect_error', (err) => {
-                console.warn('[Socket] Connection Error:', err.message);
+                // Important: socket.io errors often include useful fields like description/context
+                console.warn('[Socket] Connection Error:', {
+                    message: err?.message,
+                    description: err?.description,
+                    context: err?.context,
+                    type: err?.type,
+                });
                 setIsConnected(false);
             });
+
+            // Extra diagnostics
+            newSocket.io.on('reconnect_attempt', (attempt) => console.debug('[Socket] reconnect_attempt:', attempt));
+            newSocket.io.on('reconnect_error', (err) => console.debug('[Socket] reconnect_error:', err?.message || err));
+            newSocket.io.on('reconnect_failed', () => console.debug('[Socket] reconnect_failed'));
 
             socketRef.current = newSocket;
             setSocket(newSocket);
@@ -75,27 +91,26 @@ export const SocketProvider = ({ children }) => {
         }
     }, []);
 
-    // Helper to join a specific room (e.g. order tracking)
-    const joinRoom = useCallback((eventName, payload) => {
+    // Helper to emit an event (optionally with ack)
+    const emit = useCallback((eventName, payload, ack) => {
         if (socketRef.current && socketRef.current.connected) {
-            console.debug('[Socket] Joining room:', eventName, payload);
-            socketRef.current.emit(eventName, payload);
+            console.debug('[Socket] Emit:', eventName, payload);
+            if (typeof ack === 'function') socketRef.current.emit(eventName, payload, ack);
+            else socketRef.current.emit(eventName, payload);
         } else {
-            console.warn('[Socket] Cannot join room, socket not connected');
+            console.warn('[Socket] Cannot emit, socket not connected:', eventName);
         }
     }, []);
 
-    // Helper to leave a room (if backend supports explicit leave, or just for cleanup logic)
-    const leaveRoom = useCallback((eventName, payload) => {
-        if (socketRef.current && socketRef.current.connected) {
-            // Note: Standard socket.io logic usually handles leave via specific events too
-            // If your backend expects a 'leave-conversation' or similar, use that.
-            // Only emit if the backend documentation specifies a leave event.
-            if (eventName) {
-                socketRef.current.emit(eventName, payload);
-            }
-        }
-    }, []);
+    // Helper to join a specific room
+    const joinRoom = useCallback((eventName, payload, ack) => {
+        emit(eventName, payload, ack);
+    }, [emit]);
+
+    // Helper to leave a room
+    const leaveRoom = useCallback((eventName, payload, ack) => {
+        emit(eventName, payload, ack);
+    }, [emit]);
 
     // Initialize on mount
     useEffect(() => {
@@ -105,10 +120,8 @@ export const SocketProvider = ({ children }) => {
         };
     }, [connect, disconnect]);
 
-    // Re-connect on focus or network change could be added here
-
     return (
-        <SocketContext.Provider value={{ socket, isConnected, connect, disconnect, joinRoom, leaveRoom }}>
+        <SocketContext.Provider value={{ socket, isConnected, connect, disconnect, emit, joinRoom, leaveRoom }}>
             {children}
         </SocketContext.Provider>
     );

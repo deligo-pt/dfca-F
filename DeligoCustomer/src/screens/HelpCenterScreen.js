@@ -44,7 +44,7 @@ const HelpCenterScreen = ({ navigation }) => {
       Linking.openURL('tel:+351920136680');
     } else {
       // Open live chat modal
-      navigation.navigate('Chat');
+      navigation.navigate('LiveChat');
     }
   };
 

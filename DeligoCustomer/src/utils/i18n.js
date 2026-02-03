@@ -461,7 +461,10 @@ export const translations = {
     online: 'Online',
     offline: 'Offline',
     connectionError: 'Connection Error',
+    noInternet: 'No Internet Connection',
     sendMessageError: 'Failed to send message',
+    supportTeam: 'Support Team',
+    activeNow: 'Active now',
 
     logout: 'Logout',
     referralMessage: 'Join DeliGo and get €100 off on your first order! Use my referral code: {code}',
@@ -1217,6 +1220,22 @@ export const translations = {
     manageSecurityPreferences: 'Gerir segurança, notificações e mais',
     updateNamePhone: 'Atualizar nome e número de telemóvel',
     stillNeedHelp: 'Ainda precisa de ajuda?',
+
+    // Chat & Support
+    chatInitError: 'Falha ao inicializar sessão de chat',
+    startConversation: 'Inicie uma conversa com o suporte.',
+    typeMessage: 'Digite uma mensagem...',
+    chatClosed: 'Chat Fechado',
+    chatClosedMessage: 'Esta sessão de suporte terminou.',
+    chatSessionEnded: 'Esta sessão de chat terminou.',
+    supportTyping: 'Suporte está a escrever...',
+    online: 'Online',
+    offline: 'Offline',
+    connectionError: 'Erro de Conexão',
+    noInternet: 'Sem Ligação à Internet',
+    sendMessageError: 'Falha ao enviar mensagem',
+    supportTeam: 'Equipa de Suporte',
+    activeNow: 'Ativo agora',
   }
 };
 

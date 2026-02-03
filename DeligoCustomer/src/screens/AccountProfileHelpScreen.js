@@ -105,7 +105,7 @@ const AccountProfileHelpScreen = ({ navigation }) => {
                 {/* Contact Support */}
                 <View style={styles.supportSection}>
                     <Text style={styles.supportText}>{t('stillNeedHelp') || 'Still need help?'}</Text>
-                    <TouchableOpacity onPress={() => navigation.navigate('Chat')}>
+                    <TouchableOpacity onPress={() => navigation.navigate('LiveChat')}>
                         <Text style={styles.contactLink}>{t('contactSupport') || 'Contact Support'}</Text>
                     </TouchableOpacity>
                 </View>

@@ -69,8 +69,8 @@ const ChatScreen = ({ navigation }) => {
             setConversationStatus(conv.status || 'OPEN');
             console.log('[Chat] Initialized room:', room);
 
-            // Join via Socket
-            joinRoom('join-conversation', { room });
+            // Join via Socket - moved to useEffect to ensure connection
+            // joinRoom('join-conversation', { room });
 
             // Fetch History
             // GET /conversations/:room/messages
@@ -80,7 +80,7 @@ const ChatScreen = ({ navigation }) => {
               // Assuming data.data is array of messages
               // Need to normalize if structure differs
               const msgs = historyRes.data.data || [];
-              setMessages(msgs.reverse()); // Reverse because FlatList inverted? No, standard list is usually top-to-bottom. 
+              setMessages(msgs.reverse()); // Reverse because FlatList inverted? No, standard list is usually top-to-bottom.
               // If backend sends newest first, and we scroll to end... let's stick to standard order.
               // Actually, standard chat is: oldest at top, newest at bottom.
             }
@@ -105,7 +105,9 @@ const ChatScreen = ({ navigation }) => {
     return () => {
       mounted = false;
       if (roomId) {
-        leaveRoom('leave-conversation', { room: roomId });
+        leaveRoom('leave-conversation', { room: roomId }, (ack) => {
+          console.log('[Chat] leave-conversation ack:', ack);
+        });
       }
     };
   }, []); // eslint-disable-line react-hooks/exhaustive-deps
@@ -169,12 +171,31 @@ const ChatScreen = ({ navigation }) => {
   }, [socket, roomId, currentUser]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // 3. Robust Join Logic (Fix race condition)
+  // 3. Robust Join Logic (Fix race condition) & Re-fetch messages
   useEffect(() => {
     if (isConnected && roomId && socket) {
       console.log('[Chat] Socket connected, joining room:', roomId);
-      // We use socket.emit directly or joinRoom. joinRoom checks isConnected internally.
-      // Retrying join incase it failed during init
-      joinRoom('join-conversation', { room: roomId });
+      joinRoom('join-conversation', { room: roomId }, (ack) => {
+        console.log('[Chat] join-conversation ack:', ack);
+      });
+
+      // Refetch messages to ensure nothing was missed while disconnected
+      const fetchMessages = async () => {
+        try {
+          console.log('[Chat] Re-fetching messages on reconnect...');
+          const historyUrl = API_ENDPOINTS.CHAT.MESSAGES.replace(':room', roomId);
+          const historyRes = await customerApi.get(historyUrl);
+          if (historyRes.data && historyRes.data.success) {
+            const msgs = historyRes.data.data || [];
+            // Merge with existing or replace? Replace is safer to ensure consistency
+            setMessages(msgs.reverse());
+          }
+        } catch (error) {
+          console.warn('[Chat] Failed to re-fetch messages:', error);
+        }
+      };
+
+      fetchMessages();
     }
   }, [isConnected, roomId, joinRoom, socket]);
 
@@ -209,6 +230,7 @@ const ChatScreen = ({ navigation }) => {
 
     try {
       if (socket && socket.connected) {
+        setIsSending(true);
         const payload = {
           room: roomId,
           message: textToSend,
@@ -219,6 +241,7 @@ const ChatScreen = ({ navigation }) => {
 
         socket.emit('send-message', payload, (ack) => {
           console.log('[Chat] Server Ack:', ack);
+          setIsSending(false);
           if (ack && (ack.status === 'error' || ack.error)) {
             Alert.alert('Send Error', ack.message || 'Server rejected message');
           }
@@ -232,6 +255,7 @@ const ChatScreen = ({ navigation }) => {
       }
     } catch (error) {
       console.error('[Chat] Send error:', error);
+      setIsSending(false);
       Alert.alert(t('error'), t('sendMessageError'));
       setMessages(prev => prev.filter(m => m._id !== tempId));
       setInputText(textToSend);
@@ -370,21 +394,6 @@ const ChatScreen = ({ navigation }) => {
       );
     }
 
-    return (
-      <View style={[styles.messageContainer, isMe ? styles.userMessageContainer : styles.supportMessageContainer]}>
-        <View style={[styles.messageBubble, isMe ? styles.userMessageBubble : styles.supportMessageBubble]}>
-          <Text style={[styles.messageText, isMe ? styles.userMessageText : styles.supportMessageText]}>
-            {item.message || item.text}
-          </Text>
-        </View>
-        <Text style={styles.messageTime}>
-          {new Date(item.createdAt || item.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
-        </Text>
-      </View>
-    );
-
-
-    // New Render logic to handle attachments
     return (
       <View style={[styles.messageContainer, isMe ? styles.userMessageContainer : styles.supportMessageContainer]}>
         <View style={[styles.messageBubble, isMe ? styles.userMessageBubble : styles.supportMessageBubble]}>

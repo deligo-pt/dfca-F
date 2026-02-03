@@ -327,7 +327,7 @@ class FirebaseNotificationService {
         } else if (type === 'PROMO' || type === 'PROMOTION') {
             navigate('Vouchers');
         } else if (type === 'CHAT' && data.chatId) {
-            navigate('Chat', { chatId: data.chatId });
+            navigate('LiveChat', { chatId: data.chatId });
         } else {
             // Default to notifications screen
             navigate('Notifications');
