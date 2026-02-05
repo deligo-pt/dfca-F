@@ -464,20 +464,46 @@ const CheckoutScreen = ({ route, navigation }) => {
 
       console.log('[CheckoutScreen] Layout Dump:', JSON.stringify(checkoutPayload));
 
-      // Aggressive Cleanup: Ensure no nested address objects confuse the backend
-      if (typeof checkoutPayload.deliveryAddress === 'object') {
-        delete checkoutPayload.deliveryAddress;
-      }
+      // Fix: Ensure we send the robust deliveryAddress object if we don't have an ID
+      // Fix: ALWAYS Construct proper nested object for backend validation
+      // Even if we have an ID, the validator might be looking for deliveryAddress.street
+      // Remove root fields that might confuse backend validation if it sees both
+      // Note: Backend validation requires these fields at the root level.
+      // Do not delete them.
+      // delete checkoutPayload.street;
+      // delete checkoutPayload.address;
+      // delete checkoutPayload.city;
+      // delete checkoutPayload.state;
+      // delete checkoutPayload.country;
+      // delete checkoutPayload.postalCode;
+      // delete checkoutPayload.zipCode;
+
+      checkoutPayload.deliveryAddress = {
+        street: addressData.street,
+        city: addressData.city,
+        state: addressData.state,
+        country: addressData.country,
+        postalCode: addressData.postalCode,
+        latitude: addressData.latitude,
+        longitude: addressData.longitude,
+        detailedAddress: addressData.detailedAddress,
+        addressType: (addressData.label === 'Work' ? 'OFFICE' : addressData.label === 'Other' ? 'OTHER' : 'HOME').toUpperCase(),
+        isActive: true
+      };
 
       if (backendAddressId) {
-        // Shotgun approach: send ID in all likely fields
         checkoutPayload.deliveryAddressId = backendAddressId;
         checkoutPayload.addressId = backendAddressId;
-        checkoutPayload.deliveryAddress = backendAddressId;
+        // Do NOT overwrite deliveryAddress with the ID string, keep it as object
       }
 
       try {
         console.debug('[CheckoutScreen] Creating checkout via API with payload type:', isCartPurchase ? 'CART' : 'DIRECT');
+        // Log the exact payload to help debug if it fails again
+        if (!backendAddressId) {
+          console.warn('[CheckoutScreen] Sending NEW Address payload:', JSON.stringify(checkoutPayload.deliveryAddress));
+        }
+
         const res = await CheckoutAPI.createCheckout(checkoutPayload);
 
         if (res.success || (res.data && res.data.success)) {
