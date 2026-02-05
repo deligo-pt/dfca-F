@@ -49,10 +49,24 @@ const ProductSearchResultCard = ({ product, onPress }) => {
             {/* Image Thumbnail */}
             <View style={styles(colors, isDarkMode).imageContainer}>
                 {imageUri ? (
-                    <Image source={{ uri: imageUri }} style={styles(colors, isDarkMode).image} />
+                    <Image source={{ uri: imageUri }} style={[styles(colors, isDarkMode).image, (raw.stock?.quantity ?? 999) <= 0 && { opacity: 0.5 }]} />
                 ) : (
                     <View style={[styles(colors, isDarkMode).image, styles(colors, isDarkMode).placeholder]}>
                         <Ionicons name="fast-food" size={24} color={colors.text.tertiary} />
+                    </View>
+                )}
+
+                {/* Out Of Stock Overlay - Premium */}
+                {(raw.stock?.quantity ?? 999) <= 0 && (
+                    <View style={[StyleSheet.absoluteFill, {
+                        backgroundColor: 'rgba(255,255,255,0.4)',
+                        alignItems: 'center',
+                        justifyContent: 'center',
+                        borderRadius: borderRadius.md
+                    }]}>
+                        <View style={{ backgroundColor: 'rgba(0,0,0,0.8)', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 8 }}>
+                            <Text style={{ color: '#fff', fontSize: 8, fontWeight: '700' }}>SOLD OUT</Text>
+                        </View>
                     </View>
                 )}
             </View>

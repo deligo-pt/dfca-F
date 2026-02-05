@@ -9,6 +9,7 @@ import { useLanguage } from '../utils/LanguageContext';
 import formatCurrency from '../utils/currency';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import CheckoutAPI from '../utils/checkoutApi';
+import AlertModal from './AlertModal';
 
 /**
  * CartDetail Component
@@ -33,6 +34,12 @@ export default function CartDetail({ vendorId, navigation }) {
   const { colors, isDarkMode } = useTheme();
   const [updatingItem, setUpdatingItem] = useState(null); // Tracks the item currently being modified to show a spinner
   const [checkingOut, setCheckingOut] = useState(false);
+  const [alertVisible, setAlertVisible] = useState(false);
+  const [alertConfig, setAlertConfig] = useState({
+    title: '',
+    message: '',
+    buttons: []
+  });
 
   if (!cart) return <Text style={{ color: colors.text.secondary, padding: spacing.md }}>{t('noCartFound')}</Text>;
 
@@ -171,10 +178,53 @@ export default function CartDetail({ vendorId, navigation }) {
   const finalDeliveryTime = cart.vendorDeliveryTime || pcVendor?.deliveryTime || firstItem?.product?._raw?.vendor?.deliveryTime || pcProduct?.deliveryTime || null;
 
   const handleUpdateQuantity = async (itemId, delta) => {
+    // Local Stock Check
+    if (delta > 0) {
+      const item = items.find(it => it.id === itemId);
+      if (item) {
+        const stockQty = item.product?._raw?.stock?.quantity;
+        // Check if stock is defined and valid number
+        if (stockQty !== undefined && stockQty !== null) {
+          const maxStock = parseInt(stockQty, 10);
+          if (maxStock > 0 && (item.qty + delta) > maxStock) {
+            setAlertConfig({
+              title: t('maxComplete') || 'Max Quantity Reached',
+              message: `${t('only') || 'Only'} ${maxStock} ${t('itemsAvailable') || 'items available'}.\n${t('cannotAddMore') || 'Cannot add more to cart.'}`,
+              icon: 'alert-circle',
+              buttons: [{ text: t('ok') || 'OK', onPress: () => setAlertVisible(false) }]
+            });
+            setAlertVisible(true);
+            return;
+          }
+        }
+      }
+    }
+
     const action = delta > 0 ? 'add' : 'remove';
     setUpdatingItem({ id: itemId, action });
     try {
-      await updateQuantity(itemId, delta, vendorId);
+      // Check if this update will remove the item
+      const item = items.find(it => it.id === itemId);
+      if (item && item.qty + delta <= 0) {
+        await removeItem(itemId, vendorId);
+      } else {
+        const res = await updateQuantity(itemId, delta, vendorId);
+        if (res && !res.success) {
+          let msg = res.error;
+          // Clean up dirty backend messages if possible
+          if (msg && msg.toString().includes('quantity')) {
+            msg = `${t('cannotUpdateQty') || 'Cannot update quantity'}. ${t('stockLimitReached') || 'Stock limit might be reached.'}`;
+          }
+          setAlertConfig({
+            title: t('error') || 'Error',
+            message: msg || t('failedToUpdateCart') || 'Failed to update cart',
+            icon: 'warning-outline',
+            iconColor: colors.error || '#D32F2F',
+            buttons: [{ text: t('ok') || 'OK', onPress: () => setAlertVisible(false) }]
+          });
+          setAlertVisible(true);
+        }
+      }
     } catch (err) {
       console.error("[CartDetail] Failed to update quantity", err);
     } finally {
@@ -494,6 +544,16 @@ export default function CartDetail({ vendorId, navigation }) {
           )}
         </TouchableOpacity>
       </View>
+
+      <AlertModal
+        visible={alertVisible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        icon={alertConfig.icon}
+        iconColor={alertConfig.iconColor}
+        buttons={alertConfig.buttons}
+        onClose={() => setAlertVisible(false)}
+      />
     </View>
   );
 }
@@ -516,6 +576,7 @@ const styles = StyleSheet.create({
     width: 80,
     height: 80,
     borderRadius: borderRadius.lg,
+    biz: 1,
   },
   vendorName: {
     fontSize: fontSize.xl,

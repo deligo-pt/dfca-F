@@ -124,6 +124,14 @@ const CheckoutScreen = ({ route, navigation }) => {
     let canceled = false;
 
     const createCheckoutOnEnter = async () => {
+      // Prevent re-creating checkout if we already have a valid offer applied
+      // This prevents 'auto-refresh' logic from wiping out the discount
+      if (appliedOffer || (checkoutResponse && checkoutResponse.offerDiscount > 0)) {
+        console.debug('[CheckoutScreen] Skipping auto-createCheckout because offer is active.');
+        return;
+      }
+
+
       // If no address is set, prompt user to add one instead of calling API
       if (!address || !city) {
         console.debug('[CheckoutScreen] No address available, skipping API call');
@@ -384,10 +392,14 @@ const CheckoutScreen = ({ route, navigation }) => {
 
       if (isCartPurchase) {
         // CART PURCHASE
-        // Force manual mode to bypass broken backend Cart->Summary conversion
-        checkoutPayload.useCart = false;
+        // User requested to use "useCart: true" to leverage backend cart state
+        checkoutPayload.useCart = true;
+
+        // Note: When useCart is true, we should NOT send items array manually
+        // The backend will pull items from the user's active cart
 
         // Construct items payload explicitly from context cart
+        /*
         let calculatedSubtotal = 0;
 
         const itemsPayload = Object.keys(cart.items || {}).map(key => {
@@ -426,6 +438,7 @@ const CheckoutScreen = ({ route, navigation }) => {
         checkoutPayload.totalPrice = calculatedSubtotal;
         checkoutPayload.cartTotal = calculatedSubtotal;
         checkoutPayload.amount = calculatedSubtotal;
+        */
 
       } else {
         // DIRECT PURCHASE (Buy Now / Reorder / etc)
@@ -634,16 +647,20 @@ const CheckoutScreen = ({ route, navigation }) => {
     return sum + itemTotal + addonsCost;
   }, 0);
 
+  // Extract values from server response FIRST so they are available for valid calculation
+  const serverData = checkoutResponse?.data || checkoutResponse || {};
+  const serverTotal = serverData.subtotal ?? serverData.total ?? serverData.totalAmount ?? serverData.subTotal; // Fallback to subTotal if total missing (legacy)
+
+  // Try to find explicit delivery fee
+  const serverDeliveryFee = serverData.deliveryCharge ?? serverData.deliveryFee ?? serverData.delivery_fee ?? null;
+
   // Fees and promo discount
-  const deliveryFee = cartData?.deliveryFee || 0;
-  const serviceFee = cartData?.serviceFee || 0;
   // Extract discount from server main object or data object
-  // serverData is already checkoutResponse?.data || checkoutResponse
-  let discount = serverData?.discount || serverData?.discountAmount || cart?.appliedPromo?.discount || cartData?.discount || 0;
+  let discount = serverData?.offerDiscount || serverData?.discount || serverData?.discountAmount || cart?.appliedPromo?.discount || cartData?.discount || 0;
 
   console.debug('[CheckoutScreen] Discount Calculation:', {
     serverDiscount: discount,
-    serverDataTotal: serverData?.total || serverData?.subTotal,
+    serverDataTotal: serverTotal,
     itemsSubtotal: displaySubtotal,
     appliedOffer: appliedOffer ? { code: appliedOffer.code, type: appliedOffer.type, value: appliedOffer.value, discountAmount: appliedOffer.discountAmount } : 'null'
   });
@@ -686,13 +703,6 @@ const CheckoutScreen = ({ route, navigation }) => {
 
   // Debug: Log checkoutResponse to verify it's being populated
   console.debug('[CheckoutScreen] Render - checkoutResponse:', checkoutResponse, 'local total:', total);
-
-  // Extract values from server response
-  const serverData = checkoutResponse?.data || checkoutResponse || {};
-
-  // Try to find explicit delivery fee
-  const serverDeliveryFee = serverData.deliveryFee ?? serverData.delivery_fee ?? serverData.deliveryCharge ?? null;
-  const serverTotal = serverData.total ?? serverData.totalAmount ?? serverData.subTotal; // Fallback to subTotal if total missing (legacy)
 
   // Use server's total if available, else local
   const displayTotal = serverTotal ?? total;
@@ -1085,13 +1095,53 @@ const CheckoutScreen = ({ route, navigation }) => {
               vendorId: vendorId,
               currentTotal: displayTotal,
               onSelect: async (coupon, manualResult) => {
-                // Simply set determining offer and let createCheckoutOnEnter handle the API call
-                if (coupon && coupon.code) {
-                  console.debug('[CheckoutScreen] Voucher selected:', coupon.code);
-                  setAppliedOffer(coupon);
-                  setStripeError(null);
+                // Handle both list selection (coupon) and manual verification result (manualResult)
+                const selectedOffer = coupon || manualResult;
+
+                if (selectedOffer && selectedOffer.code) {
+                  console.debug('[CheckoutScreen] Voucher selected:', selectedOffer.code, 'AutoApply:', selectedOffer.autoApply);
+
+                  // Extract Checkout ID
+                  const checkoutSummaryId = extractCheckoutSummaryId(checkoutResponse);
+                  if (!checkoutSummaryId) {
+                    setStripeError(t('checkoutNotReady') === 'checkoutNotReady' ? 'Checkout session not ready. Please wait.' : t('checkoutNotReady'));
+                    return;
+                  }
+
+                  // User Request Fix: Always valid to send ID if we have it?
+                  // Previous rule was confusing. Now prioritizing ID if available, else Code.
+                  // For "test20" (AutoApply=false), user explicitly wanted ID.
+                  let offerIdentifier = selectedOffer.id || selectedOffer._id || selectedOffer.code;
+
+                  // Validate via API
+                  try {
+                    setIsProcessing(true);
+                    const res = await CheckoutAPI.validateApplyOffer({
+                      checkoutId: checkoutSummaryId,
+                      offerIdentifier: offerIdentifier
+                    });
+
+                    if (res.success) {
+                      console.debug('[CheckoutScreen] Offer validation FULL response:', JSON.stringify(res, null, 2));
+                      setAppliedOffer(selectedOffer);
+                      // Refresh checkout data if returned
+                      if (res.data && res.data.data) {
+                        setCheckoutResponse(res.data.data);
+                      }
+                      setStripeError(null);
+                    } else {
+                      console.warn('[CheckoutScreen] Offer validation failed:', res.error);
+                      setStripeError(res.error || 'Failed to apply voucher');
+                      setAppliedOffer(null);
+                    }
+                  } catch (err) {
+                    console.error('[CheckoutScreen] Offer validation error:', err);
+                    setStripeError('Failed to validate voucher');
+                  } finally {
+                    setIsProcessing(false);
+                  }
                 } else {
-                  console.warn('[CheckoutScreen] Voucher selected but invalid or missing code:', coupon);
+                  console.warn('[CheckoutScreen] Invalid voucher selection:', selectedOffer);
                   setStripeError('Invalid voucher selected');
                 }
               }
@@ -1224,11 +1274,32 @@ const CheckoutScreen = ({ route, navigation }) => {
               </Text>
             </View>
 
-            {/* Discount Row */}
-            {discount > 0 && (
+            {/* Tax Row - Added for transparency */}
+            {serverData?.taxAmount > 0 && (
               <View style={styles(colors).summaryRow}>
-                <Text style={styles(colors).summaryLabelDiscount}>{t('discount')}</Text>
-                <Text style={styles(colors).summaryValueDiscount}>
+                <Text style={styles(colors).summaryLabel}>{t('tax') || 'VAT / Tax'}</Text>
+                <Text style={styles(colors).summaryValue}>
+                  {formatCurrency(currency, serverData.taxAmount)}
+                </Text>
+              </View>
+            )}
+
+            {/* Discount Row - Enhanced UI */}
+            {discount > 0 && (
+              <View style={[styles(colors).summaryRow, {
+                marginTop: 8,
+                backgroundColor: '#ECFDF5',
+                padding: 8,
+                borderRadius: 8,
+                borderWidth: 1,
+                borderColor: '#10B981',
+                alignItems: 'center'
+              }]}>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <MaterialCommunityIcons name="tag" size={16} color="#059669" style={{ marginRight: 6 }} />
+                  <Text style={{ fontFamily: 'Poppins-Medium', fontSize: 13, color: '#059669' }}>{t('discount')}</Text>
+                </View>
+                <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 13, color: '#059669' }}>
                   -{formatCurrency(currency, discount)}
                 </Text>
               </View>
@@ -1245,24 +1316,71 @@ const CheckoutScreen = ({ route, navigation }) => {
           </View>
         </View>
 
-        {/* Payment Error Banner */}
+        {/* Payment Error Banner - Industry Grade */}
         {
           !!stripeError && (
-            <View style={{ backgroundColor: '#FFEBEE', padding: 12, borderRadius: 12, marginHorizontal: spacing.lg, marginBottom: 12, borderWidth: 1, borderColor: '#F44336' }}>
-              <Text style={{ color: '#D32F2F', fontFamily: 'Poppins-Medium', fontSize: 13 }}>{typeof stripeError === 'string' ? stripeError : t('error')}</Text>
+            <View style={{
+              backgroundColor: '#FEF2F2',
+              borderRadius: 16,
+              marginHorizontal: spacing.lg,
+              marginBottom: 20,
+              borderWidth: 1,
+              borderColor: '#FECACA',
+              overflow: 'hidden'
+            }}>
+              <View style={{ flexDirection: 'row', padding: 16 }}>
+                <View style={{
+                  width: 40,
+                  height: 40,
+                  borderRadius: 20,
+                  backgroundColor: '#FEE2E2',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                  marginRight: 12
+                }}>
+                  <MaterialCommunityIcons name="alert-circle-outline" size={24} color="#EF4444" />
+                </View>
 
-              {profileIncomplete ? (
-                <TouchableOpacity
-                  onPress={() => navigation.navigate('EditProfile')}
-                  style={{ marginTop: 12, backgroundColor: '#D32F2F', paddingVertical: 8, paddingHorizontal: 16, borderRadius: 8, alignSelf: 'flex-start' }}
-                >
-                  <Text style={{ color: '#fff', fontFamily: 'Poppins-Bold', fontSize: 13 }}>{t('editProfile') || 'Complete Profile'}</Text>
-                </TouchableOpacity>
-              ) : (
-                <TouchableOpacity onPress={() => navigation.goBack()} style={{ marginTop: 8 }}>
-                  <Text style={{ color: '#D32F2F', fontFamily: 'Poppins-Bold', textDecorationLine: 'underline' }}>{t('goBack')}</Text>
-                </TouchableOpacity>
-              )}
+                <View style={{ flex: 1 }}>
+                  <Text style={{ fontSize: 16, fontFamily: 'Poppins-Bold', color: '#B91C1C', marginBottom: 4 }}>
+                    {t('paymentFailed') === 'paymentFailed' ? 'Payment Failed' : t('paymentFailed')}
+                  </Text>
+                  <Text style={{ fontSize: 14, fontFamily: 'Poppins-Regular', color: '#7F1D1D', marginBottom: 8, lineHeight: 20 }}>
+                    {typeof stripeError === 'string' ? stripeError : t('error')}
+                  </Text>
+
+                  {/* User requested specific text: "please abar payment korar try korun" -> "Please try paying again" */}
+                  <Text style={{ fontSize: 13, fontFamily: 'Poppins-Medium', color: '#991B1B', marginBottom: 12 }}>
+                    Please try paying again.
+                  </Text>
+
+                  <View style={{ flexDirection: 'row', gap: 12 }}>
+                    {profileIncomplete ? (
+                      <TouchableOpacity
+                        onPress={() => navigation.navigate('EditProfile')}
+                        style={{ backgroundColor: '#DC2626', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 10, alignItems: 'center' }}
+                      >
+                        <Text style={{ color: '#fff', fontFamily: 'Poppins-Bold', fontSize: 13 }}>{t('completeProfile') || 'Complete Profile'}</Text>
+                      </TouchableOpacity>
+                    ) : (
+                      <>
+                        <TouchableOpacity
+                          onPress={() => navigation.goBack()}
+                          style={{
+                            paddingVertical: 10,
+                            paddingHorizontal: 16,
+                            borderRadius: 10,
+                            borderWidth: 1,
+                            borderColor: '#DC2626'
+                          }}
+                        >
+                          <Text style={{ color: '#DC2626', fontFamily: 'Poppins-SemiBold', fontSize: 13 }}>{t('goBack')}</Text>
+                        </TouchableOpacity>
+                      </>
+                    )}
+                  </View>
+                </View>
+              </View>
             </View>
           )
         }

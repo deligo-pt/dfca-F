@@ -94,6 +94,37 @@ class CheckoutAPI {
       return { success: false, error: error?.message || 'Network error occurred', status: null };
     }
   }
+
+  /**
+   * Validate and apply offer to a checkout session
+   * @param {object} payload - { checkoutId, offerIdentifier }
+   * @returns {Promise}
+   */
+  static async validateApplyOffer(payload) {
+    try {
+      const url = `${BASE_API_URL}/offers/validate-apply-offer`;
+      const headers = await this.getHeaders();
+
+      console.debug('[CheckoutAPI] POST validate-apply-offer', url, payload);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        return { success: false, error: responseData?.message || 'Failed to apply offer', data: responseData };
+      }
+
+      return { success: true, data: responseData };
+    } catch (error) {
+      console.error('Checkout API - Validate offer error:', error);
+      return { success: false, error: error?.message || 'Network error' };
+    }
+  }
 }
 
 export default CheckoutAPI;

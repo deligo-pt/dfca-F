@@ -519,6 +519,7 @@ export const CartProvider = ({ children }) => {
     } catch (error) {
       console.error('[Cart] Sync Exception:', error);
       revertOptimisticUpdate(canonicalKey, delta, vendorId);
+      return { success: false, error: error?.message || 'Sync error' };
     } finally {
       setSyncing(false);
     }

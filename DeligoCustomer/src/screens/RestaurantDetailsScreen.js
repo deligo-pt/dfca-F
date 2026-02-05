@@ -82,6 +82,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const [activeProduct, setActiveProduct] = useState(null);
   const [updatingProductId, setUpdatingProductId] = useState(null);
   const [addingToCart, setAddingToCart] = useState(false);
+  const [modalQuantity, setModalQuantity] = useState(1);
 
   const [selectedVariations, setSelectedVariations] = useState({});
 
@@ -91,8 +92,8 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const openProductModal = (product) => {
     setActiveProduct(product);
     setSelectedVariations({});
-    // Reset quantity to 1 for fresh addition
-    setLocalQty((prev) => ({ ...prev, [product.id]: 1 }));
+    // Reset quantity to 1 for fresh addition (using separate modal state)
+    setModalQuantity(1);
 
     // Reset add-ons
     setActiveAddons([]);
@@ -384,6 +385,11 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     const description = raw.description || raw.slug || '';
     const isUpdating = updatingProductId === product.id;
 
+    // Stock Logic
+    const stockQty = raw.stock?.quantity ?? 999; // Default to high if missing
+    const isOutOfStock = stockQty <= 0;
+    const isLowStock = stockQty > 0 && stockQty <= 5;
+
     return (
       <View
         key={product.id}
@@ -392,14 +398,32 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
         {/* Left: tap to open modal */}
         <TouchableOpacity
           activeOpacity={0.9}
-          onPress={() => openProductModal(product)}
-          style={styles.menuItemContent}
-          disabled={isUpdating}
+          onPress={() => !isOutOfStock && openProductModal(product)}
+          style={[styles.menuItemContent, isOutOfStock && { opacity: 0.6 }]}
+          disabled={isUpdating || isOutOfStock}
         >
           {image ? (
             <View>
-              <Image source={{ uri: image }} style={styles.menuItemImage} />
-              {discount > 0 && (
+              <Image source={{ uri: image }} style={[styles.menuItemImage, isOutOfStock && { opacity: 0.5 }]} />
+              {/* Out of Stock Overlay - Premium Look */}
+              {isOutOfStock && (
+                <View style={[StyleSheet.absoluteFill, {
+                  backgroundColor: 'rgba(255,255,255,0.4)', // Subtle fade
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  borderRadius: 12
+                }]}>
+                  <View style={{
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 12
+                  }}>
+                    <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700', letterSpacing: 0.5 }}>SOLD OUT</Text>
+                  </View>
+                </View>
+              )}
+              {discount > 0 && !isOutOfStock && (
                 <View style={[styles.discountBadgeAbsolute, { backgroundColor: colors.primary, position: 'absolute', top: 0, left: 0, paddingHorizontal: 4, paddingVertical: 2, borderBottomRightRadius: 8 }]}>
                   <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>{discount}%</Text>
                 </View>
@@ -408,7 +432,24 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
           ) : (
             <View style={[styles.menuItemImage, { backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' }]}>
               <Ionicons name="fast-food" size={32} color={colors.text.secondary} />
-              {discount > 0 && (
+              {isOutOfStock && (
+                <View style={[StyleSheet.absoluteFill, {
+                  backgroundColor: 'rgba(255,255,255,0.4)',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  borderRadius: 12
+                }]}>
+                  <View style={{
+                    backgroundColor: 'rgba(0,0,0,0.8)',
+                    paddingHorizontal: 8,
+                    paddingVertical: 4,
+                    borderRadius: 12
+                  }}>
+                    <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700', letterSpacing: 0.5 }}>SOLD OUT</Text>
+                  </View>
+                </View>
+              )}
+              {discount > 0 && !isOutOfStock && (
                 <View style={[styles.discountBadgeAbsolute, { backgroundColor: colors.primary, position: 'absolute', top: 0, left: 0, paddingHorizontal: 4, paddingVertical: 2, borderBottomRightRadius: 8 }]}>
                   <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>{discount}%</Text>
                 </View>
@@ -423,6 +464,13 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
             ) : null}
 
             <View style={{ marginTop: 4 }}>
+              {/* Low Stock Warning */}
+              {isLowStock && (
+                <Text style={{ fontSize: 10, color: 'orange', marginBottom: 2, fontFamily: 'Poppins-Bold' }}>
+                  {t('lowStock') || 'Low Stock'}: {stockQty} {t('left') || 'left'}
+                </Text>
+              )}
+
               {discount > 0 ? (
                 <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
                   <Text style={[styles.menuItemPrice, { color: colors.primary, marginRight: 6 }]}>
@@ -445,16 +493,16 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
         {/* Right: Add button - always opens modal */}
         <View style={styles.menuItemActions} pointerEvents="box-none">
           <TouchableOpacity
-            style={[styles.addButton, { backgroundColor: colors.primary }]}
+            style={[styles.addButton, { backgroundColor: isOutOfStock ? colors.border : colors.primary }]}
             onPress={() => openProductModal(product)}
-            disabled={isUpdating}
+            disabled={isUpdating || isOutOfStock}
             hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
           >
             {isUpdating ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <>
-                <Ionicons name="add" size={20} color="#fff" />
+                <Ionicons name={isOutOfStock ? "close" : "add"} size={20} color={isOutOfStock ? colors.text.tertiary : "#fff"} />
                 {quantity > 0 && (
                   <View style={[styles.quantityBadge, { backgroundColor: '#fff' }]}>
                     <Text style={[styles.quantityBadgeText, { color: colors.primary }]}>{quantity}</Text>
@@ -477,7 +525,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     const description = raw.longDescription || raw.description || raw.details || raw.slug || '';
     const price = raw.pricing?.price ?? raw.price ?? activeProduct.price ?? 0;
     const currency = raw.pricing?.currency ?? '';
-    const quantity = getQuantity(activeProduct.id);
+    const quantity = modalQuantity;
     const isUpdating = updatingProductId === activeProduct.id;
 
     return (
@@ -645,52 +693,65 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                 <View style={[styles.modalQuantitySection, { marginBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
                   <Text style={[styles.modalQuantityLabel, { color: colors.text.primary }]}>{t('quantity') || 'Quantity'}</Text>
 
-                  <View style={styles.modalQuantityControl}>
-                    <TouchableOpacity
-                      style={[styles.modalQuantityBtn, { backgroundColor: colors.primary }]}
-                      onPress={() => {
-                        if (quantity > 0) {
-                          setLocalQty(prev => ({ ...prev, [activeProduct.id]: Math.max(0, quantity - 1) }));
-                        }
-                      }}
-                      disabled={quantity === 0}
-                    >
-                      <Ionicons name="remove" size={22} color="#fff" />
-                    </TouchableOpacity>
-                    <Text style={[styles.modalQuantityText, { color: colors.text.primary }]}>{quantity}</Text>
-                    <TouchableOpacity
-                      style={[styles.modalQuantityBtn, { backgroundColor: colors.primary }]}
-                      onPress={() => {
-                        const currentCartQty = itemsMap?.[activeProduct.id]?.quantity || 0;
-                        const maxStock = raw.stock?.quantity;
-
-                        // Check if stock info is available
-                        if (maxStock !== undefined && maxStock !== null) {
-                          if ((currentCartQty + quantity + 1) > maxStock) {
-                            setAlertConfig({
-                              title: t('maxComplete') || 'Max Quantity Reached',
-                              message: `${t('only') || 'Only'} ${maxStock} ${t('itemsAvailable') || 'items available'} (${currentCartQty} ${t('inCart') || 'in cart'})`
-                            });
-                            setAlertVisible(true);
-                            return;
+                  {/* Stock Check for Modal */}
+                  {(raw.stock?.quantity ?? 999) <= 0 ? (
+                    <View style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: colors.border, borderRadius: 8 }}>
+                      <Text style={{ color: colors.text.secondary, fontWeight: 'bold' }}>{t('outOfStock') || 'Out of Stock'}</Text>
+                    </View>
+                  ) : (
+                    <View style={styles.modalQuantityControl}>
+                      <TouchableOpacity
+                        style={[styles.modalQuantityBtn, { backgroundColor: colors.primary }]}
+                        onPress={() => {
+                          if (quantity > 0) {
+                            setModalQuantity(Math.max(0, quantity - 1));
                           }
-                        }
+                        }}
+                        disabled={quantity === 0}
+                      >
+                        <Ionicons name="remove" size={22} color="#fff" />
+                      </TouchableOpacity>
+                      <Text style={[styles.modalQuantityText, { color: colors.text.primary }]}>{quantity}</Text>
+                      <TouchableOpacity
+                        style={[styles.modalQuantityBtn, { backgroundColor: colors.primary }]}
+                        onPress={() => {
+                          const currentCartQty = itemsMap?.[activeProduct.id]?.quantity || 0;
+                          const maxStock = parseInt(raw.stock?.quantity ?? 0, 10);
+                          const nextQty = quantity + 1;
 
-                        setLocalQty(prev => ({ ...prev, [activeProduct.id]: quantity + 1 }));
-                      }}
-                    >
-                      <Ionicons name="add" size={22} color="#fff" />
-                    </TouchableOpacity>
-                  </View>
+                          // Check if stock info is available
+                          if (maxStock > 0) {
+                            if ((currentCartQty + nextQty) > maxStock) {
+                              setAlertConfig({
+                                title: t('maxComplete') || 'Max Quantity Reached',
+                                message: `${t('only') || 'Only'} ${maxStock} ${t('itemsAvailable') || 'items available'}.\n\n` +
+                                  `${t('yourCartHas') || 'You have'} ${currentCartQty} ${t('inCart') || 'in cart'} + ${quantity} ${t('adding') || 'adding'} = ${currentCartQty + quantity}.`
+                              });
+                              setAlertVisible(true);
+                              return;
+                            }
+                          }
+
+                          setModalQuantity(quantity + 1);
+                        }}
+                      >
+                        <Ionicons name="add" size={22} color="#fff" />
+                      </TouchableOpacity>
+                    </View>
+                  )}
                 </View>
 
                 <TouchableOpacity
                   activeOpacity={0.9}
                   style={{
                     borderRadius: 16,
-                    opacity: (quantity > 0) ? 1 : 0.5
+                    opacity: (quantity > 0 && (raw.stock?.quantity ?? 999) > 0) ? 1 : 0.5,
+                    backgroundColor: colors.primary // Ensure background is visible
                   }}
                   onPress={async () => {
+                    const stockQty = raw.stock?.quantity ?? 999;
+                    if (stockQty <= 0) return;
+
                     // Prevent double-tap
                     if (addingToCart) return;
 
