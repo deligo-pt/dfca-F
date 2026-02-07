@@ -14,9 +14,9 @@ const API_BASE_URLS = {
   // development: 'http://localhost:5000',  // iOS Simulator
 
   // Deployment Targets
-  staging: 'https://deligo-food-backend.vercel.app',
+  staging: 'https://api-food.deligo.pt',
   // staging: 'https://deligo-food-delivery-server.vercel.app',
-  production: 'https://api.deligo.com',
+  production: 'https://api-food.deligo.pt',
 };
 
 /**
@@ -67,7 +67,7 @@ export const API_ENDPOINTS = {
   // --- User Profile ---
   PROFILE: {
     GET: '/profile',
-    UPDATE: '/customers/:id',
+    UPDATE: '/profile',
     ADDRESSES: '/profile/addresses',
     ADD_ADDRESS: '/profile/addresses/add',
     UPDATE_ADDRESS: '/profile/addresses/:addressId/update',

@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import { View, Text, StyleSheet, FlatList, TouchableOpacity, ActivityIndicator, Alert, SafeAreaView, StatusBar, RefreshControl, ScrollView, Modal } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -32,6 +32,9 @@ const SavedAddressesScreen = ({ navigation, route }) => {
 
   const showConfirm = (title, message, onConfirm) => setConfirmConfig({ visible: true, title, message, onConfirm });
   const hideConfirm = () => setConfirmConfig(prev => ({ ...prev, visible: false }));
+
+  // Memoize styles to prevent re-creation on every render
+  const themeStyles = useMemo(() => styles(colors), [colors]);
 
   // Determine if operating in selection mode
   const { onSelect, selectedId } = route.params || {};
@@ -139,30 +142,27 @@ const SavedAddressesScreen = ({ navigation, route }) => {
 
   const handleSelect = async (address) => {
     if (onSelect) {
-      // Ensure selected address is active to align with backend context
-      if (!address.isActive) {
-        setLoading(true);
-        try {
-          // Re-use logic: 'current status is false' -> toggle to true
-          await AddressApi.toggleDeliveryAddressStatus(address._id);
-          // Refresh local state to ensure consistency before returning
-          await fetchUserProfile();
+      // Optimistic Update: Select immediately and navigate back
+      const updatedAddress = { ...address, isActive: true };
 
-          // Update the address object to be returned with active status
-          const updatedAddress = { ...address, isActive: true };
-          onSelect(updatedAddress);
+      // 1. Notify parent listener (e.g. CheckoutScreen)
+      onSelect(updatedAddress);
+
+      // 2. Navigate back immediately (Smooth UI)
+      navigation.goBack();
+
+      // 3. Sync with backend in background (Fire and Forget)
+      if (!address.isActive) {
+        try {
+          console.log('[SavedAddresses] Background syncing active status for:', address._id);
+          await AddressApi.toggleDeliveryAddressStatus(address._id);
+          // Optional: Refresh profile silently to keep sync
+          fetchUserProfile();
         } catch (err) {
-          console.error('Failed to toggle active status on selection:', err);
-          // Fallback: still select it locally even if backend toggle failed
-          onSelect(address);
-        } finally {
-          setLoading(false);
-          navigation.goBack();
+          console.warn('[SavedAddresses] Background sync failed:', err);
+          // We don't revert UI here because the user has already moved on. 
+          // The local checkout flow will proceed with the selected address object anyway.
         }
-      } else {
-        // Already active, just select
-        onSelect(address);
-        navigation.goBack();
       }
     }
   };
@@ -174,16 +174,16 @@ const SavedAddressesScreen = ({ navigation, route }) => {
     return (
       <TouchableOpacity
         style={[
-          styles(colors).addressCard,
-          (isSelected || isActive) && styles(colors).addressCardActive
+          themeStyles.addressCard,
+          (isSelected || isActive) && themeStyles.addressCardActive
         ]}
         onPress={() => onSelect ? handleSelect(address) : handleToggleStatus(address._id, address.isActive)}
         activeOpacity={0.9}
         disabled={isActive} // If active, maybe disable click if not in select mode? Or allow click to nothing.
       >
-        <View style={styles(colors).cardContent}>
+        <View style={themeStyles.cardContent}>
           {/* Left Icon Section */}
-          <View style={[styles(colors).iconWrapper, (isActive || isSelected) && { backgroundColor: colors.primary + '15' }]}>
+          <View style={[themeStyles.iconWrapper, (isActive || isSelected) && { backgroundColor: colors.primary + '15' }]}>
             <MaterialCommunityIcons
               name={address.addressType === 'OFFICE' ? 'briefcase' : address.addressType === 'OTHER' ? 'map-marker' : 'home'}
               size={24}
@@ -192,31 +192,31 @@ const SavedAddressesScreen = ({ navigation, route }) => {
           </View>
 
           {/* Middle Text Section */}
-          <View style={styles(colors).textContainer}>
-            <View style={styles(colors).labelRow}>
-              <Text style={styles(colors).labelTitle}>
+          <View style={themeStyles.textContainer}>
+            <View style={themeStyles.labelRow}>
+              <Text style={themeStyles.labelTitle}>
                 {address.label || address.addressType || t('home')}
               </Text>
               {isActive && (
-                <View style={styles(colors).activeBadge}>
-                  <Text style={styles(colors).activeBadgeText}>{t('primary')}</Text>
+                <View style={themeStyles.activeBadge}>
+                  <Text style={themeStyles.activeBadgeText}>{t('primary')}</Text>
                 </View>
               )}
             </View>
-            <Text style={styles(colors).addressText} numberOfLines={2}>
+            <Text style={themeStyles.addressText} numberOfLines={2}>
               {[address.street, address.detailedAddress].filter(Boolean).join(', ')}
             </Text>
-            <Text style={styles(colors).subAddressText} numberOfLines={1}>
+            <Text style={themeStyles.subAddressText} numberOfLines={1}>
               {[address.city, address.state, address.country].filter(Boolean).join(', ')}
             </Text>
           </View>
 
           {/* Right Action Section */}
-          <View style={styles(colors).actionSection}>
+          <View style={themeStyles.actionSection}>
             {/* If not active and not in select mode, allow delete */}
             {!isActive && !onSelect && (
               <TouchableOpacity
-                style={styles(colors).deleteButton}
+                style={themeStyles.deleteButton}
                 onPress={() => handleDelete(address._id)}
                 hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
               >
@@ -226,8 +226,8 @@ const SavedAddressesScreen = ({ navigation, route }) => {
 
             {/* Selection Radio Circle (if in selection mode) */}
             {onSelect && (
-              <View style={[styles(colors).radioCircle, isSelected && styles(colors).radioCircleSelected]}>
-                {isSelected && <View style={styles(colors).radioInner} />}
+              <View style={[themeStyles.radioCircle, isSelected && themeStyles.radioCircleSelected]}>
+                {isSelected && <View style={themeStyles.radioInner} />}
               </View>
             )}
           </View>
@@ -239,7 +239,7 @@ const SavedAddressesScreen = ({ navigation, route }) => {
   const insets = useSafeAreaInsets();
 
   return (
-    <View style={[styles(colors).container, { paddingTop: insets.top }]}>
+    <View style={[themeStyles.container, { paddingTop: insets.top }]}>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
         backgroundColor="transparent"
@@ -247,13 +247,13 @@ const SavedAddressesScreen = ({ navigation, route }) => {
         animated={true}
       />
       {/* Header */}
-      <View style={styles(colors).header}>
-        <TouchableOpacity onPress={() => navigation.goBack()} style={styles(colors).backButton}>
+      <View style={themeStyles.header}>
+        <TouchableOpacity onPress={() => navigation.goBack()} style={themeStyles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
-        <Text style={styles(colors).headerText}>{t('savedAddresses')}</Text>
+        <Text style={themeStyles.headerText}>{t('savedAddresses')}</Text>
         <TouchableOpacity
-          style={styles(colors).refreshButton}
+          style={themeStyles.refreshButton}
           onPress={handleRefresh}
         >
           <Ionicons name="refresh" size={20} color={colors.text.primary} />
@@ -261,19 +261,19 @@ const SavedAddressesScreen = ({ navigation, route }) => {
       </View>
 
       <ScrollView
-        contentContainerStyle={styles(colors).content}
+        contentContainerStyle={themeStyles.content}
         showsVerticalScrollIndicator={false}
         refreshControl={<RefreshControl refreshing={refreshing} onRefresh={handleRefresh} />}
       >
         {loading && <ActivityIndicator size="small" color={colors.primary} style={{ marginBottom: 10 }} />}
 
         {localAddresses.length === 0 && !loading ? (
-          <View style={styles(colors).emptyState}>
-            <View style={styles(colors).emptyStateIcon}>
+          <View style={themeStyles.emptyState}>
+            <View style={themeStyles.emptyStateIcon}>
               <Ionicons name="map-outline" size={64} color={colors.primary + '40'} />
             </View>
-            <Text style={styles(colors).emptyStateTitle}>{t('noAddressesYet')}</Text>
-            <Text style={styles(colors).emptyStateText}>{t('saveAddressesToCheckOut')}</Text>
+            <Text style={themeStyles.emptyStateTitle}>{t('noAddressesYet')}</Text>
+            <Text style={themeStyles.emptyStateText}>{t('saveAddressesToCheckOut')}</Text>
           </View>
         ) : (
           localAddresses.map(address => (
@@ -283,16 +283,16 @@ const SavedAddressesScreen = ({ navigation, route }) => {
 
         {/* Add New Address Button */}
         <TouchableOpacity
-          style={styles(colors).addAddressButton}
+          style={themeStyles.addAddressButton}
           onPress={() => navigation.navigate('LocationAddress', {
             mode: 'add_delivery_address',
             onSave: () => fetchUserProfile()
           })}
         >
-          <View style={styles(colors).addIconContainer}>
+          <View style={themeStyles.addIconContainer}>
             <Ionicons name="add" size={24} color={colors.primary} />
           </View>
-          <Text style={styles(colors).addAddressText}>{t('addNewAddress')}</Text>
+          <Text style={themeStyles.addAddressText}>{t('addNewAddress')}</Text>
         </TouchableOpacity>
       </ScrollView>
 
@@ -302,18 +302,18 @@ const SavedAddressesScreen = ({ navigation, route }) => {
         animationType="fade"
         onRequestClose={hideModal}
       >
-        <View style={styles(colors).modalOverlay}>
-          <View style={styles(colors).modalContent}>
-            <View style={styles(colors).modalIconContainer}>
+        <View style={themeStyles.modalOverlay}>
+          <View style={themeStyles.modalContent}>
+            <View style={themeStyles.modalIconContainer}>
               <Ionicons name="alert-circle" size={48} color={colors.error} />
             </View>
-            <Text style={styles(colors).modalTitle}>{modalConfig.title}</Text>
-            <Text style={styles(colors).modalMessage}>{modalConfig.message}</Text>
+            <Text style={themeStyles.modalTitle}>{modalConfig.title}</Text>
+            <Text style={themeStyles.modalMessage}>{modalConfig.message}</Text>
             <TouchableOpacity
-              style={[styles(colors).modalButton, { backgroundColor: colors.primary }]}
+              style={[themeStyles.modalButton, { backgroundColor: colors.primary }]}
               onPress={hideModal}
             >
-              <Text style={styles(colors).modalButtonText}>{t('ok')}</Text>
+              <Text style={themeStyles.modalButtonText}>{t('ok')}</Text>
             </TouchableOpacity>
           </View>
         </View>
@@ -325,28 +325,28 @@ const SavedAddressesScreen = ({ navigation, route }) => {
         animationType="fade"
         onRequestClose={hideConfirm}
       >
-        <View style={styles(colors).modalOverlay}>
-          <View style={styles(colors).modalContent}>
-            <View style={[styles(colors).modalIconContainer, { backgroundColor: '#FFF5F5' }]}>
+        <View style={themeStyles.modalOverlay}>
+          <View style={themeStyles.modalContent}>
+            <View style={[themeStyles.modalIconContainer, { backgroundColor: '#FFF5F5' }]}>
               <Ionicons name="trash-outline" size={48} color={colors.error} />
             </View>
-            <Text style={styles(colors).modalTitle}>{confirmConfig.title}</Text>
-            <Text style={styles(colors).modalMessage}>{confirmConfig.message}</Text>
+            <Text style={themeStyles.modalTitle}>{confirmConfig.title}</Text>
+            <Text style={themeStyles.modalMessage}>{confirmConfig.message}</Text>
             <View style={{ flexDirection: 'row', gap: 12, marginTop: 8 }}>
               <TouchableOpacity
-                style={[styles(colors).modalButton, { backgroundColor: colors.border, flex: 1 }]}
+                style={[themeStyles.modalButton, { backgroundColor: colors.border, flex: 1 }]}
                 onPress={hideConfirm}
               >
-                <Text style={[styles(colors).modalButtonText, { color: colors.text.primary }]}>{t('cancel')}</Text>
+                <Text style={[themeStyles.modalButtonText, { color: colors.text.primary }]}>{t('cancel')}</Text>
               </TouchableOpacity>
               <TouchableOpacity
-                style={[styles(colors).modalButton, { backgroundColor: colors.error, flex: 1 }]}
+                style={[themeStyles.modalButton, { backgroundColor: colors.error, flex: 1 }]}
                 onPress={() => {
                   hideConfirm();
                   if (confirmConfig.onConfirm) confirmConfig.onConfirm();
                 }}
               >
-                <Text style={styles(colors).modalButtonText}>{t('delete')}</Text>
+                <Text style={themeStyles.modalButtonText}>{t('delete')}</Text>
               </TouchableOpacity>
             </View>
           </View>

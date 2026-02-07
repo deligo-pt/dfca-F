@@ -97,87 +97,159 @@ const CheckoutScreen = ({ route, navigation }) => {
   const insets = useSafeAreaInsets();
   const { cartData } = route.params || {};
 
-  // Checkout response state (created on this screen, not passed from CartDetail)
-  const [checkoutResponse, setCheckoutResponse] = useState(null);
-  const [initializingCheckout, setInitializingCheckout] = useState(false);
-  const [profileIncomplete, setProfileIncomplete] = useState(false);
+  // Context Hooks
+  // Context Hooks
+  const { getVendorCart } = useCart();
 
-  const [selectedPayment, setSelectedPayment] = useState('card');
-  const [isProcessing, setIsProcessing] = useState(false);
-  const [showSuccessModal, setShowSuccessModal] = useState(false);
-  const [notes, setNotes] = useState('');
-  const [stripeReady, setStripeReady] = useState(false);
-  const [stripeError, setStripeError] = useState(null);
-  const [appliedOffer, setAppliedOffer] = useState(null);
-
-  // Get real cart data from CartContext
-  const { getVendorCart, clearVendorCartAndSync } = useCart();
+  // Resolve Cart Data source
+  // cartData from params contains the items we want to checkout
+  // If it has a vendorId, we try to Load the full cart from Context to get coupons/instructions/etc
+  const paramsVendorId = cartData?.vendorId;
+  const cart = paramsVendorId ? getVendorCart(paramsVendorId) : null;
+  const vendorId = paramsVendorId;
+  const appliedOffer = cart?.appliedPromo || null;
   const { products } = useProducts();
-  const vendorId = cartData?.vendorId;
-  const cart = getVendorCart(vendorId);
-
-  // Create checkout on mount (payment integration happens here, not in CartDetail)
-  const { address, detailedAddress, city, postalCode, state, country, currentLocation, selectAddress } = useLocation();
+  const {
+    address,
+    detailedAddress,
+    city,
+    postalCode,
+    state,
+    country,
+    currentLocation,
+    selectAddress,
+  } = useLocation();
   const { user } = useProfile();
+
+  // Local State
+  const [initializingCheckout, setInitializingCheckout] = useState(false);
+  const [stripeError, setStripeError] = useState(null);
+  const [profileIncomplete, setProfileIncomplete] = useState(false);
+  const [notes, setNotes] = useState('');
+  const [checkoutResponse, setCheckoutResponse] = useState(null);
+
+  // Missing States Restoration
+  const [selectedPayment, setSelectedPayment] = useState('card');
+  const [stripeReady, setStripeReady] = useState(false);
+  const [isProcessing, setIsProcessing] = useState(false);
+  const [tip, setTip] = useState(0);
+  const [promoCode, setPromoCode] = useState('');
+  const [isApplyingPromo, setIsApplyingPromo] = useState(false);
+  const [appliedPromo, setAppliedPromo] = useState(null);
+  const [deliveryInstruction, setDeliveryInstruction] = useState('');
+
+  // Success Modal State
+  const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [isSuccess, setIsSuccess] = useState(false);
+
+  // NIF Modal State
+  const [showNifModal, setShowNifModal] = useState(false);
+  const [nifValue, setNifValue] = useState('');
+  const [nifSkipped, setNifSkipped] = useState(false);
+  const [isUpdatingNif, setIsUpdatingNif] = useState(false);
+  const { updateProfile } = useProfile();
+
+  // ... (existing state) ...
+
+  const handleUpdateNif = async () => {
+    if (!nifValue.trim()) {
+      setStripeError(t('pleaseEnterNif') || 'Please enter valid NIF');
+      return;
+    }
+
+    setIsUpdatingNif(true);
+    console.log(`[${new Date().toISOString()}] [CheckoutScreen] handleUpdateNif starting with:`, nifValue);
+    try {
+      // Send both cases to ensure backend compat
+      const success = await updateProfile({
+        NIF: nifValue.trim(),
+        nif: nifValue.trim()
+      });
+      console.log(`[${new Date().toISOString()}] [CheckoutScreen] handleUpdateNif result:`, success);
+      if (success) {
+        console.log('[CheckoutScreen] NIF updated successfully');
+        setShowNifModal(false);
+        setNifSkipped(true);
+      } else {
+        setStripeError('Failed to update NIF. Please try again or Skip.');
+      }
+    } catch (error) {
+      console.error('[CheckoutScreen] NIF update error:', error);
+      setStripeError('Failed to update NIF.');
+    } finally {
+      setIsUpdatingNif(false);
+    }
+  };
+
+  const handleSkipNif = () => {
+    setShowNifModal(false);
+    setNifSkipped(true);
+  };
+
+  // ... (render) ...
+
+
+
+
+  // Build full address string from all components
+  const fullAddressParts = [
+    address,
+    detailedAddress,
+    city,
+    postalCode
+  ].filter(part => part && part.trim()).join(', ');
+
+  const completeStreet = [detailedAddress, address]
+    .filter(part => part && part.trim())
+    .join(', ');
+
+  const addressData = {
+    // Primary address fields - combine address with details in street
+    address: completeStreet || address || '',
+    street: completeStreet || address || '', // Street should include apartment/building
+    detailedAddress: detailedAddress || '',
+    addressLine1: address || '',
+    addressLine2: detailedAddress || '', // Apartment/building as separate line
+    building: detailedAddress || '',
+    apartment: detailedAddress || '',
+    city: city || '',
+    postalCode: postalCode || '',
+    zipCode: postalCode || '',
+    // Combined full address
+    fullAddress: fullAddressParts,
+    formattedAddress: fullAddressParts,
+    // Coordinates
+    coordinates: currentLocation ? {
+      latitude: currentLocation.latitude,
+      longitude: currentLocation.longitude
+    } : null,
+    latitude: currentLocation?.latitude || null,
+    longitude: currentLocation?.longitude || null,
+    // Backend required fields
+    state: state || 'Dhaka Division', // Use map state or default
+    country: country || 'Bangladesh', // Use map country or default
+  };
 
   useEffect(() => {
     let canceled = false;
-
     const createCheckoutOnEnter = async () => {
-      // Prevent re-creating checkout if we already have a valid offer applied
-      // This prevents 'auto-refresh' logic from wiping out the discount
       if (appliedOffer || (checkoutResponse && checkoutResponse.offerDiscount > 0)) {
         console.debug('[CheckoutScreen] Skipping auto-createCheckout because offer is active.');
         return;
       }
 
+      if (user && !user.NIF && !nifSkipped && !showNifModal) {
+        console.debug('[CheckoutScreen] User missing NIF, prompting modal...');
+        setShowNifModal(true);
+        return;
+      }
 
-      // If no address is set, prompt user to add one instead of calling API
       if (!address || !city) {
         console.debug('[CheckoutScreen] No address available, skipping API call');
         setStripeError(t('pleaseSelectAddress') || 'Please select a delivery address');
         setInitializingCheckout(false);
         return;
       }
-
-      // Build full address string from all components
-      const fullAddressParts = [
-        address,
-        detailedAddress,
-        city,
-        postalCode
-      ].filter(part => part && part.trim()).join(', ');
-
-      const completeStreet = [detailedAddress, address]
-        .filter(part => part && part.trim())
-        .join(', ');
-
-      const addressData = {
-        // Primary address fields - combine address with details in street
-        address: completeStreet || address || '',
-        street: completeStreet || address || '', // Street should include apartment/building
-        detailedAddress: detailedAddress || '',
-        addressLine1: address || '',
-        addressLine2: detailedAddress || '', // Apartment/building as separate line
-        building: detailedAddress || '',
-        apartment: detailedAddress || '',
-        city: city || '',
-        postalCode: postalCode || '',
-        zipCode: postalCode || '',
-        // Combined full address
-        fullAddress: fullAddressParts,
-        formattedAddress: fullAddressParts,
-        // Coordinates
-        coordinates: currentLocation ? {
-          latitude: currentLocation.latitude,
-          longitude: currentLocation.longitude
-        } : null,
-        latitude: currentLocation?.latitude || null,
-        longitude: currentLocation?.longitude || null,
-        // Backend required fields
-        state: state || 'Dhaka Division', // Use map state or default
-        country: country || 'Bangladesh', // Use map country or default
-      };
 
       setInitializingCheckout(true);
       setStripeError(null);
@@ -387,7 +459,9 @@ const CheckoutScreen = ({ route, navigation }) => {
         vendorId: vendorId,
         // Optional fields from original req
         estimatedDeliveryTime: "25-35 min",
-        discount: 0 // Placeholder
+        discount: 0, // Placeholder
+        nif: nifValue || currentUser?.NIF || '',
+        NIF: nifValue || currentUser?.NIF || ''
       };
 
       if (isCartPurchase) {
@@ -401,18 +475,18 @@ const CheckoutScreen = ({ route, navigation }) => {
         // Construct items payload explicitly from context cart
         /*
         let calculatedSubtotal = 0;
-
+      
         const itemsPayload = Object.keys(cart.items || {}).map(key => {
           const it = cart.items[key];
           const rawId = it.product?.id || it.product?._id || it.productId || key;
-
+      
           // Calculate item subtotal for payload
           const price = Number(it.product?.price || it.price || 0);
           const qty = Number(it.quantity || 1);
           const addonsCost = (it.addons || []).reduce((s, a) => s + Number(a.price || 0), 0);
           const itemTotal = (price + addonsCost) * qty;
           calculatedSubtotal += itemTotal;
-
+      
           return {
             productId: (rawId && rawId.includes('|')) ? rawId.split('|')[0] : rawId,
             product: (rawId && rawId.includes('|')) ? rawId.split('|')[0] : rawId, // Backend might expect 'product'
@@ -430,7 +504,7 @@ const CheckoutScreen = ({ route, navigation }) => {
         checkoutPayload.cartItems = itemsPayload; // Backend alias?
         checkoutPayload.products = itemsPayload;  // Backend alias?
         checkoutPayload.orderItems = itemsPayload;// Backend alias?
-
+      
         // SHOTGUN STRATEGY: Send all possible naming conventions to satisfy backend validation
         checkoutPayload.subtotal = calculatedSubtotal;
         checkoutPayload.subTotal = calculatedSubtotal;
@@ -510,30 +584,58 @@ const CheckoutScreen = ({ route, navigation }) => {
         // Do NOT overwrite deliveryAddress with the ID string, keep it as object
       }
 
-      try {
-        console.debug('[CheckoutScreen] Creating checkout via API with payload type:', isCartPurchase ? 'CART' : 'DIRECT');
-        // Log the exact payload to help debug if it fails again
-        if (!backendAddressId) {
-          console.warn('[CheckoutScreen] Sending NEW Address payload:', JSON.stringify(checkoutPayload.deliveryAddress));
-        }
+      let attempts = 0;
+      let maxAttempts = 3;
+      let success = false;
+      let delay = 1000;
 
-        const res = await CheckoutAPI.createCheckout(checkoutPayload);
+      while (attempts < maxAttempts && !success && !canceled) {
+        attempts++;
+        try {
+          console.debug(`[CheckoutScreen] Creating checkout (Attempt ${attempts}/${maxAttempts})...`);
 
-        if (res.success || (res.data && res.data.success)) {
-          const checkoutData = res.data?.data || res.data || res;
-          console.debug('[CheckoutScreen] Checkout created successfully, ID:', extractCheckoutSummaryId(checkoutData));
-          setCheckoutResponse(checkoutData);
-        } else {
-          console.warn('[CheckoutScreen] Checkout creation failed:', res.error);
-          setStripeError(res.error || 'Failed to initialize checkout');
+          if (!backendAddressId) {
+            console.warn('[CheckoutScreen] Sending NEW Address payload:', JSON.stringify(checkoutPayload.deliveryAddress));
+          }
+
+          const res = await CheckoutAPI.createCheckout(checkoutPayload);
+
+          if (res.success || (res.data && res.data.success)) {
+            const checkoutData = res.data?.data || res.data || res;
+            console.debug('[CheckoutScreen] Checkout created successfully, ID:', extractCheckoutSummaryId(checkoutData));
+            setCheckoutResponse(checkoutData);
+            success = true;
+          } else {
+            // Handle logical errors (non-throwing)
+            console.warn('[CheckoutScreen] Checkout creation failed:', res.error);
+            // If the API returns 429 in the body/error, we might need to handle it here too, 
+            // but usually axios throws for 4xx/5xx.
+            // Assuming res.error is a string message.
+            setStripeError(res.error || 'Failed to initialize checkout');
+            break; // Don't retry logical errors (e.g. invalid data)
+          }
+        } catch (err) {
+          // Check for 429 Rate Limit
+          if (err.response && (err.response.status === 429 || err.status === 429)) {
+            console.warn(`[CheckoutScreen] 429 Too Many Requests. Retrying in ${delay}ms...`);
+            if (attempts < maxAttempts) {
+              await new Promise(resolve => setTimeout(resolve, delay));
+              delay *= 2; // Exponential backoff
+              continue; // Retry
+            } else {
+              setStripeError(t('serverBusy') || 'Server is busy. Please try again later.');
+            }
+          } else {
+            // Other errors
+            console.error('[CheckoutScreen] createCheckout error:', err);
+            setStripeError('An error occurred while initializing checkout. Please try again.');
+          }
+          break; // Break loop for non-retriable errors
         }
-      } catch (err) {
-        console.error('[CheckoutScreen] createCheckout error:', err);
-        setStripeError('An error occurred while initializing checkout. Please try again.');
-      } finally {
-        if (!canceled) {
-          setInitializingCheckout(false);
-        }
+      }
+
+      if (!canceled) {
+        setInitializingCheckout(false);
       }
     };
 
@@ -542,7 +644,7 @@ const CheckoutScreen = ({ route, navigation }) => {
     return () => {
       canceled = true;
     };
-  }, [address, detailedAddress, city, postalCode, appliedOffer]); // Re-run if address or offer changes
+  }, [address, detailedAddress, city, postalCode, appliedOffer, nifSkipped]);
 
   // Calculate real cart values with ProductsContext enrichment
   const cartItems = cart?.items ? Object.keys(cart.items).map(id => {
@@ -798,14 +900,6 @@ const CheckoutScreen = ({ route, navigation }) => {
         return;
       }
 
-      const declaredFinalAmount = checkoutResponse?.data?.subTotal || checkoutResponse?.subTotal;
-      if (declaredFinalAmount && Math.abs(declaredFinalAmount - total) > 0.01) {
-        console.debug('[CheckoutScreen] finalAmount mismatch', {
-          declaredFinalAmount,
-          uiComputedTotal: total
-        });
-      }
-
       console.debug('[CheckoutScreen] Initializing Stripe with checkoutSummaryId:', checkoutSummaryId);
 
       const res = await setupPaymentSheet(checkoutSummaryId);
@@ -884,17 +978,20 @@ const CheckoutScreen = ({ route, navigation }) => {
 
     console.debug('[CheckoutScreen] Order created successfully:', orderRes.data);
 
-    // Step 3: Clear Cart & Show Success
-    // Since we forced useCart=false, we must manually clear the cart now.
+    // Step 3: Stop Spinner & Show Success
+    console.debug('[CheckoutScreen] Order success flow: Stop spinner');
+    setIsProcessing(false);
+    setShowSuccessModal(true);
+
+    // Step 4: Clear Cart in Background
     if (vendorId) {
+      // Don't await this, let it run in background to keep UI snappy
       clearVendorCartAndSync(vendorId).catch(err => {
         console.warn('[CheckoutScreen] Failed to clear cart after order:', err);
       });
     }
 
-    setIsProcessing(false);
-    setShowSuccessModal(true);
-
+    // Step 5: Navigate away
     setTimeout(() => {
       setShowSuccessModal(false);
       navigation.reset({
@@ -1123,7 +1220,7 @@ const CheckoutScreen = ({ route, navigation }) => {
 
                     if (res.success) {
                       console.debug('[CheckoutScreen] Offer validation FULL response:', JSON.stringify(res, null, 2));
-                      setAppliedOffer(selectedOffer);
+                      setAppliedPromo(selectedOffer);
                       // Refresh checkout data if returned
                       if (res.data && res.data.data) {
                         setCheckoutResponse(res.data.data);
@@ -1132,11 +1229,12 @@ const CheckoutScreen = ({ route, navigation }) => {
                     } else {
                       console.warn('[CheckoutScreen] Offer validation failed:', res.error);
                       setStripeError(res.error || 'Failed to apply voucher');
-                      setAppliedOffer(null);
+                      setAppliedPromo(null);
                     }
                   } catch (err) {
                     console.error('[CheckoutScreen] Offer validation error:', err);
-                    setStripeError('Failed to validate voucher');
+                    setStripeError(t('failedToValidateVoucher') || 'Failed to validate voucher');
+                    setAppliedPromo(null);
                   } finally {
                     setIsProcessing(false);
                   }
@@ -1246,7 +1344,7 @@ const CheckoutScreen = ({ route, navigation }) => {
           />
         </View>
 
-        {/* Payment Summary */}
+        {/* Payment Summary - Granular Breakdown */}
         <View style={styles(colors).summarySection}>
           <View style={styles(colors).sectionHeader}>
             <View style={styles(colors).sectionTitleRow}>
@@ -1260,32 +1358,85 @@ const CheckoutScreen = ({ route, navigation }) => {
           </View>
 
           <View style={styles(colors).summaryRows}>
+            {/* 1. Items Price (Original) */}
             <View style={styles(colors).summaryRow}>
-              <Text style={styles(colors).summaryLabel}>{t('subtotal')}</Text>
+              <Text style={styles(colors).summaryLabel}>{t('itemsPrice') || 'Items Price'}</Text>
               <Text style={styles(colors).summaryValue}>
-                {formatCurrency(currency, displaySubtotal)}
+                {formatCurrency(currency, cart?.totals?.itemsOriginalTotal || 0)}
               </Text>
             </View>
 
-            <View style={styles(colors).summaryRow}>
-              <Text style={styles(colors).summaryLabel}>{t('deliveryFee')}</Text>
-              <Text style={styles(colors).summaryValue}>
-                {formatCurrency(currency, finalDeliveryFee)}
-              </Text>
-            </View>
-
-            {/* Tax Row - Added for transparency */}
-            {serverData?.taxAmount > 0 && (
+            {/* 2. Discount (Product Level) */}
+            {(cart?.totals?.discount > 0) && (
               <View style={styles(colors).summaryRow}>
-                <Text style={styles(colors).summaryLabel}>{t('tax') || 'VAT / Tax'}</Text>
-                <Text style={styles(colors).summaryValue}>
-                  {formatCurrency(currency, serverData.taxAmount)}
+                <Text style={styles(colors).summaryLabel}>{t('discount')}</Text>
+                <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 13, color: '#4CAF50' }}>
+                  -{formatCurrency(currency, cart?.totals?.discount)}
                 </Text>
               </View>
             )}
 
-            {/* Discount Row - Enhanced UI */}
-            {discount > 0 && (
+            {/* 3. Add-ons Price */}
+            {(cart?.totals?.addonsTotal > 0) && (
+              <View style={styles(colors).summaryRow}>
+                <Text style={styles(colors).summaryLabel}>{t('addons') || 'Add-ons'}</Text>
+                <Text style={styles(colors).summaryValue}>
+                  {formatCurrency(currency, cart?.totals?.addonsTotal)}
+                </Text>
+              </View>
+            )}
+
+            {/* Divider */}
+            <View style={styles(colors).divider} />
+
+            {/* 4. Subtotal (Net/Excl Tax) */}
+            <View style={styles(colors).summaryRow}>
+              <Text style={styles(colors).summaryLabel}>{t('subtotalExclTax') || 'Subtotal (Excl. Tax)'}</Text>
+              <Text style={styles(colors).summaryValue}>
+                {formatCurrency(currency, cart?.totals?.totalPrice || checkoutResponse?.totalPrice || 0)}
+              </Text>
+            </View>
+
+            {/* 5. Tax (Items) */}
+            {(cart?.totals?.itemsTax > 0 || (cart?.totals?.taxAmount > 0 && !cart?.totals?.itemsTax)) && (
+              <View style={styles(colors).summaryRow}>
+                <Text style={styles(colors).summaryLabel}>{t('taxItems') || 'Tax (Items)'}</Text>
+                <Text style={styles(colors).summaryValue}>
+                  {formatCurrency(currency, cart?.totals?.itemsTax || cart?.totals?.taxAmount || 0)}
+                </Text>
+              </View>
+            )}
+
+            {/* 6. Tax (Add-ons) */}
+            {(cart?.totals?.addonsTax > 0) && (
+              <View style={styles(colors).summaryRow}>
+                <Text style={styles(colors).summaryLabel}>{t('taxAddons') || 'Tax (Add-ons)'}</Text>
+                <Text style={styles(colors).summaryValue}>
+                  {formatCurrency(currency, cart?.totals?.addonsTax)}
+                </Text>
+              </View>
+            )}
+
+            {/* 6.5. Tax (Delivery) - Explicit from Backend */}
+            {(cart?.totals?.deliveryTax > 0 || checkoutResponse?.deliveryVatAmount > 0) && (
+              <View style={styles(colors).summaryRow}>
+                <Text style={styles(colors).summaryLabel}>{t('taxDelivery') || 'Tax (Delivery)'}</Text>
+                <Text style={styles(colors).summaryValue}>
+                  {formatCurrency(currency, cart?.totals?.deliveryTax || checkoutResponse?.deliveryVatAmount)}
+                </Text>
+              </View>
+            )}
+
+            {/* 7. Delivery Fee */}
+            <View style={styles(colors).summaryRow}>
+              <Text style={styles(colors).summaryLabel}>{t('deliveryFee')}</Text>
+              <Text style={styles(colors).summaryValue}>
+                {formatCurrency(currency, cart?.totals?.deliveryFee || checkoutResponse?.deliveryCharge || 0)}
+              </Text>
+            </View>
+
+            {/* 8. Voucher / Coupon Discount */}
+            {(checkoutResponse?.offerDiscount > 0 || (appliedPromo && appliedPromo.discount > 0)) && (
               <View style={[styles(colors).summaryRow, {
                 marginTop: 8,
                 backgroundColor: '#ECFDF5',
@@ -1296,21 +1447,22 @@ const CheckoutScreen = ({ route, navigation }) => {
                 alignItems: 'center'
               }]}>
                 <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <MaterialCommunityIcons name="tag" size={16} color="#059669" style={{ marginRight: 6 }} />
-                  <Text style={{ fontFamily: 'Poppins-Medium', fontSize: 13, color: '#059669' }}>{t('discount')}</Text>
+                  <MaterialCommunityIcons name="ticket-percent" size={16} color="#059669" style={{ marginRight: 6 }} />
+                  <Text style={{ fontFamily: 'Poppins-Medium', fontSize: 13, color: '#059669' }}>{t('voucher') || 'Voucher'}</Text>
                 </View>
                 <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 13, color: '#059669' }}>
-                  -{formatCurrency(currency, discount)}
+                  -{formatCurrency(currency, checkoutResponse?.offerDiscount || appliedPromo?.discount || 0)}
                 </Text>
               </View>
             )}
 
             <View style={styles(colors).divider} />
 
+            {/* 9. Total */}
             <View style={styles(colors).summaryRow}>
               <Text style={styles(colors).totalLabel}>{t('total')}</Text>
               <Text style={styles(colors).totalValue}>
-                {formatCurrency(currency, displayTotal || total)}
+                {formatCurrency(currency, checkoutResponse?.subtotal || cart?.totals?.grandTotal || 0)}
               </Text>
             </View>
           </View>
@@ -1435,6 +1587,147 @@ const CheckoutScreen = ({ route, navigation }) => {
 
       {renderProcessingModal()}
       {renderSuccessModal()}
+
+      {/* NIF Modal */}
+      <Modal
+        visible={showNifModal}
+        transparent={true}
+        animationType="slide"
+        onRequestClose={handleSkipNif}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
+          <View style={{
+            backgroundColor: isDarkMode ? '#1E1E1E' : '#FFFFFF',
+            borderTopLeftRadius: 28,
+            borderTopRightRadius: 28,
+            padding: 32,
+            paddingBottom: 40,
+            shadowColor: "#000",
+            shadowOffset: { width: 0, height: -4 },
+            shadowOpacity: 0.1,
+            shadowRadius: 8,
+            elevation: 10,
+          }}>
+            {/* Header Icon */}
+            <View style={{ alignItems: 'center', marginBottom: 20 }}>
+              <View style={{
+                width: 60,
+                height: 60,
+                borderRadius: 30,
+                backgroundColor: isDarkMode ? '#333' : '#F0F9FF',
+                justifyContent: 'center',
+                alignItems: 'center',
+                marginBottom: 16
+              }}>
+                <Ionicons name="card-outline" size={32} color={colors.primary} />
+              </View>
+              <Text style={{
+                fontSize: 22,
+                fontFamily: 'Poppins-Bold',
+                color: colors.text.primary,
+                textAlign: 'center',
+                marginBottom: 8
+              }}>
+                Add Tax ID (NIF)
+              </Text>
+              <Text style={{
+                fontSize: 15,
+                fontFamily: 'Poppins-Regular',
+                color: colors.text.secondary,
+                textAlign: 'center',
+                lineHeight: 22,
+                paddingHorizontal: 10
+              }}>
+                For invoice purposes, please add your Tax ID (NIF) or skip this step.
+              </Text>
+            </View>
+
+            {/* Input Field */}
+            <View style={{ marginBottom: 24 }}>
+              <Text style={{
+                fontSize: 13,
+                fontFamily: 'Poppins-Medium',
+                color: colors.text.secondary,
+                marginBottom: 8,
+                marginLeft: 4
+              }}>
+                NIF / Fiscal Number
+              </Text>
+              <TextInput
+                style={{
+                  backgroundColor: isDarkMode ? '#2C2C2C' : '#F8F9FA',
+                  borderRadius: 16,
+                  padding: 18,
+                  fontSize: 16,
+                  fontFamily: 'Poppins-Regular',
+                  color: colors.text.primary,
+                  borderWidth: 1.5,
+                  borderColor: nifValue ? colors.primary : (isDarkMode ? '#444' : '#E0E0E0')
+                }}
+                placeholder="123 456 789"
+                placeholderTextColor={colors.text.disabled}
+                value={nifValue}
+                onChangeText={setNifValue}
+                keyboardType="numeric"
+                maxLength={9}
+                autoFocus={true}
+              />
+            </View>
+
+            {/* Action Buttons */}
+            <View style={{ gap: 12 }}>
+              <TouchableOpacity
+                onPress={handleUpdateNif}
+                disabled={isUpdatingNif}
+                style={{
+                  backgroundColor: colors.primary,
+                  paddingVertical: 18,
+                  borderRadius: 16,
+                  alignItems: 'center',
+                  shadowColor: colors.primary,
+                  shadowOffset: { width: 0, height: 4 },
+                  shadowOpacity: 0.2,
+                  shadowRadius: 8,
+                  elevation: 4,
+                  flexDirection: 'row',
+                  justifyContent: 'center'
+                }}
+              >
+                {isUpdatingNif ? (
+                  <ActivityIndicator color="#FFF" style={{ marginRight: 8 }} />
+                ) : null}
+                <Text style={{
+                  fontFamily: 'Poppins-SemiBold',
+                  fontSize: 16,
+                  color: '#FFF'
+                }}>
+                  Save & Continue
+                </Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                onPress={handleSkipNif}
+                disabled={isUpdatingNif}
+                style={{
+                  paddingVertical: 16,
+                  borderRadius: 16,
+                  alignItems: 'center',
+                  backgroundColor: 'transparent'
+                }}
+              >
+                <Text style={{
+                  fontFamily: 'Poppins-Medium',
+                  fontSize: 15,
+                  color: colors.text.secondary
+                }}>
+                  Skip for now
+                </Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </View>
+      </Modal>
+
     </SafeAreaView >
   );
 };

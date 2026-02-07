@@ -182,8 +182,25 @@ const LiveChatScreen = () => {
         // Socket Listeners (Using global socket)
         if (socket) {
             const handleNewMessage = (data) => {
-                const message = data.message || data;
-                console.log('[LiveChat] New Message Received:', message);
+                console.log('[LiveChat] Raw new-message data:', JSON.stringify(data, null, 2));
+
+                // Properly normalize the message object
+                // data could be: { message: "text" }, { message: { text: "..." } }, or the full message object itself
+                let message;
+                if (typeof data === 'string') {
+                    message = { message: data, text: data };
+                } else if (typeof data.message === 'string') {
+                    // data.message is the text content directly
+                    message = { ...data, text: data.message };
+                } else if (data.message && typeof data.message === 'object') {
+                    // data.message is the full message object
+                    message = data.message;
+                } else {
+                    // data itself is the message object
+                    message = data;
+                }
+
+                console.log('[LiveChat] Normalized message:', JSON.stringify(message, null, 2));
                 setMessages((prev) => {
                     if (message._id && prev.some(m => m._id === message._id)) return prev;
                     return [...prev, message];

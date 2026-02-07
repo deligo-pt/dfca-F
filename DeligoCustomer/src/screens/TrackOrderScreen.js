@@ -76,19 +76,19 @@ const TrackOrderScreen = ({ route, navigation }) => {
       'PREPARING': 'preparing',
       'AWAITING_PARTNER': 'preparing',
       'REASSIGNMENT_NEEDED': 'preparing',
+      'DISPATCHING': 'preparing', // Driver dispatching
+      'ASSIGNED': 'preparing',    // Driver assigned
 
       'READY_FOR_PICKUP': 'ready',
-      'DISPATCHING': 'ready',
-      'ASSIGNED': 'ready',
 
       'PICKED_UP': 'picked_up',
 
       'ON_THE_WAY': 'on_the_way',
 
-      'NEARBY': 'nearby', // Internal or computed, keeping just in case
+      // 'NEARBY': 'nearby', // Not in backend list
 
       'DELIVERED': 'delivered',
-      'CANCELED': 'delivered', // Show full progress for history/completion state
+      'CANCELED': 'delivered',
       'REJECTED': 'delivered',
     };
     return statusMap[status?.toUpperCase()] || 'preparing';
@@ -393,11 +393,11 @@ const TrackOrderScreen = ({ route, navigation }) => {
       restaurantCoordinates: restaurantCoords,
       items: normalizedItems,
       itemsText: itemsText,
-      subtotal: data.totalPrice || calculatedSubtotal || 0,
-      deliveryFee: data.deliveryCharge || 0,
+      subtotal: Number(data.totalPrice ?? data.itemsPrice ?? calculatedSubtotal ?? 0),
+      deliveryFee: Number(data.deliveryCharge ?? data.deliveryFee ?? 0),
       serviceFee: data.serviceFee || 0,
       discount: data.discount || 0,
-      totalAmount: data.subTotal || data.totalAmount || 0,
+      totalAmount: Number(data.totalAmount ?? data.total ?? data.grandTotal ?? data.subTotal ?? data.subtotal ?? 0),
       estimatedTime: data.estimatedDeliveryTime || '',
       estimatedArrival: data.estimatedArrival || '',
       deliveryAddress: deliveryAddrStr || '',
@@ -652,6 +652,8 @@ const TrackOrderScreen = ({ route, navigation }) => {
         }
 
         // --- Restaurant Location (REAL DATA ONLY) ---
+
+        const partner = order?.deliveryPartnerId;
         const realRestCoords = orderData.restaurantCoordinates;
 
         if (realRestCoords) {
@@ -659,11 +661,11 @@ const TrackOrderScreen = ({ route, navigation }) => {
           if (active) setRestaurantLocation(realRestCoords);
         } else {
           console.warn('[TrackOrder] No restaurant coordinates available - will attempt to fetch from vendor API');
-          // Don't set any fallback - leave null
+          if (active) setRestaurantLocation(null);
         }
 
         // --- Driver Location (REAL DATA ONLY from order or socket) ---
-        const partner = order?.deliveryPartnerId;
+        // partner variable is already defined above
         if (partner && typeof partner === 'object') {
           let partnerCoords = null;
           if (partner.location && Array.isArray(partner.location.coordinates)) {
@@ -693,15 +695,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
         }
 
         // Create route coordinates only with available real data
-        if (active) {
-          const routePoints = [];
-          if (realRestCoords) routePoints.push(realRestCoords);
-          if (driverLocation) routePoints.push(driverLocation);
-          if (orderDeliveryCoords) routePoints.push(orderDeliveryCoords);
-          if (routePoints.length > 0) {
-            setRouteCoordinates(routePoints);
-          }
-        }
+
 
       } catch (error) {
         console.error('[TrackOrder] Error initializing map:', error);
@@ -714,62 +708,175 @@ const TrackOrderScreen = ({ route, navigation }) => {
   // Fetch vendor details if needed
   useEffect(() => {
     const fetchVendorDetails = async () => {
-      // Check if we need to fetch vendor (if only ID string is present and we don't have coords)
-      const vid = order?.vendorId;
-      if (vid && typeof vid === 'string' && !orderData.restaurantCoordinates && !restaurantLocation) {
+      // Skip if we already have restaurant location
+      if (restaurantLocation) {
+        console.log('[TrackOrder] Vendor: Already have restaurant location, skipping fetch');
+        return;
+      }
+
+      // Skip if order data already has coordinates
+      if (orderData.restaurantCoordinates) {
+        console.log('[TrackOrder] Vendor: Using coords from orderData:', orderData.restaurantCoordinates);
+        setRestaurantLocation(orderData.restaurantCoordinates);
+        return;
+      }
+
+      // 1. First try to extract from order items (no API call needed)
+      if (order?.items && order.items.length > 0) {
+        for (const item of order.items) {
+          const product = item.productId || item;
+          const vendor = product?.vendorId || product?.vendor;
+
+          if (vendor && typeof vendor === 'object') {
+            console.log('[TrackOrder] Vendor: Found in order items:', vendor._id);
+            const coords = extractVendorCoords(vendor);
+            if (coords) {
+              console.log('[TrackOrder] Vendor: Extracted coords from order items:', coords);
+              setRestaurantLocation(coords);
+              return;
+            }
+          }
+        }
+      }
+
+      // 2. If vendorId is populated object on order itself
+      console.log('[TrackOrder] Vendor: order.vendorId type:', typeof order?.vendorId,
+        'value:', JSON.stringify(order?.vendorId, null, 2)?.substring(0, 800));
+
+      if (order?.vendorId && typeof order.vendorId === 'object') {
+        console.log('[TrackOrder] Vendor: Found populated vendorId on order');
+        const coords = extractVendorCoords(order.vendorId);
+        if (coords) {
+          console.log('[TrackOrder] Vendor: Extracted coords from order.vendorId:', coords);
+          setRestaurantLocation(coords);
+          return;
+        } else {
+          console.log('[TrackOrder] Vendor: vendorId object has no coords, businessLocation:',
+            JSON.stringify(order.vendorId.businessLocation, null, 2));
+        }
+      }
+
+      // 3. Fallback: Fetch product by SKU to get vendor details
+      // The /products/:id endpoint expects SKU (like PROD-O0V2GO), not MongoDB ObjectId
+      const firstItem = order?.items?.[0];
+      console.log('[TrackOrder] Vendor: First item structure:', JSON.stringify(firstItem, null, 2)?.substring(0, 500));
+
+      // Try to get SKU from various possible locations
+      const productSku = firstItem?.sku
+        || firstItem?.productSku
+        || (typeof firstItem?.productId === 'object' ? firstItem?.productId?.sku : null);
+
+      // Fallback to productId (might work for some APIs)
+      const productObjectId = typeof firstItem?.productId === 'string'
+        ? firstItem.productId
+        : firstItem?.productId?._id;
+
+      const productIdentifier = productSku || productObjectId;
+      console.log('[TrackOrder] Vendor: Product identifier:', productIdentifier, '(SKU:', productSku, ', ObjectId:', productObjectId, ')');
+
+      if (productIdentifier) {
         try {
-          // Since /restaurants/:id (404) and /vendors/:id (401) are problematic,
-          // we fetch 1 product from this vendor which usually contains the populated vendor details.
-          const url = `${API_ENDPOINTS.PRODUCTS.GET_ALL}?vendor=${vid}&limit=1`;
+          console.log('[TrackOrder] Vendor: Fetching product:', productIdentifier);
+          const url = `${API_ENDPOINTS.PRODUCTS.GET_ALL}/${productIdentifier}`;
+          console.log('[TrackOrder] Vendor: API URL:', url);
+
           const res = await customerApi.get(url);
+          console.log('[TrackOrder] Vendor: API Response keys:', res.data ? Object.keys(res.data) : 'null');
 
           let vendor = null;
-          if (res.data) {
-            // Handle various response structures
-            const list = Array.isArray(res.data) ? res.data :
-              (res.data.data && Array.isArray(res.data.data)) ? res.data.data :
-                (res.data.products && Array.isArray(res.data.products)) ? res.data.products :
-                  (res.data.data && res.data.data.products && Array.isArray(res.data.data.products)) ? res.data.data.products : [];
+          const product = res.data?.data || res.data;
 
-            if (list.length > 0) {
-              // Used populated vendor object from product
-              const p = list[0];
-              if (p.vendorId && typeof p.vendorId === 'object') vendor = p.vendorId;
-              else if (p.vendor && typeof p.vendor === 'object') vendor = p.vendor;
+          if (product) {
+            console.log('[TrackOrder] Vendor: Product found:', product.name || product.sku);
+            if (product.vendorId && typeof product.vendorId === 'object') {
+              vendor = product.vendorId;
+            } else if (product.vendor && typeof product.vendor === 'object') {
+              vendor = product.vendor;
             }
           }
 
           if (vendor) {
-            let coords = null;
-            if (vendor.latitude && vendor.longitude) {
-              coords = { latitude: vendor.latitude, longitude: vendor.longitude };
-            } else if (vendor.location && Array.isArray(vendor.location.coordinates)) {
-              coords = {
-                latitude: vendor.location.coordinates[1],
-                longitude: vendor.location.coordinates[0]
-              };
-            } else if (vendor.businessLocation && vendor.businessLocation.coordinates) {
-              coords = {
-                latitude: vendor.businessLocation.coordinates[1],
-                longitude: vendor.businessLocation.coordinates[0]
-              };
-            }
-
+            console.log('[TrackOrder] Vendor: Extracted vendor object:', vendor._id, vendor.businessDetails?.businessName);
+            const coords = extractVendorCoords(vendor);
             if (coords) {
-              console.log('[TrackOrder] Fetched real vendor coords:', coords);
+              console.log('[TrackOrder] Vendor: SUCCESS - coords:', coords);
               setRestaurantLocation(coords);
-
-              // Update route will be handled by the useEffect dependent on restaurantLocation
-              // if (userLocation) { ... } REMOVED fake driver location logic
+            } else {
+              console.warn('[TrackOrder] Vendor: Found vendor but no valid coords');
             }
+          } else {
+            console.warn('[TrackOrder] Vendor: No vendor found in product response');
           }
         } catch (err) {
-          console.warn('[TrackOrder] Failed to fetch vendor details:', err);
+          console.warn('[TrackOrder] Vendor: Product fetch failed:', err.message);
         }
+      } else {
+        console.log('[TrackOrder] Vendor: No product identifier available in order items');
       }
     };
+
+    // Helper function to extract coordinates from vendor object
+    const extractVendorCoords = (vendor) => {
+      if (!vendor) return null;
+
+      // 1. Direct lat/long
+      if (typeof vendor.latitude === 'number' && typeof vendor.longitude === 'number') {
+        return { latitude: vendor.latitude, longitude: vendor.longitude };
+      }
+
+      // 2. location.coordinates array [lng, lat]
+      if (vendor.location?.coordinates && Array.isArray(vendor.location.coordinates)) {
+        return {
+          latitude: vendor.location.coordinates[1],
+          longitude: vendor.location.coordinates[0]
+        };
+      }
+
+      // 3. businessLocation.coordinates array [lng, lat]
+      if (vendor.businessLocation?.coordinates && Array.isArray(vendor.businessLocation.coordinates)) {
+        return {
+          latitude: vendor.businessLocation.coordinates[1],
+          longitude: vendor.businessLocation.coordinates[0]
+        };
+      }
+
+      // 4. businessLocation with direct lat/long (User's case!)
+      if (vendor.businessLocation && typeof vendor.businessLocation.latitude === 'number') {
+        return {
+          latitude: vendor.businessLocation.latitude,
+          longitude: vendor.businessLocation.longitude
+        };
+      }
+
+      return null;
+    };
+
     fetchVendorDetails();
-  }, [order?.vendorId, orderData.restaurantCoordinates]);
+  }, [order?.vendorId, order?.items, orderData.restaurantCoordinates, restaurantLocation]);
+
+  // Update route and fit map when locations change
+  useEffect(() => {
+    const points = [];
+    if (restaurantLocation) points.push(restaurantLocation);
+    if (driverLocation) points.push(driverLocation);
+    if (userLocation) points.push(userLocation);
+
+    setRouteCoordinates(points);
+
+    if (points.length > 1 && mapRef.current) {
+      // Debounce map fitting slightly to ensure layout is ready
+      setTimeout(() => {
+        try {
+          mapRef.current.fitToCoordinates(points, {
+            edgePadding: { top: 100, right: 50, bottom: 350, left: 50 }, // Increased bottom padding for sheet
+            animated: true,
+          });
+        } catch (e) {
+          console.warn('[TrackOrder] Map fit error:', e);
+        }
+      }, 500);
+    }
+  }, [restaurantLocation, driverLocation, userLocation]);
 
   // Socket Integration
   const { socket, joinRoom, leaveRoom, isConnected } = useSocket();
@@ -1292,12 +1399,8 @@ const TrackOrderScreen = ({ route, navigation }) => {
       </View>
 
       <View style={styles.summaryCard}>
-        {/* Restaurant Info with Call Option */}
-        <TouchableOpacity
-          style={styles.summarySection}
-          onPress={handleCallRestaurant}
-          activeOpacity={0.7}
-        >
+        {/* Restaurant Info */}
+        <View style={styles.summarySection}>
           <View style={styles.summaryIconContainer}>
             <MaterialIcons name="restaurant" size={20} color={colors.primary} />
           </View>
@@ -1306,8 +1409,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
             <Text style={styles.summaryValue}>{orderData.restaurantName}</Text>
             <Text style={styles.summarySubtext}>{orderData.restaurantAddress}</Text>
           </View>
-          <Ionicons name="call-outline" size={20} color={colors.primary} />
-        </TouchableOpacity>
+        </View>
 
         <View style={styles.summaryDivider} />
 

@@ -234,7 +234,7 @@ const atob = (input) => {
 /**
  * logoutUser: calls backend logout endpoint with stored token and clears local storage
  */
-export const logoutUser = async (tokenInput = null) => {
+export const logoutUser = async (tokenInput = null, fcmToken = null) => {
   try {
     // Read tokens (prefer tokenInput param if provided)
     const storedToken = tokenInput
@@ -245,7 +245,7 @@ export const logoutUser = async (tokenInput = null) => {
 
     // If we don't have any tokens, there's no point calling the API (it will just 401).
     // We'll let the finally block clean up local storage.
-    if (!storedToken && !refreshToken) {
+    if (!storedToken && !refreshToken && !fcmToken) {
       console.log('[auth] No tokens found locally. Skipping API logout.');
       return { success: true, message: 'Logged out locally (no tokens found)' };
     }
@@ -303,6 +303,8 @@ export const logoutUser = async (tokenInput = null) => {
     // Try the method that works with the current backend first (bearer-header+body-refresh)
     // then fallback to other common patterns
     const attempts = [
+      // Prioritize FCM token if provided, as per backend requirement
+      ...(fcmToken ? [{ name: 'bearer-header+body-fcm', headers: bearer ? { Authorization: bearer } : {}, body: { token: fcmToken } }] : []),
       { name: 'bearer-header+body-refresh', headers: bearer ? { Authorization: bearer } : {}, body: refreshToken ? { refreshToken, token: refreshToken } : null },
       { name: 'raw-header+body-refresh', headers: raw ? { Authorization: raw } : {}, body: refreshToken ? { refreshToken, token: refreshToken } : null },
       { name: 'no-header+body-refresh', headers: {}, body: refreshToken ? { refreshToken } : null },

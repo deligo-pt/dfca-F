@@ -1,5 +1,5 @@
 import React, { useEffect, useState, useRef, useCallback } from 'react';
-import { View, StyleSheet, Animated, Text, TouchableOpacity, RefreshControl, StatusBar, Platform } from 'react-native';
+import { View, StyleSheet, Animated, Text, TouchableOpacity, RefreshControl, StatusBar, Platform, ScrollView } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { useFocusEffect } from '@react-navigation/native';
 import { spacing } from '../theme';
@@ -57,6 +57,7 @@ const CategoriesScreen = ({ navigation }) => {
 
     const [selectedVendorType, setSelectedVendorType] = useState(null);
     const [selectedCuisine, setSelectedCuisine] = useState(null);
+    const [selectedCuisineId, setSelectedCuisineId] = useState(null); // Category ID for filtering
     const [searchQuery] = useState('');
     const scrollY = useRef(new Animated.Value(0)).current;
 
@@ -617,8 +618,8 @@ const CategoriesScreen = ({ navigation }) => {
     const filteredVendors = React.useMemo(() => {
         const arr = Array.isArray(sourceProducts) ? sourceProducts : [];
 
-        // If user hasn't chosen business + product category yet, keep existing behaviour
-        if (!selectedBusinessCategoryId && !selectedCuisine) {
+        // If user hasn't chosen any filter yet, keep existing behaviour
+        if (!selectedVendorType && !selectedCuisine) {
             return displayedByVendor;
         }
 
@@ -631,28 +632,44 @@ const CategoriesScreen = ({ navigation }) => {
             const vt = vtRaw ? String(vtRaw).toLowerCase().trim() : '';
             if (businessSlug && (!vt || !vt.includes(businessSlug))) continue;
 
-            if (cuisineSlug) {
-                const pCats = Array.isArray(p.categories) ? p.categories : (p.category ? [p.category] : []);
-                const rawTags = Array.isArray(p._raw?.tags) ? p._raw.tags : [];
-                const allCats = [...new Set([...pCats, ...rawTags])];
+            // Category/Cuisine filter
+            if (selectedCuisineId || cuisineSlug) {
+                // Get raw category ID from product (API returns category as ID string)
+                const rawCategoryId = p._raw?.category || p.category;
 
-                const matchesCuisine = allCats.some(c => {
-                    if (!c) return false;
-                    if (typeof c === 'string') {
-                        const s = c.toLowerCase().trim();
-                        return s === cuisineSlug || s.includes(cuisineSlug);
+                // First try: Match by category ID (most reliable)
+                if (selectedCuisineId && rawCategoryId) {
+                    if (String(rawCategoryId) === String(selectedCuisineId)) {
+                        // Match found by ID
+                        const card = toVendorCard(p);
+                        if (card && !vendorMap.has(card.id)) vendorMap.set(card.id, card);
+                        continue;
                     }
-                    if (typeof c === 'object') {
-                        const name = c.name ? c.name.toLowerCase().trim() : '';
-                        const slug = c.slug ? c.slug.toLowerCase().trim() : '';
-                        const id = (c._id || c.id) ? String(c._id || c.id).toLowerCase().trim() : '';
-                        return name === cuisineSlug || name.includes(cuisineSlug) ||
-                            slug === cuisineSlug || slug.includes(cuisineSlug) ||
-                            id === cuisineSlug;
-                    }
-                    return false;
-                });
-                if (!matchesCuisine) continue;
+                }
+
+                // Fallback: Match by name/slug/tags (for compatibility)
+                if (cuisineSlug) {
+                    const pCats = Array.isArray(p.categories) ? p.categories : [];
+                    const rawTags = Array.isArray(p._raw?.tags) ? p._raw.tags : [];
+                    const allCats = [...new Set([...pCats, ...rawTags])];
+
+                    const matchesCuisine = allCats.some(c => {
+                        if (!c) return false;
+                        if (typeof c === 'string') {
+                            const s = c.toLowerCase().trim();
+                            return s === cuisineSlug || s.includes(cuisineSlug);
+                        }
+                        if (typeof c === 'object') {
+                            const name = c.name ? c.name.toLowerCase().trim() : '';
+                            const slug = c.slug ? c.slug.toLowerCase().trim() : '';
+                            return name === cuisineSlug || name.includes(cuisineSlug) ||
+                                slug === cuisineSlug || slug.includes(cuisineSlug);
+                        }
+                        return false;
+                    });
+
+                    if (!matchesCuisine) continue;
+                }
             }
 
             const card = toVendorCard(p);
@@ -661,7 +678,7 @@ const CategoriesScreen = ({ navigation }) => {
         }
 
         return Array.from(vendorMap.values());
-    }, [sourceProducts, selectedBusinessCategoryId, selectedVendorType, selectedCuisine, displayedByVendor, toVendorCard]);
+    }, [sourceProducts, selectedBusinessCategoryId, selectedVendorType, selectedCuisine, selectedCuisineId, displayedByVendor, toVendorCard]);
 
     // Use API categories if available, else fallback logic
     // Defined here to ensure vendorTypesFromProducts is available
@@ -694,10 +711,15 @@ const CategoriesScreen = ({ navigation }) => {
     const handleCuisinePress = React.useCallback((cuisine) => {
         // For API product categories, slug is stable. Fallback to name.
         const val = cuisine?.slug || cuisine?.name;
-        const newVal = (selectedCuisine && val && String(selectedCuisine).toLowerCase().trim() === String(val).toLowerCase().trim()) ? null : val;
+        const cuisineId = cuisine?._id || cuisine?.id || null;
+        const isSame = selectedCuisine && val && String(selectedCuisine).toLowerCase().trim() === String(val).toLowerCase().trim();
+        const newVal = isSame ? null : val;
+        const newId = isSame ? null : cuisineId;
 
         setSelectedCuisine(newVal);
+        setSelectedCuisineId(newId);
         persistSelection('selectedCuisine', newVal);
+        persistSelection('selectedCuisineId', newId);
     }, [selectedCuisine]);
 
     const handleRestaurantPress = (restaurant) => {
@@ -912,13 +934,76 @@ const CategoriesScreen = ({ navigation }) => {
                         }) : undefined}
                     />
 
+                    {/* Active Filter Chips - Uber Eats Style */}
+                    {(selectedVendorType || selectedCuisine) && (
+                        <ScrollView
+                            horizontal
+                            showsHorizontalScrollIndicator={false}
+                            style={styles(colors).filterChipsContainer}
+                            contentContainerStyle={styles(colors).filterChipsContent}
+                        >
+                            {selectedVendorType && (
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setSelectedVendorType(null);
+                                        setSelectedBusinessCategoryId(null);
+                                        persistSelection('selectedVendorType', null);
+                                        persistSelection('selectedBusinessCategoryId', null);
+                                    }}
+                                    style={styles(colors).filterChip}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={styles(colors).filterChipText}>{selectedVendorType?.toUpperCase()}</Text>
+                                    <View style={styles(colors).filterChipClose}>
+                                        <Text style={styles(colors).filterChipCloseIcon}>×</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            )}
+                            {selectedCuisine && (
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setSelectedCuisine(null);
+                                        setSelectedCuisineId(null);
+                                        persistSelection('selectedCuisine', null);
+                                        persistSelection('selectedCuisineId', null);
+                                    }}
+                                    style={styles(colors).filterChip}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={styles(colors).filterChipText}>{selectedCuisine?.toUpperCase()}</Text>
+                                    <View style={styles(colors).filterChipClose}>
+                                        <Text style={styles(colors).filterChipCloseIcon}>×</Text>
+                                    </View>
+                                </TouchableOpacity>
+                            )}
+                            {(selectedVendorType && selectedCuisine) && (
+                                <TouchableOpacity
+                                    onPress={() => {
+                                        setSelectedVendorType(null);
+                                        setSelectedBusinessCategoryId(null);
+                                        setSelectedCuisine(null);
+                                        setSelectedCuisineId(null);
+                                        persistSelection('selectedVendorType', null);
+                                        persistSelection('selectedBusinessCategoryId', null);
+                                        persistSelection('selectedCuisine', null);
+                                        persistSelection('selectedCuisineId', null);
+                                    }}
+                                    style={styles(colors).clearAllChip}
+                                    activeOpacity={0.7}
+                                >
+                                    <Text style={styles(colors).clearAllChipText}>{t('clearFilters')}</Text>
+                                </TouchableOpacity>
+                            )}
+                        </ScrollView>
+                    )}
+
                     {productsLoading && (!displayedProducts || displayedProducts.length === 0) ? (
                         <SkeletonCategory />
-                    ) : (selectedBusinessCategoryId && selectedCuisine && filteredVendors.length === 0) ? (
+                    ) : ((selectedVendorType || selectedCuisine) && filteredVendors.length === 0) ? (
                         <View style={styles(colors).noResultsContainer}>
-                            <Text style={styles(colors).noResultsText}>{t('noVendorsFound') || 'No vendor is for that business categories'}</Text>
+                            <Text style={styles(colors).noResultsText}>{t('noVendorsFound') || 'No vendors found for this category'}</Text>
                         </View>
-                    ) : (filteredVendors.length > 0) ? (
+                    ) : ((selectedVendorType || selectedCuisine) && filteredVendors.length > 0) ? (
                         <RestaurantsList restaurants={filteredVendors} onPress={handleRestaurantPress} searchQuery={searchQuery} disableScroll={true} />
                     ) : (displayedByVendor.length > 0) ? (
                         // Default: always show vendors (deduped) when no strict filter has produced a vendor list
@@ -1017,6 +1102,68 @@ const styles = (colors) => StyleSheet.create({
         color: '#fff',
         fontFamily: 'Poppins-SemiBold',
         fontSize: 14,
+    },
+    // Uber Eats Style Filter Chips
+    filterChipsContainer: {
+        marginBottom: spacing.md,
+    },
+    filterChipsContent: {
+        paddingHorizontal: spacing.lg,
+        gap: 10,
+        flexDirection: 'row',
+        alignItems: 'center',
+    },
+    filterChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: colors.primary,
+        borderRadius: 24,
+        paddingVertical: 10,
+        paddingLeft: 16,
+        paddingRight: 8,
+        shadowColor: colors.primary,
+        shadowOffset: { width: 0, height: 3 },
+        shadowOpacity: 0.25,
+        shadowRadius: 6,
+        elevation: 4,
+    },
+    filterChipText: {
+        fontSize: 13,
+        fontFamily: 'Poppins-SemiBold',
+        color: '#fff',
+        marginRight: 8,
+        letterSpacing: 0.5,
+    },
+    filterChipClose: {
+        width: 22,
+        height: 22,
+        borderRadius: 11,
+        backgroundColor: 'rgba(255,255,255,0.3)',
+        alignItems: 'center',
+        justifyContent: 'center',
+    },
+    filterChipCloseIcon: {
+        color: '#fff',
+        fontSize: 16,
+        fontWeight: 'bold',
+        lineHeight: 20,
+        textAlign: 'center',
+    },
+    clearAllChip: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        backgroundColor: 'transparent',
+        borderRadius: 24,
+        paddingVertical: 10,
+        paddingHorizontal: 16,
+        borderWidth: 2,
+        borderColor: colors.primary,
+    },
+    clearAllChipText: {
+        fontSize: 13,
+        fontFamily: 'Poppins-SemiBold',
+        color: colors.primary,
+        letterSpacing: 0.3,
     },
     // Skeleton loader styles for native feel
     skeletonCard: {

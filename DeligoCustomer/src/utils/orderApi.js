@@ -65,11 +65,16 @@ class OrderAPI {
 
       console.debug('[OrderAPI] POST', url, body);
 
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000); // 15s timeout
+
       const response = await fetch(url, {
         method: 'POST',
         headers,
         body: JSON.stringify(body),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
 
       const responseData = await response.json();
 

@@ -117,8 +117,14 @@ function normalizeProductForCart(p) {
   const finalPriceRaw = pricing.finalPrice ?? raw.finalPrice;
 
   let finalPrice = Number(finalPriceRaw);
-  if (!Number.isFinite(finalPrice)) {
-    finalPrice = price;
+
+  // Auto-calculate final price if not provided by backend but discount exists
+  if (!Number.isFinite(finalPrice) || (discountRaw > 0 && finalPrice === price)) {
+    if (discountRaw > 0) {
+      finalPrice = price - (price * discountRaw / 100);
+    } else {
+      finalPrice = price;
+    }
   }
 
   const images = Array.isArray(raw.images) ? raw.images : [];
@@ -319,6 +325,7 @@ export const CartProvider = ({ children }) => {
           product: p,
           quantity: newQty,
           selectedVariation,
+          variationSku: options.variationSku, // Stick the SKU here so we have it for delete/update
           addons: options.addons,
           options: options.options
         }
@@ -346,6 +353,11 @@ export const CartProvider = ({ children }) => {
         payload.variantName = options.variantName;
       } else if (options.selectedVariation) {
         payload.variantName = typeof options.selectedVariation === 'string' ? options.selectedVariation : options.selectedVariation.name;
+      }
+
+      // Pass variationSku if available (Critical for products with variations)
+      if (options.variationSku) {
+        payload.variationSku = options.variationSku;
       }
 
       if (options.options) payload.options = options.options;
@@ -613,6 +625,9 @@ export const CartProvider = ({ children }) => {
       setSyncing(true);
       const payloadObj = { productId };
       if (variantName) payloadObj.variantName = variantName;
+      // CRITICAL: Include variationSku if present for accurate deletion
+      if (targetItem?.variationSku) payloadObj.variationSku = targetItem.variationSku;
+
       if (options) payloadObj.options = options;
       if (addons) payloadObj.addons = addons;
 
@@ -623,6 +638,8 @@ export const CartProvider = ({ children }) => {
       // A silently failing delete is often better UX than a reappearing item, but ideally we'd retry.
     } finally {
       setSyncing(false);
+      // Force refresh to ensure totals/taxes are accurate after deletion
+      fetchCart({ force: true, silent: true });
     }
   };
 
@@ -675,6 +692,7 @@ export const CartProvider = ({ children }) => {
         }
       }
 
+      if (item.variationSku) payloadObj.variationSku = item.variationSku;
       if (variantName) payloadObj.variantName = variantName;
       if (item.options) payloadObj.options = item.options;
       if (item.addons) payloadObj.addons = item.addons;
@@ -864,7 +882,7 @@ export const CartProvider = ({ children }) => {
     const force = !!options.force;
     const silent = !!options.silent;
     const now = Date.now();
-    const minIntervalMs = 2000;
+    const FETCH_THRESHOLD_MS = 2000;
 
     // Throttle & Safety Checks
     if (fetchInFlightRef.current && (now - lastFetchAtRef.current > 10000)) {
@@ -881,7 +899,7 @@ export const CartProvider = ({ children }) => {
       }
     }
 
-    if (!force && now - (lastFetchAtRef.current || 0) < minIntervalMs) {
+    if (!force && now - (lastFetchAtRef.current || 0) < FETCH_THRESHOLD_MS) {
       console.debug('[Cart] fetchCart skipped (throttled)');
       return { success: true, skipped: true, reason: 'throttled' };
     }
@@ -894,6 +912,13 @@ export const CartProvider = ({ children }) => {
       const res = await CartAPI.getCart();
 
       if (!res.success) {
+        // Handle 404 (Cart not found) as empty cart
+        if (res.status === 404 || (res.error && typeof res.error === 'string' && res.error.includes('not found'))) {
+          console.debug('[Cart] fetchCart 404 (empty), resetting local state');
+          setState({ carts: {} });
+          return { success: true, data: { items: [] } };
+        }
+
         console.warn('[Cart] fetchCart failed', res);
         return { success: false, error: res.error || 'Failed to fetch cart' };
       }
@@ -910,7 +935,34 @@ export const CartProvider = ({ children }) => {
       else if (Array.isArray(root?.data?.cartItems)) items = root.data.cartItems;
       else if (Array.isArray(root?.data)) items = root.data;
 
+      // Calculate global totals from the items list
+      const totalsCalc = items.reduce((acc, item) => {
+        // Addons Value & Tax
+        const itemAddons = item.addons || [];
+        const itemAddonsTotal = itemAddons.reduce((aSum, a) => aSum + (Number(a.price || 0) * Number(a.quantity || 1)), 0);
+        const itemAddonsTax = itemAddons.reduce((tSum, a) => tSum + (Number(a.taxAmount || 0)), 0);
+
+        // Items Tax & Price
+        const itemTax = Number(item.productTaxAmount || 0);
+        // Use originalPrice if available, otherwise fall back to price + discount (if any) or just price
+        // JSON shows 'originalPrice': 12.5
+        const itemOriginalPrice = Number(item.originalPrice || item.price || 0);
+        const itemQty = Number(item.quantity || 1);
+        const itemOriginalTotal = itemOriginalPrice * itemQty;
+
+        return {
+          addonsValue: acc.addonsValue + itemAddonsTotal,
+          addonsTax: acc.addonsTax + itemAddonsTax,
+          itemsTax: acc.itemsTax + itemTax,
+          originalPriceTotal: acc.originalPriceTotal + itemOriginalTotal
+        };
+      }, { addonsValue: 0, addonsTax: 0, itemsTax: 0, originalPriceTotal: 0 });
+
       console.debug('[Cart] fetchCart success', { itemCount: items.length });
+
+      // Determine source of totals. User JSON shows totals are inside 'data' object.
+      // But we also support flat structure if API changes.
+      const cartData = (root?.data?.totalPrice !== undefined) ? root.data : (root?.totalPrice !== undefined ? root : {});
 
       // Reconstruct local state grouped by vendor
       const newCarts = {};
@@ -943,7 +995,23 @@ export const CartProvider = ({ children }) => {
             vendorDeliveryTime: normalized.vendorDeliveryTime || null,
             items: {},
             appliedPromo: null,
-            deliveryInstructions: ''
+            deliveryInstructions: '',
+            // Map backend totals to the vendor cart
+            // Assuming single-vendor cart response structure as per user JSON
+            totals: {
+              totalPrice: cartData.totalPrice, // Items + Addons (Pre-tax, Post-Discount)
+              taxAmount: cartData.taxAmount, // Total Tax
+              discount: cartData.totalProductDiscount, // Total Discount
+              grandTotal: cartData.subtotal, // Final Pay Amount
+              deliveryFee: cartData.deliveryCharge, // Delivery Fee
+
+              // Granular Breakdown
+              itemsOriginalTotal: totalsCalc.originalPriceTotal, // Gross Items
+              itemsTax: totalsCalc.itemsTax,
+              addonsTotal: totalsCalc.addonsValue,
+              addonsTax: totalsCalc.addonsTax,
+              deliveryTax: cartData.deliveryVatAmount, // Explicit delivery tax from backend
+            }
           };
         } else {
           // Merge better vendor info if available
@@ -952,12 +1020,26 @@ export const CartProvider = ({ children }) => {
           if ((!c.vendorImage || c.vendorImage.includes('placeholder')) && normalized.vendorImage) {
             c.vendorImage = normalized.vendorImage;
           }
+          // Ensure totals are updated
+          c.totals = {
+            totalPrice: cartData.totalPrice,
+            taxAmount: cartData.taxAmount,
+            discount: cartData.totalProductDiscount,
+            grandTotal: cartData.subtotal,
+            deliveryFee: cartData.deliveryCharge,
+            itemsOriginalTotal: totalsCalc.originalPriceTotal,
+            itemsTax: totalsCalc.itemsTax,
+            addonsTotal: totalsCalc.addonsValue,
+            addonsTax: totalsCalc.addonsTax,
+            deliveryTax: cartData.deliveryVatAmount,
+          };
         }
 
         newCarts[vendorKey].items[itemKey] = {
           product: normalized,
           quantity: qty,
           selectedVariation: item.variantName || item.selectedVariation,
+          variationSku: item.variationSku, // CRITICAL: Persist SKU from backend
           addons: item.addons,
           options: item.options,
           subtotal: item.subtotal ?? rawProd.subtotal,

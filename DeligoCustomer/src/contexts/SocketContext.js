@@ -8,6 +8,7 @@ const SocketContext = createContext(null);
 export const useSocket = () => useContext(SocketContext);
 
 export const SocketProvider = ({ children }) => {
+    const { isAuthenticated } = require('../contexts/ProfileContext').useProfile();
     const [socket, setSocket] = useState(null);
     const [isConnected, setIsConnected] = useState(false);
     const socketRef = useRef(null);
@@ -22,6 +23,11 @@ export const SocketProvider = ({ children }) => {
         try {
             // Get token for auth
             let token = await StorageService.getAccessToken();
+            if (!token) {
+                console.debug('[Socket] No token found, skipping connection');
+                return;
+            }
+
             if (token && typeof token === 'object') {
                 token = token.accessToken || token.token || token.value;
             }
@@ -112,13 +118,14 @@ export const SocketProvider = ({ children }) => {
         emit(eventName, payload, ack);
     }, [emit]);
 
-    // Initialize on mount
+    // Manage connection based on authentication status
     useEffect(() => {
-        connect();
-        return () => {
+        if (isAuthenticated) {
+            connect();
+        } else {
             disconnect();
-        };
-    }, [connect, disconnect]);
+        }
+    }, [isAuthenticated, connect, disconnect]);
 
     return (
         <SocketContext.Provider value={{ socket, isConnected, connect, disconnect, emit, joinRoom, leaveRoom }}>

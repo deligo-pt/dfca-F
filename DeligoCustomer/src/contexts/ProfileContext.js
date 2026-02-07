@@ -27,6 +27,11 @@ export const ProfileProvider = ({ children }) => {
     const [isLoading, setIsLoading] = useState(true);
     const [isOnboardingCompleted, setIsOnboardingCompleted] = useState(false);
 
+    // Rate Limiting Refs
+    const isFetchingRef = React.useRef(false);
+    const lastFetchedRef = React.useRef(0);
+    const FETCH_THRESHOLD_MS = 60000; // 60 seconds
+
     /**
      * Checks the current authentication and onboarding status from storage.
      * Called on mount.
@@ -74,6 +79,7 @@ export const ProfileProvider = ({ children }) => {
             await AuthService.login(userData, token);
             setUser(userData);
             setIsAuthenticated(true);
+            lastFetchedRef.current = Date.now(); // Mark as fresh
             return true;
         } catch (error) {
             console.error('[ProfileContext] Login failed:', error);
@@ -86,7 +92,22 @@ export const ProfileProvider = ({ children }) => {
      */
     const logout = async () => {
         try {
-            await apiLogout(); // Calls backend and clears storage
+            let fcmToken = null;
+            // Remove FCM token first
+            try {
+                const { default: firebaseNotificationService } = await import('../services/firebaseNotificationService');
+                // Get token to send to backend before deleting
+                fcmToken = await firebaseNotificationService.getStoredToken();
+                if (!fcmToken) {
+                    fcmToken = await firebaseNotificationService.getToken();
+                }
+
+                await firebaseNotificationService.deleteToken();
+            } catch (fcmError) {
+                console.warn('[ProfileContext] Failed to handle FCM token:', fcmError);
+            }
+
+            await apiLogout(null, fcmToken); // Calls backend and clears storage
             setUser(null);
             setIsAuthenticated(false);
         } catch (error) {
@@ -114,13 +135,31 @@ export const ProfileProvider = ({ children }) => {
             // Clone data to avoid mutating original object
             const dataToUpdate = { ...updatedData };
 
-            // Security/Logic: Prevent updating sensitive or immutable fields via this endpoint
-            delete dataToUpdate.contactNumber;
+            // Logic: Prevent updating immutable fields via this endpoint if needed, but allow contactNumber as requested
+            // delete dataToUpdate.contactNumber; // Removed restriction to allow updates
             delete dataToUpdate.profilePhoto; // Handled separately as file
 
+            console.log(`[${new Date().toISOString()}] [ProfileContext] updateProfile called with:`, JSON.stringify(dataToUpdate));
+
+            const userId = user?.userId || user?._id || user?.id;
+            if (!userId) {
+                throw new Error('User ID not found. Please log in again.');
+            }
+
+            // Note: /profile endpoint uses auth token, no userId needed in URL
+            const updateUrl = API_ENDPOINTS.PROFILE.UPDATE;
+            let response;
+
+            // Decision: Always use FormData as backend requires 'data' field with JSON string
             // Prepare FormData for multipart upload
             const formData = new FormData();
-            formData.append('data', JSON.stringify(dataToUpdate));
+            const jsonPayload = JSON.stringify(dataToUpdate);
+            formData.append('data', jsonPayload);
+
+            // DEBUG: Log exactly what we're sending
+            console.log(`[ProfileContext] DEBUG - FormData 'data' field content:`, jsonPayload);
+            console.log(`[ProfileContext] DEBUG - NIF in payload:`, dataToUpdate.NIF || dataToUpdate.nif || 'NOT FOUND');
+            console.log(`[ProfileContext] DEBUG - Update URL:`, updateUrl);
 
             // Attach image file if valid
             if (imageFile && imageFile.uri && !imageFile.uri.startsWith('http')) {
@@ -131,24 +170,37 @@ export const ProfileProvider = ({ children }) => {
                 });
             }
 
-            const userId = user?.userId || user?._id || user?.id;
-            if (!userId) {
-                throw new Error('User ID not found. Please log in again.');
-            }
-
-            const updateUrl = API_ENDPOINTS.PROFILE.UPDATE.replace(':id', userId);
-
-            const response = await customerApi.patch(updateUrl, formData, {
+            response = await customerApi.patch(updateUrl, formData, {
                 headers: {
                     'Content-Type': 'multipart/form-data',
                 }
             });
-            const updatedUser = response?.data || response;
+
+            // DEBUG: Log the FULL response structure
+            console.log(`[ProfileContext] DEBUG - Full API Response:`, JSON.stringify(response, null, 2));
+            console.log(`[ProfileContext] DEBUG - response.data:`, JSON.stringify(response?.data, null, 2));
+
+            const updatedUser = response?.data?.data || response?.data || response;
+
+            console.log(`[${new Date().toISOString()}] [ProfileContext] updateProfile response:`, JSON.stringify(updatedUser));
+            console.log(`[ProfileContext] DEBUG - NIF in response:`, updatedUser?.NIF || updatedUser?.nif || 'NOT IN RESPONSE');
 
             if (updatedUser) {
-                setUser(updatedUser);
+                // Optimistic merge: Ensure critical fields like NIF are preserved locally
+                // even if backend response is incomplete/lazy.
+                const mergedUser = {
+                    ...updatedUser,
+                    ...(updatedData.NIF && { NIF: updatedData.NIF }),
+                    ...(updatedData.nif && { nif: updatedData.nif }),
+                    ...(updatedData.address && { address: updatedData.address })
+                };
+
+                console.log(`[${new Date().toISOString()}] [ProfileContext] Merged local user state:`, JSON.stringify(mergedUser));
+
+                setUser(mergedUser);
                 // Persist updated data to local storage
-                await import('../utils/auth').then(mod => mod.saveUserData(updatedUser));
+                await import('../utils/auth').then(mod => mod.saveUserData(mergedUser));
+                lastFetchedRef.current = Date.now(); // Mark as fresh
                 return true;
             } else {
                 console.error('[ProfileContext] No data returned from update API');
@@ -199,7 +251,27 @@ export const ProfileProvider = ({ children }) => {
      * 
      * @returns {Promise<Object|null>} The user object or null if failed.
      */
-    const fetchUserProfile = async () => {
+    /**
+     * Fetches the fresh user profile from the server.
+     * Updates local state and storage.
+     * @param {boolean} force - If true, bypasses the throttle.
+     * @returns {Promise<Object|null>} The user object or null if failed.
+     */
+    const fetchUserProfile = useCallback(async (force = false) => {
+        // Concurrency Check
+        if (isFetchingRef.current) {
+            console.debug('[ProfileContext] Profile fetch in progress, skipping.');
+            return null;
+        }
+
+        // Rate Limiting Check
+        const now = Date.now();
+        if (!force && (now - lastFetchedRef.current < FETCH_THRESHOLD_MS)) {
+            console.debug(`[ProfileContext] Profile fetch throttled. Last fetch ${now - lastFetchedRef.current}ms ago.`);
+            return user; // Return current local user
+        }
+
+        isFetchingRef.current = true;
         try {
             const { customerApi } = await import('../utils/api');
             const { API_ENDPOINTS } = await import('../constants/config').then(m => m.default || m);
@@ -211,13 +283,16 @@ export const ProfileProvider = ({ children }) => {
                 console.log('[ProfileContext] Fetched fresh user profile:', userData?.name || userData?.firstName);
                 setUser(userData);
                 await import('../utils/auth').then(mod => mod.saveUserData(userData));
+                lastFetchedRef.current = Date.now();
                 return userData;
             }
         } catch (error) {
             console.error('[ProfileContext] Failed to fetch user profile:', error);
+        } finally {
+            isFetchingRef.current = false;
         }
         return null;
-    };
+    }, [user]);
 
     return (
         <ProfileContext.Provider value={{

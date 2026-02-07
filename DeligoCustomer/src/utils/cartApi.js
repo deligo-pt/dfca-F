@@ -77,6 +77,11 @@ class CartAPI {
           if (it.variantName) {
             payload.variantName = it.variantName;
           }
+          // CRITICAL: Include variationSku if present (required for some backends)
+          if (it.variationSku) {
+            payload.variationSku = it.variationSku;
+          }
+
           if (it.options && Object.keys(it.options).length > 0) {
             payload.options = it.options;
           }
@@ -93,11 +98,16 @@ class CartAPI {
       }
 
       console.debug('[CartAPI] POST', url, 'items:', preparedItems);
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 15000);
+
       const response = await fetch(url, {
         method: 'POST',
         headers,
         body: JSON.stringify({ items: preparedItems }),
+        signal: controller.signal
       });
+      clearTimeout(timeoutId);
       const responseData = await response.json();
       console.debug('[CartAPI] addToCart response status:', response.status, 'data:', responseData);
       if (!response.ok) {
@@ -178,6 +188,10 @@ class CartAPI {
             return { productId: item };
           } else if (item && typeof item === 'object') {
             const obj = { productId: item.productId || item.id };
+            // CRITICAL: Include variationSku to ensure correct item deletion
+            if (item.variationSku) {
+              obj.variationSku = item.variationSku;
+            }
             if (item.variantName) obj.variantName = item.variantName;
             if (item.options) obj.options = item.options;
             if (item.addons) {

@@ -15,10 +15,14 @@ import {
   ActivityIndicator,
   SafeAreaView,
   StatusBar,
+  Alert,
 } from 'react-native';
 import { sendOTP, verifyOTP, saveUserData, resendOTP } from '../utils/auth';
 import { useProfile } from '../contexts/ProfileContext';
 import { useProducts } from '../contexts/ProductsContext';
+import firebaseNotificationService from '../services/firebaseNotificationService';
+
+
 import CountryPicker from 'react-native-country-picker-modal';
 import CustomModal from '../components/CustomModal';
 import OTPInput from '../components/OTPInput';
@@ -275,7 +279,19 @@ const LoginScreen = ({ navigation }) => {
                 />
               </Animated.View>
 
-              <Text style={styles.appTitle}>DeliGo</Text>
+              <TouchableOpacity
+                activeOpacity={0.8}
+                onLongPress={async () => {
+                  const token = await firebaseNotificationService.getStoredToken();
+                  Alert.alert(
+                    'Debug: FCM Token',
+                    token ? `Token Exists:\n${token.substring(0, 20)}...` : '✅ Token Deleted (None)',
+                  );
+                }}
+                delayLongPress={1000}
+              >
+                <Text style={styles.appTitle}>DeliGo</Text>
+              </TouchableOpacity>
             </View>
           </SafeAreaView>
 
@@ -538,11 +554,7 @@ const styles = StyleSheet.create({
     borderTopRightRadius: 30,
     overflow: 'hidden',
     paddingTop: 30,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: -10 }, // Shadow pulsing upwards
-    shadowOpacity: 0.1,
-    shadowRadius: 20,
-    elevation: 20,
+    backgroundColor: '#FFFFFF', // Ensure background is white if not set dynamically
   },
   scrollContent: {
     flexGrow: 1,
@@ -584,10 +596,7 @@ const styles = StyleSheet.create({
   formContainer: {
     width: '100%',
   },
-  formContainer: {
-    borderBottomColor: '#EEE',
-    width: '100%',
-  },
+
   tabContainer: {
     flexDirection: 'row',
     marginBottom: 30,

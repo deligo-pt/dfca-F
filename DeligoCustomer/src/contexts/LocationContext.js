@@ -51,16 +51,25 @@ export const LocationProvider = ({ children }) => {
 
     /**
      * Initialize location data from local storage on mount.
+     * Permission is already granted in onboarding - just load/refresh location.
      */
     useEffect(() => {
         const init = async () => {
-            await loadStoredLocationData();
+            // Load stored location first for instant UI
+            const hasLocation = await loadStoredLocationData();
+
+            // If no stored coordinates, fetch fresh location (permission already granted)
+            if (!hasLocation) {
+                console.log('[Location] No stored coordinates, fetching fresh location...');
+                await getCurrentLocation();
+            }
         };
         init();
     }, []);
 
     /**
      * Loads saved addresses and the last selected location from storage.
+     * @returns {Promise<boolean>} True if stored location was found.
      */
     const loadStoredLocationData = async () => {
         try {
@@ -81,8 +90,12 @@ export const LocationProvider = ({ children }) => {
             if (storedAddresses && Array.isArray(storedAddresses)) {
                 setSavedAddresses(storedAddresses);
             }
+
+            // Return true if we had a valid stored location with coordinates
+            return !!(storedLocation && storedLocation.coordinates);
         } catch (err) {
             console.warn('[Location] Failed to load stored data:', err);
+            return false;
         }
     };
 

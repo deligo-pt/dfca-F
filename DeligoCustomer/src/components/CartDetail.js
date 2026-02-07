@@ -123,18 +123,25 @@ export default function CartDetail({ vendorId, navigation }) {
 
   const currency = items[0]?.currency || '';
 
-  // Calculate generic totals for the summary view
-  const baseSubtotal = items.reduce((s, it) => s + it.basePrice * it.qty, 0);
-  const discountTotal = items.reduce((s, it) => s + it.discountUnit * it.qty, 0);
-  const subtotalAfterDiscount = baseSubtotal - discountTotal;
-  const taxTotal = items.reduce((s, it) => s + it.taxUnit * it.qty, 0);
-
   // Final Total calculation: Use backend subtotal logic if items match, otherwise fallback to local math
   const total = items.reduce((s, it) => {
     if (it.backendSubtotal !== null && it.backendSubtotal !== undefined) {
       return s + Number(it.backendSubtotal);
     }
     return s + it.finalUnit * it.qty;
+  }, 0);
+
+  // Calculate generic totals for the summary view
+  const baseSubtotal = items.reduce((s, it) => s + it.basePrice * it.qty, 0);
+  const discountTotal = items.reduce((s, it) => s + it.discountUnit * it.qty, 0);
+  const subtotalAfterDiscount = baseSubtotal - discountTotal;
+
+  // Tax Calculation: Prefer backend taxAmount if available
+  const taxTotal = items.reduce((s, it) => {
+    if (it.taxAmount !== undefined && it.taxAmount !== null) {
+      return s + Number(it.taxAmount);
+    }
+    return s + (it.taxUnit * it.qty);
   }, 0);
 
   // Resolve Vendor Details (Context > Cart > Item fallback)
@@ -462,55 +469,160 @@ export default function CartDetail({ vendorId, navigation }) {
           </View>
 
           {(() => {
-            const itemsTotalBase = items.reduce((sum, it) => sum + (it.basePrice * it.qty), 0);
-            const itemsDiscount = items.reduce((sum, it) => sum + (it.discountUnit * it.qty), 0);
+            // Start with backend totals if available
+            const totals = cart.totals || {};
+            const hasBackendTotals = totals.grandTotal !== undefined;
 
-            // Calculate total cost of selected add-ons
-            const itemsAddons = items.reduce((sum, it) => {
-              const addonsCost = (it.addons || []).reduce((aSum, a) => aSum + (Number(a.price || 0) * Number(a.quantity || 1)), 0);
-              return sum + addonsCost;
+            if (hasBackendTotals) {
+              const itemsOriginal = totals.itemsOriginalTotal || 0;
+              const discount = totals.discount || 0;
+              const addons = totals.addonsTotal || 0;
+              const subtotalNet = totals.totalPrice || 0; // Items Net + Addons
+              const taxItems = totals.itemsTax || 0;
+              const taxAddons = totals.addonsTax || 0;
+              const grandTotal = totals.grandTotal || 0;
+
+              return (
+                <>
+                  {/* 1. Items Price (Original) */}
+                  <View style={styles.rowBetween}>
+                    <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>{t('itemsPrice') || 'Items Price'}</Text>
+                    <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>
+                      {formatCurrency(currency, itemsOriginal)}
+                    </Text>
+                  </View>
+
+                  {/* 2. Discount */}
+                  {discount > 0 && (
+                    <View style={styles.rowBetween}>
+                      <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>{t('discount')}</Text>
+                      <Text style={{ color: '#4CAF50', fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>
+                        -{formatCurrency(currency, discount)}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* 3. Add-ons Price */}
+                  {addons > 0 && (
+                    <View style={styles.rowBetween}>
+                      <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>{t('addons') || 'Add-ons'}</Text>
+                      <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>
+                        {formatCurrency(currency, addons)}
+                      </Text>
+                    </View>
+                  )}
+
+                  <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 6, opacity: 0.5 }} />
+
+                  {/* 4. Subtotal (Net/Excl Tax) */}
+                  <View style={styles.rowBetween}>
+                    <Text style={{ color: colors.text.primary, fontSize: fontSize.md, fontFamily: 'Poppins-Medium' }}>{t('subtotalExclTax') || 'Subtotal (Excl. Tax)'}</Text>
+                    <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>
+                      {formatCurrency(currency, subtotalNet)}
+                    </Text>
+                  </View>
+
+                  {/* 5 & 6. Taxes */}
+                  {(taxItems > 0) && (
+                    <View style={styles.rowBetween}>
+                      <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>{t('taxItems') || 'Tax (Items)'}</Text>
+                      <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>
+                        {formatCurrency(currency, taxItems)}
+                      </Text>
+                    </View>
+                  )}
+                  {(taxAddons > 0 || (addons > 0 && taxAddons === 0 && taxItems === 0)) ? (
+                    // Show separate addon tax if it exists, or if addons exist but maybe tax is 0 (just to be complete if desired, but condition taxAddons > 0 is safer)
+                    taxAddons > 0 && (
+                      <View style={styles.rowBetween}>
+                        <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>{t('taxAddons') || 'Tax (Add-ons)'}</Text>
+                        <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>
+                          {formatCurrency(currency, taxAddons)}
+                        </Text>
+                      </View>
+                    )
+                  ) : null}
+
+                  <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
+
+                  {/* 7. Grand Total */}
+                  <View style={styles.rowBetween}>
+                    <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-Bold', fontSize: fontSize.lg }}>{t('total')}</Text>
+                    <Text style={{ color: colors.primary, fontFamily: 'Poppins-Bold', fontSize: fontSize.xl }}>
+                      {formatCurrency(currency, grandTotal)}
+                    </Text>
+                  </View>
+                </>
+              );
+            }
+
+            // Fallback to local calculation (Original Logic)
+            const localBaseUniqueItems = items.reduce((s, it) => s + (it.basePrice * it.qty), 0);
+            const localAddons = items.reduce((sum, it) => {
+              return sum + (it.addons || []).reduce((aSum, a) => aSum + (Number(a.price || 0) * Number(a.quantity || 1)), 0);
             }, 0);
+            const localDiscount = items.reduce((sum, it) => sum + (it.discountUnit * it.qty), 0);
+
+            const renderItemsTotal = localBaseUniqueItems; // This is actually Original Price in local logic since discount is calc'd later
+            const renderAddonsTotal = localAddons;
+            const renderDiscount = localDiscount;
+            const renderTax = taxTotal;
+            const renderGrandTotal = total;
 
             return (
               <>
                 <View style={styles.rowBetween}>
-                  <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>{t('itemsTotal') || 'Items Total'}</Text>
+                  <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>{t('itemsPrice') || 'Items Price'}</Text>
                   <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>
-                    {formatCurrency(currency, itemsTotalBase)}
+                    {formatCurrency(currency, renderItemsTotal)}
                   </Text>
                 </View>
 
-                {itemsAddons > 0 && (
-                  <View style={styles.rowBetween}>
-                    <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>{t('addons') || 'Add-ons'}</Text>
-                    <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>
-                      {formatCurrency(currency, itemsAddons)}
-                    </Text>
-                  </View>
-                )}
-
-                {itemsDiscount > 0 && (
+                {renderDiscount > 0 && (
                   <View style={styles.rowBetween}>
                     <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>{t('discount')}</Text>
                     <Text style={{ color: '#4CAF50', fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>
-                      -{formatCurrency(currency, itemsDiscount)}
+                      -{formatCurrency(currency, renderDiscount)}
                     </Text>
                   </View>
                 )}
 
+                {renderAddonsTotal > 0 && (
+                  <View style={styles.rowBetween}>
+                    <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>{t('addons') || 'Add-ons'}</Text>
+                    <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>
+                      {formatCurrency(currency, renderAddonsTotal)}
+                    </Text>
+                  </View>
+                )}
+
+                <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 6, opacity: 0.5 }} />
+
+                {/* Fallback doesn't easily support split 'Subtotal Excl Tax' without calc. 
+                    Net = (Items + Addons - Discount). 
+                */}
                 <View style={styles.rowBetween}>
-                  <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>{t('tax')}</Text>
+                  <Text style={{ color: colors.text.primary, fontSize: fontSize.md, fontFamily: 'Poppins-Medium' }}>{t('subtotalExclTax') || 'Subtotal (Excl. Tax)'}</Text>
                   <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>
-                    {taxTotal > 0 ? formatCurrency(currency, taxTotal) : formatCurrency(currency, 0)}
+                    {formatCurrency(currency, (renderItemsTotal + renderAddonsTotal - renderDiscount))}
                   </Text>
                 </View>
+
+                {renderTax > 0 && (
+                  <View style={styles.rowBetween}>
+                    <Text style={{ color: colors.text.secondary, fontSize: fontSize.md }}>{t('tax') || 'Tax'}</Text>
+                    <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-SemiBold', fontSize: fontSize.md }}>
+                      {formatCurrency(currency, renderTax)}
+                    </Text>
+                  </View>
+                )}
 
                 <View style={{ height: 1, backgroundColor: colors.border, marginVertical: spacing.md }} />
 
                 <View style={styles.rowBetween}>
                   <Text style={{ color: colors.text.primary, fontFamily: 'Poppins-Bold', fontSize: fontSize.lg }}>{t('total')}</Text>
                   <Text style={{ color: colors.primary, fontFamily: 'Poppins-Bold', fontSize: fontSize.xl }}>
-                    {formatCurrency(currency, total)}
+                    {formatCurrency(currency, renderGrandTotal)}
                   </Text>
                 </View>
               </>
@@ -527,7 +639,9 @@ export default function CartDetail({ vendorId, navigation }) {
       }]}>
         <View style={{ flex: 1 }}>
           <Text style={{ color: colors.text.secondary, fontSize: 13 }}>{items.reduce((s, it) => s + it.qty, 0)} {t('items')}</Text>
-          <Text style={{ color: colors.primary, fontFamily: 'Poppins-Bold', fontSize: 20 }}>{formatCurrency(currency, total)}</Text>
+          <Text style={{ color: colors.primary, fontFamily: 'Poppins-Bold', fontSize: 20 }}>
+            {formatCurrency(currency, cart.totals?.grandTotal ?? total)}
+          </Text>
         </View>
         <TouchableOpacity
           style={[styles.checkoutBtn, { backgroundColor: colors.primary, opacity: checkingOut ? 0.7 : 1 }]}

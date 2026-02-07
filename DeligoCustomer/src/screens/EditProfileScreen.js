@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useMemo } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, Modal, Platform, StatusBar } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, TextInput, Image, Modal, Platform, StatusBar, ActivityIndicator } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
@@ -226,6 +226,7 @@ const EditProfileScreen = ({ navigation, route }) => {
 
   const [email, setEmail] = useState('');
   const [mobile, setMobile] = useState('');
+  const [nif, setNif] = useState('');
   const [address, setAddress] = useState(null);
   const [isEditing, setIsEditing] = useState(false);
   const [profilePhoto, setProfilePhoto] = useState(null);
@@ -236,6 +237,7 @@ const EditProfileScreen = ({ navigation, route }) => {
   const [imagePickerVisible, setImagePickerVisible] = useState(false);
   const [selectedImageUri, setSelectedImageUri] = useState(null);
   const [imageEditorVisible, setImageEditorVisible] = useState(false);
+  const [isSaving, setIsSaving] = useState(false);
 
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
@@ -324,6 +326,7 @@ const EditProfileScreen = ({ navigation, route }) => {
         setLastName(lname);
         setEmail(routeUser.email || routeUser.contactEmail || '');
         setMobile(routeUser.contactNumber || routeUser.phone || routeUser.mobile || '');
+        setNif(routeUser.NIF || routeUser.nif || '');
         setProfilePhoto(routeUser.profilePhoto || routeUser.photo || routeUser.avatar || routeUser.photoUrl || routeUser.avatarUrl || null);
 
         const addr = routeUser.address || routeUser.location || defaultAddress;
@@ -355,6 +358,7 @@ const EditProfileScreen = ({ navigation, route }) => {
       setLastName(localUserData?.name?.lastName || '');
       setEmail(localUserData?.email || '');
       setMobile(localUserData?.contactNumber || '');
+      setNif(localUserData?.NIF || localUserData?.nif || '');
       setProfilePhoto(localUserData?.profilePhoto || localUserData?.photo || localUserData?.avatarUrl || localUserData?.avatar || null);
 
       const addr = localUserData?.address || localUserData?.location || defaultAddress;
@@ -478,19 +482,24 @@ const EditProfileScreen = ({ navigation, route }) => {
   };
 
   const handleSave = async () => {
+    if (isSaving) return; // Prevent double-tap
+    setIsSaving(true);
     try {
       if (!firstName.trim()) {
         showModal(t('error'), t('enterFirstName'), null, true);
+        setIsSaving(false);
         return;
       }
 
       if (!mobile.trim()) {
         showModal(t('error'), t('enterMobileNumberError'), null, true);
+        setIsSaving(false);
         return;
       }
 
       if (!address) {
         showModal(t('error'), t('provideAddress'), null, true);
+        setIsSaving(false);
         return;
       }
 
@@ -510,7 +519,11 @@ const EditProfileScreen = ({ navigation, route }) => {
       };
 
       // Send the update to the server - pass the file object, not the URI
-      const updateResponse = await updateProfile({ address: completeAddress }, profilePhotoFile, userData);
+      const updateResponse = await updateProfile({
+        address: completeAddress,
+        NIF: nif,
+        nif: nif
+      }, profilePhotoFile, userData);
 
       // Refresh local user data to ensure synchronization
       const currentLocalUser = await getUserData();
@@ -531,6 +544,8 @@ const EditProfileScreen = ({ navigation, route }) => {
         },
         contactNumber: mobile,
         email: email,
+        NIF: nif,
+        nif: nif, // robust double-send
         address: completeAddress,
         profilePhoto: updatedPhotoUrl,
       };
@@ -569,6 +584,8 @@ const EditProfileScreen = ({ navigation, route }) => {
     } catch (error) {
       console.error('Save failed:', error);
       showModal(t('error'), error.message || t('saveFailed'), null, true);
+    } finally {
+      setIsSaving(false);
     }
   };
 
@@ -974,6 +991,23 @@ const EditProfileScreen = ({ navigation, route }) => {
           </View>
 
           <View style={styles.inputGroup}>
+            <Text style={styles.label}>{t('nif') || 'NIF / Tax ID'}</Text>
+            <View style={isEditing ? [styles.inputContainer, { backgroundColor: colors.background, borderColor: colors.primary }] : styles.inputContainer}>
+              <Ionicons name="document-text-outline" size={20} color={colors.text.secondary} />
+              <TextInput
+                style={styles.input}
+                value={nif}
+                onChangeText={setNif}
+                placeholder={t('enterYourNif') || 'Enter your NIF'}
+                keyboardType="numeric"
+                maxLength={9}
+                editable={isEditing}
+                placeholderTextColor={colors.text.light}
+              />
+            </View>
+          </View>
+
+          <View style={styles.inputGroup}>
             <Text style={styles.label}>{t('deliveryAddress') || t('address')}</Text>
             {address ? (
               isEditing ? (
@@ -1037,8 +1071,16 @@ const EditProfileScreen = ({ navigation, route }) => {
         </View>
 
         {isEditing && (
-          <TouchableOpacity style={styles.saveButton} onPress={handleSave}>
-            <Text style={styles.saveButtonText}>{t('saveChanges')}</Text>
+          <TouchableOpacity
+            style={[styles.saveButton, isSaving && { opacity: 0.7 }]}
+            onPress={handleSave}
+            disabled={isSaving}
+          >
+            {isSaving ? (
+              <ActivityIndicator size="small" color="#FFFFFF" />
+            ) : (
+              <Text style={styles.saveButtonText}>{t('saveChanges')}</Text>
+            )}
           </TouchableOpacity>
         )}
       </ScrollView>

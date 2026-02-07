@@ -457,7 +457,7 @@ const OrdersScreen = ({ navigation }) => {
                 {order.vendorName || t('groceriesAndFood') || 'Groceries & Food'}
               </Text>
               <Text style={[styles.orderPrice, { color: colors.text.primary }]}>
-                €{order.subTotal?.toFixed(2) || '0.00'}
+                €{Number(order.totalAmount ?? order.total ?? order.grandTotal ?? order.subTotal ?? order.subtotal ?? 0).toFixed(2)}
               </Text>
             </View>
             <View style={styles.subHeaderRow}>

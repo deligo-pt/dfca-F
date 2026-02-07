@@ -141,6 +141,18 @@ export const ProductsProvider = ({ children }) => {
   const [error, setError] = useState(null);
   const [params, setParams] = useState({ page: 1, limit: 1000 });
 
+  // Rate Limiting & Caching Refs
+  const isFetchingRef = useRef(false);
+  const lastFetchedRef = useRef(0);
+  const FETCH_THRESHOLD_MS = 60000; // 60 seconds for products
+
+  const businessCategoriesCache = useRef(null);
+  const lastBusinessCategoriesFetch = useRef(0);
+
+  const productCategoriesCache = useRef(null);
+  const lastProductCategoriesFetch = useRef(0);
+  const CATEGORY_CACHE_TTL = 300000; // 5 minutes for categories (rarely change)
+
   // Use ref for params to avoid infinite loops in dependency arrays
   const paramsRef = useRef(params);
   useEffect(() => {
@@ -188,23 +200,47 @@ export const ProductsProvider = ({ children }) => {
         }
       } catch (e) { /* ignore cache read errors */ }
 
-      // --- Cache Freshness Check ---
-      let effectiveTTL = PRODUCTS_CACHE_TTL_MS;
-      // Allow override from storage (debugging/config)
-      try {
-        const storedTtl = await StorageService.getItem('PRODUCTS_CACHE_TTL_MS');
-        if (typeof storedTtl === 'number' && !isNaN(storedTtl) && storedTtl > 0) effectiveTTL = storedTtl;
-      } catch (e) { }
+      // --- Cache Freshness Check (SWR Strategy) ---
+      // FRESH: < 60s, return cache only
+      // STALE: 60s - 5min, return cache + background refresh
+      // EXPIRED: > 5min, show loading + fetch
+      const FRESH_TTL = 60 * 1000;  // 60 seconds
+      const STALE_TTL = PRODUCTS_CACHE_TTL_MS; // 5 minutes
 
       const cacheAge = cachedRaw && cachedRaw.ts ? (Date.now() - cachedRaw.ts) : Infinity;
       const hadCache = cachedRaw && Array.isArray(cachedRaw.items) && cachedRaw.items.length > 0;
 
-      // If cache is fresh and not forced, skip network
-      if (!final.force && hadCache && cacheAge < effectiveTTL) {
-        console.debug('[ProductsContext] Cache fresh, skipping network');
+      // FRESH: Cache is very recent, skip network entirely
+      if (!final.force && hadCache && cacheAge < FRESH_TTL) {
+        console.debug('[ProductsContext] Cache FRESH, skipping network');
         return;
       }
 
+      // STALE: Cache exists but aging, show cache + background refresh (no loading spinner)
+      const isBackgroundRefresh = hadCache && cacheAge >= FRESH_TTL && cacheAge < STALE_TTL;
+      if (isBackgroundRefresh && !final.force) {
+        console.debug('[ProductsContext] Cache STALE, background refresh...');
+        // Don't set loading, just continue to fetch silently
+      }
+
+      // EXPIRED: Cache too old or no cache, show loading
+      const isExpired = !hadCache || cacheAge >= STALE_TTL;
+
+      // Concurrency & Rate Limiting Check
+      if (isFetchingRef.current) {
+        console.debug('[ProductsContext] Fetch already in progress, skipping concurrent request.');
+        return;
+      }
+
+      const now = Date.now();
+      // If we have data in memory (products state not empty) and it's recent, skip
+      if (!final.force && !isBackgroundRefresh && products.length > 0 && (now - lastFetchedRef.current < FETCH_THRESHOLD_MS)) {
+        console.debug(`[ProductsContext] Throttled. Last fetch ${now - lastFetchedRef.current}ms ago.`);
+        return;
+      }
+
+      isFetchingRef.current = true;
+      // Show loading when no cache exists (first load or expired)
       if (!hadCache) setLoading(true);
 
       // --- Authorization Setup ---
@@ -331,6 +367,8 @@ export const ProductsProvider = ({ children }) => {
       setError(err.message || 'Error fetching products');
     } finally {
       setLoading(false);
+      isFetchingRef.current = false;
+      if (!error) lastFetchedRef.current = Date.now();
     }
   }, []); // paramsRef dependency ensures stability
 
@@ -446,9 +484,16 @@ export const ProductsProvider = ({ children }) => {
 
   /**
    * Fetches business categories (e.g., Grocery, Restaurant, Pharmacy).
+   * Caches result for 5 minutes.
    * @returns {Promise<Array>} List of business categories.
    */
-  const fetchBusinessCategories = useCallback(async () => {
+  const fetchBusinessCategories = useCallback(async (force = false) => {
+    const now = Date.now();
+    if (!force && businessCategoriesCache.current && (now - lastBusinessCategoriesFetch.current < CATEGORY_CACHE_TTL)) {
+      console.debug('[ProductsContext] Serving Business Categories from cache');
+      return businessCategoriesCache.current;
+    }
+
     try {
       const endpoint = API_ENDPOINTS.UTIL.BUSINESS_CATEGORIES;
       const url = `${BASE_API_URL}${endpoint}`;
@@ -465,13 +510,19 @@ export const ProductsProvider = ({ children }) => {
       const json = await res.json();
       const items = json.data?.data || [];
 
-      return items.map(item => ({
+      const mapped = items.map(item => ({
         id: item._id,
         name: item.name,
         slug: item.slug,
         icon: item.icon,
         isActive: item.isActive
       }));
+
+      // Update Cache
+      businessCategoriesCache.current = mapped;
+      lastBusinessCategoriesFetch.current = Date.now();
+
+      return mapped;
     } catch (err) {
       console.error('[ProductsContext] Business Categories Error:', err);
       return [];
@@ -480,9 +531,16 @@ export const ProductsProvider = ({ children }) => {
 
   /**
    * Fetches product categories (cuisines, item types).
+   * Caches result for 5 minutes.
    * @returns {Promise<Array>} List of product categories.
    */
-  const fetchProductCategories = useCallback(async () => {
+  const fetchProductCategories = useCallback(async (force = false) => {
+    const now = Date.now();
+    if (!force && productCategoriesCache.current && (now - lastProductCategoriesFetch.current < CATEGORY_CACHE_TTL)) {
+      console.debug('[ProductsContext] Serving Product Categories from cache');
+      return productCategoriesCache.current;
+    }
+
     try {
       const endpoint = API_ENDPOINTS.UTIL.PRODUCT_CATEGORIES;
       const url = `${BASE_API_URL}${endpoint}`;
@@ -499,7 +557,7 @@ export const ProductsProvider = ({ children }) => {
       const json = await res.json();
       const items = json.data?.data || [];
 
-      return items.map(item => ({
+      const mapped = items.map(item => ({
         id: item._id,
         _id: item._id,
         name: item.name,
@@ -509,9 +567,50 @@ export const ProductsProvider = ({ children }) => {
         businessCategoryId: item.businessCategoryId,
         isActive: item.isActive
       }));
+
+      // Update Cache
+      productCategoriesCache.current = mapped;
+      lastProductCategoriesFetch.current = Date.now();
+
+      return mapped;
     } catch (err) {
       console.error('[ProductsContext] Product Categories Error:', err);
       return [];
+    }
+  }, []);
+
+  /**
+   * Fetches full details for a single product by ID or SKU.
+   * Useful for getting extended data not present in list views (e.g. nutrition, full descriptions).
+   *
+   * @param {string} productId - ID or SKU of the product
+   */
+  const fetchProductDetails = useCallback(async (productId) => {
+    if (!productId) return null;
+
+    // Check cache/existing products first?
+    // Usually we want fresh data for details, but could return existing as placeholder.
+
+    try {
+      let token = await getAccessToken();
+      if (token && typeof token === 'object') token = token.accessToken || token.token || null;
+
+      const headers = { Accept: 'application/json' };
+      if (token) headers.Authorization = token.startsWith('Bearer ') ? token : `Bearer ${token}`;
+
+      const url = `${BASE_API_URL}${API_ENDPOINTS.PRODUCTS.GET_ALL}/${productId}`; // Assumes /products/:id
+      console.log('[ProductsContext] Fetching details:', url);
+
+      const res = await fetch(url, { headers });
+      if (!res.ok) throw new Error(`HTTP ${res.status}`);
+
+      const json = await res.json();
+      const raw = json.data || json.product || json;
+
+      return normalizeProduct(raw);
+    } catch (err) {
+      console.error('[ProductsContext] Failed to fetch product details:', err);
+      return null;
     }
   }, []);
 
@@ -534,8 +633,9 @@ export const ProductsProvider = ({ children }) => {
     lastUpdated,
     fetchRestaurantMenu,
     fetchBusinessCategories,
-    fetchProductCategories
-  }), [products, loading, error, fetchProducts, params, lastUpdated, fetchRestaurantMenu, fetchBusinessCategories, fetchProductCategories]);
+    fetchProductCategories,
+    fetchProductDetails // Add the new function here
+  }), [products, loading, error, fetchProducts, setProducts, params, setParams, lastUpdated, fetchRestaurantMenu, fetchBusinessCategories, fetchProductCategories, fetchProductDetails]);
 
   return (
     <ProductsContext.Provider value={contextValue}>
