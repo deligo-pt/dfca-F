@@ -29,6 +29,7 @@ export const translations = {
     mAgo: 'm ago',
     hAgo: 'h ago',
     searchPlaceholderHeader: 'Search restaurants, cuisines, dishes...',
+    awaitingPartner: 'Looking for Driver',
     awaitingDriver: 'Awaiting Driver',
 
     // Navigation
@@ -68,6 +69,19 @@ export const translations = {
     viewAll: 'View All',
 
     noProductCategoriesAdded: 'No product categories added',
+    pizza: 'Pizza',
+    burger: 'Burger',
+    chinese: 'Chinese',
+    indian: 'Indian',
+    healthy: 'Healthy',
+    dessert: 'Dessert',
+    coffee: 'Coffee',
+    dairy: 'Dairy',
+    fruits: 'Fruits',
+    snacks: 'Snacks',
+    beverages: 'Beverages',
+    frozen: 'Frozen',
+    household: 'Household',
 
     // Categories Screen
     whatDoYouNeed: "What's on your mind?",
@@ -252,6 +266,12 @@ export const translations = {
     // Track Order Screen
     loadingOrder: 'Loading order details...',
     readyForPickup: 'Ready for Pickup',
+    orderPending: 'Order Pending',
+    waitingForRestaurant: 'Waiting for restaurant response',
+    orderAccepted: 'Order Accepted',
+    restaurantAccepted: 'Restaurant accepted your order',
+    findingDriver: 'Finding delivery partner...',
+    driverAssignedPreparing: 'Driver assigned • Preparing your order',
 
     // Rating Modal
     rateOrder: 'Rate Order',
@@ -937,6 +957,12 @@ export const translations = {
 
     // Track Order Screen
     readyForPickup: 'Pronto para Recolha',
+    orderPending: 'Pedido Pendente',
+    waitingForRestaurant: 'Aguardando resposta do restaurante',
+    orderAccepted: 'Pedido Aceite',
+    restaurantAccepted: 'Restaurante aceitou o seu pedido',
+    findingDriver: 'A procurar estafeta...',
+    driverAssignedPreparing: 'Estafeta atribuído • A preparar o seu pedido',
     pickedUp: 'Recolhido',
     nearby: 'Por perto',
     restaurantPreparing: 'O restaurante está a preparar o seu pedido',

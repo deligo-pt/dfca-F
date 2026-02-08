@@ -1013,6 +1013,28 @@ const CheckoutScreen = ({ route, navigation }) => {
           <View style={styles(colors).successDetails}>
             <Text style={styles(colors).successDetailText}>{t('estimatedDeliveryTime')}: 25-35 {t('min')}</Text>
           </View>
+          {/* Manual navigation button as fallback */}
+          <TouchableOpacity
+            style={{
+              marginTop: 24,
+              backgroundColor: colors.primary,
+              paddingVertical: 14,
+              paddingHorizontal: 32,
+              borderRadius: 30,
+              elevation: 2,
+            }}
+            onPress={() => {
+              setShowSuccessModal(false);
+              navigation.reset({
+                index: 0,
+                routes: [{ name: 'Main', params: { screen: 'Orders' } }]
+              });
+            }}
+          >
+            <Text style={{ color: '#fff', fontFamily: 'Poppins-Bold', fontSize: 16 }}>
+              {t('viewOrders') || 'View Orders'} →
+            </Text>
+          </TouchableOpacity>
         </View>
       </View>
     </Modal>

@@ -106,7 +106,45 @@ export const OrdersProvider = ({ children }) => {
       }
 
       const ordersData = responseData?.data || [];
-      const newOrders = Array.isArray(ordersData) ? ordersData : [];
+      const rawOrders = Array.isArray(ordersData) ? ordersData : [];
+
+      // Normalize orders to ensure consistent structure (ids as strings, etc.)
+      const newOrders = rawOrders.map(order => {
+        // Handle vendorId
+        let normalizedVendorId = order.vendorId;
+        let vendorName = order.vendorName;
+        if (typeof order.vendorId === 'object' && order.vendorId) {
+          normalizedVendorId = order.vendorId._id || order.vendorId;
+          // Extract vendor name if missing
+          if (!vendorName) {
+            const v = order.vendorId;
+            if (v.name && typeof v.name === 'object') {
+              vendorName = `${v.name.firstName || ''} ${v.name.lastName || ''}`.trim();
+            } else {
+              vendorName = v.businessName || v.businessDetails?.businessName || v.name || v.vendorName || 'Vendor';
+            }
+          }
+        }
+
+        // Handle items
+        const normalizedItems = (order.items || []).map(item => {
+          let productName = item.name;
+          let productId = item.productId;
+          if (typeof item.productId === 'object' && item.productId) {
+            productName = item.productId.name || item.name || 'Product';
+            productId = item.productId._id;
+          }
+          return { ...item, name: productName, productId };
+        });
+
+        return {
+          ...order,
+          vendorId: normalizedVendorId,
+          vendorName: vendorName || order.vendorName,
+          items: normalizedItems
+        };
+      });
+
       setOrders(newOrders);
       lastFetchedRef.current = Date.now();
     } catch (e) {
@@ -123,11 +161,8 @@ export const OrdersProvider = ({ children }) => {
     if (!isConnected || !socket) return;
 
     // Join tracking room for each ongoing order
-    // leveraging the memoized ongoingOrders from below would be ideal, 
-    // but we can't use it before it's defined. 
-    // However, 'orders' state is available.
     const currentOngoingOrders = orders.filter(order =>
-      ['PENDING', 'ACCEPTED', 'APPROVED', 'CONFIRMED', 'PREPARING', 'ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'ON_THE_WAY'].includes(order.orderStatus?.toUpperCase())
+      ['PENDING', 'ACCEPTED', 'APPROVED', 'CONFIRMED', 'PREPARING', 'AWAITING_PARTNER', 'DISPATCHING', 'ASSIGNED', 'REASSIGNMENT_NEEDED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'ON_THE_WAY', 'ARRIVED_AT_PICKUP', 'ARRIVED_AT_DELIVERY'].includes(order.orderStatus?.toUpperCase())
     );
 
     currentOngoingOrders.forEach(order => {
@@ -188,11 +223,11 @@ export const OrdersProvider = ({ children }) => {
 
   /**
    * Derived state: Orders currently in progress.
-   * Statuses: PENDING, ACCEPTED, APPROVED, CONFIRMED, PREPARING, ASSIGNED, PICKED_UP, OUT_FOR_DELIVERY, ON_THE_WAY
+   * Statuses: PENDING, ACCEPTED, APPROVED, CONFIRMED, PREPARING, AWAITING_PARTNER, DISPATCHING, ASSIGNED, REASSIGNMENT_NEEDED, PICKED_UP, OUT_FOR_DELIVERY, ON_THE_WAY, ARRIVED_AT_PICKUP, ARRIVED_AT_DELIVERY
    */
   const ongoingOrders = useMemo(() =>
     orders.filter(order =>
-      ['PENDING', 'ACCEPTED', 'APPROVED', 'CONFIRMED', 'PREPARING', 'ASSIGNED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'ON_THE_WAY'].includes(order.orderStatus?.toUpperCase())
+      ['PENDING', 'ACCEPTED', 'APPROVED', 'CONFIRMED', 'PREPARING', 'AWAITING_PARTNER', 'DISPATCHING', 'ASSIGNED', 'REASSIGNMENT_NEEDED', 'PICKED_UP', 'OUT_FOR_DELIVERY', 'ON_THE_WAY', 'ARRIVED_AT_PICKUP', 'ARRIVED_AT_DELIVERY'].includes(order.orderStatus?.toUpperCase())
     ), [orders]
   );
 

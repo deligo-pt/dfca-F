@@ -478,7 +478,8 @@ export default function CartDetail({ vendorId, navigation }) {
               const discount = totals.discount || 0;
               const addons = totals.addonsTotal || 0;
               const subtotalNet = totals.totalPrice || 0; // Items Net + Addons
-              const taxItems = totals.itemsTax || 0;
+              // Use backend's total taxAmount for accuracy instead of locally calculated itemsTax
+              const taxItems = totals.taxAmount || totals.itemsTax || 0;
               const taxAddons = totals.addonsTax || 0;
               const grandTotal = totals.grandTotal || 0;
 

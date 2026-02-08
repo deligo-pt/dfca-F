@@ -24,6 +24,7 @@ import {
   StatusBar,
   BackHandler
 } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons, MaterialIcons } from '@expo/vector-icons';
 import { useLanguage } from '../utils/LanguageContext';
@@ -32,161 +33,25 @@ import { BASE_API_URL, API_ENDPOINTS } from '../constants/config';
 import StorageService from '../utils/storage';
 import { useCart } from '../contexts/CartContext';
 import { useProducts } from '../contexts/ProductsContext';
+import { useOrders } from '../contexts/OrdersContext'; // Import useOrders hook
 
 const OrdersScreen = ({ navigation }) => {
   const { t } = useLanguage();
   const { colors, isDarkMode } = useTheme();
+  // Get orders and actions from OrdersContext
+  const { ongoingOrders, pastOrders, loading: ordersLoading, fetchOrders } = useOrders();
   const [activeTab, setActiveTab] = useState('ongoing');
-  const [orders, setOrders] = useState([]);
-  const [loading, setLoading] = useState(true);
   const [refreshing, setRefreshing] = useState(false);
-  const [error, setError] = useState(null);
 
   // Get products from ProductsContext to lookup vendor businessName
   const { products } = useProducts();
 
-  // Fetch orders from API
-  const fetchOrders = async (isRefreshing = false) => {
-    try {
-      if (!isRefreshing) setLoading(true);
-      setError(null);
+  // Computed state for display
+  const [displayOrders, setDisplayOrders] = useState([]);
 
-      // Get auth token
-      let token = await StorageService.getAccessToken();
-      if (token && typeof token === 'object') {
-        token = token.accessToken || token.token || token.value;
-      }
-
-      const headers = {
-        'Content-Type': 'application/json',
-        'Accept': 'application/json',
-      };
-
-      if (token) {
-        const rawToken = token.startsWith('Bearer ') ? token.substring(7) : token;
-        headers.Authorization = rawToken;
-      }
-
-      console.debug('[OrdersScreen] Fetching orders from API');
-      const url = `${BASE_API_URL}${API_ENDPOINTS.ORDERS.LIST}`;
-
-      // Add timeout to prevent infinite loading
-      const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 10000);
-
-      try {
-        const response = await fetch(url, {
-          method: 'GET',
-          headers,
-          signal: controller.signal,
-        });
-        clearTimeout(timeoutId);
-
-        const responseData = await response.json();
-        console.debug('[OrdersScreen] Orders response:', responseData);
-
-        if (!response.ok) {
-          throw new Error(responseData?.message || 'Failed to fetch orders');
-        }
-
-        // Extract orders from response
-        const ordersData = responseData?.data || [];
-        // Normalize vendorId, vendorName, customerId, deliveryAddress, and items
-        const normalizedOrders = ordersData.map(order => {
-          // Handle vendorId - extract _id and build vendorName from businessName or nested name object
-          let normalizedVendorId = order.vendorId;
-          let vendorName = order.vendorName;
-          if (typeof order.vendorId === 'object' && order.vendorId) {
-            normalizedVendorId = order.vendorId._id || order.vendorId;
-            // Priority: businessName > businessDetails.businessName > firstName+lastName
-            const vendor = order.vendorId;
-            const businessDetails = vendor.businessDetails || {};
-            if (vendor.businessName) {
-              vendorName = vendor.businessName;
-            } else if (businessDetails.businessName) {
-              vendorName = businessDetails.businessName;
-            } else if (typeof vendor.name === 'object' && vendor.name) {
-              // Handle nested name object with firstName/lastName
-              vendorName = `${vendor.name.firstName || ''} ${vendor.name.lastName || ''}`.trim() || 'Vendor';
-            } else {
-              vendorName = vendor.name || vendor.vendorName || vendorName || 'Vendor';
-            }
-          }
-
-          // Handle deliveryAddress - build address string from object
-          let deliveryAddressString = order.deliveryAddress;
-          if (typeof order.deliveryAddress === 'object' && order.deliveryAddress) {
-            const addr = order.deliveryAddress;
-            deliveryAddressString = [addr.street, addr.city, addr.state, addr.country]
-              .filter(Boolean)
-              .join(', ') || 'Address';
-          }
-
-          // Handle customerId - extract _id and build customer name from nested name object
-          let normalizedCustomerId = order.customerId;
-          let customerName = '';
-          if (typeof order.customerId === 'object' && order.customerId) {
-            normalizedCustomerId = order.customerId._id || order.customerId;
-            // Handle nested name object with firstName/lastName
-            if (typeof order.customerId.name === 'object' && order.customerId.name) {
-              customerName = `${order.customerId.name.firstName || ''} ${order.customerId.name.lastName || ''}`.trim() || 'Customer';
-            } else {
-              customerName = order.customerId.name || 'Customer';
-            }
-          }
-
-          // Handle items - extract product name from productId object
-          const normalizedItems = (order.items || []).map(item => {
-            let productName = item.name;
-            if (typeof item.productId === 'object' && item.productId) {
-              productName = item.productId.name || item.name || 'Product';
-            }
-            return {
-              ...item,
-              name: productName,
-              productId: typeof item.productId === 'object' ? item.productId._id : item.productId
-            };
-          });
-
-          return {
-            ...order,
-            vendorId: normalizedVendorId,
-            vendorName: vendorName,
-            deliveryAddress: deliveryAddressString,
-            customerId: normalizedCustomerId,
-            customerName: customerName,
-            items: normalizedItems
-          };
-        });
-        setOrders(normalizedOrders);
-
-        // Update vendor business names from ProductsContext
-        // This is called synchronously since we already have the products data
-        setTimeout(() => updateOrdersWithBusinessNames(normalizedOrders), 0);
-      } catch (fetchError) {
-        clearTimeout(timeoutId);
-        // If aborted due to timeout or network error, still set loading to false
-        if (fetchError.name === 'AbortError') {
-          console.debug('[OrdersScreen] Request timed out');
-          setOrders([]); // Show empty state on timeout
-        } else {
-          throw fetchError;
-        }
-      }
-
-    } catch (err) {
-      console.error('[OrdersScreen] Error fetching orders:', err);
-      // Don't show error for network issues, just show empty state
-      setOrders([]);
-      // setError(err.message || 'Failed to load orders');
-    } finally {
-      setLoading(false);
-      setRefreshing(false);
-    }
-  };
-  // Get vendor business names from ProductsContext products
-  const getVendorBusinessNames = (vendorIds) => {
-    const vendorNameMap = {};
+  // Get vendor details (name + image) from ProductsContext products
+  const getVendorDetails = (vendorIds) => {
+    const vendorMap = {};
 
     vendorIds.forEach(vendorId => {
       // Find a product from this vendor in the products array
@@ -197,38 +62,64 @@ const OrdersScreen = ({ navigation }) => {
       });
 
       if (productFromVendor) {
-        // The normalized product has vendor.vendorName which contains businessName
-        // from normalizeProduct logic: vendorSource.businessName || businessDetails.businessName
-        const businessName = productFromVendor.vendor?.vendorName;
-        if (businessName && businessName !== 'Unknown') {
-          vendorNameMap[vendorId] = businessName;
-          console.debug(`[OrdersScreen] Found businessName for vendor ${vendorId}:`, businessName);
+        // The normalized product has vendor object with vendorName and storePhoto
+        const v = productFromVendor.vendor;
+        if (v) {
+          vendorMap[vendorId] = {
+            name: v.vendorName !== 'Unknown' ? v.vendorName : null,
+            image: v.storePhoto
+          };
+          console.debug(`[OrdersScreen] Found details for vendor ${vendorId}:`, vendorMap[vendorId]);
         }
       }
     });
 
-    return vendorNameMap;
+    return vendorMap;
   };
 
-  // Update orders with vendor business names from ProductsContext
-  const updateOrdersWithBusinessNames = (ordersToUpdate) => {
+  // Update orders with vendor business names and images from ProductsContext
+  const updateOrdersWithVendorDetails = (ordersToUpdate) => {
     const uniqueVendorIds = [...new Set(ordersToUpdate.map(o => o.vendorId).filter(Boolean))];
     if (uniqueVendorIds.length === 0) return;
 
-    const vendorNameMap = getVendorBusinessNames(uniqueVendorIds);
+    const vendorMap = getVendorDetails(uniqueVendorIds);
 
-    if (Object.keys(vendorNameMap).length > 0) {
-      setOrders(prevOrders => prevOrders.map(order => ({
-        ...order,
-        vendorName: vendorNameMap[order.vendorId] || order.vendorName
-      })));
-      console.debug('[OrdersScreen] Updated orders with vendor business names from ProductsContext:', vendorNameMap);
+    if (Object.keys(vendorMap).length > 0) {
+      setDisplayOrders(prevOrders => prevOrders.map(order => {
+        const details = vendorMap[order.vendorId];
+        return {
+          ...order,
+          vendorName: details?.name || order.vendorName,
+          vendorImage: details?.image || order.vendorImage
+        };
+      }));
+      console.debug('[OrdersScreen] Updated orders with vendor details from ProductsContext');
     }
   };
 
+  // Sync display orders when tab changes or context data updates
   useEffect(() => {
-    fetchOrders();
+    if (activeTab === 'ongoing') {
+      setDisplayOrders(ongoingOrders);
+      // Update vendor details for ongoing orders
+      setTimeout(() => updateOrdersWithVendorDetails(ongoingOrders), 0);
+    } else {
+      setDisplayOrders(pastOrders);
+      // Update vendor details for past orders
+      setTimeout(() => updateOrdersWithVendorDetails(pastOrders), 0);
+    }
+  }, [activeTab, ongoingOrders, pastOrders, products]);
 
+  // Initial fetch on mount handled by Context, but we can force refresh if needed
+  useEffect(() => {
+    const unsubscribe = navigation.addListener('focus', () => {
+      // Optional: force fetch on focus if needed, but context handles auth-based fetching
+      // fetchOrders(); 
+    });
+    return unsubscribe;
+  }, [navigation]);
+
+  useEffect(() => {
     const backAction = () => {
       // If we are on Orders tab, pressing back should probably go to Home tab
       navigation.navigate('Main');
@@ -243,60 +134,38 @@ const OrdersScreen = ({ navigation }) => {
     return () => backHandler.remove();
   }, []);
 
-  // Update orders with business names when products change (in case products load after orders)
-  useEffect(() => {
-    if (orders.length > 0 && products.length > 0) {
-      updateOrdersWithBusinessNames(orders);
-    }
-  }, [products]); // Re-run when products update
-
-  const handleRefresh = () => {
+  const handleRefresh = async () => {
     setRefreshing(true);
-    fetchOrders(true);
+    await fetchOrders(true); // Force refresh
+    setRefreshing(false);
   };
-
-  // Separate orders into ongoing and history based on the provided status list
-  const getOngoingOrders = () => {
-    return orders.filter(order =>
-      ['PENDING', 'ACCEPTED', 'AWAITING_PARTNER', 'DISPATCHING', 'ASSIGNED', 'REASSIGNMENT_NEEDED', 'PICKED_UP', 'ON_THE_WAY'].includes(order.orderStatus?.toUpperCase())
-    );
-  };
-
-  const getHistoryOrders = () => {
-    return orders.filter(order =>
-      ['DELIVERED', 'CANCELED', 'REJECTED'].includes(order.orderStatus?.toUpperCase())
-    );
-  };
-
-  const ongoingOrders = getOngoingOrders();
-  const historyOrders = getHistoryOrders();
 
   const getStatusIcon = (status) => {
     const statusUpper = status?.toUpperCase();
     switch (statusUpper) {
       case 'PENDING':
-        return { name: 'time', library: 'Ionicons', color: colors.warning || '#FFA500' };
+        return { name: 'clock-outline', library: 'MaterialCommunityIcons', color: colors.warning || '#FFA500' };
       case 'ACCEPTED':
-        return { name: 'checkmark-circle', library: 'Ionicons', color: colors.success || '#4CAF50' };
+        return { name: 'check-circle-outline', library: 'MaterialCommunityIcons', color: colors.success || '#4CAF50' };
       case 'AWAITING_PARTNER':
-        return { name: 'time', library: 'Ionicons', color: colors.warning || '#FFA500' };
+        return { name: 'account-clock-outline', library: 'MaterialCommunityIcons', color: colors.warning || '#FFA500' };
       case 'DISPATCHING':
-        return { name: 'bicycle', library: 'Ionicons', color: colors.info || '#2196F3' };
+        return { name: 'bike', library: 'MaterialCommunityIcons', color: colors.info || '#2196F3' };
       case 'ASSIGNED':
-        return { name: 'person-outline', library: 'Ionicons', color: colors.info || '#2196F3' };
+        return { name: 'account-check-outline', library: 'MaterialCommunityIcons', color: colors.info || '#2196F3' };
       case 'REASSIGNMENT_NEEDED':
-        return { name: 'alert-circle', library: 'Ionicons', color: colors.error || '#F44336' };
+        return { name: 'alert-circle-outline', library: 'MaterialCommunityIcons', color: colors.error || '#F44336' };
       case 'PICKED_UP':
-        return { name: 'bicycle', library: 'Ionicons', color: colors.info || '#2196F3' };
+        return { name: 'bike-fast', library: 'MaterialCommunityIcons', color: colors.info || '#2196F3' };
       case 'ON_THE_WAY':
-        return { name: 'bicycle', library: 'Ionicons', color: colors.info || '#2196F3' };
+        return { name: 'map-marker-path', library: 'MaterialCommunityIcons', color: colors.info || '#2196F3' };
       case 'DELIVERED':
-        return { name: 'checkmark-circle', library: 'Ionicons', color: colors.success || '#4CAF50' };
+        return { name: 'check-decagram', library: 'MaterialCommunityIcons', color: colors.success || '#4CAF50' };
       case 'CANCELED':
       case 'REJECTED':
-        return { name: 'close-circle', library: 'Ionicons', color: colors.error || '#F44336' };
+        return { name: 'close-circle-outline', library: 'MaterialCommunityIcons', color: colors.error || '#F44336' };
       default:
-        return { name: 'time', library: 'Ionicons', color: colors.text?.secondary || '#999' };
+        return { name: 'clock-outline', library: 'MaterialCommunityIcons', color: colors.text?.secondary || '#999' };
     }
   };
 
@@ -434,15 +303,17 @@ const OrdersScreen = ({ navigation }) => {
     // Get items list as string
     const itemsList = order.items?.map(item => `${item.quantity}x ${item.name}`).join(', ') || t('items') || 'items';
 
-    // Placeholder image
-    const restaurantImage = require('../assets/images/logo.png');
+    // Use vendor image if available, else placeholder
+    const restaurantImage = order.vendorImage
+      ? { uri: order.vendorImage }
+      : require('../assets/images/logo.png');
 
     return (
       <TouchableOpacity
         key={order._id || order.orderId}
         style={[styles.orderCard, { backgroundColor: colors.surface, shadowColor: colors.shadow }]}
         activeOpacity={0.9}
-        onPress={() => isOngoing ? navigation.navigate('TrackOrder', { order }) : null}
+        onPress={() => navigation.navigate('TrackOrder', { order })}
       >
         {/* Top Section: Vendor Info & Status */}
         <View style={styles.cardHeader}>
@@ -464,7 +335,14 @@ const OrdersScreen = ({ navigation }) => {
               <Text style={[styles.dateText, { color: colors.text.light }]}>
                 {formatDate(order.createdAt)} • {formatTime(order.createdAt)}
               </Text>
-              <View style={[styles.statusBadge, { backgroundColor: statusIcon.color + '15' }]}>
+              {/* Status Badge with Material Icon */}
+              <View style={[styles.statusBadge, { backgroundColor: statusIcon.color + '15', flexDirection: 'row', alignItems: 'center' }]}>
+                <MaterialCommunityIcons
+                  name={statusIcon.name}
+                  size={12}
+                  color={statusIcon.color}
+                  style={{ marginRight: 4 }}
+                />
                 <Text style={[styles.statusText, { color: statusIcon.color }]}>
                   {getStatusText(order.orderStatus)}
                 </Text>
@@ -583,16 +461,9 @@ const OrdersScreen = ({ navigation }) => {
         </View>
 
         {/* Orders List */}
-        {loading && !refreshing ? (
+        {ordersLoading && !refreshing ? (
           <View style={styles.loadingContainer}>
             <ActivityIndicator size="large" color={colors.primary} />
-          </View>
-        ) : error ? (
-          <View style={styles.errorContainer}>
-            <Text style={[styles.errorText, { color: colors.text.secondary }]}>{t('somethingWentWrong') || 'Something went wrong'}</Text>
-            <TouchableOpacity onPress={() => fetchOrders()} style={{ marginTop: 10 }}>
-              <Text style={{ color: colors.primary, fontFamily: 'Poppins-SemiBold' }}>{t('tryAgain') || 'Try Again'}</Text>
-            </TouchableOpacity>
           </View>
         ) : (
           <ScrollView
@@ -608,18 +479,10 @@ const OrdersScreen = ({ navigation }) => {
               />
             }
           >
-            {activeTab === 'ongoing' ? (
-              ongoingOrders.length > 0 ? (
-                ongoingOrders.map(order => renderOrderCard(order, true))
-              ) : (
-                renderEmptyState('ongoing')
-              )
+            {displayOrders.length > 0 ? (
+              displayOrders.map(order => renderOrderCard(order, activeTab === 'ongoing'))
             ) : (
-              historyOrders.length > 0 ? (
-                historyOrders.map(order => renderOrderCard(order, false))
-              ) : (
-                renderEmptyState('history')
-              )
+              renderEmptyState(activeTab)
             )}
           </ScrollView>
         )}
@@ -633,38 +496,43 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: 20,
-    paddingVertical: 15,
+    paddingHorizontal: 24,
+    paddingVertical: 16,
     backgroundColor: '#FAFAFA',
   },
   headerTitle: {
-    fontSize: 26,
+    fontSize: 28,
     fontFamily: 'Poppins-Bold',
+    letterSpacing: -0.5,
+    color: '#1a1a1a',
   },
   tabContainer: {
-    paddingHorizontal: 20,
-    marginBottom: 20,
+    paddingHorizontal: 24,
+    marginBottom: 24,
   },
   tabWrapper: {
     flexDirection: 'row',
-    borderRadius: 25,
+    borderRadius: 16,
     padding: 4,
-    height: 44,
+    height: 50,
+    backgroundColor: '#f0f0f0',
   },
   tab: {
     flex: 1,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 22,
+    borderRadius: 14,
   },
   activeTab: {
-    elevation: 2,
-    shadowOffset: { width: 0, height: 1 },
+    backgroundColor: '#fff',
+    elevation: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.1,
-    shadowRadius: 2,
+    shadowRadius: 4,
   },
   tabText: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: 'Poppins-SemiBold',
   },
   loadingContainer: {
@@ -681,35 +549,42 @@ const styles = StyleSheet.create({
     paddingBottom: 100,
   },
   // Card Styles
+  // Card Styles - Premium Industry Grade
   orderCard: {
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 16,
+    borderRadius: 24,
+    padding: 20,
+    marginBottom: 24,
     backgroundColor: '#fff',
-    elevation: 2,
-    shadowOffset: { width: 0, height: 2 },
+    elevation: 8,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.08,
-    shadowRadius: 6,
+    shadowRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.03)',
   },
   cardHeader: {
     flexDirection: 'row',
+    alignItems: 'center',
   },
   restaurantImage: {
-    width: 48,
-    height: 48,
-    borderRadius: 10,
-    backgroundColor: '#eee',
+    width: 64,
+    height: 64,
+    borderRadius: 18,
+    backgroundColor: '#f5f5f5',
+    borderWidth: 1,
+    borderColor: 'rgba(0,0,0,0.05)',
   },
   headerContent: {
     flex: 1,
-    marginLeft: 12,
+    marginLeft: 16,
     justifyContent: 'center',
   },
   headerRow: {
     flexDirection: 'row',
     justifyContent: 'space-between',
     alignItems: 'center',
-    marginBottom: 4,
+    marginBottom: 6,
   },
   subHeaderRow: {
     flexDirection: 'row',
@@ -717,67 +592,82 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   restaurantName: {
-    fontSize: 15,
+    fontSize: 17,
     fontFamily: 'Poppins-Bold',
+    color: '#1a1a1a',
     flex: 1,
     marginRight: 8,
+    letterSpacing: -0.3,
   },
   orderPrice: {
-    fontSize: 15,
+    fontSize: 17,
     fontFamily: 'Poppins-Bold',
+    color: '#1a1a1a',
   },
   dateText: {
     fontSize: 12,
     fontFamily: 'Poppins-Medium',
+    opacity: 0.6,
   },
   statusBadge: {
-    paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingHorizontal: 12,
+    paddingVertical: 6,
+    borderRadius: 20,
   },
   statusText: {
-    fontSize: 11,
-    fontFamily: 'Poppins-SemiBold',
+    fontSize: 10,
+    fontFamily: 'Poppins-Bold',
     textTransform: 'uppercase',
+    letterSpacing: 0.5,
   },
   divider: {
     height: 1,
-    marginVertical: 12,
-    opacity: 0.5,
+    marginVertical: 18,
+    backgroundColor: '#f0f0f0',
   },
   itemsContainer: {
-    marginBottom: 16,
+    marginBottom: 18,
   },
   itemsText: {
-    fontSize: 13,
+    fontSize: 14,
     fontFamily: 'Poppins-Regular',
-    lineHeight: 18,
+    lineHeight: 22,
+    color: '#666',
   },
   actionsContainer: {
     flexDirection: 'row',
   },
   primaryButton: {
     flex: 1,
-    height: 42,
-    borderRadius: 21,
+    height: 50,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    elevation: 4,
+    shadowColor: '#FC8019',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
   },
   primaryButtonText: {
     color: '#fff',
-    fontSize: 14,
-    fontFamily: 'Poppins-SemiBold',
+    fontSize: 15,
+    fontFamily: 'Poppins-Bold',
+    letterSpacing: 0.5,
   },
   reorderButton: {
     flex: 1,
-    height: 42,
-    borderRadius: 21,
+    height: 50,
+    borderRadius: 16,
     alignItems: 'center',
     justifyContent: 'center',
+    borderWidth: 1,
+    borderColor: 'transparent',
+    backgroundColor: 'rgba(252, 128, 25, 0.08)',
   },
   reorderButtonText: {
-    fontSize: 14,
-    fontFamily: 'Poppins-SemiBold',
+    fontSize: 15,
+    fontFamily: 'Poppins-Bold',
   },
   // Empty State Styles
   emptyState: {

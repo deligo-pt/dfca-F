@@ -485,6 +485,7 @@ export const CartProvider = ({ children }) => {
       // Extract variation data needed for identification on backend
       // Extract variation data directly from current state
       let variantName = null;
+      let variationSku = null; // CRITICAL: Required for products with variations
       let realProductId = canonicalKey; // Default to key if lookup fails (fallback)
 
       const carts = state.carts || {};
@@ -499,6 +500,9 @@ export const CartProvider = ({ children }) => {
           } else {
             variantName = rawVariant;
           }
+
+          // Extract variationSku - CRITICAL for backend identification
+          variationSku = item.variationSku || item.product?.variationSku || item.product?._raw?.variationSku || null;
 
           // Extract the actual product ID from the item
           if (item.product && item.product.id) {
@@ -519,7 +523,8 @@ export const CartProvider = ({ children }) => {
 
       const action = delta > 0 ? 'increment' : 'decrement';
       // Use the actual product ID, not the internal composite key
-      const res = await CartAPI.activateItem(realProductId, Math.abs(delta), action, variantName);
+      // Pass variationSku for products with variations
+      const res = await CartAPI.activateItem(realProductId, Math.abs(delta), action, variantName, variationSku);
 
       if (!res.success) {
         console.warn('[Cart] API Sync Failed:', res);

@@ -142,10 +142,9 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    paddingHorizontal: 20,
-    paddingVertical: 16,
-    backgroundColor: '#F9F9F9',
-    // Removed border/shadow for glovo-like cleanliness
+    paddingHorizontal: 24,
+    paddingVertical: 18,
+    backgroundColor: '#FAFAFA',
   },
   headerContent: {
     flexDirection: 'row',
@@ -154,6 +153,8 @@ const styles = StyleSheet.create({
   headerTitle: {
     fontSize: 28,
     fontFamily: 'Poppins-Bold',
+    letterSpacing: -0.5,
+    color: '#1a1a1a',
   },
   badge: {
     marginLeft: 12,
@@ -209,14 +210,14 @@ const styles = StyleSheet.create({
     lineHeight: 22,
   },
   browseButton: {
-    paddingHorizontal: 40,
+    paddingHorizontal: 32,
     paddingVertical: 16,
-    borderRadius: 30,
-    elevation: 4,
+    borderRadius: 24,
+    elevation: 6,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
   },
   browseButtonText: {
     color: '#fff',

@@ -132,7 +132,7 @@ class CartAPI {
    * @param {string} action - 'increment' or 'decrement'
    * @returns {Promise}
    */
-  static async activateItem(productId, quantity, action = 'increment', variantName = null) {
+  static async activateItem(productId, quantity, action = 'increment', variantName = null, variationSku = null) {
     try {
       // Update item quantity via dedicated endpoint
       const url = `${BASE_API_URL}${API_ENDPOINTS.CART.UPDATE_QUANTITY}`;
@@ -143,6 +143,11 @@ class CartAPI {
       // Include variantName if provided (required for products with variations)
       if (variantName) {
         payload.variantName = variantName;
+      }
+
+      // Include variationSku if provided (CRITICAL for products with variations)
+      if (variationSku) {
+        payload.variationSku = variationSku;
       }
 
       console.debug('[CartAPI] PATCH', url, payload);

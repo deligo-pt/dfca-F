@@ -21,12 +21,14 @@ import {
   StatusBar,
   BackHandler,
   ActivityIndicator,
+  Easing,
+  AppState,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { spacing, fontSize, borderRadius } from '../theme';
-import { Ionicons, MaterialIcons } from '@expo/vector-icons';
+import { Ionicons, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme, darkMapStyle } from '../utils/ThemeContext';
 import { useSocket } from '../contexts/SocketContext';
@@ -36,6 +38,9 @@ const { height } = Dimensions.get('window');
 
 import { customerApi } from '../utils/api';
 import OrderRatingModal from '../components/OrderRatingModal';
+
+// Google Maps API Key for ETA calculations
+const GOOGLE_MAPS_API_KEY = 'AIzaSyCZ1jixNYbSRM21Uq82a6KXNO_FSpLUwaQ';
 
 // Format address object to string
 const formatAddress = (addr) => {
@@ -71,13 +76,13 @@ const TrackOrderScreen = ({ route, navigation }) => {
   // Map API status to internal stage
   const mapOrderStatusToStage = (status) => {
     const statusMap = {
-      'PENDING': 'preparing',
-      'ACCEPTED': 'preparing',
+      'PENDING': 'pending',
+      'ACCEPTED': 'accepted',
+      'AWAITING_PARTNER': 'accepted', // Use accepted stage but show specific text
+      'REASSIGNMENT_NEEDED': 'accepted',
+      'DISPATCHING': 'accepted', // Still finding driver
+      'ASSIGNED': 'preparing',    // Driver assigned, now preparing? Or vice versa. Let's stick to sequence.
       'PREPARING': 'preparing',
-      'AWAITING_PARTNER': 'preparing',
-      'REASSIGNMENT_NEEDED': 'preparing',
-      'DISPATCHING': 'preparing', // Driver dispatching
-      'ASSIGNED': 'preparing',    // Driver assigned
 
       'READY_FOR_PICKUP': 'ready',
 
@@ -88,16 +93,18 @@ const TrackOrderScreen = ({ route, navigation }) => {
       // 'NEARBY': 'nearby', // Not in backend list
 
       'DELIVERED': 'delivered',
-      'CANCELED': 'delivered',
-      'REJECTED': 'delivered',
+      'CANCELED': 'cancelled',
+      'REJECTED': 'cancelled',
     };
-    return statusMap[status?.toUpperCase()] || 'preparing';
+    return statusMap[status?.toUpperCase()] || 'pending';
   };
 
-  const initialStatus = order?.orderStatus ? mapOrderStatusToStage(order.orderStatus) : 'preparing';
+  const initialStatus = order?.orderStatus ? mapOrderStatusToStage(order.orderStatus) : 'pending';
   const [currentStatus, setCurrentStatus] = useState(initialStatus);
   const [progressAnim] = useState(new Animated.Value(0));
-  const mapRef = useRef(null);
+  const inlineMapRef = useRef(null);
+  const fullscreenMapRef = useRef(null);
+  const geocodingCache = useRef({});
 
   // Location state management
   const [userLocation, setUserLocation] = useState(null);
@@ -105,49 +112,126 @@ const TrackOrderScreen = ({ route, navigation }) => {
   const [restaurantLocation, setRestaurantLocation] = useState(null);
   const [routeCoordinates, setRouteCoordinates] = useState([]);
   const [mapReady, setMapReady] = useState(false);
-  const [mapLayout, setMapLayout] = useState(false);
+  const [inlineMapLayout, setInlineMapLayout] = useState(false);
+  const [fullscreenMapLayout, setFullscreenMapLayout] = useState(false);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
   const [driverEta, setDriverEta] = useState(null);
   const [callModalVisible, setCallModalVisible] = useState(false);
+  const [messageModalVisible, setMessageModalVisible] = useState(false);
   const [callTarget, setCallTarget] = useState({ name: '', phone: '', cleanPhone: '', type: '' });
+  const [initialFitDone, setInitialFitDone] = useState(false);
+  const [lastDriverUpdate, setLastDriverUpdate] = useState(null);
+  const [isDriverLive, setIsDriverLive] = useState(false);
+  const fittingTimeoutRef = useRef(null);
+  const lastEtaRequestTime = useRef(0);
 
-  // Calculate ETA based on distance
+  // Check driver liveness periodically
   useEffect(() => {
-    if (driverLocation && userLocation) {
-      const getDistanceFromLatLonInKm = (lat1, lon1, lat2, lon2) => {
-        const R = 6371; // Radius of the earth in km
-        const dLat = deg2rad(lat2 - lat1);
-        const dLon = deg2rad(lon2 - lon1);
-        const a =
-          Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-          Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
-          Math.sin(dLon / 2) * Math.sin(dLon / 2);
-        const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-        const d = R * c; // Distance in km
-        return d;
-      };
-
-      const deg2rad = (deg) => {
-        return deg * (Math.PI / 180);
-      };
-
-      const dist = getDistanceFromLatLonInKm(
-        driverLocation.latitude,
-        driverLocation.longitude,
-        userLocation.latitude,
-        userLocation.longitude
-      );
-
-      // Assume average city speed of 20 km/h + 2 mins buffer
-      // Time = Distance / Speed
-      const speedKmH = 20;
-      const hours = dist / speedKmH;
-      const minutes = Math.ceil(hours * 60) + 2;
-
-      // If very close, say 1 min
-      setDriverEta(minutes < 1 ? 1 : minutes);
+    if (!lastDriverUpdate) {
+      if (isDriverLive) setIsDriverLive(false);
+      return;
     }
+
+    const checkLiveness = () => {
+      const now = Date.now();
+      const diff = now - lastDriverUpdate;
+      // Consider live if update within last 2 minutes (120000ms)
+      const isLive = diff < 120000;
+      if (isLive !== isDriverLive) setIsDriverLive(isLive);
+    };
+
+    checkLiveness(); // Check immediately
+    const intervalId = setInterval(checkLiveness, 30000); // Check every 30s
+
+    return () => clearInterval(intervalId);
+  }, [lastDriverUpdate, isDriverLive]);
+
+  // Pulse Animation for Active Stage
+  const activeStagePulse = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.loop(
+      Animated.timing(activeStagePulse, {
+        toValue: 1,
+        duration: 2000,
+        useNativeDriver: true,
+        easing: Easing.out(Easing.ease),
+      })
+    ).start();
+  }, []);
+
+  // Calculate ETA using Google Distance Matrix API or Fallback
+  useEffect(() => {
+    let active = true;
+    const minRequestInterval = 30000; // Throttle API calls to every 30 seconds
+
+    const fetchGoogleEta = async (origin, destination) => {
+      const now = Date.now();
+      if (now - lastEtaRequestTime.current < minRequestInterval) {
+        return;
+      }
+
+      try {
+        console.log('[TrackOrder] Fetching Google ETA...');
+        const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origin.latitude},${origin.longitude}&destinations=${destination.latitude},${destination.longitude}&key=${GOOGLE_MAPS_API_KEY}`;
+
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (active && data.status === 'OK' && data.rows[0].elements[0].status === 'OK') {
+          const duration = data.rows[0].elements[0].duration;
+          // duration.value is in seconds
+          const minutes = Math.ceil(duration.value / 60);
+          console.log(`[TrackOrder] Google ETA: ${minutes} mins (${duration.text})`);
+          setDriverEta(minutes);
+          lastEtaRequestTime.current = now;
+          return true;
+        } else {
+          console.warn('[TrackOrder] Google Distance Matrix API error:', data.status, data.error_message);
+          return false;
+        }
+      } catch (error) {
+        console.error('[TrackOrder] Google API fetch failed:', error);
+        return false;
+      }
+    };
+
+    const calculateFallbackEta = (lat1, lon1, lat2, lon2) => {
+      const R = 6371; // Radius of the earth in km
+      const deg2rad = (deg) => deg * (Math.PI / 180);
+      const dLat = deg2rad(lat2 - lat1);
+      const dLon = deg2rad(lon2 - lon1);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(deg2rad(lat1)) * Math.cos(deg2rad(lat2)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const d = R * c; // Distance in km
+
+      const speedKmH = 20; // Average city speed
+      const hours = d / speedKmH;
+      const minutes = Math.ceil(hours * 60) + 2;
+      return minutes < 1 ? 1 : minutes;
+    };
+
+    if (driverLocation && userLocation) {
+      // Try Google API first
+      fetchGoogleEta(driverLocation, userLocation).then(success => {
+        if (!success && active) {
+          // Fallback to manual calculation
+          const fallbackMin = calculateFallbackEta(
+            driverLocation.latitude,
+            driverLocation.longitude,
+            userLocation.latitude,
+            userLocation.longitude
+          );
+          setDriverEta(fallbackMin);
+        }
+      });
+    }
+
+    return () => { active = false; };
   }, [driverLocation, userLocation]);
 
   // Trigger rating automatically when order is delivered
@@ -240,7 +324,57 @@ const TrackOrderScreen = ({ route, navigation }) => {
     fetchOrderDetails();
 
     return () => { isActive = false; };
-  }, [paramOrderId, paramOrder]);
+    return () => { isActive = false; };
+  }, [order?._id, order?.vendorId, order?.items]);
+
+  // Smart Polling Mechanism (Hybrid Approach)
+  useEffect(() => {
+    // Only poll if:
+    // 1. We have an order ID
+    // 2. Driver is NOT strictly "Live" (socket active & recent)
+    // 3. Status is active (picked_up, on_the_way, nearby)
+    const shouldPoll = order?._id && !isDriverLive &&
+      ['PICKED_UP', 'ON_THE_WAY', 'NEARBY', 'ASSIGNED'].includes(order?.orderStatus);
+
+    if (!shouldPoll) return;
+
+    const pollInterval = setInterval(async () => {
+      // Don't poll if app is in background to save resources
+      if (AppState.currentState !== 'active') {
+        console.log('[TrackOrder] App in background, skipping poll');
+        return;
+      }
+
+      try {
+        // Use paramOrderId (from navigation) as it's proven to work for initial fetch
+        // Or fallback to order.orderId or order._id if available
+        const idToUse = paramOrderId || order?.orderId || order?._id;
+        console.log(`[TrackOrder] Smart Polling: Fetching snapshot for ID: ${idToUse}`);
+
+        const url = API_ENDPOINTS.ORDERS.GET_BY_ID.replace(':id', idToUse);
+        const response = await customerApi.get(url);
+
+        if (response && response.success && response.data) {
+          const newOrder = response.data;
+          // Only update if location changed to avoid map jitters
+          const newPartner = newOrder.deliveryPartnerId;
+          if (newPartner?.currentSessionLocation?.coordinates) {
+            const newCoords = {
+              latitude: newPartner.currentSessionLocation.coordinates[1],
+              longitude: newPartner.currentSessionLocation.coordinates[0]
+            };
+            console.log('[TrackOrder] Smart Polling: Got new snapshot coords:', newCoords);
+            setDriverLocation(newCoords);
+            // We do NOT set isDriverLive to true here, because this is a snapshot, not a live stream.
+          }
+        }
+      } catch (err) {
+        console.log('[TrackOrder] Smart Polling failed:', err.message);
+      }
+    }, 45000); // 45 seconds interval - low pressure
+
+    return () => clearInterval(pollInterval);
+  }, [order?._id, isDriverLive, order?.orderStatus]);
 
   // Normalize order data structure
   const normalizeOrderData = (data) => {
@@ -303,8 +437,17 @@ const TrackOrderScreen = ({ route, navigation }) => {
     let restaurantCoords = null;
     const vendorObj = typeof data.vendorId === 'object' ? data.vendorId : (typeof data.vendor === 'object' ? data.vendor : null);
 
-    // 1. Check top-level fully populated vendor object
-    if (vendorObj) {
+    // 1. Check for explicit pickupAddress (Highest Priority)
+    if (data.pickupAddress && typeof data.pickupAddress.latitude === 'number' && typeof data.pickupAddress.longitude === 'number') {
+      restaurantCoords = {
+        latitude: data.pickupAddress.latitude,
+        longitude: data.pickupAddress.longitude
+      };
+      console.log('[TrackOrder] Using pickupAddress for restaurant location:', restaurantCoords);
+    }
+
+    // 2. Check top-level fully populated vendor object (Fallback)
+    if (!restaurantCoords && vendorObj) {
       if (typeof vendorObj.latitude === 'number' && typeof vendorObj.longitude === 'number') {
         restaurantCoords = { latitude: vendorObj.latitude, longitude: vendorObj.longitude };
       } else if (vendorObj.location && Array.isArray(vendorObj.location.coordinates)) {
@@ -387,7 +530,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
       orderDate: orderDate,
       orderTime: orderTime,
       restaurantName: restaurantName,
-      restaurantAddress: data.restaurantAddress || '',
+      restaurantAddress: data.pickupAddress ? formatAddress(data.pickupAddress) : (data.restaurantAddress || ''),
       restaurantPhone: data.restaurantPhone || '',
       restaurantImage: data.restaurantImage || '',
       restaurantCoordinates: restaurantCoords,
@@ -422,9 +565,27 @@ const TrackOrderScreen = ({ route, navigation }) => {
 
   const orderStages = useMemo(() => [
     {
+      id: 'pending',
+      title: t('orderPending') || 'Order Pending',
+      subtitle: t('waitingForRestaurant') || 'Waiting for restaurant response',
+      icon: 'time',
+      iconLibrary: 'Ionicons',
+    },
+    {
+      id: 'accepted',
+      title: t('orderAccepted') || 'Order Accepted',
+      subtitle: (order?.orderStatus === 'AWAITING_PARTNER' || order?.orderStatus === 'DISPATCHING' || order?.orderStatus === 'REASSIGNMENT_NEEDED')
+        ? (t('findingDriver') || 'Finding delivery partner...')
+        : (t('restaurantAccepted') || 'Restaurant accepted your order'),
+      icon: 'checkmark-circle',
+      iconLibrary: 'Ionicons',
+    },
+    {
       id: 'preparing',
-      title: t('preparing'),
-      subtitle: t('restaurantPreparing'),
+      title: t('preparing') || 'Preparing',
+      subtitle: (order?.orderStatus === 'ASSIGNED')
+        ? (t('driverAssignedPreparing') || 'Driver assigned • Preparing your order')
+        : (t('restaurantPreparing') || 'Restaurant is preparing your order'),
       icon: 'restaurant',
       iconLibrary: 'MaterialIcons',
     },
@@ -535,31 +696,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
 
   // Handle driver messaging
   const handleMessageDriver = () => {
-    Alert.alert(
-      t('messageDriver'),
-      `${t('messageDriver')} ${orderData.driverName}?`,
-      [
-        {
-          text: t('cancel'),
-          style: 'cancel',
-        },
-        {
-          text: t('quickMessages'),
-          onPress: () => showQuickMessages(),
-        },
-        {
-          text: t('customMessage'),
-          onPress: () => {
-            // In production, this would open a chat interface
-            Alert.alert(
-              t('chat'),
-              t('chatFeatureText'),
-              [{ text: 'OK' }]
-            );
-          },
-        },
-      ]
-    );
+    setMessageModalVisible(true);
   };
 
   // Quick Message Templates
@@ -630,21 +767,37 @@ const TrackOrderScreen = ({ route, navigation }) => {
         } else {
           // Try geocoding the address string if we have a real address
           if (orderData.deliveryAddress && orderData.deliveryAddress !== 'Delivery address' && orderData.deliveryAddress.trim() !== '') {
-            try {
-              console.log('[TrackOrder] Geocoding address:', orderData.deliveryAddress);
-              const geocoded = await Location.geocodeAsync(orderData.deliveryAddress);
-              if (geocoded && geocoded.length > 0) {
-                const geoCoords = { latitude: geocoded[0].latitude, longitude: geocoded[0].longitude };
-                console.log('[TrackOrder] Geocoded delivery address:', geoCoords);
-                if (active) {
-                  setUserLocation(geoCoords);
-                  orderDeliveryCoords = geoCoords;
-                }
-              } else {
-                console.warn('[TrackOrder] Geocoding returned no results');
+            const addressKey = orderData.deliveryAddress.trim();
+
+            // Check cache first
+            if (geocodingCache.current[addressKey]) {
+              const cachedCoords = geocodingCache.current[addressKey];
+              console.log('[TrackOrder] Using cached delivery coordinates:', cachedCoords);
+              if (active) {
+                setUserLocation(cachedCoords);
+                orderDeliveryCoords = cachedCoords;
               }
-            } catch (e) {
-              console.warn('[TrackOrder] Geocoding failed:', e);
+            } else {
+              try {
+                console.log('[TrackOrder] Geocoding address:', addressKey);
+                const geocoded = await Location.geocodeAsync(addressKey);
+                if (geocoded && geocoded.length > 0) {
+                  const geoCoords = { latitude: geocoded[0].latitude, longitude: geocoded[0].longitude };
+                  console.log('[TrackOrder] Geocoded delivery address:', geoCoords);
+
+                  // Save to cache
+                  geocodingCache.current[addressKey] = geoCoords;
+
+                  if (active) {
+                    setUserLocation(geoCoords);
+                    orderDeliveryCoords = geoCoords;
+                  }
+                } else {
+                  console.warn('[TrackOrder] Geocoding returned no results');
+                }
+              } catch (e) {
+                console.warn('[TrackOrder] Geocoding failed:', e);
+              }
             }
           } else {
             console.warn('[TrackOrder] No delivery address available in order');
@@ -682,11 +835,30 @@ const TrackOrderScreen = ({ route, navigation }) => {
             } else if (typeof cl.latitude === 'number') {
               partnerCoords = { latitude: cl.latitude, longitude: cl.longitude };
             }
+          } else if (partner.currentSessionLocation) {
+            const csl = partner.currentSessionLocation;
+            if (Array.isArray(csl.coordinates)) {
+              partnerCoords = { latitude: csl.coordinates[1], longitude: csl.coordinates[0] };
+            } else if (typeof csl.latitude === 'number') {
+              partnerCoords = { latitude: csl.latitude, longitude: csl.longitude };
+            }
           }
 
           if (partnerCoords) {
             console.log('[TrackOrder] Using real driver coordinates from order:', partnerCoords);
-            if (active) setDriverLocation(partnerCoords);
+            if (active) {
+              setDriverLocation(partnerCoords);
+
+              // Initialize last driver update time
+              // Do NOT set lastDriverUpdate from initial load. 
+              // We want "LIVE" to mean strictly "Connected to Socket".
+              // if (partner.currentSessionLocation?.lastLocationUpdate) {
+              //   const lastUpdate = new Date(partner.currentSessionLocation.lastLocationUpdate).getTime();
+              //   if (!isNaN(lastUpdate)) {
+              //     setLastDriverUpdate(lastUpdate);
+              //   }
+              // }
+            }
           } else {
             console.log('[TrackOrder] Driver assigned but no location data - waiting for socket updates');
           }
@@ -703,21 +875,26 @@ const TrackOrderScreen = ({ route, navigation }) => {
       }
     })();
     return () => { active = false; };
-  }, [order, orderData.restaurantCoordinates]);
+  }, [order?._id, order?.orderStatus, order?.driverId, order?.deliveryPartnerId?._id]);
 
   // Fetch vendor details if needed
   useEffect(() => {
     const fetchVendorDetails = async () => {
-      // Skip if we already have restaurant location
-      if (restaurantLocation) {
-        console.log('[TrackOrder] Vendor: Already have restaurant location, skipping fetch');
+      // 0. If order has specific restaurant/pickup coordinates, ALWAYS use them
+      if (orderData.restaurantCoordinates) {
+        // Check if different to avoid unnecessary updates
+        if (!restaurantLocation ||
+          restaurantLocation.latitude !== orderData.restaurantCoordinates.latitude ||
+          restaurantLocation.longitude !== orderData.restaurantCoordinates.longitude) {
+          console.log('[TrackOrder] Vendor: Updating coords from orderData:', orderData.restaurantCoordinates);
+          setRestaurantLocation(orderData.restaurantCoordinates);
+        }
         return;
       }
 
-      // Skip if order data already has coordinates
-      if (orderData.restaurantCoordinates) {
-        console.log('[TrackOrder] Vendor: Using coords from orderData:', orderData.restaurantCoordinates);
-        setRestaurantLocation(orderData.restaurantCoordinates);
+      // Skip if we already have restaurant location (from manual fetch below)
+      if (restaurantLocation) {
+        console.log('[TrackOrder] Vendor: Already have restaurant location, skipping fetch');
         return;
       }
 
@@ -854,6 +1031,41 @@ const TrackOrderScreen = ({ route, navigation }) => {
     fetchVendorDetails();
   }, [order?.vendorId, order?.items, orderData.restaurantCoordinates, restaurantLocation]);
 
+  // Helper for safe map fitting
+  const safeFitToCoordinates = (ref, isLayoutReady, coords, padding = { top: 100, right: 50, bottom: 350, left: 50 }) => {
+    if (!ref.current || !isLayoutReady || coords.length < 2) return;
+
+    // Clear any existing fitting timeout to prevent race conditions
+    if (fittingTimeoutRef.current) {
+      clearTimeout(fittingTimeoutRef.current);
+    }
+
+    // Mandatory delay to ensure native map instance is truly ready after layout
+    fittingTimeoutRef.current = setTimeout(() => {
+      if (ref.current) {
+        try {
+          console.log(`[TrackOrder] Power Fitting ${ref === inlineMapRef ? 'inline' : 'fullscreen'} map to ${coords.length} points`);
+          ref.current.fitToCoordinates(coords, {
+            edgePadding: padding,
+            animated: true,
+          });
+        } catch (e) {
+          console.warn('[TrackOrder] Map fit error:', e.message);
+        }
+      }
+      fittingTimeoutRef.current = null;
+    }, 1000); // 1 second delay for stability
+  };
+
+  // Cleanup timeouts on unmount
+  useEffect(() => {
+    return () => {
+      if (fittingTimeoutRef.current) {
+        clearTimeout(fittingTimeoutRef.current);
+      }
+    };
+  }, []);
+
   // Update route and fit map when locations change
   useEffect(() => {
     const points = [];
@@ -863,20 +1075,20 @@ const TrackOrderScreen = ({ route, navigation }) => {
 
     setRouteCoordinates(points);
 
-    if (points.length > 1 && mapRef.current) {
-      // Debounce map fitting slightly to ensure layout is ready
+    if (points.length > 1) {
+      // Fit inline map
       setTimeout(() => {
-        try {
-          mapRef.current.fitToCoordinates(points, {
-            edgePadding: { top: 100, right: 50, bottom: 350, left: 50 }, // Increased bottom padding for sheet
-            animated: true,
-          });
-        } catch (e) {
-          console.warn('[TrackOrder] Map fit error:', e);
-        }
+        safeFitToCoordinates(inlineMapRef, inlineMapLayout, points);
       }, 500);
+
+      // Fit fullscreen map if active
+      if (isMapFullscreen) {
+        setTimeout(() => {
+          safeFitToCoordinates(fullscreenMapRef, fullscreenMapLayout, points, { top: 100, right: 50, bottom: 100, left: 50 });
+        }, 600);
+      }
     }
-  }, [restaurantLocation, driverLocation, userLocation]);
+  }, [restaurantLocation, driverLocation, userLocation, inlineMapLayout, fullscreenMapLayout, isMapFullscreen]);
 
   // Socket Integration
   const { socket, joinRoom, leaveRoom, isConnected } = useSocket();
@@ -892,14 +1104,16 @@ const TrackOrderScreen = ({ route, navigation }) => {
       return;
     }
 
-    console.log('[TrackOrder] Setting up live tracking for order:', order._id);
+    console.log('[TrackOrder] [Socket] Setting up live tracking for order:', order._id);
+    console.log('[TrackOrder] [Socket] Socket connected:', socket.id);
 
     // Join the specific order room
+    console.log('[TrackOrder] [Socket] Joining room: join-order-tracking', { orderId: order._id });
     joinRoom('join-order-tracking', { orderId: order._id });
 
     // Listen for live location updates from delivery partner
     const handleLocationUpdate = (data) => {
-      console.log('[TrackOrder] 📍 Received live driver location:', data);
+      console.log('[TrackOrder] [Socket] 📍 Received live driver location data:', JSON.stringify(data));
       if (data && (data.latitude !== undefined) && (data.longitude !== undefined)) {
         const newLocation = {
           latitude: Number(data.latitude),
@@ -907,6 +1121,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
         };
         console.log('[TrackOrder] Updating driver marker to:', newLocation);
         setDriverLocation(newLocation);
+        setLastDriverUpdate(Date.now());
       } else {
         console.warn('[TrackOrder] Received invalid location data:', data);
       }
@@ -919,6 +1134,17 @@ const TrackOrderScreen = ({ route, navigation }) => {
         const newStage = mapOrderStatusToStage(data.orderStatus);
         console.log('[TrackOrder] Status changed to:', data.orderStatus, '-> stage:', newStage);
         setCurrentStatus(newStage);
+
+        // Update local order data to reflect change immediately
+        setFetchedOrder(prev => {
+          // If we have previous data, merge it. Otherwise use current 'order' or empty
+          const baseOrder = prev || order || {};
+          return {
+            ...baseOrder,
+            ...data,
+            orderStatus: data.orderStatus
+          };
+        });
       }
     };
 
@@ -927,7 +1153,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
     socket.on('order-updated', handleOrderUpdate); // Alternative event name
 
     return () => {
-      console.log('[TrackOrder] Cleaning up socket listeners');
+      console.log('[TrackOrder] [Socket] Cleaning up socket listeners for order:', order._id);
       socket.off('delivery-location-live', handleLocationUpdate);
       socket.off('order-status-update', handleOrderUpdate);
       socket.off('order-updated', handleOrderUpdate);
@@ -959,31 +1185,22 @@ const TrackOrderScreen = ({ route, navigation }) => {
 
   // Reset map layout state when switching fullscreen mode
   useEffect(() => {
-    setMapLayout(false);
-    // We might also want to reset mapRef if possible, but refs are mutable.
-    // The key is to force the layout check again.
-  }, [isMapFullscreen]);
-
-  // Adjust map viewport
-  useEffect(() => {
-    if (mapReady && mapLayout && mapRef.current && routeCoordinates.length > 0) {
-      const timeoutId = setTimeout(() => {
-        // Double-check mapRef is still valid
-        if (mapRef.current && routeCoordinates.length > 0) {
-          try {
-            mapRef.current.fitToCoordinates(routeCoordinates, {
-              edgePadding: { top: 100, right: 50, bottom: 300, left: 50 },
-              animated: true,
-            });
-          } catch (error) {
-            console.log('Error fitting map to coordinates:', error);
-          }
-        }
-      }, 500);
-
-      return () => clearTimeout(timeoutId);
+    // We don't necessarily need to reset here if we use separate trackers
+    // but we can trigger a fit if needed
+    if (isMapFullscreen && fullscreenMapLayout && routeCoordinates.length > 1) {
+      safeFitToCoordinates(fullscreenMapRef, fullscreenMapLayout, routeCoordinates, { top: 100, right: 50, bottom: 100, left: 50 });
     }
-  }, [mapReady, mapLayout, routeCoordinates]);
+  }, [isMapFullscreen, fullscreenMapLayout]);
+
+  // Initial fit logic
+  useEffect(() => {
+    if (mapReady && routeCoordinates.length > 0 && !initialFitDone) {
+      if (inlineMapLayout) {
+        safeFitToCoordinates(inlineMapRef, inlineMapLayout, routeCoordinates);
+        setInitialFitDone(true);
+      }
+    }
+  }, [mapReady, inlineMapLayout, routeCoordinates, initialFitDone]);
 
   useEffect(() => {
     // Simulate order progress
@@ -1009,9 +1226,129 @@ const TrackOrderScreen = ({ route, navigation }) => {
 
   const isCurrentStage = (stageId) => {
     return currentStatus === stageId;
+    return currentStatus === stageId;
+  };
+
+  // --- Animation for Waiting View ---
+  const pulseAnim = useRef(new Animated.Value(1)).current;
+
+  useEffect(() => {
+    if (currentStatus === 'pending') {
+      Animated.loop(
+        Animated.sequence([
+          Animated.timing(pulseAnim, {
+            toValue: 1.2,
+            duration: 1000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+          Animated.timing(pulseAnim, {
+            toValue: 1,
+            duration: 1000,
+            easing: Easing.inOut(Easing.ease),
+            useNativeDriver: true,
+          }),
+        ])
+      ).start();
+    } else {
+      pulseAnim.setValue(1); // Reset
+    }
+  }, [currentStatus]);
+
+  const renderWaitingView = () => (
+    <View style={[styles.mapContainer, { alignItems: 'center', justifyContent: 'center', backgroundColor: colors.surface }]}>
+      <Animated.View style={{
+        transform: [{ scale: pulseAnim }],
+        marginBottom: spacing.lg,
+        alignItems: 'center',
+        justifyContent: 'center',
+        width: 100,
+        height: 100,
+        borderRadius: 50,
+        backgroundColor: colors.primary + '15', // Light primary background
+      }}>
+        <MaterialCommunityIcons name="store-clock-outline" size={48} color={colors.primary} />
+      </Animated.View>
+      <Text style={{
+        fontSize: fontSize.lg,
+        fontFamily: 'Poppins-Bold',
+        color: colors.text.primary,
+        marginBottom: spacing.xs,
+        textAlign: 'center',
+      }}>{t('orderPending') || 'Order Pending'}</Text>
+      <Text style={{
+        fontSize: fontSize.sm,
+        fontFamily: 'Poppins-Regular',
+        color: colors.text.secondary,
+        textAlign: 'center',
+        paddingHorizontal: spacing.xl,
+      }}>{t('waitingForRestaurant') || 'Waiting for restaurant response'}</Text>
+    </View>
+  );
+
+  const renderMessageModal = () => {
+    return (
+      <Modal
+        animationType="fade"
+        transparent={true}
+        visible={messageModalVisible}
+        onRequestClose={() => setMessageModalVisible(false)}
+      >
+        <TouchableOpacity
+          style={styles.modalOverlay}
+          activeOpacity={1}
+          onPress={() => setMessageModalVisible(false)}
+        >
+          <View style={[styles.modalContent, { backgroundColor: isDarkMode ? '#1E1E1E' : '#FFFFFF' }]}>
+            <View style={[styles.modalIconContainer, { backgroundColor: colors.primary + '20' }]}>
+              <Ionicons name="chatbubble" size={32} color={colors.primary} />
+            </View>
+
+            <Text style={[styles.modalTitle, { color: colors.text.primary }]}>{t('messageDriver')}</Text>
+            <Text style={[styles.modalSubtitle, { color: colors.text.secondary }]}>
+              {t('messageDriver')} <Text style={{ fontWeight: 'bold', color: colors.text.primary }}>{orderData.driverName}</Text>?
+            </Text>
+
+            <View style={{ width: '100%', gap: 12, marginTop: 20 }}>
+              <TouchableOpacity
+                style={[styles.modalButtonSecondary, { borderColor: colors.primary }]}
+                onPress={() => {
+                  setMessageModalVisible(false);
+                  // Navigate to chat or show feature alert
+                  Alert.alert(t('chat'), t('chatFeatureText'), [{ text: 'OK' }]);
+                }}
+              >
+                <Text style={[styles.modalButtonSecondaryText, { color: colors.primary }]}>{t('customMessage')}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.modalButtonSecondary, { borderColor: colors.secondary }]}
+                onPress={() => {
+                  setMessageModalVisible(false);
+                  showQuickMessages();
+                }}
+              >
+                <Text style={[styles.modalButtonSecondaryText, { color: colors.secondary }]}>{t('quickMessages')}</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={{ alignSelf: 'center', padding: 8, marginTop: 4 }}
+                onPress={() => setMessageModalVisible(false)}
+              >
+                <Text style={{ fontSize: fontSize.md, fontFamily: 'Poppins-Medium', color: colors.text.secondary }}>{t('cancel')}</Text>
+              </TouchableOpacity>
+            </View>
+          </View>
+        </TouchableOpacity>
+      </Modal>
+    );
   };
 
   const renderMapPlaceholder = () => {
+    // Show Animated Waiting View if status is PENDING
+    if (currentStatus === 'pending') {
+      return renderWaitingView();
+    }
     // If no location data available at all, show unavailable message
     if (!userLocation && !restaurantLocation) {
       return (
@@ -1029,10 +1366,18 @@ const TrackOrderScreen = ({ route, navigation }) => {
     // Determine which location to center the map on
     const centerLocation = userLocation || restaurantLocation;
 
+    console.log('[TrackOrder] Map Render:', {
+      hasDriverLocation: !!driverLocation,
+      driverCoords: driverLocation,
+      status: currentStatus,
+      driverName: orderData.driverName,
+      isDriverLive: isDriverLive
+    });
+
     return (
       <View style={styles.mapContainer}>
         <MapView
-          ref={mapRef}
+          ref={inlineMapRef}
           provider={PROVIDER_GOOGLE}
           style={styles.map}
           onMapReady={() => setMapReady(true)}
@@ -1053,7 +1398,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
           onLayout={(e) => {
             const { width, height } = e.nativeEvent.layout;
             if (width > 50 && height > 50) {
-              setMapLayout(true);
+              setInlineMapLayout(true);
             }
           }}
         >
@@ -1072,8 +1417,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
             </Marker>
           )}
 
-          {/* Driver Marker */}
-          {driverLocation && (currentStatus === 'picked_up' || currentStatus === 'on_the_way' || currentStatus === 'nearby') && (
+          {driverLocation && (
             <Marker
               coordinate={driverLocation}
               title={orderData.driverName}
@@ -1119,7 +1463,9 @@ const TrackOrderScreen = ({ route, navigation }) => {
         {/* Delivery ETA Badge */}
         <View style={styles.etaBadge}>
           <Ionicons name="time-outline" size={18} color={colors.text.white} />
-          <Text style={styles.etaText}>{orderData.estimatedTime}</Text>
+          <Text style={styles.etaText}>
+            {driverEta ? `${driverEta} min` : orderData.estimatedTime}
+          </Text>
         </View>
 
 
@@ -1137,12 +1483,12 @@ const TrackOrderScreen = ({ route, navigation }) => {
           <TouchableOpacity
             style={styles.zoomButton}
             onPress={() => {
-              if (mapRef.current) {
+              if (inlineMapRef.current) {
                 try {
-                  mapRef.current.getCamera().then((cam) => {
-                    if (mapRef.current) {
+                  inlineMapRef.current.getCamera().then((cam) => {
+                    if (inlineMapRef.current) {
                       cam.zoom += 1;
-                      mapRef.current.animateCamera(cam);
+                      inlineMapRef.current.animateCamera(cam);
                     }
                   }).catch(err => console.log('Zoom in error:', err));
                 } catch (error) {
@@ -1157,12 +1503,12 @@ const TrackOrderScreen = ({ route, navigation }) => {
           <TouchableOpacity
             style={styles.zoomButton}
             onPress={() => {
-              if (mapRef.current) {
+              if (inlineMapRef.current) {
                 try {
-                  mapRef.current.getCamera().then((cam) => {
-                    if (mapRef.current) {
+                  inlineMapRef.current.getCamera().then((cam) => {
+                    if (inlineMapRef.current) {
                       cam.zoom -= 1;
-                      mapRef.current.animateCamera(cam);
+                      inlineMapRef.current.animateCamera(cam);
                     }
                   }).catch(err => console.log('Zoom out error:', err));
                 } catch (error) {
@@ -1179,9 +1525,9 @@ const TrackOrderScreen = ({ route, navigation }) => {
         <TouchableOpacity
           style={styles.myLocationButton}
           onPress={() => {
-            if (userLocation && mapRef.current) {
+            if (userLocation && inlineMapRef.current) {
               try {
-                mapRef.current.animateToRegion({
+                inlineMapRef.current.animateToRegion({
                   latitude: userLocation.latitude,
                   longitude: userLocation.longitude,
                   latitudeDelta: 0.01,
@@ -1199,91 +1545,127 @@ const TrackOrderScreen = ({ route, navigation }) => {
     );
   };
 
-  const renderOrderProgress = () => (
-    <View style={styles.progressContainer}>
-      <View style={styles.progressHeader}>
-        <Text style={styles.progressTitle}>{t('orderStatus')}</Text>
+  const renderOrderProgress = () => {
+    return (
+      <View style={styles.progressContainer}>
+        <View style={styles.progressHeader}>
+          <Text style={styles.progressTitle}>{t('orderStatus')}</Text>
+        </View>
 
-      </View>
+        {/* Stages Container - Premium Vertical Layout */}
+        <View style={styles.stagesContainer}>
+          {orderStages.map((stage, index) => {
+            const completed = isStageCompleted(stage.id);
+            const current = isCurrentStage(stage.id);
+            const isLast = index === orderStages.length - 1;
 
-      {/* Progress Bar */}
-      <View style={styles.progressBarContainer}>
-        <View style={styles.progressBarBackground} />
-        <Animated.View
-          style={[
-            styles.progressBarFill,
-            {
-              width: progressAnim.interpolate({
-                inputRange: [0, 1],
-                outputRange: ['0%', '100%'],
-              }),
-            },
-          ]}
-        />
-      </View>
-
-      {/* Order Stages */}
-      <View style={styles.stagesContainer}>
-        {orderStages.map((stage, index) => {
-          const completed = isStageCompleted(stage.id);
-          const current = isCurrentStage(stage.id);
-
-          return (
-            <View key={stage.id} style={styles.stageItem}>
-              <View style={styles.stageIconContainer}>
-                <View
-                  style={[
-                    styles.stageIconWrapper,
-                    completed && styles.stageIconCompleted,
-                    current && styles.stageIconCurrent,
-                  ]}
-                >
-                  {stage.iconLibrary === 'Ionicons' ? (
-                    <Ionicons
-                      name={stage.icon}
-                      size={20}
-                      color={completed || current ? colors.text.white : colors.text.light}
-                    />
-                  ) : (
-                    <MaterialIcons
-                      name={stage.icon}
-                      size={20}
-                      color={completed || current ? colors.text.white : colors.text.light}
-                    />
+            return (
+              <View key={stage.id} style={styles.stageItem}>
+                {/* Left Timeline Column */}
+                <View style={styles.stageIconContainer}>
+                  {/* Top Connector Line (connects to previous) */}
+                  {index > 0 && (
+                    <View style={[
+                      styles.stageConnectorTop,
+                      { backgroundColor: completed || current ? colors.primary : colors.border }
+                    ]} />
                   )}
-                </View>
-                {index < orderStages.length - 1 && (
+
+                  {/* Icon Circle */}
                   <View
                     style={[
-                      styles.stageConnector,
-                      completed && styles.stageConnectorCompleted,
+                      styles.stageIconWrapper,
+                      completed && styles.stageIconCompleted,
+                      current && styles.stageIconCurrent,
+                      !completed && !current && styles.stageIconPending
                     ]}
-                  />
-                )}
-              </View>
-              <View style={styles.stageContent}>
-                <Text
-                  style={[
-                    styles.stageTitle,
-                    (completed || current) && styles.stageTitleActive,
-                  ]}
-                >
-                  {stage.title}
-                </Text>
-                <Text style={styles.stageSubtitle}>{stage.subtitle}</Text>
-                {current && (
-                  <View style={styles.currentBadge}>
-                    <View style={styles.pulseDot} />
-                    <Text style={styles.currentBadgeText}>{t('inProgress')}</Text>
+                  >
+                    {current ? (
+                      // Active Pulse Effect
+                      <View style={styles.activePulseContainer}>
+                        <Animated.View style={[
+                          styles.pulseRing,
+                          {
+                            borderColor: colors.primary,
+                            transform: [{
+                              scale: activeStagePulse.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [1, 1.5]
+                              })
+                            }],
+                            opacity: activeStagePulse.interpolate({
+                              inputRange: [0, 1],
+                              outputRange: [0.6, 0]
+                            })
+                          }
+                        ]} />
+                        <Ionicons name={stage.icon} size={18} color={colors.text.white} />
+                      </View>
+                    ) : (
+                      // Standard Icon
+                      stage.iconLibrary === 'Ionicons' ? (
+                        <Ionicons
+                          name={completed ? 'checkmark' : stage.icon}
+                          size={18}
+                          color={completed ? colors.text.white : colors.text.light}
+                        />
+                      ) : (
+                        <MaterialIcons
+                          name={completed ? 'check' : stage.icon}
+                          size={18}
+                          color={completed ? colors.text.white : colors.text.light}
+                        />
+                      )
+                    )}
                   </View>
-                )}
+
+                  {/* Bottom Connector Line (connects to next) */}
+                  {!isLast && (
+                    <View style={[
+                      styles.stageConnectorBottom,
+                      { backgroundColor: completed ? colors.primary : colors.border }
+                    ]} />
+                  )}
+                </View>
+
+                {/* Right Content Column */}
+                <View style={[styles.stageContent, { opacity: (completed || current) ? 1 : 0.6 }]}>
+                  <Text
+                    style={[
+                      styles.stageTitle,
+                      current && styles.stageTitleActive,
+                      completed && styles.stageTitleCompleted
+                    ]}
+                  >
+                    {stage.title}
+                  </Text>
+
+                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                    {(stage.id === 'accepted' && (order?.orderStatus === 'AWAITING_PARTNER' || order?.orderStatus === 'DISPATCHING')) && (
+                      <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 8 }} />
+                    )}
+                    <Text style={[styles.stageSubtitle, { flex: 1 }]} numberOfLines={2}>
+                      {stage.subtitle && stage.subtitle !== 'findingDriver' ? stage.subtitle : (t('findingDriver') !== 'findingDriver' ? t('findingDriver') : 'Finding delivery partner...')}
+                    </Text>
+                  </View>
+
+                  {/* Current Status Badge Indicator */}
+                  {current && currentStatus !== 'delivered' && currentStatus !== 'cancelled' && (
+                    <View style={styles.currentBadge}>
+                      <View style={styles.pulseDot} />
+                      <Text style={styles.currentBadgeText}>{t('inProgress')}</Text>
+                    </View>
+                  )}
+                </View>
               </View>
-            </View>
-          );
-        })}
+            );
+          })}
+        </View>
       </View>
-    </View>
-  );
+    );
+  };
+
+
 
   const renderDriverInfo = () => (
     <View style={styles.driverContainer}>
@@ -1303,11 +1685,22 @@ const TrackOrderScreen = ({ route, navigation }) => {
           <View style={styles.driverAvatar}>
             <Ionicons name="person" size={32} color={colors.primary} />
             <View style={styles.onlineBadge}>
-              <View style={styles.onlineDot} />
+              <View style={[styles.onlineDot, { backgroundColor: isDriverLive ? '#4CAF50' : '#BDBDBD' }]} />
             </View>
           </View>
           <View style={styles.driverInfo}>
-            <Text style={styles.driverName}>{orderData.driverName}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+              <Text style={styles.driverName}>{orderData.driverName}</Text>
+              {isDriverLive ? (
+                <View style={{ backgroundColor: '#E8F5E9', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                  <Text style={{ fontSize: 10, fontFamily: 'Poppins-Bold', color: '#4CAF50' }}>LIVE</Text>
+                </View>
+              ) : (
+                <View style={{ backgroundColor: '#F5F5F5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                  <Text style={{ fontSize: 10, fontFamily: 'Poppins-Bold', color: '#757575' }}>OFFLINE</Text>
+                </View>
+              )}
+            </View>
             {(orderData.driverRating > 0 || orderData.vehicleType) && (
               <View style={styles.driverRating}>
                 {orderData.driverRating > 0 && (
@@ -1535,7 +1928,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
           ) : (
             <>
               <MapView
-                ref={mapRef}
+                ref={fullscreenMapRef}
                 provider={PROVIDER_GOOGLE}
                 style={styles.fullscreenMap}
                 initialRegion={{
@@ -1552,7 +1945,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
                 onLayout={(e) => {
                   const { width, height } = e.nativeEvent.layout;
                   if (width > 50 && height > 50) {
-                    setMapLayout(true);
+                    setFullscreenMapLayout(true);
                   }
                 }}
               >
@@ -1572,7 +1965,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
                 )}
 
                 {/* Driver Marker */}
-                {driverLocation && (currentStatus === 'picked_up' || currentStatus === 'on_the_way' || currentStatus === 'nearby') && (
+                {driverLocation && (
                   <Marker
                     coordinate={driverLocation}
                     title={orderData.driverName}
@@ -1619,7 +2012,9 @@ const TrackOrderScreen = ({ route, navigation }) => {
               {/* ETA Badge - Fullscreen */}
               <View style={styles.fullscreenEtaBadge}>
                 <Ionicons name="time-outline" size={20} color={colors.text.white} />
-                <Text style={styles.fullscreenEtaText}>{orderData.estimatedTime}</Text>
+                <Text style={styles.fullscreenEtaText}>
+                  {driverEta ? `${driverEta} min` : orderData.estimatedTime}
+                </Text>
               </View>
 
               {/* Zoom Controls - Fullscreen */}
@@ -1627,12 +2022,12 @@ const TrackOrderScreen = ({ route, navigation }) => {
                 <TouchableOpacity
                   style={styles.zoomButton}
                   onPress={() => {
-                    if (mapRef.current) {
+                    if (fullscreenMapRef.current) {
                       try {
-                        mapRef.current.getCamera().then((cam) => {
-                          if (mapRef.current) {
+                        fullscreenMapRef.current.getCamera().then((cam) => {
+                          if (fullscreenMapRef.current) {
                             cam.zoom += 1;
-                            mapRef.current.animateCamera(cam);
+                            fullscreenMapRef.current.animateCamera(cam);
                           }
                         }).catch(err => console.log('Zoom in error:', err));
                       } catch (error) {
@@ -1647,12 +2042,12 @@ const TrackOrderScreen = ({ route, navigation }) => {
                 <TouchableOpacity
                   style={styles.zoomButton}
                   onPress={() => {
-                    if (mapRef.current) {
+                    if (fullscreenMapRef.current) {
                       try {
-                        mapRef.current.getCamera().then((cam) => {
-                          if (mapRef.current) {
+                        fullscreenMapRef.current.getCamera().then((cam) => {
+                          if (fullscreenMapRef.current) {
                             cam.zoom -= 1;
-                            mapRef.current.animateCamera(cam);
+                            fullscreenMapRef.current.animateCamera(cam);
                           }
                         }).catch(err => console.log('Zoom out error:', err));
                       } catch (error) {
@@ -1669,9 +2064,9 @@ const TrackOrderScreen = ({ route, navigation }) => {
               <TouchableOpacity
                 style={styles.fullscreenMyLocationButton}
                 onPress={() => {
-                  if (userLocation && mapRef.current) {
+                  if (userLocation && fullscreenMapRef.current) {
                     try {
-                      mapRef.current.animateToRegion({
+                      fullscreenMapRef.current.animateToRegion({
                         latitude: userLocation.latitude,
                         longitude: userLocation.longitude,
                         latitudeDelta: 0.01,
@@ -1687,7 +2082,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
               </TouchableOpacity>
 
               {/* Driver Info Card - Fullscreen Bottom */}
-              {(currentStatus === 'picked_up' || currentStatus === 'on_the_way' || currentStatus === 'nearby') && (
+              {driverLocation && (
                 <View style={styles.fullscreenDriverCard}>
                   <View style={styles.driverCardContent}>
                     <View style={styles.driverLeft}>
@@ -1698,7 +2093,18 @@ const TrackOrderScreen = ({ route, navigation }) => {
                         </View>
                       </View>
                       <View style={styles.driverInfo}>
-                        <Text style={styles.driverName}>{orderData.driverName}</Text>
+                        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                          <Text style={styles.driverName}>{orderData.driverName}</Text>
+                          {isDriverLive ? (
+                            <View style={styles.liveBadge}>
+                              <Text style={styles.liveText}>LIVE</Text>
+                            </View>
+                          ) : (
+                            <View style={[styles.liveBadge, { backgroundColor: colors.text.secondary }]}>
+                              <Text style={styles.liveText}>OFFLINE</Text>
+                            </View>
+                          )}
+                        </View>
                         <View style={styles.driverRating}>
                           <Ionicons name="star" size={14} color="#FFD700" />
                           <Text style={styles.driverRatingText}>{orderData.driverRating}</Text>
@@ -1706,24 +2112,24 @@ const TrackOrderScreen = ({ route, navigation }) => {
                         </View>
                       </View>
                     </View>
-                    <View style={styles.driverActions}>
-                      <TouchableOpacity
-                        style={styles.driverActionButton}
-                        onPress={handleCallDriver}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons name="call" size={20} color={colors.primary} />
-                        <Text style={styles.actionButtonLabel}>{t('call')}</Text>
-                      </TouchableOpacity>
-                      <TouchableOpacity
-                        style={styles.driverActionButton}
-                        onPress={handleMessageDriver}
-                        activeOpacity={0.7}
-                      >
-                        <Ionicons name="chatbubble" size={20} color={colors.primary} />
-                        <Text style={styles.actionButtonLabel}>{t('chat')}</Text>
-                      </TouchableOpacity>
-                    </View>
+                  </View>
+                  <View style={styles.driverActions}>
+                    <TouchableOpacity
+                      style={styles.driverActionButton}
+                      onPress={handleCallDriver}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="call" size={20} color={colors.primary} />
+                      <Text style={styles.actionButtonLabel}>{t('call')}</Text>
+                    </TouchableOpacity>
+                    <TouchableOpacity
+                      style={styles.driverActionButton}
+                      onPress={handleMessageDriver}
+                      activeOpacity={0.7}
+                    >
+                      <Ionicons name="chatbubble" size={20} color={colors.primary} />
+                      <Text style={styles.actionButtonLabel}>{t('chat')}</Text>
+                    </TouchableOpacity>
                   </View>
                 </View>
               )}
@@ -1731,7 +2137,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
           )}
         </View>
       </SafeAreaView>
-    </Modal>
+    </Modal >
   );
 
   const styles = useMemo(() => StyleSheet.create({
@@ -1965,11 +2371,19 @@ const TrackOrderScreen = ({ route, navigation }) => {
       flexDirection: 'row',
       justifyContent: 'space-between',
       alignItems: 'center',
-      backgroundColor: colors.background,
-      padding: spacing.md,
+      backgroundColor: colors.surface,
       borderRadius: borderRadius.lg,
+      padding: spacing.md,
       borderWidth: 1,
       borderColor: colors.border,
+      // Premium Shadow
+      elevation: 4,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.1,
+      shadowRadius: 8,
+      marginHorizontal: 1,
+      marginTop: 4,
     },
     driverLeft: {
       flexDirection: 'row',
@@ -2115,22 +2529,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
       fontFamily: 'Poppins-Medium',
       color: colors.primary,
     },
-    progressBarContainer: {
-      height: 6,
-      backgroundColor: colors.border,
-      borderRadius: 3,
-      marginBottom: spacing.lg,
-      overflow: 'hidden',
-    },
-    progressBarBackground: {
-      ...StyleSheet.absoluteFillObject,
-      backgroundColor: colors.border,
-    },
-    progressBarFill: {
-      height: '100%',
-      backgroundColor: colors.primary,
-      borderRadius: 3,
-    },
+
     stagesContainer: {
       marginTop: spacing.sm,
     },
@@ -2143,39 +2542,80 @@ const TrackOrderScreen = ({ route, navigation }) => {
       marginRight: spacing.md,
     },
     stageIconWrapper: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: colors.border,
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      backgroundColor: colors.surface,
       alignItems: 'center',
       justifyContent: 'center',
+      borderWidth: 2,
+      borderColor: colors.border,
+      zIndex: 2,
     },
     stageIconCompleted: {
-      backgroundColor: colors.success,
+      backgroundColor: colors.primary,
+      borderColor: colors.primary,
     },
     stageIconCurrent: {
       backgroundColor: colors.primary,
+      borderColor: colors.primary,
+      elevation: 4,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 4,
     },
-    stageConnector: {
+    stageIconPending: {
+      backgroundColor: colors.surface,
+      borderColor: colors.border,
+    },
+    activePulseContainer: {
+      width: '100%',
+      height: '100%',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    pulseRing: {
+      position: 'absolute',
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      borderWidth: 4,
+    },
+    stageConnectorTop: {
+      position: 'absolute',
+      top: -24, // Reach up to previous item
+      bottom: '50%',
       width: 2,
-      flex: 1,
       backgroundColor: colors.border,
-      marginVertical: 4,
+      zIndex: 1,
     },
-    stageConnectorCompleted: {
-      backgroundColor: colors.success,
+    stageConnectorBottom: {
+      position: 'absolute',
+      top: '50%',
+      bottom: -24, // Reach down to next item
+      width: 2,
+      backgroundColor: colors.border,
+      zIndex: 1,
     },
     stageContent: {
       flex: 1,
-      paddingTop: 2,
+      paddingVertical: 4,
+      justifyContent: 'center',
     },
     stageTitle: {
       fontSize: fontSize.md,
-      fontFamily: 'Poppins-SemiBold',
-      color: colors.text.light,
+      fontFamily: 'Poppins-Medium',
+      color: colors.text.secondary,
       marginBottom: 2,
     },
     stageTitleActive: {
+      fontFamily: 'Poppins-Bold',
+      color: colors.primary,
+      fontSize: fontSize.md + 1,
+    },
+    stageTitleCompleted: {
+      fontFamily: 'Poppins-SemiBold',
       color: colors.text.primary,
     },
     stageSubtitle: {
@@ -2659,9 +3099,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
         <Text style={styles.headerTitle}>{t('trackOrder')}</Text>
-        <TouchableOpacity style={styles.helpButton}>
-          <Ionicons name="help-circle-outline" size={24} color={colors.text.primary} />
-        </TouchableOpacity>
+        <View style={styles.helpButton} />
       </View>
 
       <ScrollView
@@ -2670,10 +3108,10 @@ const TrackOrderScreen = ({ route, navigation }) => {
         contentContainerStyle={styles.scrollContent}
       >
         {/* Map */}
-        {renderMapPlaceholder()}
+        {currentStatus !== 'delivered' && currentStatus !== 'cancelled' && renderMapPlaceholder()}
 
         {/* Driver Info */}
-        {(currentStatus === 'picked_up' || currentStatus === 'on_the_way' || currentStatus === 'nearby') && renderDriverInfo()}
+        {(currentStatus === 'picked_up' || currentStatus === 'on_the_way' || currentStatus === 'nearby' || (currentStatus === 'preparing' && orderData.driverName)) && renderDriverInfo()}
 
         {/* Order Progress */}
         {renderOrderProgress()}
@@ -2752,6 +3190,9 @@ const TrackOrderScreen = ({ route, navigation }) => {
           </View>
         </View>
       </Modal>
+
+      {/* Message Modal */}
+      {renderMessageModal()}
 
       {/* Rating Modal */}
       <OrderRatingModal

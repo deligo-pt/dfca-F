@@ -85,6 +85,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const [updatingProductId, setUpdatingProductId] = useState(null);
   const [addingToCart, setAddingToCart] = useState(false);
   const [modalQuantity, setModalQuantity] = useState(1);
+  const [modalReady, setModalReady] = useState(false); // For fixing footer position on first render
 
   const [selectedVariations, setSelectedVariations] = useState({});
 
@@ -107,7 +108,11 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
     // Reset add-ons
     setActiveAddons([]);
+    setModalReady(false); // Reset modal ready state
     setProductModalVisible(true);
+
+    // Delay to let modal animation complete before showing footer
+    setTimeout(() => setModalReady(true), 50);
 
     // FETCH FRESH DETAILS (Single Product Get)
     // This ensures we have the latest price, tax, and stock info which might be missing from list
@@ -686,7 +691,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
       <Modal visible={productModalVisible} transparent animationType="slide" onRequestClose={closeProductModal}>
         <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
           <TouchableOpacity style={{ flex: 1 }} onPress={closeProductModal} />
-          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+          <View style={[styles.modalCard, { backgroundColor: colors.surface, flexDirection: 'column' }]}>
             {/* Image Section */}
             <View style={{ position: 'relative' }}>
               {images.length > 0 ? (
@@ -702,8 +707,8 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
             </View>
 
             <ScrollView
-              style={{ flexShrink: 1 }}
-              contentContainerStyle={{ paddingBottom: 220 }} // Large padding to clear the absolute footer completely
+              style={{ flexShrink: 1, flexGrow: 1 }}
+              contentContainerStyle={{ paddingBottom: 200 }}
               showsVerticalScrollIndicator={false}
             >
               {/* Content */}
@@ -913,351 +918,354 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
             </ScrollView>
 
-            {/* Footer - Absolute Positioned to guarantee visibility */}
-            <View style={[styles.modalFooter, {
-              position: 'absolute',
-              bottom: 0,
-              left: 0,
-              right: 0,
-              backgroundColor: colors.surface,
-              borderTopWidth: 1,
-              borderTopColor: colors.border,
-              paddingBottom: Platform.OS === 'android' ? Math.max(24, insets.bottom + 20) : Math.max(16, insets.bottom)
-            }]}>
-              <View style={{ backgroundColor: colors.primary + '05', borderRadius: borderRadius.xl, padding: spacing.md }}>
 
-                {/* Quantity Controls - Row Layout (Label Left, Controls Right) */}
-                <View style={[styles.modalQuantitySection, { marginBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-                  <Text style={[styles.modalQuantityLabel, { color: colors.text.primary }]}>{t('quantity') || 'Quantity'}</Text>
+            {/* Footer - Absolute Positioned, rendered after modal ready */}
+            {modalReady && (
+              <View style={[styles.modalFooter, {
+                position: 'absolute',
+                bottom: 0,
+                left: 0,
+                right: 0,
+                backgroundColor: colors.surface,
+                borderTopWidth: 1,
+                borderTopColor: colors.border,
+                paddingBottom: Platform.OS === 'android' ? Math.max(24, insets.bottom + 20) : Math.max(16, insets.bottom)
+              }]}>
+                <View style={{ backgroundColor: colors.primary + '05', borderRadius: borderRadius.xl, padding: spacing.md }}>
 
-                  {/* Stock Check for Modal */}
-                  {(raw.stock?.quantity ?? 999) <= 0 ? (
-                    <View style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: colors.border, borderRadius: 8 }}>
-                      <Text style={{ color: colors.text.secondary, fontWeight: 'bold' }}>{t('outOfStock') || 'Out of Stock'}</Text>
-                    </View>
-                  ) : (
-                    <View style={styles.modalQuantityControl}>
-                      <TouchableOpacity
-                        style={[styles.modalQuantityBtn, { backgroundColor: colors.primary }]}
-                        onPress={() => {
-                          if (quantity > 0) {
-                            setModalQuantity(Math.max(0, quantity - 1));
-                          }
-                        }}
-                        disabled={quantity === 0}
-                      >
-                        <Ionicons name="remove" size={22} color="#fff" />
-                      </TouchableOpacity>
-                      <Text style={[styles.modalQuantityText, { color: colors.text.primary }]}>{quantity}</Text>
-                      <TouchableOpacity
-                        style={[styles.modalQuantityBtn, { backgroundColor: colors.primary }]}
-                        onPress={() => {
-                          const currentCartQty = itemsMap?.[activeProduct.id]?.quantity || 0;
-                          const maxStock = parseInt(raw.stock?.quantity ?? 0, 10);
-                          const nextQty = quantity + 1;
+                  {/* Quantity Controls - Row Layout (Label Left, Controls Right) */}
+                  <View style={[styles.modalQuantitySection, { marginBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
+                    <Text style={[styles.modalQuantityLabel, { color: colors.text.primary }]}>{t('quantity') || 'Quantity'}</Text>
 
-                          // Check if stock info is available
-                          if (maxStock > 0) {
-                            if ((currentCartQty + nextQty) > maxStock) {
-                              setMaxQuantityData({
-                                maxStock: maxStock,
-                                currentCartQty: currentCartQty,
-                                itemName: activeProduct?.name || 'Item'
-                              });
-                              setMaxQuantityModalVisible(true);
-                              return;
+                    {/* Stock Check for Modal */}
+                    {(raw.stock?.quantity ?? 999) <= 0 ? (
+                      <View style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: colors.border, borderRadius: 8 }}>
+                        <Text style={{ color: colors.text.secondary, fontWeight: 'bold' }}>{t('outOfStock') || 'Out of Stock'}</Text>
+                      </View>
+                    ) : (
+                      <View style={styles.modalQuantityControl}>
+                        <TouchableOpacity
+                          style={[styles.modalQuantityBtn, { backgroundColor: colors.primary }]}
+                          onPress={() => {
+                            if (quantity > 0) {
+                              setModalQuantity(Math.max(0, quantity - 1));
                             }
-                          }
+                          }}
+                          disabled={quantity === 0}
+                        >
+                          <Ionicons name="remove" size={22} color="#fff" />
+                        </TouchableOpacity>
+                        <Text style={[styles.modalQuantityText, { color: colors.text.primary }]}>{quantity}</Text>
+                        <TouchableOpacity
+                          style={[styles.modalQuantityBtn, { backgroundColor: colors.primary }]}
+                          onPress={() => {
+                            const currentCartQty = itemsMap?.[activeProduct.id]?.quantity || 0;
+                            const maxStock = parseInt(raw.stock?.quantity ?? 0, 10);
+                            const nextQty = quantity + 1;
 
-                          setModalQuantity(quantity + 1);
-                        }}
-                      >
-                        <Ionicons name="add" size={22} color="#fff" />
-                      </TouchableOpacity>
-                    </View>
-                  )}
-                </View>
+                            // Check if stock info is available
+                            if (maxStock > 0) {
+                              if ((currentCartQty + nextQty) > maxStock) {
+                                setMaxQuantityData({
+                                  maxStock: maxStock,
+                                  currentCartQty: currentCartQty,
+                                  itemName: activeProduct?.name || 'Item'
+                                });
+                                setMaxQuantityModalVisible(true);
+                                return;
+                              }
+                            }
 
-                <TouchableOpacity
-                  activeOpacity={0.9}
-                  style={{
-                    borderRadius: 16,
-                    opacity: (quantity > 0 && (raw.stock?.quantity ?? 999) > 0) ? 1 : 0.5,
-                    backgroundColor: colors.primary // Ensure background is visible
-                  }}
-                  onPress={async () => {
-                    const stockQty = raw.stock?.quantity ?? 999;
-                    if (stockQty <= 0) return;
+                            setModalQuantity(quantity + 1);
+                          }}
+                        >
+                          <Ionicons name="add" size={22} color="#fff" />
+                        </TouchableOpacity>
+                      </View>
+                    )}
+                  </View>
 
-                    // Prevent double-tap
-                    if (addingToCart) return;
+                  <TouchableOpacity
+                    activeOpacity={0.9}
+                    style={{
+                      borderRadius: 16,
+                      opacity: (quantity > 0 && (raw.stock?.quantity ?? 999) > 0) ? 1 : 0.5,
+                      backgroundColor: colors.primary // Ensure background is visible
+                    }}
+                    onPress={async () => {
+                      const stockQty = raw.stock?.quantity ?? 999;
+                      if (stockQty <= 0) return;
 
-                    // Validate quantity first
-                    if (quantity === 0) {
-                      setAlertConfig({
-                        title: t('error') || 'Error',
-                        message: t('pleaseAddQuantity') || 'Please add at least 1 item'
-                      });
-                      setAlertVisible(true);
-                      return;
-                    }
+                      // Prevent double-tap
+                      if (addingToCart) return;
 
-                    // Enhanced validation: Check if product has variations and ALL are selected
-                    const variations = raw.variations || raw.options || [];
-
-                    if (variations.length > 0) {
-                      // Check if ANY variation is not selected
-                      // RELAXED: User requested optional variants. Only enforce if 'required' is explicitly true.
-                      // If your data doesn't have 'required' property, this loop effectively becomes optional.
-                      const unselectedRequired = variations.filter(v => v.required && !selectedVariations[v.name || v.title || v.id]);
-
-                      if (unselectedRequired.length > 0) {
+                      // Validate quantity first
+                      if (quantity === 0) {
                         setAlertConfig({
-                          title: t('selectionRequired') || 'Selection Required',
-                          message: `${t('pleaseSelect') || 'Please select'}: ${unselectedRequired[0].name || unselectedRequired[0].title || 'a variation'}`
+                          title: t('error') || 'Error',
+                          message: t('pleaseAddQuantity') || 'Please add at least 1 item'
                         });
                         setAlertVisible(true);
                         return;
                       }
-                    }
 
-                    // Start loading
-                    setAddingToCart(true);
+                      // Enhanced validation: Check if product has variations and ALL are selected
+                      const variations = raw.variations || raw.options || [];
 
-                    try {
-                      // Validate Add-on requirements
-                      // Validation relaxed to prevent blocking valid flows due to backend data mismatch.
-                      /*
-                      for (const group of activeAddons) {
-                        if (group.minSelectable > 0) {
-                          const groupSelections = selectedAddons[group._id] || {};
-                          // Check total items count for "select X items" requirement
-                          const totalCount = Object.values(groupSelections).reduce((s, o) => s + (o.quantity || 0), 0);
-            
-                          if (totalCount < group.minSelectable) {
-                            setAlertConfig({
-                              title: t('selectionRequired') || 'Selection Required',
-                              message: `${t('pleaseSelect') || 'Please select at least'} ${group.minSelectable} ${t('from') || 'from'} ${group.title || group.name}`
-                            });
-                            setAlertVisible(true);
-                            return;
-                          }
+                      if (variations.length > 0) {
+                        // Check if ANY variation is not selected
+                        // RELAXED: User requested optional variants. Only enforce if 'required' is explicitly true.
+                        // If your data doesn't have 'required' property, this loop effectively becomes optional.
+                        const unselectedRequired = variations.filter(v => v.required && !selectedVariations[v.name || v.title || v.id]);
+
+                        if (unselectedRequired.length > 0) {
+                          setAlertConfig({
+                            title: t('selectionRequired') || 'Selection Required',
+                            message: `${t('pleaseSelect') || 'Please select'}: ${unselectedRequired[0].name || unselectedRequired[0].title || 'a variation'}`
+                          });
+                          setAlertVisible(true);
+                          return;
                         }
                       }
-                      */
 
-                      // Retrieve detailed objects for selections
-                      const selectedObjs = Object.keys(selectedVariations)
-                        .filter(k => k.endsWith('_obj'))
-                        .map(k => selectedVariations[k]);
+                      // Start loading
+                      setAddingToCart(true);
 
-                      // Map selection to variant name for backend compatibility.
-                      let targetVariantName = null;
-
-                      // 1. Look for option with explicit SKU
-                      // CRITICAL FIX: If selectedObjs comes from initial "lite" product data, it might miss SKU.
-                      // We must re-lookup the selection in the *current* activeProduct (which is likely fresh now).
-
-                      let variationSku = null;
-
-                      // Identify what was selected
-                      const selectedKeys = Object.keys(selectedVariations).filter(k => !k.endsWith('_obj'));
-
-                      if (selectedKeys.length > 0) {
-                        // Try to find the SKU from the fresh activeProduct data using the selected values
-                        const freshVariations = activeProduct._raw?.variations || activeProduct._raw?.options || [];
-
-                        for (const key of selectedKeys) {
-                          const selectedValue = selectedVariations[key]; // e.g., "VAR-SPI-MED-Z4D" or "Medium"
-
-                          // Find the group
-                          const group = freshVariations.find(v => (v.name || v.title || v.id) === key);
-                          if (group) {
-                            // Find the option
-                            const options = group.items || group.options || [];
-                            const option = options.find(o =>
-                              (o.label || o.name || o.value) === selectedValue ||
-                              (o.id || o._id) === selectedValue ||
-                              (o.sku === selectedValue) // unlikely but possible
-                            );
-
-                            if (option && option.sku) {
-                              variationSku = option.sku;
-                              targetVariantName = option.label || option.name || option.value;
-                              break; // Found a SKU, we are good
+                      try {
+                        // Validate Add-on requirements
+                        // Validation relaxed to prevent blocking valid flows due to backend data mismatch.
+                        /*
+                        for (const group of activeAddons) {
+                          if (group.minSelectable > 0) {
+                            const groupSelections = selectedAddons[group._id] || {};
+                            // Check total items count for "select X items" requirement
+                            const totalCount = Object.values(groupSelections).reduce((s, o) => s + (o.quantity || 0), 0);
+              
+                            if (totalCount < group.minSelectable) {
+                              setAlertConfig({
+                                title: t('selectionRequired') || 'Selection Required',
+                                message: `${t('pleaseSelect') || 'Please select at least'} ${group.minSelectable} ${t('from') || 'from'} ${group.title || group.name}`
+                              });
+                              setAlertVisible(true);
+                              return;
                             }
                           }
                         }
-                      }
+                        */
 
-                      // Fallback: use the object we have in state if re-lookup failed
-                      if (!variationSku) {
-                        const skuOption = selectedObjs.find(o => o.sku);
-                        if (skuOption) {
-                          targetVariantName = skuOption.label || skuOption.name || skuOption.value;
-                          variationSku = skuOption.sku;
+                        // Retrieve detailed objects for selections
+                        const selectedObjs = Object.keys(selectedVariations)
+                          .filter(k => k.endsWith('_obj'))
+                          .map(k => selectedVariations[k]);
+
+                        // Map selection to variant name for backend compatibility.
+                        let targetVariantName = null;
+
+                        // 1. Look for option with explicit SKU
+                        // CRITICAL FIX: If selectedObjs comes from initial "lite" product data, it might miss SKU.
+                        // We must re-lookup the selection in the *current* activeProduct (which is likely fresh now).
+
+                        let variationSku = null;
+
+                        // Identify what was selected
+                        const selectedKeys = Object.keys(selectedVariations).filter(k => !k.endsWith('_obj'));
+
+                        if (selectedKeys.length > 0) {
+                          // Try to find the SKU from the fresh activeProduct data using the selected values
+                          const freshVariations = activeProduct._raw?.variations || activeProduct._raw?.options || [];
+
+                          for (const key of selectedKeys) {
+                            const selectedValue = selectedVariations[key]; // e.g., "VAR-SPI-MED-Z4D" or "Medium"
+
+                            // Find the group
+                            const group = freshVariations.find(v => (v.name || v.title || v.id) === key);
+                            if (group) {
+                              // Find the option
+                              const options = group.items || group.options || [];
+                              const option = options.find(o =>
+                                (o.label || o.name || o.value) === selectedValue ||
+                                (o.id || o._id) === selectedValue ||
+                                (o.sku === selectedValue) // unlikely but possible
+                              );
+
+                              if (option && option.sku) {
+                                variationSku = option.sku;
+                                targetVariantName = option.label || option.name || option.value;
+                                break; // Found a SKU, we are good
+                              }
+                            }
+                          }
                         }
-                      }
 
-                      // 2. If no SKU, check for "Size" or "Variations" (common primary attributes)
-                      if (!targetVariantName) {
-                        // Fallback: don't join with commas. Just pick the first significant one.
-                        // Ideally we'd pick the one that affects price the most? 
-                        // For now, pick the first one to avoid "A, B" errors.
-                        const firstOpt = selectedObjs[0];
-                        if (firstOpt) targetVariantName = firstOpt.label || firstOpt.name || firstOpt.value;
-                      }
+                        // Fallback: use the object we have in state if re-lookup failed
+                        if (!variationSku) {
+                          const skuOption = selectedObjs.find(o => o.sku);
+                          if (skuOption) {
+                            targetVariantName = skuOption.label || skuOption.name || skuOption.value;
+                            variationSku = skuOption.sku;
+                          }
+                        }
 
-                      const variantName = targetVariantName || null;
+                        // 2. If no SKU, check for "Size" or "Variations" (common primary attributes)
+                        if (!targetVariantName) {
+                          // Fallback: don't join with commas. Just pick the first significant one.
+                          // Ideally we'd pick the one that affects price the most? 
+                          // For now, pick the first one to avoid "A, B" errors.
+                          const firstOpt = selectedObjs[0];
+                          if (firstOpt) targetVariantName = firstOpt.label || firstOpt.name || firstOpt.value;
+                        }
 
-                      // Check if product has addon groups
-                      const addonGroupIds = raw.addonGroups || [];
-                      const hasAddons = addonGroupIds.length > 0;
+                        const variantName = targetVariantName || null;
 
-                      // Payload for cart - addons will be handled on separate screen
-                      const payload = {
-                        variantName: variantName,
-                        variationSku: variationSku, // Added SKU for backend
-                        options: selectedVariations,
-                        addons: [] // Don't send addons here, let AddonsScreen handle it
-                      };
+                        // Check if product has addon groups
+                        const addonGroupIds = raw.addonGroups || [];
+                        const hasAddons = addonGroupIds.length > 0;
 
-                      // Add the product to cart first (without addons)
-                      const result = await addItem(activeProduct, quantity, payload);
+                        // Payload for cart - addons will be handled on separate screen
+                        const payload = {
+                          variantName: variantName,
+                          variationSku: variationSku, // Added SKU for backend
+                          options: selectedVariations,
+                          addons: [] // Don't send addons here, let AddonsScreen handle it
+                        };
 
-                      if (result && !result.success) {
-                        // Check for different vendor error
-                        if (result.error === 'DIFFERENT_VENDOR') {
-                          // Helper to safely fallback if t(key) returns key
-                          const safeT = (key, fallback) => {
-                            const val = t(key);
-                            return val === key ? fallback : val;
-                          };
+                        // Add the product to cart first (without addons)
+                        const result = await addItem(activeProduct, quantity, payload);
 
-                          setAlertConfig({
-                            title: safeT('startNewBasket', 'Start new basket?'),
-                            message: safeT('clearCartConfirm', 'Your cart contains items from another restaurant. Do you want to clear it and add this item?'),
-                            buttons: [
-                              {
-                                text: safeT('cancel', 'Cancel'),
-                                style: 'cancel',
-                                onPress: () => console.log('Cancelled new basket')
-                              },
-                              {
-                                text: safeT('clearAndAdd', 'Clear & Add'),
-                                onPress: async () => {
-                                  try {
-                                    // Clear all carts directly
-                                    await clearAllCarts();
-                                    // Wait a tick for state to update
-                                    setTimeout(async () => {
-                                      // Retry adding
-                                      const retry = await addItem(activeProduct, quantity, payload);
-                                      if (retry && !retry.success) {
-                                        setAlertConfig({
-                                          title: safeT('error', 'Error'),
-                                          message: retry.message || safeT('addToCartFailed', 'Failed to add item')
-                                        });
-                                        setAlertVisible(true);
-                                      } else {
-                                        // Success path - same as below
-                                        closeProductModal();
-                                        if (hasAddons) {
-                                          // ... navigate to addons
-                                          setTimeout(() => {
-                                            const mongoProductId = raw._id || activeProduct._raw?._id || activeProduct.id;
-                                            navigation.navigate('Addons', {
-                                              product: { name: raw.name || activeProduct.name, id: mongoProductId },
-                                              productId: mongoProductId,
-                                              variantName: variantName,
-                                              addonGroupIds: addonGroupIds,
-                                              currency: raw.pricing?.currency || 'EUR'
-                                            });
-                                          }, 300);
+                        if (result && !result.success) {
+                          // Check for different vendor error
+                          if (result.error === 'DIFFERENT_VENDOR') {
+                            // Helper to safely fallback if t(key) returns key
+                            const safeT = (key, fallback) => {
+                              const val = t(key);
+                              return val === key ? fallback : val;
+                            };
+
+                            setAlertConfig({
+                              title: safeT('startNewBasket', 'Start new basket?'),
+                              message: safeT('clearCartConfirm', 'Your cart contains items from another restaurant. Do you want to clear it and add this item?'),
+                              buttons: [
+                                {
+                                  text: safeT('cancel', 'Cancel'),
+                                  style: 'cancel',
+                                  onPress: () => console.log('Cancelled new basket')
+                                },
+                                {
+                                  text: safeT('clearAndAdd', 'Clear & Add'),
+                                  onPress: async () => {
+                                    try {
+                                      // Clear all carts directly
+                                      await clearAllCarts();
+                                      // Wait a tick for state to update
+                                      setTimeout(async () => {
+                                        // Retry adding
+                                        const retry = await addItem(activeProduct, quantity, payload);
+                                        if (retry && !retry.success) {
+                                          setAlertConfig({
+                                            title: safeT('error', 'Error'),
+                                            message: retry.message || safeT('addToCartFailed', 'Failed to add item')
+                                          });
+                                          setAlertVisible(true);
+                                        } else {
+                                          // Success path - same as below
+                                          closeProductModal();
+                                          if (hasAddons) {
+                                            // ... navigate to addons
+                                            setTimeout(() => {
+                                              const mongoProductId = raw._id || activeProduct._raw?._id || activeProduct.id;
+                                              navigation.navigate('Addons', {
+                                                product: { name: raw.name || activeProduct.name, id: mongoProductId },
+                                                productId: mongoProductId,
+                                                variantName: variantName,
+                                                addonGroupIds: addonGroupIds,
+                                                currency: raw.pricing?.currency || 'EUR'
+                                              });
+                                            }, 300);
+                                          }
                                         }
-                                      }
-                                    }, 100);
-                                  } catch (e) {
-                                    console.error('Failed to clear and add:', e);
+                                      }, 100);
+                                    } catch (e) {
+                                      console.error('Failed to clear and add:', e);
+                                    }
                                   }
                                 }
-                              }
-                            ]
-                          });
-                          setAlertVisible(true);
-                          return; // Stop execution, wait for user input
+                              ]
+                            });
+                            setAlertVisible(true);
+                            return; // Stop execution, wait for user input
+                          }
+                          console.warn('[RestaurantDetails] Add to cart failed:', result);
+                          throw new Error(result.message || 'Failed to add to cart');
                         }
-                        console.warn('[RestaurantDetails] Add to cart failed:', result);
-                        throw new Error(result.message || 'Failed to add to cart');
+
+                        closeProductModal();
+
+                        // If product has addons, navigate to AddonsScreen
+                        if (hasAddons) {
+                          // Small delay to ensure modal is closed
+                          setTimeout(() => {
+                            // Use MongoDB _id for productId since backend looks up items by _id
+                            const mongoProductId = raw._id || activeProduct._raw?._id || activeProduct.id;
+
+                            navigation.navigate('Addons', {
+                              product: {
+                                name: raw.name || activeProduct.name,
+                                id: mongoProductId,
+                              },
+                              productId: mongoProductId,
+                              variantName: variantName,
+                              addonGroupIds: addonGroupIds,
+                              currency: raw.pricing?.currency || 'EUR'
+                            });
+                          }, 300);
+                        }
+                      } catch (error) {
+                        console.error('[RestaurantDetails] Add to cart error:', error);
+                        setAlertConfig({
+                          title: t('error') || 'Error',
+                          // Show actual error message if available, otherwise fallback
+                          message: error.message || t('addToCartFailed') || 'Failed to add item to cart'
+                        });
+                        setAlertVisible(true);
+                      } finally {
+                        setAddingToCart(false);
                       }
-
-                      closeProductModal();
-
-                      // If product has addons, navigate to AddonsScreen
-                      if (hasAddons) {
-                        // Small delay to ensure modal is closed
-                        setTimeout(() => {
-                          // Use MongoDB _id for productId since backend looks up items by _id
-                          const mongoProductId = raw._id || activeProduct._raw?._id || activeProduct.id;
-
-                          navigation.navigate('Addons', {
-                            product: {
-                              name: raw.name || activeProduct.name,
-                              id: mongoProductId,
-                            },
-                            productId: mongoProductId,
-                            variantName: variantName,
-                            addonGroupIds: addonGroupIds,
-                            currency: raw.pricing?.currency || 'EUR'
-                          });
-                        }, 300);
-                      }
-                    } catch (error) {
-                      console.error('[RestaurantDetails] Add to cart error:', error);
-                      setAlertConfig({
-                        title: t('error') || 'Error',
-                        // Show actual error message if available, otherwise fallback
-                        message: error.message || t('addToCartFailed') || 'Failed to add item to cart'
-                      });
-                      setAlertVisible(true);
-                    } finally {
-                      setAddingToCart(false);
-                    }
-                  }}
-                  disabled={isUpdating || addingToCart || quantity === 0}
-                >
-                  <LinearGradient
-                    colors={(quantity > 0) ? ['#EC407A', '#D81B60'] : ['#E0E0E0', '#BDBDBD']}
-                    start={{ x: 0, y: 0 }}
-                    end={{ x: 1, y: 0 }}
-                    style={styles.modalAddToCartBtn}
+                    }}
+                    disabled={isUpdating || addingToCart || quantity === 0}
                   >
-                    {addingToCart ? (
-                      <ActivityIndicator size="small" color="#fff" style={{ marginRight: 10 }} />
-                    ) : (
-                      <Ionicons name="cart" size={22} color={quantity > 0 ? "#fff" : colors.text.light} style={{ marginRight: 10 }} />
-                    )}
-                    {/* Fixed width container for text to prevent layout jitter */}
-                    <View style={{ minWidth: 200, alignItems: 'center' }}>
-                      <Text style={[styles.modalAddToCartText, { color: quantity > 0 ? '#fff' : colors.text.light }]}>
-                        {addingToCart
-                          ? (t('adding') || 'Adding...')
-                          : quantity > 0
-                            ? (() => {
-                              const total = calculateModalTotal();
-                              return `${t('addToCart') || 'Add to cart'} • ${formatCurrency(currency, total)}`;
-                            })()
-                            : (t('addToCart') || 'Add to cart')
-                        }
-                      </Text>
-                    </View>
-                  </LinearGradient>
-                </TouchableOpacity>
+                    <LinearGradient
+                      colors={(quantity > 0) ? ['#EC407A', '#D81B60'] : ['#E0E0E0', '#BDBDBD']}
+                      start={{ x: 0, y: 0 }}
+                      end={{ x: 1, y: 0 }}
+                      style={styles.modalAddToCartBtn}
+                    >
+                      {addingToCart ? (
+                        <ActivityIndicator size="small" color="#fff" style={{ marginRight: 10 }} />
+                      ) : (
+                        <Ionicons name="cart" size={22} color={quantity > 0 ? "#fff" : colors.text.light} style={{ marginRight: 10 }} />
+                      )}
+                      {/* Fixed width container for text to prevent layout jitter */}
+                      <View style={{ minWidth: 200, alignItems: 'center' }}>
+                        <Text style={[styles.modalAddToCartText, { color: quantity > 0 ? '#fff' : colors.text.light }]}>
+                          {addingToCart
+                            ? (t('adding') || 'Adding...')
+                            : quantity > 0
+                              ? (() => {
+                                const total = calculateModalTotal();
+                                return `${t('addToCart') || 'Add to cart'} • ${formatCurrency(currency, total)}`;
+                              })()
+                              : (t('addToCart') || 'Add to cart')
+                          }
+                        </Text>
+                      </View>
+                    </LinearGradient>
+                  </TouchableOpacity>
+                </View>
               </View>
-            </View >
-          </View >
-        </View >
-      </Modal >
+            )}
+          </View>
+        </View>
+      </Modal>
     );
   };
 
@@ -1841,7 +1849,7 @@ const styles = StyleSheet.create({
   modalFooter: {
     paddingHorizontal: spacing.md,
     paddingTop: spacing.md,
-    paddingBottom: spacing.md,
+    // paddingBottom is handled dynamically via style prop with insets
   },
   modalAddToCartBtn: {
     flexDirection: 'row',
@@ -1911,6 +1919,7 @@ const styles = StyleSheet.create({
     alignItems: 'center',
     marginHorizontal: spacing.md,
     marginTop: spacing.md,
+    marginBottom: spacing.md, // Ensure space below too
     padding: spacing.md,
     borderRadius: borderRadius.md,
     borderWidth: 1,
@@ -1918,11 +1927,13 @@ const styles = StyleSheet.create({
   addonsBannerTitle: {
     fontSize: fontSize.sm,
     fontFamily: 'Poppins-SemiBold',
+    lineHeight: 20, // Better line height
   },
   addonsBannerText: {
     fontSize: fontSize.xs,
     fontFamily: 'Poppins-Regular',
     marginTop: 2,
+    lineHeight: 16, // Better line height
   },
 });
 
