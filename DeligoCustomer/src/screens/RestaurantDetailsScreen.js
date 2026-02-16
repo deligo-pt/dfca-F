@@ -191,7 +191,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     })
   );
   const [menuLoading, setMenuLoading] = useState(false);
-  const vendorProducts = menuProducts;
+  let vendorProducts = menuProducts;
 
   // Location resolution
   const [dynamicLocation, setDynamicLocation] = useState(null);
@@ -256,11 +256,21 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
   // Derive menu categories
   const derivedCategories = new Set();
+
   vendorProducts.forEach((p) => {
+
     const raw = p._raw || {};
-    if (raw.subCategory) derivedCategories.add(raw.subCategory);
-    else if (raw.category) derivedCategories.add(raw.category);
-    else if (Array.isArray(p.categories) && p.categories.length) p.categories.forEach(c => derivedCategories.add(c));
+    const categories = raw.category;
+    const subCategories = raw.subCategory
+    derivedCategories.add("all")
+    derivedCategories.add('popular')
+
+    if (categories.name) {
+      derivedCategories.add(categories.name)
+    }
+    if (subCategories) {
+      derivedCategories.add(subCategories)
+    }
   });
   const menuCategories = ['All', 'Popular', ...Array.from(derivedCategories)];
 
@@ -385,29 +395,62 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
   // Filter menu items
   const getFilteredMenuItems = () => {
-    let items = vendorProducts;
+
+
+
+
+    // for safety store vendor products or empty array
+    let items = vendorProducts || [];
+    console.log('[singal items]', items[0]);
     // "All" shows everything - no filtering
-    if (selectedCategory === 'All') {
+    if (selectedCategory === 'all' || selectedCategory === 'All' || selectedCategory === "ALL") {
+      return menuProducts
+
       // No filter - show all items
-    } else if (selectedCategory === 'Popular') {
-      const popular = items.filter(p => (p._raw?.meta && p._raw.meta.isFeatured) || p._raw?.isFeatured);
-      if (popular.length) items = popular;
+    } else if (selectedCategory === 'Popular' || selectedCategory === "popular" || selectedCategory === "POPULAR") {
+      return items.filter(p => (p._raw?.meta && p._raw.meta.isFeatured) || p._raw?.isFeatured) || [];
     } else if (selectedCategory) {
-      items = items.filter((p) => {
-        const raw = p._raw || {};
-        const cat = raw.subCategory || raw.category || (Array.isArray(p.categories) && p.categories[0]) || '';
-        return String(cat) === String(selectedCategory);
-      });
+      const filterItemList = []
+      items.forEach((currentItem) => {
+        const rawItem = currentItem._raw;
+        if (rawItem.subCategory === selectedCategory) {
+          filterItemList.push(currentItem)
+        } else if (rawItem.category.name === selectedCategory) {
+          filterItemList.push(currentItem)
+        } else {
+          console.log('[Item is category | subcategory is not match]',);
+        }
+
+
+      })
+
+      return filterItemList;
+
     }
 
-    if (!searchQuery.trim()) return items;
-    const q = searchQuery.toLowerCase();
-    return items.filter((item) => {
-      const rawItem = item._raw || {};
-      const itemName = (rawItem.product?.name || rawItem.name || rawItem.productName || item.name || '').toLowerCase();
-      const desc = (rawItem.description || rawItem.slug || '').toLowerCase();
-      return itemName.includes(q) || desc.includes(q);
+    if (!searchQuery.trim()) {
+
+
+      if (!q) return []
+
+      const q = searchQuery.toLowerCase();
+
+    const filteredItems = items.filter((item) => {
+      const rawName = (item._raw?.name || '').toLowerCase();
+      const rawDesc = (item._raw?.description || '').toLowerCase();
+      return q.length > 0 && (rawName.includes(q) || rawDesc.includes(q));
     });
+
+    return filteredItems.sort((a, b) => {
+      const nameA = (a._raw?.name || '').toLowerCase();
+      const nameB = (b._raw?.name || '').toLowerCase();
+      return nameA.localeCompare(nameB);
+    });
+    }
+
+    
+
+
   };
 
   const calculateModalTotal = () => {
@@ -1298,7 +1341,10 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
             placeholder={t('searchMenu') || 'Search menu...'}
             placeholderTextColor={colors.text.secondary}
             value={searchQuery}
-            onChangeText={setSearchQuery}
+            onChangeText={(e) => {
+              setSearchQuery(e)
+              getFilteredMenuItems()
+            }}
             autoFocus
           />
           {searchQuery.length > 0 && (
@@ -1352,10 +1398,11 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
           showsHorizontalScrollIndicator={false}
           style={[styles.categoryTabs, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}
           contentContainerStyle={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}
+
         >
-          {menuCategories.map((category) => (
+          {[...derivedCategories].map((category, currentIndex) => (
             <TouchableOpacity
-              key={category}
+              key={currentIndex}
               style={[
                 styles.categoryTab,
                 { backgroundColor: colors.background, borderColor: colors.border },
@@ -1363,11 +1410,12 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
               ]}
               onPress={() => setSelectedCategory(category)}
             >
+
               <Text
                 style={[
                   styles.categoryTabText,
                   { color: colors.text.secondary },
-                  selectedCategory === category && { color: '#fff' },
+                  selectedCategory === category && { color: '#fff' }, { textTransform: 'uppercase' }
                 ]}
               >
                 {category === 'Popular' ? (t('popular') || 'Popular') : category}
