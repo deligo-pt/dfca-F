@@ -41,8 +41,40 @@ import { fetchAddonGroups } from '../utils/addonApi';
 const RestaurantDetailsScreen = ({ route, navigation }) => {
   const { colors, isDarkMode } = useTheme();
   const { t } = useLanguage();
-  const { restaurant } = route.params;
+  // SAFETY CHECK: Ensure route params exist
+  if (!route || !route.params || !route.params.restaurant) {
+    console.error('[RestaurantDetailsScreen] Missing restaurant data in route params');
+    // If navigation is available, go back after a tick, otherwise return error view
+    // useEffect to trigger navigation safely
+    useEffect(() => {
+      if (navigation && navigation.canGoBack()) navigation.goBack();
+    }, []);
+    return (
+      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ marginTop: 16, color: colors.text.secondary }}>{t('loading') || 'Loading...'}</Text>
+      </SafeAreaView>
+    );
+  }
+
   const insets = useSafeAreaInsets();
+
+  // SAFETY CHECK: Ensure route params exist
+  if (!route || !route.params || !route.params.restaurant) {
+    console.error('[RestaurantDetailsScreen] Missing restaurant data in route params');
+    // useEffect to trigger navigation safely
+    useEffect(() => {
+      if (navigation && navigation.canGoBack()) navigation.goBack();
+    }, []);
+    return (
+      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ marginTop: 16, color: colors.text.secondary }}>{t('loading') || 'Loading...'}</Text>
+      </SafeAreaView>
+    );
+  }
+
+  const { restaurant } = route.params;
 
   // Normalize rating
   const _r = restaurant || {};
@@ -258,9 +290,20 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const derivedCategories = new Set();
   vendorProducts.forEach((p) => {
     const raw = p._raw || {};
-    if (raw.subCategory) derivedCategories.add(raw.subCategory);
-    else if (raw.category) derivedCategories.add(raw.category);
-    else if (Array.isArray(p.categories) && p.categories.length) p.categories.forEach(c => derivedCategories.add(c));
+    if (raw.subCategory) {
+      const val = typeof raw.subCategory === 'object' ? (raw.subCategory.name || raw.subCategory.slug) : raw.subCategory;
+      if (val) derivedCategories.add(String(val));
+    }
+    else if (raw.category) {
+      const val = typeof raw.category === 'object' ? (raw.category.name || raw.category.slug) : raw.category;
+      if (val) derivedCategories.add(String(val));
+    }
+    else if (Array.isArray(p.categories) && p.categories.length) {
+      p.categories.forEach(c => {
+        const val = typeof c === 'object' ? (c.name || c.slug) : c;
+        if (val) derivedCategories.add(String(val));
+      });
+    }
   });
   const menuCategories = ['All', 'Popular', ...Array.from(derivedCategories)];
 

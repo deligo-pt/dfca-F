@@ -55,7 +55,12 @@ const RestaurantCard = ({ restaurant, onPress }) => {
   else if (p.rating && typeof p.rating === 'object' && typeof p.rating.average === 'number') ratingValue = p.rating.average;
 
   // Resolve tags
-  const tags = Array.isArray(p.tags) ? p.tags : (Array.isArray(p.tags) ? p.tags : (p.tags || []));
+  const rawTags = Array.isArray(p.tags) ? p.tags : (Array.isArray(p.tags) ? p.tags : (p.tags || []));
+  const tags = rawTags.map(t => {
+    if (typeof t === 'string') return t;
+    if (t && typeof t === 'object') return t.name || t.slug || t.label || '';
+    return '';
+  }).filter(t => t);
 
   const deliveryTime = mergedVendor.deliveryTime || p.deliveryTime || null;
 
