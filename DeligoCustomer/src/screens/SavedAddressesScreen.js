@@ -67,7 +67,9 @@ const SavedAddressesScreen = ({ navigation, route }) => {
 
   const handleRefresh = async () => {
     setRefreshing(true);
-    await fetchUserProfile();
+    const refreshData = await fetchUserProfile();
+
+    console.log("ReFresh data: ", refreshData)
     setRefreshing(false);
   };
 
@@ -127,8 +129,16 @@ const SavedAddressesScreen = ({ navigation, route }) => {
       async () => {
         setLoading(true);
         try {
-          await AddressApi.deleteDeliveryAddress(addressId);
-          await fetchUserProfile();
+          const result = await AddressApi.deleteDeliveryAddress(addressId);
+          // filter address after delete for rendering replect imediatly
+          if (result.success) {
+            setLocalAddresses((prev) => {
+              const filterAdd = prev.filter((currentAdd) => currentAdd._id !== addressId);
+              return filterAdd
+            })
+          }
+
+          //  await fetchUserProfile();
         } catch (error) {
           console.error('Delete address error:', error);
           const errMsg = error?.response?.data?.message || error?.message || t('failedToDeleteAddress');

@@ -221,13 +221,14 @@ export const translations = {
     creditDebitCard: 'Credit/Debit Card',
     digitalWallet: 'Digital Wallet',
     recommended: 'Recommended',
+    viewOrders: 'View Orders',
 
     // Orders Screen
     ongoingOrders: 'Ongoing Orders',
     pastOrders: 'Past Orders',
     ongoing: 'Ongoing',
     history: 'History',
-    reorder: 'Reorder',
+    reorder: 'Re order',
     noOrders: 'No orders yet',
     noActiveOrders: 'No active orders',
     noPastOrders: 'No past orders',
@@ -886,6 +887,9 @@ export const translations = {
     failedInitializeCheckout: 'Falha ao inicializar o checkout',
     checkoutSessionExpired: 'Sessão expirada. Tente novamente.',
     paymentNotReady: 'Pagamento não pronto. Aguarde...',
+    viewOrders: 'ver pedidos',
+
+    
     // Generic buttons / placeholders
     ok: 'OK',
     noAddress: 'Nenhum endereço fornecido',

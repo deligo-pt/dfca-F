@@ -73,6 +73,12 @@ const TrackOrderScreen = ({ route, navigation }) => {
   const order = fetchedOrder || paramOrder;
   const orderId = order?._id || paramOrderId;
 
+  useEffect(() => {
+    console.log("[##########]", order)
+  }, [order])
+
+
+
   // Map API status to internal stage
   const mapOrderStatusToStage = (status) => {
     const statusMap = {
@@ -125,6 +131,8 @@ const TrackOrderScreen = ({ route, navigation }) => {
   const [isDriverLive, setIsDriverLive] = useState(false);
   const fittingTimeoutRef = useRef(null);
   const lastEtaRequestTime = useRef(0);
+
+
 
   // Check driver liveness periodically
   useEffect(() => {
@@ -238,8 +246,18 @@ const TrackOrderScreen = ({ route, navigation }) => {
   useEffect(() => {
     if (currentStatus === 'delivered') {
       // Small delay to ensure user sees the "Delivered" status update first
+
+
+      let checkRatingStatus;
+
+      const { isProductRated, isDeliveryRated, isVendorRated } = order.ratingStatus;
+
+      if (!isProductRated || !isDeliveryRated) {
+        checkRatingStatus = true
+      }
+
       const timer = setTimeout(() => {
-        setShowRatingModal(true);
+        setShowRatingModal(checkRatingStatus);
       }, 2000);
       return () => clearTimeout(timer);
     }
@@ -326,6 +344,9 @@ const TrackOrderScreen = ({ route, navigation }) => {
     return () => { isActive = false; };
     return () => { isActive = false; };
   }, [order?._id, order?.vendorId, order?.items]);
+
+
+
 
   // Smart Polling Mechanism (Hybrid Approach)
   useEffect(() => {
@@ -3209,6 +3230,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
           // Optionally navigate away or refresh
           // navigation.goBack();
         }}
+        ratingStatus={orderData.ratingStatus}
       />
     </SafeAreaView>
   );
