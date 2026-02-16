@@ -42,6 +42,7 @@ const OrdersScreen = ({ navigation }) => {
   const { ongoingOrders, pastOrders, loading: ordersLoading, fetchOrders } = useOrders();
   const [activeTab, setActiveTab] = useState('ongoing');
   const [refreshing, setRefreshing] = useState(false);
+  const [loading, setLoading] = useState(false)
 
   // Get products from ProductsContext to lookup vendor businessName
   const { products } = useProducts();
@@ -198,6 +199,9 @@ const OrdersScreen = ({ navigation }) => {
         return t('processing') || 'Processing';
     }
   };
+
+
+
 
   // Reorder functionality
   const { addItem, clearVendorCartAndSync } = useCart();
@@ -373,9 +377,10 @@ const OrdersScreen = ({ navigation }) => {
           ) : (
             <TouchableOpacity
               style={[styles.reorderButton, { backgroundColor: colors.primary + '15' }]} // Tinted background
+              disabled={loading}
               onPress={() => handleReorder(order)}
             >
-              <Text style={[styles.reorderButtonText, { color: colors.primary }]}>{t('reorder') || 'Reorder'}</Text>
+              <Text style={[styles.reorderButtonText, { color: colors.primary }]}>{t('reorder') || 'Re order'}</Text>
             </TouchableOpacity>
           )}
         </View>

@@ -93,7 +93,7 @@ const TagButton = ({ label, selected, onPress }) => {
     );
 };
 
-const OrderRatingModal = ({ visible, onClose, orderId, restaurantName, driverName, onRatingSuccess }) => {
+const OrderRatingModal = ({ visible, onClose, orderId, restaurantName, driverName, onRatingSuccess, ratingStatus }) => {
     const { colors, isDarkMode } = useTheme();
     const { t } = useLanguage();
 
@@ -266,43 +266,47 @@ const OrderRatingModal = ({ visible, onClose, orderId, restaurantName, driverNam
             contentContainerStyle={{ paddingBottom: spacing.xl }}
         >
             {/* PRODUCT SECTION */}
-            <View style={{ marginBottom: spacing.xl }}>
-                <Text style={styles.title}>{t('howWasFood') || `How was the food from ${restaurantName}?`}</Text>
-                <Text style={styles.subtitle}>{t('yourFeedbackHelps') || 'Your feedback helps others make better choices.'}</Text>
+            {/* // render rating option if product rating is not submitted yet */}
+            {
+                !ratingStatus?.isProductRated && <View style={{ marginBottom: spacing.xl }}>
+                    <Text style={styles.title}>{t('howWasFood') || `How was the food from ${restaurantName}?`}</Text>
+                    <Text style={styles.subtitle}>{t('yourFeedbackHelps') || 'Your feedback helps others make better choices.'}</Text>
 
-                <View style={styles.starContainer}>
-                    {[1, 2, 3, 4, 5].map((star) => (
-                        <RatingStar
-                            key={star}
-                            filled={star <= productRating}
-                            onPress={() => {
-                                setProductRating(star);
-                            }}
-                            size={40}
-                        />
-                    ))}
-                </View>
-
-                {productRating > 0 && (
-                    <View style={styles.subRatingsContainer}>
-                        <SubRatingRow
-                            label={t('foodQuality') || "Food Quality"}
-                            rating={foodQuality}
-                            onRate={setFoodQuality}
-                        />
-                        <SubRatingRow
-                            label={t('packaging') || "Packaging"}
-                            rating={packaging}
-                            onRate={setPackaging}
-                        />
+                    <View style={styles.starContainer}>
+                        {[1, 2, 3, 4, 5].map((star) => (
+                            <RatingStar
+                                key={star}
+                                filled={star <= productRating}
+                                onPress={() => {
+                                    setProductRating(star);
+                                }}
+                                size={40}
+                            />
+                        ))}
                     </View>
-                )}
+
+                    {productRating > 0 && (
+                        <View style={styles.subRatingsContainer}>
+                            <SubRatingRow
+                                label={t('foodQuality') || "Food Quality"}
+                                rating={foodQuality}
+                                onRate={setFoodQuality}
+                            />
+                            <SubRatingRow
+                                label={t('packaging') || "Packaging"}
+                                rating={packaging}
+                                onRate={setPackaging}
+                            />
+                        </View>
+                    )}
 
 
-            </View>
+                </View>
+            }
 
             {/* DRIVER SECTION */}
-            {driverName && (
+            {/* render rating option if driver rating is not submitted yet */}
+            {ratingStatus?.isDeliveryRated || driverName && (
                 <View style={{ marginBottom: spacing.xl, borderTopWidth: 1, borderTopColor: colors.border, paddingTop: spacing.xl }}>
                     <Text style={styles.title}>{t('howWasDelivery') || `How was the delivery by ${driverName}?`}</Text>
                     <Text style={styles.subtitle}>{t('rateDriverSubtitle') || 'Rate the delivery service.'}</Text>

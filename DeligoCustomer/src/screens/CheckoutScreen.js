@@ -644,7 +644,7 @@ const CheckoutScreen = ({ route, navigation }) => {
     return () => {
       canceled = true;
     };
-  }, [address, detailedAddress, city, postalCode, appliedOffer, nifSkipped]);
+  }, [address, detailedAddress, city, postalCode, appliedOffer, nifSkipped, navigation]);
 
   // Calculate real cart values with ProductsContext enrichment
   const cartItems = cart?.items ? Object.keys(cart.items).map(id => {
@@ -1001,6 +1001,9 @@ const CheckoutScreen = ({ route, navigation }) => {
     }, 2000);
   };
 
+
+  console.log("[checkout screen] : estemeted time: ", checkoutResponse)
+
   const renderSuccessModal = () => (
     <Modal visible={showSuccessModal} transparent animationType="fade">
       <View style={styles(colors).modalOverlay}>
@@ -1011,7 +1014,9 @@ const CheckoutScreen = ({ route, navigation }) => {
           <Text style={styles(colors).successTitle}>{t('orderPlaced')}</Text>
           <Text style={styles(colors).successMessage}>{t('orderConfirmed')}</Text>
           <View style={styles(colors).successDetails}>
-            <Text style={styles(colors).successDetailText}>{t('estimatedDeliveryTime')}: 25-35 {t('min')}</Text>
+            <Text style={styles(colors).successDetailText}>{t('estimatedDeliveryTime')}: {checkoutResponse?.estimatedDeliveryTime || '25-30 min'}
+              {/* {t('min')} */}
+            </Text>
           </View>
           {/* Manual navigation button as fallback */}
           <TouchableOpacity
@@ -1032,7 +1037,7 @@ const CheckoutScreen = ({ route, navigation }) => {
             }}
           >
             <Text style={{ color: '#fff', fontFamily: 'Poppins-Bold', fontSize: 16 }}>
-              {t('viewOrders') || 'View Orders'} →
+              {t('viewOrders')} →
             </Text>
           </TouchableOpacity>
         </View>
@@ -1071,7 +1076,9 @@ const CheckoutScreen = ({ route, navigation }) => {
         <View style={styles(colors).headerCenter}>
           <Text style={styles(colors).headerTitle}>{cart?.vendorName || cartData?.vendorName || t('checkout')}</Text>
           <Text style={styles(colors).headerSubtitle}>
-            {cartItems.length} {cartItems.length === 1 ? t('item') : t('items')} • {t('estimated')} 25-35 {t('min')}
+            {cartItems.length} {cartItems.length === 1 ? t('item') : t('items')} • {t('estimated')} {checkoutResponse && checkoutResponse?.estimatedDeliveryTime}
+            {/* {t('min')} */}
+
           </Text>
         </View>
         <View style={styles(colors).headerRight} />
@@ -1089,7 +1096,10 @@ const CheckoutScreen = ({ route, navigation }) => {
           </View>
           <View style={styles(colors).deliveryTimeContent}>
             <Text style={styles(colors).deliveryTimeLabel}>{t('deliveryTime')}</Text>
-            <Text style={styles(colors).deliveryTimeValue}>25-35 {t('min')}</Text>
+            <Text style={styles(colors).deliveryTimeValue}>{checkoutResponse?.estimatedDeliveryTime}
+              {/* {t('min')} */}
+
+            </Text>
           </View>
           <View style={styles(colors).deliveryTimeBadge}>
             <Ionicons name="flash" size={14} color="#FFA000" />
@@ -1534,7 +1544,7 @@ const CheckoutScreen = ({ route, navigation }) => {
                         onPress={() => navigation.navigate('EditProfile')}
                         style={{ backgroundColor: '#DC2626', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 10, alignItems: 'center' }}
                       >
-                        <Text style={{ color: '#fff', fontFamily: 'Poppins-Bold', fontSize: 13 }}>{t('completeProfile') || 'Complete Profile'}</Text>
+                        <Text style={{ color: '#fff', fontFamily: 'Poppins-Bold', fontSize: 13 }}>{t('complete profile') || 'Complete Profile'}</Text>
                       </TouchableOpacity>
                     ) : (
                       <>

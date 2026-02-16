@@ -44,7 +44,7 @@ const LocationAddressScreen = ({ navigation, route }) => {
     savedAddresses,
     selectAddress,
   } = useLocation();
-  const { updateProfile: updateProfileContext } = useProfile();
+  const { updateProfile: updateProfileContext, fetchUserProfile } = useProfile();
 
   // Local state for LocationDetails component
   const [isMapFullScreen, setIsMapFullScreen] = useState(false);
@@ -279,10 +279,14 @@ const LocationAddressScreen = ({ navigation, route }) => {
           console.debug('[LocationAddressScreen] Adding delivery address:', payload);
           const res = await AddressApi.addDeliveryAddress(payload);
 
+
+
           if (res.data && res.data.success === false) {
             throw new Error(res.data.message || 'Failed');
           }
 
+
+          await fetchUserProfile(true)
           if (route.params?.onSave) {
             route.params.onSave(addressData);
           }

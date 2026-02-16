@@ -294,6 +294,9 @@ export const ProfileProvider = ({ children }) => {
         return null;
     }, [user]);
 
+
+
+
     return (
         <ProfileContext.Provider value={{
             user,
@@ -309,7 +312,8 @@ export const ProfileProvider = ({ children }) => {
             setUserData: async (data) => {
                 setUser(data);
                 await import('../utils/auth').then(mod => mod.saveUserData(data));
-            }
+            },
+
         }}>
             {children}
         </ProfileContext.Provider>
