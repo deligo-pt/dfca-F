@@ -256,7 +256,11 @@ export const CartProvider = ({ children }) => {
     return state.carts?.[String(vendorId)] || null;
   };
 
-  const getCartsArray = () => Object.keys(state.carts || {}).map(k => state.carts[k]);
+  const getCartsArray = () => {
+    return Object.keys(state.carts || {})
+      .map(k => state.carts[k])
+      .filter(cart => cart.items && Object.keys(cart.items).length > 0);
+  };
 
   const buildItemsMap = () => {
     const map = {};

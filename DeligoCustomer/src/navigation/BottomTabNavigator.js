@@ -31,7 +31,7 @@ const BottomTabNavigator = ({ onLogout }) => {
     const insets = useSafeAreaInsets();
 
     // Context hooks for badges
-    const { cartsArray } = useCart();
+    const { cartsArray, itemCount } = useCart();
     const { ongoingOrders, ordersCount, fetchOrders } = useOrders();
 
     // Badge calculations
@@ -139,7 +139,7 @@ const BottomTabNavigator = ({ onLogout }) => {
                             options={{
                                 tabBarLabel: t('cart'),
                                 tabBarIcon: ({ focused, color }) => <CartIcon focused={focused} color={color} />,
-                                tabBarBadge: cartsCount > 0 ? cartsCount : undefined,
+                                tabBarBadge: itemCount > 0 ? itemCount : undefined,
                                 tabBarBadgeStyle: { backgroundColor: colors.primary, color: '#fff', fontFamily: 'Poppins-SemiBold' },
                             }}
                         />

@@ -99,7 +99,7 @@ const CheckoutScreen = ({ route, navigation }) => {
 
   // Context Hooks
   // Context Hooks
-  const { getVendorCart } = useCart();
+  const { getVendorCart, clearVendorCartAndSync, cartsArray } = useCart();
 
   // Resolve Cart Data source
   // cartData from params contains the items we want to checkout
@@ -984,11 +984,15 @@ const CheckoutScreen = ({ route, navigation }) => {
     setShowSuccessModal(true);
 
     // Step 4: Clear Cart in Background
-    if (vendorId) {
+    const targetVendorId = vendorId || (cartsArray && cartsArray.length > 0 ? cartsArray[0].vendorId : null);
+
+    if (targetVendorId) {
       // Don't await this, let it run in background to keep UI snappy
-      clearVendorCartAndSync(vendorId).catch(err => {
+      clearVendorCartAndSync(targetVendorId).catch(err => {
         console.warn('[CheckoutScreen] Failed to clear cart after order:', err);
       });
+    } else {
+      console.warn('[CheckoutScreen] Could not determine vendorId to clear cart');
     }
 
     // Step 5: Navigate away
@@ -1032,7 +1036,7 @@ const CheckoutScreen = ({ route, navigation }) => {
             }}
           >
             <Text style={{ color: '#fff', fontFamily: 'Poppins-Bold', fontSize: 16 }}>
-              {t('viewOrders') || 'View Orders'} →
+              {t('trackOrder') || 'Track Order'} →
             </Text>
           </TouchableOpacity>
         </View>
