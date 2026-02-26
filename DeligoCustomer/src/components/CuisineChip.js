@@ -112,16 +112,22 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
   container: {
     width: 85,          // Fixed width for vertical column alignment
     alignItems: 'center',
-    marginRight: 4,
+    marginRight: 8,
   },
   imageContainer: {
-    width: 74,          // Large circular image
-    height: 74,
-    borderRadius: 37,
+    width: 78,
+    height: 78,
+    borderRadius: 39, // Fully circular
     justifyContent: 'center',
     alignItems: 'center',
     marginBottom: 8,
-    overflow: 'hidden',
+    backgroundColor: '#FFFFFF',
+    overflow: 'hidden', // Clip image to circle
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.08,
+    shadowRadius: 10,
+    elevation: 3,
   },
   emojiIcon: {
     fontSize: 28,

@@ -1,128 +1,135 @@
 import React from 'react';
-import { View, Text, TouchableOpacity, Image, StyleSheet, ScrollView } from 'react-native';
+import {
+    View,
+    Text,
+    TouchableOpacity,
+    Image,
+    StyleSheet,
+    Dimensions,
+    ScrollView,
+} from 'react-native';
 import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
 
-/**
- * BubbleItem Component
- * 
- * Renders a single category as a circular "bubble" item.
- * Updated Style: Swiggy-like (Large circle, flat, image full cover).
- * 
- * @param {Object} props
- * @param {Object} props.category - Category data object (id, name, image/icon).
- * @param {string} props.selectedId - ID of the currently active category.
- * @param {Function} props.onPress - Selection handler.
- * @param {Object} props.colors - Theme palette.
- */
-const BubbleItem = ({ category, selectedId, onPress, colors }) => {
+const { width } = Dimensions.get('window');
+
+const BubbleItem = ({ category, selectedId, onPress, colors, fixedWidth }) => {
     const [imageError, setImageError] = React.useState(false);
 
-    // Validate inputs
     if (!category) return null;
 
     const isSelected = selectedId === category.slug || selectedId === category.id;
     const displayName = category.name || '';
     const iconUrl = category.image || category.icon || null;
 
-    // Theme-aware color derivation
-    const backgroundColor = isSelected ? colors.primaryLight : colors.surface;
+    const isImage =
+        iconUrl &&
+        !imageError &&
+        typeof iconUrl === 'string' &&
+        (iconUrl.startsWith('http') || iconUrl.startsWith('file'));
 
-    // Icon Strategy:
-    // 1. Remote URL (Http/File) -> Render Image
-    // 2. String is Emoji-like -> Render Text
-    // 3. Fallback -> Render First Letter
-    const isImage = iconUrl && !imageError && (typeof iconUrl === 'string' && (iconUrl.startsWith('http') || iconUrl.startsWith('file')));
-    const isEmoji = !isImage && typeof iconUrl === 'string' && iconUrl.match(/\p{Emoji}/u);
     const fallbackLetter = displayName.charAt(0).toUpperCase();
+    const titleCaseName = displayName.charAt(0).toUpperCase() + displayName.slice(1).toLowerCase();
 
     return (
         <TouchableOpacity
-            style={styles.bubbleContainer}
+            activeOpacity={0.8}
             onPress={() => onPress && onPress(category)}
-            activeOpacity={0.7}
+            style={[styles.bubbleItem, fixedWidth ? styles.bubbleItemFixed : styles.bubbleItemFlex]}
         >
-            <View style={[
-                styles.bubbleCircle,
-                {
-                    backgroundColor: backgroundColor,
-                    // Subtle border only if selected to highlight, otherwise clean
-                    borderColor: isSelected ? colors.primary : 'transparent',
-                    borderWidth: isSelected ? 2 : 0
-                }
-            ]}>
+            <View style={styles.imageWrapper}>
                 {isImage ? (
                     <Image
                         source={{ uri: iconUrl }}
-                        style={styles.bubbleImage}
+                        style={styles.image}
+                        resizeMode="contain"
                         onError={() => setImageError(true)}
-                        resizeMode="cover"
                     />
+                ) : iconUrl && typeof iconUrl === 'string' ? (
+                    <Text style={styles.emoji}>
+                        {iconUrl}
+                    </Text>
                 ) : (
-                    <Text style={[styles.bubbleEmoji, { fontSize: isEmoji ? 32 : 28, color: colors.primary }]}>
-                        {isEmoji ? iconUrl : fallbackLetter}
+                    <Text style={[styles.emoji, { color: colors.primary }]}>
+                        {fallbackLetter}
                     </Text>
                 )}
             </View>
+
             <Text
-                numberOfLines={2}
-                style={[styles.bubbleText, { color: isSelected ? colors.primary : colors.text.primary, fontWeight: isSelected ? '700' : '500' }]}
+                numberOfLines={1}
+                style={[
+                    styles.label,
+                    { color: isSelected ? '#000000' : '#6B6B6B' }
+                ]}
             >
-                {displayName}
+                {titleCaseName}
             </Text>
+
+            {/* Tiny dot indicator — minimal premium */}
+            {isSelected && (
+                <View style={styles.activeIndicator} />
+            )}
         </TouchableOpacity>
     );
 };
 
-/**
- * GlovoBubbles (Horizontal List)
- * 
- * Displays top-level categories in a horizontal scrolling list.
- * Optimized for Swiggy-like "What's on your mind?" visual discovery.
- * 
- * @param {Object} props
- * @param {Array} props.categories - Array of category objects to render.
- * @param {Function} props.onPress - Callback for category selection.
- * @param {string} props.selectedId - Currently selected category ID.
- */
-const GlovoBubbles = ({ categories, onPress, selectedId, showTitle = true }) => {
+const PremiumCategories = ({
+    categories,
+    onPress,
+    selectedId,
+    showTitle = true
+}) => {
     const { colors } = useTheme();
     const { t } = useLanguage();
 
-    const data = Array.isArray(categories) ? categories : [];
+    if (!Array.isArray(categories) || categories.length === 0) return null;
 
-    if (data.length === 0) {
-        return null;
-    }
+    const useScroll = categories.length > 3;
 
     return (
         <View style={styles.container}>
             {showTitle && (
                 <View style={styles.header}>
-                    <Text style={[styles.title, { color: colors.text.primary }]}>
+                    <Text style={styles.title}>
                         {t('shopOnDeliGo')}
                     </Text>
                 </View>
             )}
 
-            <ScrollView
-                horizontal={true}
-                showsHorizontalScrollIndicator={false}
-                contentContainerStyle={styles.scrollContent}
-                decelerationRate="fast"
-                snapToInterval={90} // approximate width + margin
-                snapToAlignment="start"
-            >
-                {data.map((category, index) => (
-                    <BubbleItem
-                        key={category.id || category.slug || index}
-                        category={category}
-                        selectedId={selectedId}
-                        onPress={onPress}
-                        colors={colors}
-                    />
-                ))}
-            </ScrollView>
+            <View style={styles.glassCard}>
+                {useScroll ? (
+                    <ScrollView
+                        horizontal
+                        showsHorizontalScrollIndicator={false}
+                        contentContainerStyle={styles.scrollContent}
+                    >
+                        {categories.map((category, index) => (
+                            <BubbleItem
+                                key={category.id || category.slug || index}
+                                category={category}
+                                selectedId={selectedId}
+                                onPress={onPress}
+                                colors={colors}
+                                fixedWidth={true}
+                            />
+                        ))}
+                    </ScrollView>
+                ) : (
+                    <View style={styles.rowContent}>
+                        {categories.map((category, index) => (
+                            <BubbleItem
+                                key={category.id || category.slug || index}
+                                category={category}
+                                selectedId={selectedId}
+                                onPress={onPress}
+                                colors={colors}
+                                fixedWidth={false}
+                            />
+                        ))}
+                    </View>
+                )}
+            </View>
         </View>
     );
 };
@@ -130,57 +137,83 @@ const GlovoBubbles = ({ categories, onPress, selectedId, showTitle = true }) => 
 const styles = StyleSheet.create({
     container: {
         paddingVertical: 15,
-        // No horizontal padding on container so scroll goes edge-to-edge
     },
     header: {
-        marginBottom: 15,
-        paddingHorizontal: 20 // Align title with general app padding
+        marginBottom: 16,
+        paddingHorizontal: 20,
     },
     title: {
-        fontSize: 20,
+        fontSize: 22,
         fontWeight: '700',
-        fontFamily: 'Poppins-Bold',
-        textAlign: 'left',
-        letterSpacing: 0.5,
+        fontFamily: 'Poppins-Bold', // keeping bold but sharp
+        letterSpacing: 0.2,
+        color: '#1C1C1E', // Apple-esque dark gray
+    },
+    glassCard: {
+        marginHorizontal: 20,
+        borderRadius: 24,
+        paddingVertical: 14,
+
+        backgroundColor: '#FFFFFF',
+        borderWidth: 1,
+        borderColor: 'rgba(0, 0, 0, 0.04)',
+
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 12 },
+        shadowOpacity: 0.08,
+        shadowRadius: 28,
+        elevation: 8,
+    },
+    rowContent: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        paddingHorizontal: 8,
     },
     scrollContent: {
-        paddingHorizontal: 15, // Initial padding for the first item
-        paddingBottom: 5,      // Space for any potential shadow clipping
-    },
-    bubbleContainer: {
-        width: 100,          // Widened to fit RESTAURANT
+        paddingHorizontal: 8,
         alignItems: 'center',
-        marginRight: 4,     // Spacing between items
     },
-    bubbleCircle: {
-        width: 74,
-        height: 74,
-        borderRadius: 37,
+    bubbleItem: {
+        alignItems: 'center',
+        justifyContent: 'center',
+        paddingVertical: 12,
+        borderRadius: 16,
+        marginHorizontal: 4,
+    },
+    bubbleItemFlex: {
+        flex: 1,  // Spread evenly for ≤3 items
+    },
+    bubbleItemFixed: {
+        width: (width - 80) / 3,  // Fixed width for scrollable items
+    },
+    imageWrapper: {
+        width: 110,
+        height: 80,
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 10,
-        backgroundColor: '#f5f5f5', // Fallback color
-        overflow: 'hidden', // Ensure image stays inside circle
+        marginBottom: 12,
     },
-    bubbleImage: {
+    image: {
         width: '100%',
-        height: '100%',
+        height: '100%'
     },
-    bubbleEmoji: {
+    emoji: {
+        fontSize: 42,
         textAlign: 'center',
     },
-    bubbleText: {
-        fontSize: 12, // Industry standard min
-        lineHeight: 16,
-        textAlign: 'center',
-        width: '100%',
-        paddingHorizontal: 0,
-        fontFamily: 'Poppins-Bold',
-        color: '#000000',
+    label: {
+        fontFamily: 'Poppins-SemiBold',
+        fontSize: 16,
+        letterSpacing: 0.3,
+        textAlign: 'center'
+    },
+    activeIndicator: {
+        width: 6,
+        height: 6,
+        borderRadius: 3,
+        backgroundColor: '#1C1C1E',
         marginTop: 6,
-        textTransform: 'uppercase',
-        letterSpacing: 0,
     }
 });
 
-export default GlovoBubbles;
+export default PremiumCategories;

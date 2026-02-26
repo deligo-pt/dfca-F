@@ -358,6 +358,15 @@ export const ProductsProvider = ({ children }) => {
       };
 
       if (final.force || isNewData(cachedRaw, items)) {
+        // Filter out INACTIVE / deleted / unapproved products
+        items = items.filter(item => {
+          const status = item.meta?.status;
+          if (status && status !== 'ACTIVE') return false;
+          if (item.isDeleted) return false;
+          if (item.isApproved === false) return false;
+          return true;
+        });
+
         await StorageService.setItem(cacheKey, { items, meta: json.meta || {}, ts: Date.now() });
         setProducts(items.map(normalizeProduct));
         setLastUpdated(Date.now());
@@ -456,6 +465,17 @@ export const ProductsProvider = ({ children }) => {
 
       console.log(`[ProductsContext] Menu fetched: ${items.length} items`);
 
+      // Filter out INACTIVE / deleted / unapproved products
+      items = items.filter(item => {
+        const status = item.meta?.status;
+        if (status && status !== 'ACTIVE') return false;
+        if (item.isDeleted) return false;
+        if (item.isApproved === false) return false;
+        return true;
+      });
+
+      console.log(`[ProductsContext] Menu after filtering: ${items.length} active items`);
+
       // Force update cache logic to prevent stale data conflicts
       try {
         await StorageService.removeKeysByPrefix('productsCache:');
@@ -464,7 +484,6 @@ export const ProductsProvider = ({ children }) => {
         const freshNormalized = items.map(normalizeProduct);
         setProducts(prev => {
           const freshMap = new Map(freshNormalized.map(p => [p.id, p]));
-          // Replace any existing products in state with the fresh ones from this menu
           return prev.map(p => {
             const norm = normalizeProduct(p);
             return freshMap.has(norm.id) ? freshMap.get(norm.id) : p;

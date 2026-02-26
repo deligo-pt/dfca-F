@@ -5,11 +5,21 @@
  * Provides easy access to location, cart, and search functions.
  * Uses animated opacity for smooth transitions based on scroll position.
  */
-import React, { useState } from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, TextInput, Animated, ScrollView, ActivityIndicator, Platform, StatusBar } from 'react-native';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, TextInput, Animated, ScrollView, ActivityIndicator, Platform, StatusBar, Image } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import { spacing, fontSize } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
+import { LinearGradient } from 'expo-linear-gradient';
+
+// Selection of premium inspirational shop & food images (matching LocationHeader)
+const SHOP_IMAGES = [
+  'https://images.unsplash.com/photo-1578916171728-46686eac8d58?q=80&w=800&auto=format&fit=crop', // Grocery / Supermarket
+  'https://images.unsplash.com/photo-1554118811-1e0d58224f24?q=80&w=800&auto=format&fit=crop', // Cafe / Restaurant
+  'https://images.unsplash.com/photo-1509440159596-0249088772ff?q=80&w=800&auto=format&fit=crop', // Bakery
+  'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?q=80&w=800&auto=format&fit=crop', // Storefront
+  'https://images.unsplash.com/photo-1534723452862-4c874018d66d?q=80&w=800&auto=format&fit=crop', // Shopping Aisles
+];
 
 const STATUSBAR_HEIGHT = Platform.OS === 'android' ? StatusBar.currentHeight : 0;
 
@@ -41,6 +51,15 @@ const StickySearchHeader = ({
 }) => {
   const { colors, isDarkMode } = useTheme();
 
+  // State for dynamic background
+  const [bgImage, setBgImage] = useState(SHOP_IMAGES[0]);
+
+  useEffect(() => {
+    // Select a random image every time the component mounts
+    const randomImg = SHOP_IMAGES[Math.floor(Math.random() * SHOP_IMAGES.length)];
+    setBgImage(randomImg);
+  }, []);
+
   const headerOpacity = scrollY.interpolate({
     inputRange: [80, 150],
     outputRange: [0, 1],
@@ -56,6 +75,26 @@ const StickySearchHeader = ({
         style={[styles(colors, isDarkMode).container, { paddingTop: paddingTop }]}
         pointerEvents={pointerEvents}
       >
+        <Image
+          source={{ uri: bgImage }}
+          style={StyleSheet.absoluteFillObject}
+          resizeMode="cover"
+          opacity={isDarkMode ? 0.2 : 0.35}
+        />
+
+        <LinearGradient
+          colors={['rgba(0,0,0,0.7)', 'rgba(0,0,0,0.2)', 'transparent']}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: paddingTop + 50,
+            zIndex: 1,
+          }}
+          pointerEvents="none"
+        />
+
         <View style={styles(colors, isDarkMode).topRow}>
           <TouchableOpacity
             style={styles(colors, isDarkMode).locationButton}
@@ -74,7 +113,12 @@ const StickySearchHeader = ({
             onPress={onCartPress}
             activeOpacity={0.7}
           >
-            <Ionicons name="cart-outline" size={20} color={colors.text.white || '#FFFFFF'} />
+            <LinearGradient
+              colors={['rgba(255, 255, 255, 0.3)', 'rgba(255, 255, 255, 0.05)']}
+              style={StyleSheet.absoluteFill}
+              borderRadius={16}
+            />
+            <Ionicons name="cart-outline" size={18} color={colors.text.white || '#FFFFFF'} />
             {cartItemCount > 0 && (
               <View style={styles(colors, isDarkMode).badge}>
                 <Text style={styles(colors, isDarkMode).badgeText}>{cartItemCount > 99 ? '99+' : cartItemCount}</Text>
@@ -85,21 +129,29 @@ const StickySearchHeader = ({
 
         <View style={styles(colors, isDarkMode).searchRow}>
           <TouchableOpacity
-            style={styles(colors, isDarkMode).searchContainer}
+            style={styles(colors, isDarkMode).searchContainerWrapper}
             activeOpacity={0.9}
             onPress={onSearchPress}
           >
-            <Ionicons
-              name="search"
-              size={18}
-              color={colors.text.secondary}
-              style={styles(colors, isDarkMode).searchIcon}
-            />
-            <Text style={[styles(colors, isDarkMode).input, { paddingVertical: 8, color: colors.text.secondary }]}>
-              Search restaurants, cuisines...
-            </Text>
+            <LinearGradient
+              colors={['rgba(255, 255, 255, 0.95)', 'rgba(255, 255, 255, 0.85)']}
+              style={styles(colors, isDarkMode).searchContainer}
+            >
+              <Ionicons
+                name="search"
+                size={18}
+                color={colors.text.secondary}
+                style={styles(colors, isDarkMode).searchIcon}
+              />
+              <Text style={[styles(colors, isDarkMode).input, { paddingVertical: 8, color: colors.text.secondary }]}>
+                Search restaurants, cuisines...
+              </Text>
+            </LinearGradient>
           </TouchableOpacity>
         </View>
+
+        {/* Upward Overlapping Curve */}
+        <View style={styles(colors, isDarkMode).bottomCurve} />
       </View>
     </Animated.View>
   );
@@ -112,26 +164,21 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
     left: 0,
     right: 0,
     zIndex: 1000,
-    backgroundColor: colors.primary,
+    backgroundColor: 'transparent',
   },
   container: {
     backgroundColor: colors.primary,
-    paddingBottom: spacing.sm,
+    paddingBottom: spacing.xl + 16, // Extra padding for the curve overlap
     paddingHorizontal: spacing.md,
-    shadowColor: colors.shadow || '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 10,
-    borderBottomLeftRadius: 20,
-    borderBottomRightRadius: 20,
+    overflow: 'hidden',
   },
   topRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: spacing.xs,
-    height: 28,
+    height: 38,
+    zIndex: 2,
   },
   locationButton: {
     flexDirection: 'row',
@@ -152,10 +199,14 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
+    borderRadius: 16,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
+    zIndex: 2,
   },
   backButton: {
     width: 38,
@@ -166,19 +217,32 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
     justifyContent: 'center',
     marginRight: spacing.xs,
   },
-  searchContainer: {
+  searchContainerWrapper: {
     flex: 1,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.15,
+    shadowRadius: 12,
+    elevation: 5,
+  },
+  searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: colors.surface,
-    borderRadius: 20,
+    borderRadius: 24,
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 2,
-    shadowColor: colors.shadow || '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.08,
-    shadowRadius: 8,
-    elevation: 4,
+    paddingVertical: spacing.xs + 4,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.6)',
+  },
+  bottomCurve: {
+    position: 'absolute',
+    bottom: -1,
+    left: -10, // Prevent minor edge bleeding
+    right: -10,
+    height: 32,
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
   },
   searchContainerFocused: {
     shadowOpacity: 0.15,

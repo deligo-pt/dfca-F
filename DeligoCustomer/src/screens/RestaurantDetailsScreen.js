@@ -540,147 +540,128 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     const discount = Number(raw.pricing?.discount ?? raw.discount ?? 0);
 
     let finalPrice = Number(raw.pricing?.finalPrice ?? raw.finalPrice ?? price);
-
-    // Auto-calculate final price if backend doesn't provide it but has discount
     if (discount > 0 && finalPrice === price) {
       finalPrice = price - (price * discount / 100);
     }
 
     const currency = raw.pricing?.currency ?? '';
-
-    // Logic for variations
     const hasVariations = (raw.variations && raw.variations.length > 0) || (raw.options && raw.options.length > 0);
     const description = raw.description || raw.slug || '';
     const isUpdating = updatingProductId === product.id;
 
     // Stock Logic
-    const stockQty = raw.stock?.quantity ?? 999; // Default to high if missing
+    const stockQty = raw.stock?.quantity ?? 999;
     const isOutOfStock = stockQty <= 0;
     const isLowStock = stockQty > 0 && stockQty <= 5;
 
     return (
-      <View
+      <TouchableOpacity
         key={product.id}
-        style={[styles.menuItem, { backgroundColor: colors.surface, borderColor: colors.border }]}
+        activeOpacity={0.92}
+        onPress={() => !isOutOfStock && openProductModal(product)}
+        disabled={isUpdating || isOutOfStock}
+        style={[
+          styles.menuItem,
+          {
+            backgroundColor: colors.surface,
+            borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+          },
+          isOutOfStock && { opacity: 0.65 }
+        ]}
       >
-        {/* Left: tap to open modal */}
-        <TouchableOpacity
-          activeOpacity={0.9}
-          onPress={() => !isOutOfStock && openProductModal(product)}
-          style={[styles.menuItemContent, isOutOfStock && { opacity: 0.6 }]}
-          disabled={isUpdating || isOutOfStock}
-        >
+        {/* Image */}
+        <View style={styles.menuImageWrap}>
           {image ? (
-            <View>
-              <Image source={{ uri: image }} style={[styles.menuItemImage, isOutOfStock && { opacity: 0.5 }]} />
-              {/* Out of Stock Overlay - Premium Look */}
-              {isOutOfStock && (
-                <View style={[StyleSheet.absoluteFill, {
-                  backgroundColor: 'rgba(255,255,255,0.4)', // Subtle fade
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  borderRadius: 12
-                }]}>
-                  <View style={{
-                    backgroundColor: 'rgba(0,0,0,0.8)',
-                    paddingHorizontal: 8,
-                    paddingVertical: 4,
-                    borderRadius: 12
-                  }}>
-                    <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700', letterSpacing: 0.5 }}>SOLD OUT</Text>
-                  </View>
-                </View>
-              )}
-              {discount > 0 && !isOutOfStock && (
-                <View style={[styles.discountBadgeAbsolute, { backgroundColor: colors.primary, position: 'absolute', top: 0, left: 0, paddingHorizontal: 4, paddingVertical: 2, borderBottomRightRadius: 8 }]}>
-                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>{discount}%</Text>
-                </View>
-              )}
-            </View>
+            <Image source={{ uri: image }} style={styles.menuItemImage} resizeMode="cover" />
           ) : (
-            <View style={[styles.menuItemImage, { backgroundColor: colors.border, alignItems: 'center', justifyContent: 'center' }]}>
-              <Ionicons name="fast-food" size={32} color={colors.text.secondary} />
-              {isOutOfStock && (
-                <View style={[StyleSheet.absoluteFill, {
-                  backgroundColor: 'rgba(255,255,255,0.4)',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  borderRadius: 12
-                }]}>
-                  <View style={{
-                    backgroundColor: 'rgba(0,0,0,0.8)',
-                    paddingHorizontal: 8,
-                    paddingVertical: 4,
-                    borderRadius: 12
-                  }}>
-                    <Text style={{ color: '#fff', fontSize: 9, fontWeight: '700', letterSpacing: 0.5 }}>SOLD OUT</Text>
-                  </View>
-                </View>
-              )}
-              {discount > 0 && !isOutOfStock && (
-                <View style={[styles.discountBadgeAbsolute, { backgroundColor: colors.primary, position: 'absolute', top: 0, left: 0, paddingHorizontal: 4, paddingVertical: 2, borderBottomRightRadius: 8 }]}>
-                  <Text style={{ color: '#fff', fontSize: 10, fontWeight: 'bold' }}>{discount}%</Text>
-                </View>
-              )}
+            <View style={[styles.menuItemImage, { backgroundColor: isDarkMode ? '#2a2a2a' : '#f4f4f5', alignItems: 'center', justifyContent: 'center' }]}>
+              <Ionicons name="fast-food-outline" size={28} color={isDarkMode ? '#555' : '#ccc'} />
             </View>
           )}
 
-          <View style={styles.menuItemInfo}>
-            <Text style={[styles.menuItemName, { color: colors.text.primary }]} numberOfLines={2}>{displayProductName}</Text>
-            {description ? (
-              <Text style={[styles.menuItemDescription, { color: colors.text.secondary }]} numberOfLines={2}>{description}</Text>
-            ) : null}
-
-            <View style={{ marginTop: 4 }}>
-              {/* Low Stock Warning */}
-              {isLowStock && (
-                <Text style={{ fontSize: 10, color: 'orange', marginBottom: 2, fontFamily: 'Poppins-Bold' }}>
-                  {t('lowStock') || 'Low Stock'}: {stockQty} {t('left') || 'left'}
-                </Text>
-              )}
-
-              {discount > 0 ? (
-                <View style={{ flexDirection: 'row', alignItems: 'baseline' }}>
-                  <Text style={[styles.menuItemPrice, { color: colors.primary, marginRight: 6 }]}>
-                    {formatCurrency(currency, finalPrice)}
-                  </Text>
-                  <Text style={[styles.menuItemOriginalPrice, { color: colors.text.light, textDecorationLine: 'line-through', fontSize: 12 }]}>
-                    {formatCurrency(currency, price)}
-                  </Text>
-                </View>
-              ) : (
-                <Text style={[styles.menuItemPrice, { color: colors.primary }]}>
-                  {hasVariations ? 'From ' : ''}{formatCurrency(currency, price)}
-                </Text>
-              )}
-              {hasVariations && <Text style={{ fontSize: 10, color: colors.text.secondary, marginTop: 2 }}>{t('customizable') || 'Customizable'}</Text>}
+          {/* Discount Badge */}
+          {discount > 0 && !isOutOfStock && (
+            <View style={[styles.discountFlag, { backgroundColor: colors.primary }]}>
+              <Text style={styles.discountFlagText}>{discount}%</Text>
             </View>
-          </View>
-        </TouchableOpacity>
+          )}
 
-        {/* Right: Add button - always opens modal */}
-        <View style={styles.menuItemActions} pointerEvents="box-none">
-          <TouchableOpacity
-            style={[styles.addButton, { backgroundColor: isOutOfStock ? colors.border : colors.primary }]}
-            onPress={() => openProductModal(product)}
-            disabled={isUpdating || isOutOfStock}
-            hitSlop={{ top: 8, bottom: 8, left: 8, right: 8 }}
+          {/* Sold Out */}
+          {isOutOfStock && (
+            <View style={styles.soldOutOverlay}>
+              <Text style={styles.soldOutText}>SOLD OUT</Text>
+            </View>
+          )}
+        </View>
+
+        {/* Info */}
+        <View style={styles.menuItemInfo}>
+          <Text style={[styles.menuItemName, { color: colors.text.primary }]} numberOfLines={2}>
+            {displayProductName}
+          </Text>
+
+          {description ? (
+            <Text style={[styles.menuItemDescription, { color: isDarkMode ? '#888' : '#999' }]} numberOfLines={2}>
+              {description}
+            </Text>
+          ) : null}
+
+          {/* Low Stock */}
+          {isLowStock && (
+            <Text style={styles.lowStockText}>
+              {t('lowStock') || 'Low Stock'}: {stockQty} {t('left') || 'left'}
+            </Text>
+          )}
+
+          {/* Price Row */}
+          <View style={styles.priceRow}>
+            {discount > 0 ? (
+              <>
+                <Text style={[styles.menuItemPrice, { color: colors.primary }]}>
+                  {formatCurrency(currency, finalPrice)}
+                </Text>
+                <Text style={styles.originalPrice}>
+                  {formatCurrency(currency, price)}
+                </Text>
+              </>
+            ) : (
+              <Text style={[styles.menuItemPrice, { color: colors.primary }]}>
+                {hasVariations ? 'From ' : ''}{formatCurrency(currency, price)}
+              </Text>
+            )}
+            {hasVariations && (
+              <Text style={[styles.customizableTag, { color: colors.text.secondary }]}>
+                {t('customizable') || 'Customizable'}
+              </Text>
+            )}
+          </View>
+        </View>
+
+        {/* Add Button */}
+        <View style={styles.menuItemActions}>
+          <View
+            style={[
+              styles.addButton,
+              { backgroundColor: isOutOfStock ? (isDarkMode ? '#333' : '#eee') : colors.primary }
+            ]}
           >
             {isUpdating ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
-              <>
-                <Ionicons name={isOutOfStock ? "close" : "add"} size={20} color={isOutOfStock ? colors.text.tertiary : "#fff"} />
-                {quantity > 0 && (
-                  <View style={[styles.quantityBadge, { backgroundColor: '#fff' }]}>
-                    <Text style={[styles.quantityBadgeText, { color: colors.primary }]}>{quantity}</Text>
-                  </View>
-                )}
-              </>
+              <Ionicons
+                name={isOutOfStock ? 'close' : 'add'}
+                size={22}
+                color={isOutOfStock ? '#999' : '#fff'}
+              />
             )}
-          </TouchableOpacity>
+            {quantity > 0 && !isOutOfStock && (
+              <View style={[styles.quantityBadge, { borderColor: colors.primary }]}>
+                <Text style={[styles.quantityBadgeText, { color: colors.primary }]}>{quantity}</Text>
+              </View>
+            )}
+          </View>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -1366,8 +1347,8 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
           />
         }
       >
-        {/* Vendor Header */}
-        <View style={[styles.restaurantCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+        {/* Premium Vendor Header */}
+        <View style={styles.vendorHero}>
           <Image
             source={
               restaurant._raw?.vendor?.storePhoto
@@ -1375,18 +1356,26 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                 : (restaurant.image ? { uri: restaurant.image } : require('../assets/images/logonew.png'))
             }
             style={styles.restaurantImage}
+            resizeMode="cover"
           />
-          <View style={styles.restaurantInfo}>
-            <Text style={[styles.restaurantName, { color: colors.text.primary }]}>{displayName}</Text>
-            {displayLocation && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
-                <Ionicons name="location-outline" size={14} color={colors.text.secondary} />
-                <Text style={{ color: colors.text.secondary, fontSize: 13, fontFamily: 'Poppins-Regular', marginLeft: 4 }}>
-                  {displayLocation}
-                </Text>
-              </View>
-            )}
-          </View>
+          {/* Bottom gradient for blending */}
+          <LinearGradient
+            colors={['transparent', 'rgba(0,0,0,0.06)']}
+            style={styles.heroBottomGradient}
+          />
+        </View>
+
+        {/* Glassmorphism Info Card — floating overlap */}
+        <View style={styles.glassInfoCard}>
+          <Text style={[styles.restaurantName, { color: colors.text.primary }]}>{displayName}</Text>
+          {displayLocation && (
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
+              <Ionicons name="location-outline" size={14} color={colors.text.secondary} />
+              <Text style={[styles.locationText, { color: colors.text.secondary }]}>
+                {displayLocation}
+              </Text>
+            </View>
+          )}
         </View>
 
         {/* Category Tabs */}
@@ -1528,33 +1517,59 @@ const styles = StyleSheet.create({
     fontFamily: 'Poppins-Regular',
     paddingVertical: spacing.xs,
   },
-  restaurantCard: {
-    margin: spacing.md,
-    borderRadius: 16,
-    borderWidth: 1,
+  // ── Premium Vendor Hero ──
+  vendorHero: {
+    position: 'relative',
+    marginHorizontal: 16,
+    marginTop: 12,
+    borderRadius: 24,
     overflow: 'hidden',
-    elevation: 2,
+    // Premium shadow
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.12,
+    shadowRadius: 20,
+    elevation: 6,
+  },
+  heroBottomGradient: {
+    position: 'absolute',
+    bottom: 0,
+    left: 0,
+    right: 0,
+    height: 50,
   },
   restaurantImage: {
     width: '100%',
-    height: 180,
+    height: 200,
+    backgroundColor: '#f0f0f0',
   },
-  restaurantInfo: {
-    padding: spacing.md,
+  // ── Glassmorphism Info Overlay ──
+  glassInfoCard: {
+    marginHorizontal: 28,
+    marginTop: -40,  // Float over hero image
+    padding: 18,
+    borderRadius: 20,
+    backgroundColor: 'rgba(255, 255, 255, 0.92)',
+    // Glass border
+    borderWidth: 1,
+    borderColor: 'rgba(255, 255, 255, 0.85)',
+    // Deep premium shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.10,
+    shadowRadius: 24,
+    elevation: 8,
+    marginBottom: 8,
   },
   restaurantName: {
-    fontSize: fontSize.xxl,
+    fontSize: 22,
     fontFamily: 'Poppins-Bold',
-    marginBottom: spacing.xs,
+    letterSpacing: 0.15,
   },
-  restaurantCategories: {
-    fontSize: fontSize.sm,
+  locationText: {
+    fontSize: 13,
     fontFamily: 'Poppins-Regular',
-    marginBottom: spacing.sm,
+    marginLeft: 5,
   },
   restaurantMeta: {
     flexDirection: 'row',
@@ -1624,60 +1639,118 @@ const styles = StyleSheet.create({
   },
   menuItem: {
     flexDirection: 'row',
-    justifyContent: 'space-between',
     alignItems: 'center',
-    padding: spacing.md,
-    borderRadius: 16,
-    marginBottom: spacing.md,
+    padding: 12,
+    borderRadius: 20,
+    marginBottom: 14,
     borderWidth: 1,
-    elevation: 1,
+    // Premium depth
+    elevation: 4,
     shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 2,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.08,
+    shadowRadius: 16,
   },
-  menuItemContent: {
-    flexDirection: 'row',
-    flex: 1,
+  menuImageWrap: {
+    position: 'relative',
+    borderRadius: 16,
+    overflow: 'hidden',
   },
   menuItemImage: {
-    width: 80,
-    height: 80,
-    borderRadius: 12,
-    marginRight: spacing.md,
+    width: 88,
+    height: 88,
+    borderRadius: 16,
+  },
+  discountFlag: {
+    position: 'absolute',
+    top: 6,
+    left: 6,
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+  },
+  discountFlagText: {
+    color: '#fff',
+    fontSize: 10,
+    fontFamily: 'Poppins-Bold',
+    letterSpacing: 0.3,
+  },
+  soldOutOverlay: {
+    ...StyleSheet.absoluteFillObject,
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    borderRadius: 16,
+  },
+  soldOutText: {
+    color: '#fff',
+    fontSize: 10,
+    fontFamily: 'Poppins-Bold',
+    letterSpacing: 1,
   },
   menuItemInfo: {
     flex: 1,
+    paddingLeft: 14,
+    paddingRight: 4,
     justifyContent: 'center',
   },
   menuItemName: {
-    fontSize: fontSize.md,
+    fontSize: 15,
     fontFamily: 'Poppins-SemiBold',
-    marginBottom: spacing.xs,
+    letterSpacing: 0.1,
+    marginBottom: 3,
   },
   menuItemDescription: {
-    fontSize: fontSize.sm,
+    fontSize: 12,
     fontFamily: 'Poppins-Regular',
-    marginBottom: spacing.xs,
+    lineHeight: 17,
+    marginBottom: 6,
+  },
+  lowStockText: {
+    fontSize: 10,
+    color: '#E8850C',
+    fontFamily: 'Poppins-SemiBold',
+    marginBottom: 3,
+  },
+  priceRow: {
+    flexDirection: 'row',
+    alignItems: 'baseline',
+    flexWrap: 'wrap',
   },
   menuItemPrice: {
-    fontSize: fontSize.md,
+    fontSize: 15,
     fontFamily: 'Poppins-Bold',
+    letterSpacing: 0.2,
+    marginRight: 6,
+  },
+  originalPrice: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    color: '#bbb',
+    textDecorationLine: 'line-through',
+  },
+  customizableTag: {
+    fontSize: 10,
+    fontFamily: 'Poppins-Medium',
+    marginLeft: 4,
   },
   menuItemActions: {
-    marginLeft: spacing.sm,
-  },
-  addButton: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
+    paddingLeft: 8,
     alignItems: 'center',
     justifyContent: 'center',
-    elevation: 2,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.2,
-    shadowRadius: 2,
+  },
+  addButton: {
+    width: 42,
+    height: 42,
+    borderRadius: 14,
+    alignItems: 'center',
+    justifyContent: 'center',
+    // Premium shadow glow
+    shadowColor: '#E91E63',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.25,
+    shadowRadius: 8,
+    elevation: 4,
   },
   quantityControl: {
     flexDirection: 'row',

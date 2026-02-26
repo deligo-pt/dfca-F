@@ -45,10 +45,11 @@ const BottomTabNavigator = ({ onLogout }) => {
         android: Math.max(insets.bottom, 12),
     });
 
-    const tabBarBaseHeight = 64;
+    // Increased base height for a more premium, spacious look
+    const tabBarBaseHeight = 72;
     const totalTabBarHeight = tabBarBaseHeight + bottomPadding;
 
-    // Custom tab bar styling to support floating effect and dark mode
+    // Custom tab bar styling to support the premium, highly-rounded look
     const tabBarStyle = {
         position: 'absolute',
         left: 0,
@@ -56,30 +57,31 @@ const BottomTabNavigator = ({ onLogout }) => {
         bottom: 0,
         height: totalTabBarHeight,
         paddingBottom: bottomPadding,
-        paddingTop: 8,
-        paddingHorizontal: 16,
-        borderTopLeftRadius: 22,
-        borderTopRightRadius: 22,
+        paddingTop: 12,
+        paddingHorizontal: 8,
+        borderTopLeftRadius: 36,
+        borderTopRightRadius: 36,
         backgroundColor: isDarkMode ? colors.surface : colors.background,
-        borderTopWidth: isDarkMode ? 1 : 0,
-        borderTopColor: isDarkMode ? colors.border : 'transparent',
+        borderTopWidth: 0,
+        borderTopColor: 'transparent',
         marginHorizontal: 0,
         ...Platform.select({
             ios: {
                 shadowColor: '#000',
-                shadowOffset: { width: 0, height: -4 },
-                shadowOpacity: isDarkMode ? 0.3 : 0.12,
-                shadowRadius: isDarkMode ? 20 : 16,
+                shadowOffset: { width: 0, height: -6 },
+                shadowOpacity: isDarkMode ? 0.3 : 0.08,
+                shadowRadius: isDarkMode ? 20 : 20,
             },
             android: {
-                elevation: isDarkMode ? 20 : 16,
+                elevation: isDarkMode ? 20 : 24,
             },
         }),
     };
 
     return (
-        <SafeAreaView style={{ flex: 1, backgroundColor: colors.primary }} edges={['top', 'left', 'right']}>
-            <StatusBar style="light" backgroundColor={colors.primary} />
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['left', 'right']}>
+            {/* Global transculent status bar for tab screens to enable full-screen headers */}
+            <StatusBar style="light" backgroundColor="transparent" translucent={true} />
             <View style={{ flex: 1, backgroundColor: colors.background }}>
                 <KeyboardAvoidingView
                     style={{ flex: 1 }}

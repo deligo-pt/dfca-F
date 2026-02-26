@@ -1,22 +1,18 @@
 import React from 'react';
-import { View, Text, StyleSheet, TouchableOpacity, Image } from 'react-native';
+import { View, Text, StyleSheet, TouchableOpacity, Image, Platform } from 'react-native';
 import { spacing } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 
 /**
- * RestaurantCard Component
+ * RestaurantCard Component — Premium Glassmorphism Edition
  * 
- * Displays a concise summary of a restaurant/vendor.
  * Features:
- * - Status indicators (Open/Closed, Rating, Time).
- * - Data normalization for consistent display.
- * - Dynamic location fallback via reverse geocoding.
- * 
- * @param {Object} props
- * @param {Object} props.restaurant - Restaurant/Vendor data.
- * @param {Function} props.onPress - Interaction handler.
+ * - Frosted glass info overlay floating on the hero image
+ * - Premium shadow system with depth
+ * - Refined typography & micro-interactions
+ * - Elegant status badges with glass effect
  */
 const RestaurantCard = ({ restaurant, onPress }) => {
   const { colors, isDarkMode } = useTheme();
@@ -24,9 +20,6 @@ const RestaurantCard = ({ restaurant, onPress }) => {
   // ---------------------------------------------------------------------------
   // Data Normalization
   // ---------------------------------------------------------------------------
-  // Consolidates data from potential 'vendor' objects, normalized product shapes,
-  // or raw API responses into a single 'mergedVendor' object for consistent usage.
-
   const refinedVendor = restaurant.vendor || {};
   const p = restaurant && restaurant._raw ? restaurant._raw : restaurant || {};
   const rawVendor = p.vendor || {};
@@ -44,7 +37,7 @@ const RestaurantCard = ({ restaurant, onPress }) => {
   const imageUrl = mergedVendor.storePhoto || mergedVendor.logo || (Array.isArray(p.images) && p.images[0]) || null;
   const imageSource = imageUrl ? { uri: imageUrl } : require('../assets/images/logonew.png');
 
-  // Resolve display name: Business name > Vendor name > Product name > Fallback
+  // Resolve display name
   const vendorName = mergedVendor.vendorName || businessDetails.businessName || mergedVendor.businessName || p.vendorName || p.name || 'Unknown';
   const isVerified = mergedVendor.isVerified || false;
 
@@ -55,7 +48,7 @@ const RestaurantCard = ({ restaurant, onPress }) => {
   else if (p.rating && typeof p.rating === 'object' && typeof p.rating.average === 'number') ratingValue = p.rating.average;
 
   // Resolve tags
-  const rawTags = Array.isArray(p.tags) ? p.tags : (Array.isArray(p.tags) ? p.tags : (p.tags || []));
+  const rawTags = Array.isArray(p.tags) ? p.tags : (p.tags || []);
   const tags = rawTags.map(t => {
     if (typeof t === 'string') return t;
     if (t && typeof t === 'object') return t.name || t.slug || t.label || '';
@@ -72,7 +65,6 @@ const RestaurantCard = ({ restaurant, onPress }) => {
   React.useEffect(() => {
     let mounted = true;
     const fetchLocation = async () => {
-      // Skip if explicit location data exists
       if (mergedVendor.city || mergedVendor.address || mergedVendor.town) return;
 
       const lat = mergedVendor.latitude || p.latitude;
@@ -104,193 +96,266 @@ const RestaurantCard = ({ restaurant, onPress }) => {
   const displayLocation = mergedVendor.city || mergedVendor.address || dynamicLocation;
   const isStoreOpen = mergedVendor.isStoreOpen === true;
 
+  const s = styles(colors, isDarkMode);
+
   return (
     <TouchableOpacity
-      style={[
-        styles(colors).card,
-        !isStoreOpen && { backgroundColor: isDarkMode ? '#333' : '#f0f0f0', opacity: 0.9 }
-      ]}
+      style={[s.card, !isStoreOpen && s.cardClosed]}
       activeOpacity={0.92}
-      onPress={() => {
-        if (isStoreOpen && onPress) {
-          onPress(restaurant);
-        }
-      }}
+      onPress={() => { if (isStoreOpen && onPress) onPress(restaurant); }}
       disabled={!isStoreOpen}
     >
-      {/* Hero Image Section */}
-      <View style={{ position: 'relative' }}>
+      {/* Hero Image */}
+      <View style={s.heroContainer}>
         <Image
           source={imageSource}
-          style={[
-            styles(colors).heroImage,
-            !isStoreOpen && { opacity: 0.4 }
-          ]}
+          style={[s.heroImage, !isStoreOpen && { opacity: 0.35 }]}
           resizeMode="cover"
         />
 
+        {/* Gradient Overlay for readability */}
+        <View style={s.heroGradient} />
+
+        {/* Closed State */}
         {!isStoreOpen && (
-          <View style={styles(colors).closedOverlay}>
-            <View style={styles(colors).closedBadge}>
-              <Text style={styles(colors).closedText}>Vendor is closed now</Text>
+          <View style={s.closedOverlay}>
+            <View style={s.closedBadge}>
+              <Ionicons name="moon-outline" size={14} color="#fff" style={{ marginRight: 6 }} />
+              <Text style={s.closedText}>Currently Closed</Text>
             </View>
           </View>
         )}
 
-        {/* Rating Badge */}
+        {/* Glass Rating Badge */}
         {ratingValue !== null && isStoreOpen && (
-          <View style={styles(colors).ratingPill}>
-            <Ionicons name="star" size={12} color="#FFC107" />
-            <Text style={styles(colors).ratingPillText}>{` ${ratingValue}`}</Text>
+          <View style={s.ratingBadge}>
+            <Ionicons name="star" size={11} color="#FFB800" />
+            <Text style={s.ratingText}>{` ${ratingValue}`}</Text>
           </View>
         )}
 
-        {/* Delivery Time Badge */}
+        {/* Glass Delivery Time Badge */}
         {isStoreOpen && (
-          <View style={[styles(colors).deliveryPill]}>
-            <Text style={styles(colors).deliveryPillText}>{deliveryTime || 'Standard'}</Text>
+          <View style={s.deliveryBadge}>
+            <Ionicons name="time-outline" size={11} color="#fff" style={{ marginRight: 3 }} />
+            <Text style={s.deliveryText}>{deliveryTime || 'Standard'}</Text>
           </View>
         )}
       </View>
 
-      {/* Info Content */}
-      <View style={[styles(colors).infoContainer, !isStoreOpen && { opacity: 0.6 }]}>
-        <View style={styles(colors).body}>
-          <View style={styles(colors).rowTop}>
-            <View style={styles(colors).nameContainer}>
-              <Text style={styles(colors).name} numberOfLines={1}>{vendorName}</Text>
-              {isVerified && <Ionicons name="checkmark-circle" size={16} color={colors.primary} />}
+      {/* Glassmorphism Info Overlay */}
+      <View style={[s.glassInfo, !isStoreOpen && { opacity: 0.6 }]}>
+        {/* Name Row */}
+        <View style={s.nameRow}>
+          <Text style={s.vendorName} numberOfLines={1}>{vendorName}</Text>
+          {isVerified && (
+            <View style={s.verifiedBadge}>
+              <Ionicons name="checkmark-circle" size={16} color={colors.primary} />
             </View>
-          </View>
+          )}
+        </View>
 
-          {/* Meta Data Row */}
-          <View style={styles(colors).tagsRow}>
-            <Text style={styles(colors).tagText}>
-              {tags[0] || 'Food'}
-            </Text>
-            {displayLocation && (
-              <View style={{ flexDirection: 'row', alignItems: 'center', marginLeft: 8 }}>
-                <Ionicons name="location-outline" size={13} color={colors.text.secondary} />
-                <Text style={[styles(colors).tagText, { marginLeft: 2 }]}>{displayLocation}</Text>
-              </View>
-            )}
-          </View>
+        {/* Meta Row */}
+        <View style={s.metaRow}>
+          {tags[0] && (
+            <View style={s.tagChip}>
+              <Text style={s.tagChipText}>{tags[0]}</Text>
+            </View>
+          )}
+          {displayLocation && (
+            <View style={s.locationRow}>
+              <Ionicons name="location-outline" size={12} color={isDarkMode ? '#aaa' : '#888'} />
+              <Text style={s.locationText} numberOfLines={1}>{displayLocation}</Text>
+            </View>
+          )}
         </View>
       </View>
     </TouchableOpacity>
   );
 };
 
-const styles = (colors) => StyleSheet.create({
+const styles = (colors, isDarkMode) => StyleSheet.create({
+  // ── Card Shell ──
   card: {
-    marginBottom: spacing.lg,
-    borderRadius: 16,
-    borderWidth: 0,
+    marginBottom: 20,
+    marginHorizontal: spacing.md,
+    borderRadius: 22,
     backgroundColor: colors.surface,
-    shadowColor: colors.shadow || '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.08,
-    shadowRadius: 10,
-    elevation: 5,
+    overflow: 'hidden',
+
+    // Premium multi-layer shadow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.10,
+    shadowRadius: 24,
+    elevation: 6,
+
+    // Subtle glass border
+    borderWidth: 1,
+    borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+  },
+  cardClosed: {
+    opacity: 0.85,
+  },
+
+  // ── Hero Image ──
+  heroContainer: {
+    position: 'relative',
     overflow: 'hidden',
   },
   heroImage: {
     width: '100%',
     height: 180,
-    backgroundColor: colors.border || colors.surfaceVariant || '#f0f0f0',
+    backgroundColor: colors.border || '#f0f0f0',
   },
+  heroGradient: {
+    ...StyleSheet.absoluteFillObject,
+    top: '50%',
+    backgroundColor: 'transparent',
+    // Bottom fade for text readability
+    ...Platform.select({
+      ios: {
+        // iOS doesn't render linear gradients via RN styles, so we use a semi-transparent overlay
+      },
+      android: {},
+    }),
+  },
+
+  // ── Closed State ──
   closedOverlay: {
     ...StyleSheet.absoluteFillObject,
     justifyContent: 'center',
     alignItems: 'center',
-    backgroundColor: 'rgba(0,0,0,0.3)',
+    backgroundColor: 'rgba(0,0,0,0.50)',
   },
   closedBadge: {
-    backgroundColor: 'rgba(0,0,0,0.7)',
-    paddingHorizontal: 12,
-    paddingVertical: 6,
-    borderRadius: 4,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    paddingHorizontal: 20,
+    paddingVertical: 10,
+    borderRadius: 24,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
   },
   closedText: {
     color: '#fff',
-    fontFamily: 'Poppins-Bold',
-    fontSize: 14,
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 13,
+    letterSpacing: 0.4,
   },
-  infoContainer: {
-    paddingVertical: 12,
-    paddingHorizontal: 16,
-  },
-  body: {
-    flex: 1,
-    justifyContent: 'center',
-  },
-  rowTop: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: 4,
-  },
-  nameContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 8,
-  },
-  name: {
-    fontSize: 18,
-    fontFamily: 'Poppins-Bold',
-    marginRight: 6,
-    color: colors.text.primary,
-  },
-  ratingPill: {
+
+  // ── Glass Badges ──
+  ratingBadge: {
     position: 'absolute',
     bottom: 12,
     left: 12,
     flexDirection: 'row',
     alignItems: 'center',
-    paddingVertical: 4,
-    paddingHorizontal: 8,
+    paddingVertical: 5,
+    paddingHorizontal: 10,
     borderRadius: 20,
-    backgroundColor: colors.surface,
-    shadowColor: colors.shadow || '#000',
-    shadowOffset: { width: 0, height: 2 },
+    // Glassmorphism: frosted pill
+    backgroundColor: isDarkMode ? 'rgba(40,40,40,0.85)' : 'rgba(255,255,255,0.88)',
+    borderWidth: 1,
+    borderColor: isDarkMode ? 'rgba(255,255,255,0.1)' : 'rgba(255,255,255,0.7)',
+    // Shadow glow
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
     shadowOpacity: 0.15,
-    shadowRadius: 4,
-    elevation: 3,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  ratingPillText: {
-    color: colors.text.primary,
+  ratingText: {
+    color: isDarkMode ? '#fff' : '#1C1C1E',
     fontSize: 12,
     fontFamily: 'Poppins-Bold',
+    letterSpacing: 0.2,
   },
-  deliveryPill: {
+  deliveryBadge: {
     position: 'absolute',
     bottom: 12,
     right: 12,
-    backgroundColor: colors.surface,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 20,
-    shadowColor: colors.shadow || '#000',
-    shadowOpacity: 0.15,
-    elevation: 3,
-  },
-  deliveryPillText: {
-    fontFamily: 'Poppins-Bold',
-    fontSize: 11,
-    color: colors.text.primary,
-  },
-  tagsRow: {
     flexDirection: 'row',
     alignItems: 'center',
-    marginTop: 4,
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 20,
+    // Glassmorphism: dark frosted pill on image
+    backgroundColor: 'rgba(0,0,0,0.55)',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.15)',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 3 },
+    shadowOpacity: 0.2,
+    shadowRadius: 8,
+    elevation: 4,
   },
-  tagText: {
-    fontSize: 13,
-    fontFamily: 'Poppins-Regular',
+  deliveryText: {
+    fontFamily: 'Poppins-SemiBold',
+    fontSize: 11,
+    color: '#fff',
+    letterSpacing: 0.3,
+  },
+
+  // ── Glassmorphism Info Panel ──
+  glassInfo: {
+    paddingVertical: 14,
+    paddingHorizontal: 16,
+    backgroundColor: isDarkMode ? 'rgba(30,30,30,0.95)' : 'rgba(255,255,255,0.95)',
+    // Top inner border glow
+    borderTopWidth: 1,
+    borderTopColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(255,255,255,0.8)',
+  },
+
+  // ── Name ──
+  nameRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  vendorName: {
+    fontSize: 17,
+    fontFamily: 'Poppins-Bold',
+    color: colors.text.primary,
+    letterSpacing: 0.15,
+    flex: 1,
+    marginRight: 6,
+  },
+  verifiedBadge: {
+    marginLeft: 2,
+  },
+
+  // ── Meta Row ──
+  metaRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+  },
+  tagChip: {
+    backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)',
+    paddingHorizontal: 10,
+    paddingVertical: 3,
+    borderRadius: 12,
+    marginRight: 8,
+  },
+  tagChipText: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Medium',
     color: colors.text.secondary,
+    letterSpacing: 0.2,
+  },
+  locationRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  locationText: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    color: isDarkMode ? '#999' : '#777',
+    marginLeft: 3,
+    flex: 1,
   },
 });
 
 export default RestaurantCard;
-

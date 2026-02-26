@@ -13,7 +13,7 @@ import {
     SkeletonCategory,
     PromoCarousel,
 } from '../components';
-import GlovoBubbles from '../components/GlovoBubbles';
+import PremiumCategories from '../components/GlovoBubbles';
 import Category from '../components/Categories/CuisinesList';
 import { useProducts } from '../contexts/ProductsContext';
 import StorageService from '../utils/storage';
@@ -833,16 +833,6 @@ const CategoriesScreen = ({ navigation }) => {
                 backgroundColor="transparent"
                 translucent={true}
             />
-            {/* PERMANENT FIX: Static Status Bar Background */}
-            <View style={{
-                position: 'absolute',
-                top: 0,
-                left: 0,
-                right: 0,
-                height: insets.top,
-                backgroundColor: colors.primary,
-                zIndex: 9999,
-            }} />
 
             {/* Sticky Search Header - appears on scroll */}
             <StickySearchHeader
@@ -898,8 +888,8 @@ const CategoriesScreen = ({ navigation }) => {
                         refreshTrigger={promoRefreshTrigger}
                     />
 
-                    {/* Glovo-Style "Super App" Bubbles */}
-                    <GlovoBubbles
+                    {/* High-End App Hub Bubbles */}
+                    <PremiumCategories
                         categories={displayCategories}
                         onPress={handleVendorTypePress}
                         selectedId={selectedVendorType}
@@ -907,7 +897,7 @@ const CategoriesScreen = ({ navigation }) => {
 
                     {/* Categories Section - filtered by selected Business Category */}
                     <SectionHeader
-                        title={t('exploreCategories')}
+                        title={t('what_on_your_mind', { defaultValue: "What's on your mind?" }) || "What's on your mind?"}
                         showSeeAll={false}
                     />
 

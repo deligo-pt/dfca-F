@@ -23,7 +23,7 @@ const API_BASE_URLS = {
  * Current Environment
  * Change this value to switch between 'development', 'staging', and 'production' modes.
  */
-const ENVIRONMENT = 'staging';
+const ENVIRONMENT = 'production';
 
 /**
  * General API Settings

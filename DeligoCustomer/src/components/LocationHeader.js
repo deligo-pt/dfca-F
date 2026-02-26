@@ -1,30 +1,27 @@
-import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, ScrollView, StatusBar, Platform } from 'react-native';
-
-import { Ionicons } from '@expo/vector-icons';
+import React, { useState, useEffect } from 'react';
+import { View, Text, StyleSheet, TouchableOpacity, ActivityIndicator, StatusBar, Platform, Image } from 'react-native';
+import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { spacing, fontSize } from '../theme';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
+import { useProfile } from '../contexts/ProfileContext';
+import { LinearGradient } from 'expo-linear-gradient';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-const STATUSBAR_HEIGHT = Platform.OS === 'android' ? StatusBar.currentHeight : 0;
+// Selection of premium inspirational shop & food images
+const SHOP_IMAGES = [
+  'https://images.unsplash.com/photo-1578916171728-46686eac8d58?q=80&w=800&auto=format&fit=crop', // Grocery / Supermarket
+  'https://images.unsplash.com/photo-1554118811-1e0d58224f24?q=80&w=800&auto=format&fit=crop', // Cafe / Restaurant
+  'https://images.unsplash.com/photo-1509440159596-0249088772ff?q=80&w=800&auto=format&fit=crop', // Bakery
+  'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?q=80&w=800&auto=format&fit=crop', // Storefront
+  'https://images.unsplash.com/photo-1534723452862-4c874018d66d?q=80&w=800&auto=format&fit=crop', // Shopping Aisles
+];
 
 /**
  * LocationHeader Component
  * 
- * Main header for the home screen.
- * Displays greeting, location selector, notification badge, and search input.
- * 
- * @param {Object} props
- * @param {Object} props.location - Current location data.
- * @param {string} props.area - Display name of current area.
- * @param {boolean} props.loading - Loading state for location.
- * @param {Function} props.onLocationPress - Location selector handler.
- * @param {Function} props.onSearchPress - Search input handler.
- * @param {Array} props.categories - List of categories (optional).
- * @param {Function} props.onCategoryPress - Category press handler.
- * @param {string} [props.userName] - Display name of user.
- * @param {Function} props.onProfilePress - Profile button handler.
- * @param {Function} props.onNotificationPress - Notification button handler.
- * @param {number} [props.paddingTop=0] - Additional top padding.
+ * Premium redesigned header based on the "inspirational" UI vibe, 
+ * now featuring dynamic shop backgrounds and glassmorphism.
  */
 const LocationHeader = ({
   location,
@@ -41,6 +38,17 @@ const LocationHeader = ({
 }) => {
   const { colors, isDarkMode } = useTheme();
   const { t } = useLanguage();
+  const { user } = useProfile();
+  const insets = useSafeAreaInsets();
+
+  // State for dynamic background
+  const [bgImage, setBgImage] = useState(SHOP_IMAGES[0]);
+
+  useEffect(() => {
+    // Select a random image every time the component mounts
+    const randomImg = SHOP_IMAGES[Math.floor(Math.random() * SHOP_IMAGES.length)];
+    setBgImage(randomImg);
+  }, []);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -49,69 +57,117 @@ const LocationHeader = ({
     return t('goodEvening');
   };
 
-  const greeting = userName ? `${getGreeting()}, ${userName} 👋` : `${getGreeting()} 👋`;
+  // Profile image handling
+  const getProfileImage = () => {
+    if (user && user.profilePhoto) return { uri: user.profilePhoto };
+    if (user && user.avatar) return { uri: user.avatar };
+    // Elegant fallback
+    return { uri: 'https://cdn-icons-png.flaticon.com/512/3135/3135715.png' };
+  };
 
   return (
     <View style={styles(colors, isDarkMode).wrapper}>
       <StatusBar translucent backgroundColor="transparent" barStyle="light-content" />
 
-      <View
-        style={[styles(colors, isDarkMode).container, { backgroundColor: colors.primary, paddingTop: paddingTop }]}
-      >
-        {/* Header Top Row: Greeting & Profile */}
-        <View style={styles(colors, isDarkMode).greetingRow}>
-          <Text style={styles(colors, isDarkMode).greetingText}>{greeting}</Text>
-          <TouchableOpacity
-            style={styles(colors, isDarkMode).profileButton}
-            onPress={onProfilePress}
-          >
-            <Ionicons name="person-circle-outline" size={32} color="#FFFFFF" />
-          </TouchableOpacity>
+      {/* Main Gradient-like Premium Background */}
+      <View style={[styles(colors, isDarkMode).premiumBackground, { paddingTop: insets.top + spacing.sm }]}>
+
+        {/* Dynamic Shop Background Image blending with primary color */}
+        <Image
+          source={{ uri: bgImage }}
+          style={StyleSheet.absoluteFillObject}
+          resizeMode="cover"
+          opacity={isDarkMode ? 0.2 : 0.35}
+        />
+
+        {/* Robust Dark Status Bar Gradient for Premium Visibility */}
+        <LinearGradient
+          colors={['rgba(0,0,0,0.7)', 'rgba(0,0,0,0.2)', 'transparent']}
+          style={{
+            position: 'absolute',
+            top: 0,
+            left: 0,
+            right: 0,
+            height: insets.top + 50,
+            zIndex: 1,
+          }}
+          pointerEvents="none"
+        />
+
+        {/* Top Header Row with Profile, Greeting and Icons */}
+        <View style={styles(colors, isDarkMode).headerTopRow}>
+
+          <View style={styles(colors, isDarkMode).profileAndGreeting}>
+            {/* Profile Avatar with subtle glass wrapper */}
+            <TouchableOpacity style={styles(colors, isDarkMode).avatarContainer} onPress={onProfilePress} activeOpacity={0.8}>
+              <Image source={getProfileImage()} style={styles(colors, isDarkMode).avatarImage} />
+            </TouchableOpacity>
+
+            {/* User Details */}
+            <View style={styles(colors, isDarkMode).userDetailsContainer}>
+              <Text style={styles(colors, isDarkMode).userNameText} numberOfLines={1}>
+                {userName || user?.firstName || t('guest')}
+              </Text>
+              <Text style={styles(colors, isDarkMode).welcomeText}>
+                {t('welcomeBack') || 'Welcome back'} 👋
+              </Text>
+            </View>
+          </View>
+
+          {/* Right Action Icons with Glassmorphism */}
+          <View style={styles(colors, isDarkMode).actionIconsContainer}>
+            <TouchableOpacity activeOpacity={0.8} onPress={onSearchPress}>
+              <LinearGradient
+                colors={['rgba(255, 255, 255, 0.3)', 'rgba(255, 255, 255, 0.05)']}
+                style={styles(colors, isDarkMode).circleIconButton}
+              >
+                <Ionicons name="search-outline" size={20} color="#ffffff" />
+              </LinearGradient>
+            </TouchableOpacity>
+
+            <TouchableOpacity activeOpacity={0.8} onPress={onNotificationPress}>
+              <LinearGradient
+                colors={['rgba(255, 255, 255, 0.3)', 'rgba(255, 255, 255, 0.05)']}
+                style={styles(colors, isDarkMode).circleIconButton}
+              >
+                <Ionicons name="notifications-outline" size={20} color="#ffffff" />
+                <View style={styles(colors, isDarkMode).notificationDot} />
+              </LinearGradient>
+            </TouchableOpacity>
+          </View>
         </View>
 
-        {/* Header Middle Row: Location Selector & Notifications */}
-        <View style={styles(colors, isDarkMode).locationRow}>
-          <TouchableOpacity
-            style={styles(colors, isDarkMode).locationButton}
-            onPress={onLocationPress}
-            activeOpacity={0.7}
+        {/* Location Premium Card (matching Vendor 'Earning' card style) */}
+        <TouchableOpacity
+          onPress={onLocationPress}
+          activeOpacity={0.85}
+        >
+          <LinearGradient
+            colors={['rgba(255, 255, 255, 0.25)', 'rgba(255, 255, 255, 0.05)']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 1 }}
+            style={styles(colors, isDarkMode).premiumLocationCard}
           >
-            {loading ? (
-              <ActivityIndicator size="small" color="#FFFFFF" />
-            ) : (
-              <View style={styles(colors, isDarkMode).locationContent}>
-                <Ionicons name="location-sharp" size={14} color="#FFFFFF" />
-                <Text style={styles(colors, isDarkMode).locationText} numberOfLines={1}>
+            <View style={styles(colors, isDarkMode).walletIconContainer}>
+              <MaterialCommunityIcons name="map-marker-outline" size={20} color={colors.primary} />
+            </View>
+            <View style={styles(colors, isDarkMode).pillTextWrapper}>
+              {loading ? (
+                <ActivityIndicator size="small" color="#FFFFFF" style={{ alignSelf: 'flex-start' }} />
+              ) : (
+                <Text style={styles(colors, isDarkMode).pillValueText} numberOfLines={1}>
                   {area || t('setYourLocation')}
                 </Text>
-                <Ionicons name="chevron-down" size={12} color="#FFFFFF" />
-              </View>
-            )}
-          </TouchableOpacity>
-
-          <TouchableOpacity
-            style={styles(colors, isDarkMode).notificationButton}
-            onPress={onNotificationPress}
-          >
-            <Ionicons name="notifications-outline" size={24} color="#FFFFFF" />
-            <View style={styles(colors, isDarkMode).notificationBadge} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Header Bottom Row: Search Entry Card */}
-        <TouchableOpacity
-          style={styles(colors, isDarkMode).searchCard}
-          activeOpacity={0.9}
-          onPress={onSearchPress}
-        >
-          <View style={styles(colors, isDarkMode).searchIconWrapper}>
-            <Ionicons name="search" size={22} color={colors.primary} />
-          </View>
-          <Text style={styles(colors, isDarkMode).searchPlaceholder}>
-            {t('searchPlaceholderHeader')}
-          </Text>
+              )}
+            </View>
+            <Ionicons name="chevron-forward" size={18} color="rgba(255,255,255,0.8)" />
+          </LinearGradient>
         </TouchableOpacity>
       </View>
+
+      {/* Upward Overlapping Curve (Vendor App Style) */}
+      <View style={styles(colors, isDarkMode).bottomCurve} />
+
     </View>
   );
 };
@@ -119,144 +175,129 @@ const LocationHeader = ({
 const styles = (colors, isDarkMode) => StyleSheet.create({
   wrapper: {
     position: 'relative',
+    backgroundColor: isDarkMode ? colors.background : colors.background,
   },
-  container: {
-    paddingBottom: spacing.md,
+  premiumBackground: {
+    backgroundColor: colors.primary,
     paddingHorizontal: spacing.md,
-    borderBottomLeftRadius: 28,
-    borderBottomRightRadius: 28,
+    paddingBottom: spacing.xl + 20, // Extra padding for the curve overlap
+    overflow: 'hidden',
   },
-  greetingRow: {
+  headerTopRow: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    marginBottom: spacing.xs - 2,
+    marginBottom: spacing.lg,
+    zIndex: 2, // Place above background pattern
   },
-  greetingText: {
-    color: '#FFFFFF',
-    fontSize: fontSize.lg,
+  profileAndGreeting: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+  },
+  avatarContainer: {
+    width: 52,
+    height: 52,
+    borderRadius: 26,
+    backgroundColor: 'rgba(255,255,255,0.3)',
+    padding: 3,
+    marginRight: spacing.sm,
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.5)',
+  },
+  avatarImage: {
+    width: '100%',
+    height: '100%',
+    borderRadius: 24,
+    backgroundColor: '#ddd',
+  },
+  userDetailsContainer: {
+    flex: 1,
+    justifyContent: 'center',
+  },
+  userNameText: {
+    fontSize: 20,
     fontFamily: 'Poppins-Bold',
-    flex: 1,
-    textShadowColor: 'rgba(0, 0, 0, 0.2)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 3,
+    color: '#ffffff',
+    lineHeight: 28,
   },
-  profileButton: {
-    marginLeft: spacing.sm,
+  welcomeText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: 'rgba(255,255,255,0.95)',
+    marginTop: -2,
   },
-  locationRow: {
+  actionIconsContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
+    gap: 12,
   },
-  locationButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    paddingVertical: spacing.xs - 2,
-  },
-  locationContent: {
-    flexDirection: 'row',
-    alignItems: 'center',
-  },
-  locationText: {
-    color: 'rgba(255, 255, 255, 0.95)',
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Medium',
-    marginLeft: spacing.xs - 2,
-    marginRight: spacing.xs - 3,
-    maxWidth: 200,
-  },
-  notificationButton: {
+  circleIconButton: {
     width: 40,
     height: 40,
+    borderRadius: 20,
     alignItems: 'center',
     justifyContent: 'center',
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.2)',
-    position: 'relative',
+    borderWidth: 1,
+    borderColor: 'rgba(255,255,255,0.2)',
   },
-  notificationBadge: {
+  notificationDot: {
     position: 'absolute',
     top: 8,
-    right: 8,
+    right: 10,
     width: 8,
     height: 8,
     borderRadius: 4,
-    backgroundColor: '#FFD700',
+    backgroundColor: '#FF3B30',
     borderWidth: 1.5,
-    borderColor: colors.primary,
+    borderColor: '#ffffff',
   },
-  searchCard: {
+  premiumLocationCard: {
     flexDirection: 'row',
     alignItems: 'center',
-    backgroundColor: '#FFFFFF',
-    borderRadius: 16,
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm + 2,
-    marginBottom: spacing.sm + spacing.xs,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 6,
+    borderRadius: 16, // vendor app uses softer rounded rects
+    paddingVertical: 14,
+    paddingHorizontal: 16,
     borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.3)',
-  },
-  searchIconWrapper: {
-    width: 40,
-    height: 40,
-    borderRadius: 20,
-    backgroundColor: colors.primary + '15',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.sm,
-  },
-  searchPlaceholder: {
-    flex: 1,
-    fontSize: fontSize.md,
-    fontFamily: 'Poppins-Medium',
-    color: colors.text.secondary,
-  },
-  categoriesScroll: {
-    flexGrow: 0,
-  },
-  categoriesContent: {
-    paddingRight: spacing.md,
-  },
-  categoryChip: {
-    alignItems: 'center',
-    marginRight: spacing.md,
-    minWidth: 65,
-  },
-  categoryIconWrapper: {
-    width: 56,
-    height: 56,
-    borderRadius: 28,
-    backgroundColor: 'rgba(255, 255, 255, 0.25)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: spacing.xs - 2,
-    borderWidth: 2,
-    borderColor: 'rgba(255, 255, 255, 0.4)',
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.1,
-    shadowRadius: 4,
+    borderColor: 'rgba(255,255,255,0.25)',
+    zIndex: 2,
     elevation: 3,
+    shadowColor: 'rgba(0,0,0,0.1)',
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.5,
+    shadowRadius: 10,
   },
-  categoryIcon: {
-    fontSize: 28,
+  walletIconContainer: {
+    width: 36,
+    height: 36,
+    borderRadius: 10,
+    backgroundColor: 'rgba(255,255,255,0.95)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginRight: 12,
   },
-  categoryLabel: {
-    fontSize: fontSize.xs,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#FFFFFF',
-    textAlign: 'center',
-    textShadowColor: 'rgba(0, 0, 0, 0.3)',
-    textShadowOffset: { width: 0, height: 1 },
-    textShadowRadius: 2,
+  pillTextWrapper: {
+    flex: 1,
+    flexDirection: 'column',
+    justifyContent: 'center',
+  },
+  pillValueText: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Bold',
+    color: '#ffffff',
+    textAlign: 'left',
+    letterSpacing: 0.2,
+    paddingRight: 6,
+  },
+  bottomCurve: {
+    position: 'absolute',
+    bottom: -1,
+    left: -10, // Prevent minor edge bleeding
+    right: -10,
+    height: 32,
+    backgroundColor: colors.background,
+    borderTopLeftRadius: 30,
+    borderTopRightRadius: 30,
   },
 });
 
