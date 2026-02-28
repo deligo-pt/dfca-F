@@ -1,11 +1,11 @@
 /**
  * RestaurantDetailsScreen
- * 
+ *
  * Displays restaurant information and menu, allowing users to browse categories,
  * view product details, and add items to their cart.
  */
 
-import React, { useState, useEffect, useCallback } from 'react';
+import React, { useState, useEffect, useCallback } from "react";
 import {
   View,
   Text,
@@ -22,37 +22,54 @@ import {
   UIManager,
   RefreshControl,
   InteractionManager,
-} from 'react-native';
-import { useFocusEffect } from '@react-navigation/native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { LinearGradient } from 'expo-linear-gradient';
-import { spacing, fontSize, borderRadius } from '../theme';
-import { useTheme } from '../utils/ThemeContext';
-import { useProducts } from '../contexts/ProductsContext';
-import { useLanguage } from '../utils/LanguageContext';
-import { useCart } from '../contexts/CartContext';
-import formatCurrency from '../utils/currency';
-import * as Location from 'expo-location';
-import AlertModal from '../components/AlertModal';
-import MaxQuantityModal from '../components/MaxQuantityModal';
-import { fetchAddonGroups } from '../utils/addonApi';
+  Linking,
+} from "react-native";
+import { useFocusEffect } from "@react-navigation/native";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import MapView, { Marker, PROVIDER_GOOGLE } from "react-native-maps";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { LinearGradient } from "expo-linear-gradient";
+import { BlurView } from "expo-blur";
+import { spacing, fontSize, borderRadius } from "../theme";
+import { useTheme } from "../utils/ThemeContext";
+import { useProducts } from "../contexts/ProductsContext";
+import { useLanguage } from "../utils/LanguageContext";
+import { useCart } from "../contexts/CartContext";
+import formatCurrency from "../utils/currency";
+import * as Location from "expo-location";
+import AlertModal from "../components/AlertModal";
+import MaxQuantityModal from "../components/MaxQuantityModal";
+import { fetchAddonGroups } from "../utils/addonApi";
 
 const RestaurantDetailsScreen = ({ route, navigation }) => {
   const { colors, isDarkMode } = useTheme();
   const { t } = useLanguage();
   // SAFETY CHECK: Ensure route params exist
   if (!route || !route.params || !route.params.restaurant) {
-    console.error('[RestaurantDetailsScreen] Missing restaurant data in route params');
+    console.error(
+      "[RestaurantDetailsScreen] Missing restaurant data in route params",
+    );
     // If navigation is available, go back after a tick, otherwise return error view
     // useEffect to trigger navigation safely
     useEffect(() => {
       if (navigation && navigation.canGoBack()) navigation.goBack();
     }, []);
     return (
-      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+      <SafeAreaView
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: colors.background,
+        }}
+      >
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={{ marginTop: 16, color: colors.text.secondary }}>{t('loading') || 'Loading...'}</Text>
+        <Text style={{ marginTop: 16, color: colors.text.secondary }}>
+          {t("loading") || "Loading..."}
+        </Text>
       </SafeAreaView>
     );
   }
@@ -61,15 +78,26 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
   // SAFETY CHECK: Ensure route params exist
   if (!route || !route.params || !route.params.restaurant) {
-    console.error('[RestaurantDetailsScreen] Missing restaurant data in route params');
+    console.error(
+      "[RestaurantDetailsScreen] Missing restaurant data in route params",
+    );
     // useEffect to trigger navigation safely
     useEffect(() => {
       if (navigation && navigation.canGoBack()) navigation.goBack();
     }, []);
     return (
-      <SafeAreaView style={{ flex: 1, justifyContent: 'center', alignItems: 'center', backgroundColor: colors.background }}>
+      <SafeAreaView
+        style={{
+          flex: 1,
+          justifyContent: "center",
+          alignItems: "center",
+          backgroundColor: colors.background,
+        }}
+      >
         <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={{ marginTop: 16, color: colors.text.secondary }}>{t('loading') || 'Loading...'}</Text>
+        <Text style={{ marginTop: 16, color: colors.text.secondary }}>
+          {t("loading") || "Loading..."}
+        </Text>
       </SafeAreaView>
     );
   }
@@ -80,21 +108,41 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const _r = restaurant || {};
   let ratingValue = null;
   if (_r.rating !== undefined && _r.rating !== null) {
-    if (typeof _r.rating === 'number') ratingValue = _r.rating;
-    else if (typeof _r.rating === 'object' && typeof _r.rating.average === 'number') ratingValue = _r.rating.average;
+    if (typeof _r.rating === "number") ratingValue = _r.rating;
+    else if (
+      typeof _r.rating === "object" &&
+      typeof _r.rating.average === "number"
+    )
+      ratingValue = _r.rating.average;
   }
-  if ((ratingValue === null || ratingValue === undefined) && _r.vendor && typeof _r.vendor.rating === 'number') {
+  if (
+    (ratingValue === null || ratingValue === undefined) &&
+    _r.vendor &&
+    typeof _r.vendor.rating === "number"
+  ) {
     ratingValue = _r.vendor.rating;
   }
 
-  const [selectedCategory, setSelectedCategory] = useState('All');
+  // Fallback to nested vendor rating from backend data
+  if (ratingValue === null || ratingValue === undefined || ratingValue === 0) {
+    const rawRating =
+      _r._raw?.vendorId?.rating?.average || _r._raw?.vendor?.rating?.average;
+    if (rawRating) ratingValue = rawRating;
+  }
+
+  const [selectedCategory, setSelectedCategory] = useState("All");
   const [searchVisible, setSearchVisible] = useState(false);
-  const [searchQuery, setSearchQuery] = useState('');
-  const { addItem, updateQuantity: cartUpdateQuantity, itemsMap, clearAllCarts } = useCart();
+  const [searchQuery, setSearchQuery] = useState("");
+  const {
+    addItem,
+    updateQuantity: cartUpdateQuantity,
+    itemsMap,
+    clearAllCarts,
+  } = useCart();
 
   // Alert modal state
   const [alertVisible, setAlertVisible] = useState(false);
-  const [alertConfig, setAlertConfig] = useState({ title: '', message: '' });
+  const [alertConfig, setAlertConfig] = useState({ title: "", message: "" });
 
   // REMOVED LayoutAnimation enablement to fix Modal glitch on Android
   // useEffect(() => {
@@ -107,7 +155,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const [localQty, setLocalQty] = useState({});
   const getQuantity = (productId) => {
     const q = localQty[productId];
-    if (typeof q === 'number') return q;
+    if (typeof q === "number") return q;
     return itemsMap?.[productId]?.quantity || 0;
   };
 
@@ -129,8 +177,24 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const [maxQuantityData, setMaxQuantityData] = useState({
     maxStock: 0,
     currentCartQty: 0,
-    itemName: ''
+    itemName: "",
   });
+
+  const [vendorDetailsVisible, setVendorDetailsVisible] = useState(false);
+  const [fullMapVisible, setFullMapVisible] = useState(false);
+  const [fullMapReady, setFullMapReady] = useState(false);
+
+  useEffect(() => {
+    let timeout;
+    if (fullMapVisible) {
+      timeout = setTimeout(() => {
+        setFullMapReady(true);
+      }, 350); // delay render to avoid zero-dimension bounds calculation on Android during slide animation
+    } else {
+      setFullMapReady(false);
+    }
+    return () => clearTimeout(timeout);
+  }, [fullMapVisible]);
 
   const openProductModal = (product) => {
     setActiveProduct(product);
@@ -149,24 +213,36 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     // FETCH FRESH DETAILS (Single Product Get)
     // This ensures we have the latest price, tax, and stock info which might be missing from list
     if (product.id) {
-      fetchProductDetails(product.id).then(freshDetails => {
+      fetchProductDetails(product.id).then((freshDetails) => {
         if (freshDetails) {
-          console.log('[RestaurantDetails] Updated active product with fresh details', freshDetails.id);
+          console.log(
+            "[RestaurantDetails] Updated active product with fresh details",
+            freshDetails.id,
+          );
 
           // Fix for UI Glitch: Wait for modal animation to complete before updating heavy state
           InteractionManager.runAfterInteractions(() => {
             // Merge fresh details but keep local UI state if needed
-            setActiveProduct(prev => prev && prev.id === freshDetails.id ? freshDetails : prev);
+            setActiveProduct((prev) =>
+              prev && prev.id === freshDetails.id ? freshDetails : prev,
+            );
 
             // Also update addons if present in fresh details
             const rawProduct = freshDetails._raw || freshDetails;
             if (rawProduct.addonGroups && rawProduct.addonGroups.length > 0) {
               fetchAddonGroups(rawProduct.addonGroups)
-                .then(groups => {
-                  const processedGroups = groups.map(g => g.data || g).filter(g => !g.isDeleted);
+                .then((groups) => {
+                  const processedGroups = groups
+                    .map((g) => g.data || g)
+                    .filter((g) => !g.isDeleted);
                   setActiveAddons(processedGroups);
                 })
-                .catch(err => console.error('Failed to load add-ons from fresh details', err));
+                .catch((err) =>
+                  console.error(
+                    "Failed to load add-ons from fresh details",
+                    err,
+                  ),
+                );
             }
           });
         }
@@ -177,12 +253,14 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     const rawProduct = product._raw || product;
     if (rawProduct.addonGroups && rawProduct.addonGroups.length > 0) {
       fetchAddonGroups(rawProduct.addonGroups)
-        .then(groups => {
+        .then((groups) => {
           // Filter active groups. The API might return { data: group } or just group
-          const processedGroups = groups.map(g => g.data || g).filter(g => !g.isDeleted);
+          const processedGroups = groups
+            .map((g) => g.data || g)
+            .filter((g) => !g.isDeleted);
           setActiveAddons(processedGroups);
         })
-        .catch(err => console.error('Failed to load add-ons', err));
+        .catch((err) => console.error("Failed to load add-ons", err));
     }
   };
 
@@ -192,24 +270,38 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   };
 
   // Use ProductsContext
-  const { products: allProducts, fetchRestaurantMenu, fetchProductDetails } = useProducts();
+  const {
+    products: allProducts,
+    fetchRestaurantMenu,
+    fetchProductDetails,
+  } = useProducts();
 
   // Resolve vendor ID from various potential data structures
   // Access normalized vendor if available, else raw nested object, else raw flat props
   const normVendor = restaurant.vendor || {};
   const rawVendorObj = restaurant._raw?.vendorId || {};
-  // If vendorId is an object in _raw, use its _id
-  const rawVendorId = (typeof rawVendorObj === 'object') ? rawVendorObj._id : rawVendorObj;
 
-  const vendorId = (
+  // Enhanced Vendor Details extraction for display
+  const vendorBusinessDetails =
+    rawVendorObj?.businessDetails || normVendor?.businessDetails || {};
+  const vendorOpeningHours = vendorBusinessDetails.openingHours;
+  const vendorClosingHours = vendorBusinessDetails.closingHours;
+  const formattedHours =
+    vendorOpeningHours && vendorClosingHours
+      ? `${vendorOpeningHours} – ${vendorClosingHours}`
+      : vendorOpeningHours || normVendor.openingHours || "11:00 – 23:59";
+  // If vendorId is an object in _raw, use its _id
+  const rawVendorId =
+    typeof rawVendorObj === "object" ? rawVendorObj._id : rawVendorObj;
+
+  const vendorId =
     normVendor.id ||
     normVendor.vendorId ||
     rawVendorId ||
     restaurant?._raw?.vendor?.vendorId ||
     restaurant?.vendorId ||
     restaurant?._raw?.vendorId ||
-    null
-  );
+    null;
 
   // Menu products state with initial cache and fresh fetch support
   const [menuProducts, setMenuProducts] = useState(
@@ -217,16 +309,40 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
       // Use robust vendorId extraction for filtering
       const pRaw = p._raw || p;
       const pRawVendorObj = pRaw.vendorId || {};
-      const pRawVendorId = (typeof pRawVendorObj === 'object') ? pRawVendorObj._id : pRawVendorObj;
-      const pId = p.vendor?.id || pRaw.vendor?.vendorId || pRawVendorId || pRaw.vendorId;
+      const pRawVendorId =
+        typeof pRawVendorObj === "object" ? pRawVendorObj._id : pRawVendorObj;
+      const pId =
+        p.vendor?.id || pRaw.vendor?.vendorId || pRawVendorId || pRaw.vendorId;
       return pId && vendorId && String(pId) === String(vendorId);
-    })
+    }),
   );
   const [menuLoading, setMenuLoading] = useState(false);
   const vendorProducts = menuProducts;
 
   // Location resolution
   const [dynamicLocation, setDynamicLocation] = useState(null);
+
+  // Derive vendor coordinates
+  const vendorCoordsObj = restaurant._raw?.vendor || restaurant.vendor || {};
+  const vendorNestedObj =
+    typeof restaurant._raw?.vendorId === "object"
+      ? restaurant._raw.vendorId
+      : {};
+  const rawLat =
+    normVendor.latitude ||
+    vendorNestedObj.businessLocation?.latitude ||
+    vendorNestedObj.latitude ||
+    vendorCoordsObj.latitude;
+  const rawLng =
+    normVendor.longitude ||
+    vendorNestedObj.businessLocation?.longitude ||
+    vendorNestedObj.longitude ||
+    vendorCoordsObj.longitude;
+  const vendorCoords =
+    rawLat && rawLng
+      ? { latitude: parseFloat(rawLat), longitude: parseFloat(rawLng) }
+      : null;
+
   useEffect(() => {
     let mounted = true;
     const fetchLocation = async () => {
@@ -235,20 +351,21 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
       const v = restaurant._raw?.vendor || restaurant.vendor || {};
       // Fallback: check nested vendorId object
-      const vNested = (typeof restaurant._raw?.vendorId === 'object') ? restaurant._raw.vendorId : {};
+      const vNested =
+        typeof restaurant._raw?.vendorId === "object"
+          ? restaurant._raw.vendorId
+          : {};
 
       if (v.city || v.address || v.town) return; // explicit exists
 
-      const lat = normVendor.latitude || vNested.businessLocation?.latitude || vNested.latitude || v.latitude;
-      const lng = normVendor.longitude || vNested.businessLocation?.longitude || vNested.longitude || v.longitude;
-
-      if (lat && lng) {
+      if (vendorCoords) {
         try {
-          const res = await Location.reverseGeocodeAsync({ latitude: parseFloat(lat), longitude: parseFloat(lng) });
+          const res = await Location.reverseGeocodeAsync(vendorCoords);
           if (mounted && res && res.length > 0) {
             const addr = res[0];
             // Get specific area (neighborhood)
-            const area = addr.street || addr.district || addr.name || addr.subregion;
+            const area =
+              addr.street || addr.district || addr.name || addr.subregion;
             // Get city
             const city = addr.city || addr.region;
             // Combine: "Basabo, Dhaka" or just city if no area
@@ -258,32 +375,47 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
               setDynamicLocation(area || city);
             }
           }
-        } catch (e) { /* ignore */ }
+        } catch (e) {
+          /* ignore */
+        }
       }
     };
     fetchLocation();
-    return () => { mounted = false; };
+    return () => {
+      mounted = false;
+    };
   }, [restaurant]);
 
   // Derived values using normalized data
-  const displayName = (
+  const displayName =
     normVendor.vendorName ||
     normVendor.businessName ||
-    (typeof restaurant._raw?.vendorId === 'object' ? restaurant._raw.vendorId.businessDetails?.businessName : null) ||
+    (typeof restaurant._raw?.vendorId === "object"
+      ? restaurant._raw.vendorId.businessDetails?.businessName
+      : null) ||
     restaurant?.name ||
     restaurant?._raw?.name ||
     restaurant?._raw?.product?.name ||
     restaurant?._raw?.productName ||
     restaurant?._raw?.vendor?.vendorName ||
-    'Restaurant'
-  );
+    "Restaurant";
 
-  const displayLocation = (normVendor.address || restaurant._raw?.vendor?.city || restaurant._raw?.vendor?.address) || dynamicLocation;
+  const displayLocation =
+    normVendor.address ||
+    restaurant._raw?.vendor?.city ||
+    restaurant._raw?.vendor?.address ||
+    dynamicLocation;
 
   // Vendor currency
   const vendorCurrency = (() => {
-    const productWithCurrency = vendorProducts.find(p => p?._raw?.pricing?.currency || p?.pricing?.currency);
-    return productWithCurrency ? (productWithCurrency._raw?.pricing?.currency || productWithCurrency.pricing?.currency || '') : '';
+    const productWithCurrency = vendorProducts.find(
+      (p) => p?._raw?.pricing?.currency || p?.pricing?.currency,
+    );
+    return productWithCurrency
+      ? productWithCurrency._raw?.pricing?.currency ||
+          productWithCurrency.pricing?.currency ||
+          ""
+      : "";
   })();
 
   // Derive menu categories
@@ -291,21 +423,25 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   vendorProducts.forEach((p) => {
     const raw = p._raw || {};
     if (raw.subCategory) {
-      const val = typeof raw.subCategory === 'object' ? (raw.subCategory.name || raw.subCategory.slug) : raw.subCategory;
+      const val =
+        typeof raw.subCategory === "object"
+          ? raw.subCategory.name || raw.subCategory.slug
+          : raw.subCategory;
       if (val) derivedCategories.add(String(val));
-    }
-    else if (raw.category) {
-      const val = typeof raw.category === 'object' ? (raw.category.name || raw.category.slug) : raw.category;
+    } else if (raw.category) {
+      const val =
+        typeof raw.category === "object"
+          ? raw.category.name || raw.category.slug
+          : raw.category;
       if (val) derivedCategories.add(String(val));
-    }
-    else if (Array.isArray(p.categories) && p.categories.length) {
-      p.categories.forEach(c => {
-        const val = typeof c === 'object' ? (c.name || c.slug) : c;
+    } else if (Array.isArray(p.categories) && p.categories.length) {
+      p.categories.forEach((c) => {
+        const val = typeof c === "object" ? c.name || c.slug : c;
         if (val) derivedCategories.add(String(val));
       });
     }
   });
-  const menuCategories = ['All', 'Popular', ...Array.from(derivedCategories)];
+  const menuCategories = ["All", "Popular", ...Array.from(derivedCategories)];
 
   // Fetch fresh menu data on focus
   useFocusEffect(
@@ -318,50 +454,62 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
         }
         setMenuLoading(true);
         try {
-          console.log('[RestaurantDetails] Fetching fresh menu for', vendorId);
+          console.log("[RestaurantDetails] Fetching fresh menu for", vendorId);
           const freshItems = await fetchRestaurantMenu(vendorId);
           if (active) {
             // ALWAYS update with fresh data, even if empty
             if (freshItems && freshItems.length > 0) {
               setMenuProducts(freshItems);
-              console.log('[RestaurantDetails] Updated menu with', freshItems.length, 'items');
+              console.log(
+                "[RestaurantDetails] Updated menu with",
+                freshItems.length,
+                "items",
+              );
             } else {
-              console.log('[RestaurantDetails] Fresh menu empty, keeping previous/cached data if any');
+              console.log(
+                "[RestaurantDetails] Fresh menu empty, keeping previous/cached data if any",
+              );
             }
           }
         } catch (err) {
-          console.error('[RestaurantDetails] Failed to load menu', err);
+          console.error("[RestaurantDetails] Failed to load menu", err);
           // if (active) setMenuProducts([]); // DO NOT CLEAR ON ERROR - Keep cached data
         } finally {
           if (active) setMenuLoading(false);
         }
       };
       loadMenu();
-      return () => { active = false; };
-    }, [vendorId, fetchRestaurantMenu])
+      return () => {
+        active = false;
+      };
+    }, [vendorId, fetchRestaurantMenu]),
   );
 
   const [refreshing, setRefreshing] = useState(false);
   const onRefresh = useCallback(async () => {
     setRefreshing(true);
     try {
-      console.log('[RestaurantDetails] Refreshing menu for', vendorId);
+      console.log("[RestaurantDetails] Refreshing menu for", vendorId);
       const freshItems = await fetchRestaurantMenu(vendorId);
       // ALWAYS update with fresh data IF valid
       if (freshItems && freshItems.length > 0) {
         setMenuProducts(freshItems);
-        console.log('[RestaurantDetails] Refreshed menu with', freshItems.length, 'items');
+        console.log(
+          "[RestaurantDetails] Refreshed menu with",
+          freshItems.length,
+          "items",
+        );
       } else {
-        console.log('[RestaurantDetails] Refreshed menu empty, keeping previous data');
+        console.log(
+          "[RestaurantDetails] Refreshed menu empty, keeping previous data",
+        );
       }
     } catch (err) {
-      console.error('Refresh failed', err);
+      console.error("Refresh failed", err);
     } finally {
       setRefreshing(false);
     }
   }, [fetchRestaurantMenu, vendorId]);
-
-
 
   // Update add/remove with optimistic updates and animation
   const addToCart = async (item, options = {}) => {
@@ -392,53 +540,72 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     return ids.reduce((s, id) => {
       const it = itemsMap[id];
       if (!it) return s;
-      const vendorIdOfItem = it.product.vendorId || it.product._raw?.vendor?.vendorId;
+      const vendorIdOfItem =
+        it.product.vendorId || it.product._raw?.vendor?.vendorId;
       if (vendorIdOfItem && vendorIdOfItem === vendorId) return s + it.quantity;
       return s;
     }, 0);
   };
 
-  const getTotalPrice = () => Object.keys(itemsMap || {}).reduce((s, id) => {
-    const it = itemsMap[id];
-    if (!it) return s;
-    const vendorIdOfItem = it.product.vendorId || it.product._raw?.vendor?.vendorId || it.vendorId;
+  const getTotalPrice = () =>
+    Object.keys(itemsMap || {}).reduce((s, id) => {
+      const it = itemsMap[id];
+      if (!it) return s;
+      const vendorIdOfItem =
+        it.product.vendorId || it.product._raw?.vendor?.vendorId || it.vendorId;
 
-    // Use backend subtotal if available (includes addons, discounts, etc.)
-    // Check multiple locations where subtotal might be stored
-    const rawData = it.product?._raw || {};
-    const backendSubtotal = it.subtotal ?? rawData.subtotal ?? rawData.totalBeforeTax;
+      // Use backend subtotal if available (includes addons, discounts, etc.)
+      // Check multiple locations where subtotal might be stored
+      const rawData = it.product?._raw || {};
+      const backendSubtotal =
+        it.subtotal ?? rawData.subtotal ?? rawData.totalBeforeTax;
 
-    let itemTotal = 0;
-    if (backendSubtotal !== undefined && backendSubtotal !== null) {
-      itemTotal = Number(backendSubtotal);
-      console.log(`[RestaurantDetails] Using backend subtotal for ${it.product?.name}: ${itemTotal}`);
-    } else {
-      // Fallback calculation if no backend subtotal
-      const basePrice = Number(it.product.finalPrice ?? it.product.price ?? 0);
-      // Include addon prices from backend data or local state
-      const addons = rawData.addons || it.addons || [];
-      const addonsTotal = addons.reduce((sum, ad) => sum + (Number(ad.price || 0) * (ad.quantity || 1)), 0);
-      itemTotal = (basePrice * it.quantity) + addonsTotal;
-      console.log(`[RestaurantDetails] Calc fallback for ${it.product?.name}: base=${basePrice}, addons=${addonsTotal}, qty=${it.quantity} -> ${itemTotal}`);
-    }
+      let itemTotal = 0;
+      if (backendSubtotal !== undefined && backendSubtotal !== null) {
+        itemTotal = Number(backendSubtotal);
+        console.log(
+          `[RestaurantDetails] Using backend subtotal for ${it.product?.name}: ${itemTotal}`,
+        );
+      } else {
+        // Fallback calculation if no backend subtotal
+        const basePrice = Number(
+          it.product.finalPrice ?? it.product.price ?? 0,
+        );
+        // Include addon prices from backend data or local state
+        const addons = rawData.addons || it.addons || [];
+        const addonsTotal = addons.reduce(
+          (sum, ad) => sum + Number(ad.price || 0) * (ad.quantity || 1),
+          0,
+        );
+        itemTotal = basePrice * it.quantity + addonsTotal;
+        console.log(
+          `[RestaurantDetails] Calc fallback for ${it.product?.name}: base=${basePrice}, addons=${addonsTotal}, qty=${it.quantity} -> ${itemTotal}`,
+        );
+      }
 
-    if (vendorIdOfItem && vendorIdOfItem === vendorId) return s + itemTotal;
-    return s;
-  }, 0);
+      if (vendorIdOfItem && vendorIdOfItem === vendorId) return s + itemTotal;
+      return s;
+    }, 0);
 
   // Filter menu items
   const getFilteredMenuItems = () => {
     let items = vendorProducts;
     // "All" shows everything - no filtering
-    if (selectedCategory === 'All') {
+    if (selectedCategory === "All") {
       // No filter - show all items
-    } else if (selectedCategory === 'Popular') {
-      const popular = items.filter(p => (p._raw?.meta && p._raw.meta.isFeatured) || p._raw?.isFeatured);
+    } else if (selectedCategory === "Popular") {
+      const popular = items.filter(
+        (p) => (p._raw?.meta && p._raw.meta.isFeatured) || p._raw?.isFeatured,
+      );
       if (popular.length) items = popular;
     } else if (selectedCategory) {
       items = items.filter((p) => {
         const raw = p._raw || {};
-        const cat = raw.subCategory || raw.category || (Array.isArray(p.categories) && p.categories[0]) || '';
+        const cat =
+          raw.subCategory ||
+          raw.category ||
+          (Array.isArray(p.categories) && p.categories[0]) ||
+          "";
         return String(cat) === String(selectedCategory);
       });
     }
@@ -447,8 +614,14 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     const q = searchQuery.toLowerCase();
     return items.filter((item) => {
       const rawItem = item._raw || {};
-      const itemName = (rawItem.product?.name || rawItem.name || rawItem.productName || item.name || '').toLowerCase();
-      const desc = (rawItem.description || rawItem.slug || '').toLowerCase();
+      const itemName = (
+        rawItem.product?.name ||
+        rawItem.name ||
+        rawItem.productName ||
+        item.name ||
+        ""
+      ).toLowerCase();
+      const desc = (rawItem.description || rawItem.slug || "").toLowerCase();
       return itemName.includes(q) || desc.includes(q);
     });
   };
@@ -460,11 +633,15 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     // Base price
     // Prefer finalPrice from backend if available for DEFAULT item.
     // BUT we must check for VARIATION override first.
-    let basePrice = Number(pricing.price ?? raw.price ?? activeProduct?.price ?? 0);
+    let basePrice = Number(
+      pricing.price ?? raw.price ?? activeProduct?.price ?? 0,
+    );
 
     // Check for selected variation price override
     if (selectedVariations) {
-      const variationKeys = Object.keys(selectedVariations).filter(k => k.endsWith('_obj'));
+      const variationKeys = Object.keys(selectedVariations).filter((k) =>
+        k.endsWith("_obj"),
+      );
       for (const key of variationKeys) {
         const opt = selectedVariations[key];
         if (opt && opt.price) {
@@ -481,21 +658,21 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
     // 1. Apply Discount
     if (discount > 0) {
-      effectivePrice = basePrice - (basePrice * discount / 100);
+      effectivePrice = basePrice - (basePrice * discount) / 100;
     }
 
     // 2. Apply Tax (on discounted price)
     if (taxRate > 0) {
-      effectivePrice += (effectivePrice * taxRate / 100);
+      effectivePrice += (effectivePrice * taxRate) / 100;
     }
 
     let total = effectivePrice * modalQuantity;
 
     // Add variations
     if (selectedVariations) {
-      Object.keys(selectedVariations).forEach(key => {
+      Object.keys(selectedVariations).forEach((key) => {
         // Skip object refs
-        if (key.endsWith('_obj')) return;
+        if (key.endsWith("_obj")) return;
 
         const variantPrice = selectedVariations[`${key}_price`];
         if (variantPrice) {
@@ -510,17 +687,19 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
       // We need to iterate over selectedAddons state to sum up
       // Since logic is complex and state is distinct, reusing existing loop if available
       // or simple traverse:
-      Object.values(selectedAddons).flat().forEach(addon => {
-        if (addon && addon.price) {
-          total += Number(addon.price) * (addon.quantity || 1);
-        }
-        // Flattened structure depends on implementation
-      });
+      Object.values(selectedAddons)
+        .flat()
+        .forEach((addon) => {
+          if (addon && addon.price) {
+            total += Number(addon.price) * (addon.quantity || 1);
+          }
+          // Flattened structure depends on implementation
+        });
 
       // Correct approach for current structure:
-      Object.keys(selectedAddons).forEach(groupId => {
+      Object.keys(selectedAddons).forEach((groupId) => {
         const groupSelections = selectedAddons[groupId];
-        Object.values(groupSelections).forEach(item => {
+        Object.values(groupSelections).forEach((item) => {
           total += Number(item.price || 0) * (item.quantity || 1);
         });
       });
@@ -532,7 +711,8 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const renderMenuItem = (product) => {
     const quantity = getQuantity(product.id);
     const raw = product._raw || {};
-    const displayProductName = raw.product?.name || raw.name || raw.productName || product.name || '';
+    const displayProductName =
+      raw.product?.name || raw.name || raw.productName || product.name || "";
     const image = product.image || (Array.isArray(raw.images) && raw.images[0]);
 
     // Pricing logic
@@ -541,12 +721,14 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
     let finalPrice = Number(raw.pricing?.finalPrice ?? raw.finalPrice ?? price);
     if (discount > 0 && finalPrice === price) {
-      finalPrice = price - (price * discount / 100);
+      finalPrice = price - (price * discount) / 100;
     }
 
-    const currency = raw.pricing?.currency ?? '';
-    const hasVariations = (raw.variations && raw.variations.length > 0) || (raw.options && raw.options.length > 0);
-    const description = raw.description || raw.slug || '';
+    const currency = raw.pricing?.currency ?? "";
+    const hasVariations =
+      (raw.variations && raw.variations.length > 0) ||
+      (raw.options && raw.options.length > 0);
+    const description = raw.description || raw.slug || "";
     const isUpdating = updatingProductId === product.id;
 
     // Stock Logic
@@ -564,24 +746,45 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
           styles.menuItem,
           {
             backgroundColor: colors.surface,
-            borderColor: isDarkMode ? 'rgba(255,255,255,0.06)' : 'rgba(0,0,0,0.05)',
+            borderColor: isDarkMode
+              ? "rgba(255,255,255,0.06)"
+              : "rgba(0,0,0,0.05)",
           },
-          isOutOfStock && { opacity: 0.65 }
+          isOutOfStock && { opacity: 0.65 },
         ]}
       >
         {/* Image */}
         <View style={styles.menuImageWrap}>
           {image ? (
-            <Image source={{ uri: image }} style={styles.menuItemImage} resizeMode="cover" />
+            <Image
+              source={{ uri: image }}
+              style={styles.menuItemImage}
+              resizeMode="cover"
+            />
           ) : (
-            <View style={[styles.menuItemImage, { backgroundColor: isDarkMode ? '#2a2a2a' : '#f4f4f5', alignItems: 'center', justifyContent: 'center' }]}>
-              <Ionicons name="fast-food-outline" size={28} color={isDarkMode ? '#555' : '#ccc'} />
+            <View
+              style={[
+                styles.menuItemImage,
+                {
+                  backgroundColor: isDarkMode ? "#2a2a2a" : "#f4f4f5",
+                  alignItems: "center",
+                  justifyContent: "center",
+                },
+              ]}
+            >
+              <Ionicons
+                name="fast-food-outline"
+                size={28}
+                color={isDarkMode ? "#555" : "#ccc"}
+              />
             </View>
           )}
 
           {/* Discount Badge */}
           {discount > 0 && !isOutOfStock && (
-            <View style={[styles.discountFlag, { backgroundColor: colors.primary }]}>
+            <View
+              style={[styles.discountFlag, { backgroundColor: colors.primary }]}
+            >
               <Text style={styles.discountFlagText}>{discount}%</Text>
             </View>
           )}
@@ -596,12 +799,21 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
         {/* Info */}
         <View style={styles.menuItemInfo}>
-          <Text style={[styles.menuItemName, { color: colors.text.primary }]} numberOfLines={2}>
+          <Text
+            style={[styles.menuItemName, { color: colors.text.primary }]}
+            numberOfLines={2}
+          >
             {displayProductName}
           </Text>
 
           {description ? (
-            <Text style={[styles.menuItemDescription, { color: isDarkMode ? '#888' : '#999' }]} numberOfLines={2}>
+            <Text
+              style={[
+                styles.menuItemDescription,
+                { color: isDarkMode ? "#888" : "#999" },
+              ]}
+              numberOfLines={2}
+            >
               {description}
             </Text>
           ) : null}
@@ -609,7 +821,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
           {/* Low Stock */}
           {isLowStock && (
             <Text style={styles.lowStockText}>
-              {t('lowStock') || 'Low Stock'}: {stockQty} {t('left') || 'left'}
+              {t("lowStock") || "Low Stock"}: {stockQty} {t("left") || "left"}
             </Text>
           )}
 
@@ -626,12 +838,18 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
               </>
             ) : (
               <Text style={[styles.menuItemPrice, { color: colors.primary }]}>
-                {hasVariations ? 'From ' : ''}{formatCurrency(currency, price)}
+                {hasVariations ? "From " : ""}
+                {formatCurrency(currency, price)}
               </Text>
             )}
             {hasVariations && (
-              <Text style={[styles.customizableTag, { color: colors.text.secondary }]}>
-                {t('customizable') || 'Customizable'}
+              <Text
+                style={[
+                  styles.customizableTag,
+                  { color: colors.text.secondary },
+                ]}
+              >
+                {t("customizable") || "Customizable"}
               </Text>
             )}
           </View>
@@ -642,21 +860,33 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
           <View
             style={[
               styles.addButton,
-              { backgroundColor: isOutOfStock ? (isDarkMode ? '#333' : '#eee') : colors.primary }
+              {
+                backgroundColor: isOutOfStock
+                  ? isDarkMode
+                    ? "#333"
+                    : "#eee"
+                  : colors.primary,
+              },
             ]}
           >
             {isUpdating ? (
               <ActivityIndicator size="small" color="#fff" />
             ) : (
               <Ionicons
-                name={isOutOfStock ? 'close' : 'add'}
+                name={isOutOfStock ? "close" : "add"}
                 size={22}
-                color={isOutOfStock ? '#999' : '#fff'}
+                color={isOutOfStock ? "#999" : "#fff"}
               />
             )}
             {quantity > 0 && !isOutOfStock && (
-              <View style={[styles.quantityBadge, { borderColor: colors.primary }]}>
-                <Text style={[styles.quantityBadgeText, { color: colors.primary }]}>{quantity}</Text>
+              <View
+                style={[styles.quantityBadge, { borderColor: colors.primary }]}
+              >
+                <Text
+                  style={[styles.quantityBadgeText, { color: colors.primary }]}
+                >
+                  {quantity}
+                </Text>
               </View>
             )}
           </View>
@@ -669,22 +899,35 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const renderProductModal = () => {
     if (!activeProduct) return null;
     const raw = activeProduct._raw || {};
-    const title = raw.product?.name || raw.name || raw.productName || activeProduct.name || '';
-    const images = Array.isArray(raw.images) && raw.images.length ? raw.images : (activeProduct.image ? [activeProduct.image] : []);
-    const description = raw.longDescription || raw.description || raw.details || raw.slug || '';
+    const title =
+      raw.product?.name ||
+      raw.name ||
+      raw.productName ||
+      activeProduct.name ||
+      "";
+    const images =
+      Array.isArray(raw.images) && raw.images.length
+        ? raw.images
+        : activeProduct.image
+          ? [activeProduct.image]
+          : [];
+    const description =
+      raw.longDescription || raw.description || raw.details || raw.slug || "";
     const price = raw.pricing?.price ?? raw.price ?? activeProduct.price ?? 0;
-    const currency = raw.pricing?.currency ?? '';
+    const currency = raw.pricing?.currency ?? "";
     const quantity = modalQuantity;
     const isUpdating = updatingProductId === activeProduct.id;
 
     // Helper to calculate total price dynamically
     const calculateModalTotal = () => {
-      let base = Number(raw.pricing?.price ?? raw.price ?? activeProduct.price ?? 0);
+      let base = Number(
+        raw.pricing?.price ?? raw.price ?? activeProduct.price ?? 0,
+      );
 
       // 1. Variations override
       if (selectedVariations) {
-        Object.values(selectedVariations).forEach(val => {
-          if (val && typeof val === 'object' && val.price) {
+        Object.values(selectedVariations).forEach((val) => {
+          if (val && typeof val === "object" && val.price) {
             base = Math.max(base, Number(val.price));
           }
         });
@@ -699,33 +942,52 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
       const discount = Number(raw.pricing?.discount ?? raw.discount ?? 0);
       if (discount > 0) {
-        base = base - (base * discount / 100);
+        base = base - (base * discount) / 100;
       }
 
       // Add tax
       const taxRate = Number(raw.pricing?.taxRate ?? 0);
       if (taxRate > 0) {
-        base += (base * taxRate / 100);
+        base += (base * taxRate) / 100;
       }
 
       return base * quantity;
     };
 
     return (
-      <Modal visible={productModalVisible} transparent animationType="slide" onRequestClose={closeProductModal}>
-        <View style={[styles.modalOverlay, { backgroundColor: 'rgba(0,0,0,0.5)' }]}>
+      <Modal
+        visible={productModalVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={closeProductModal}
+      >
+        <View
+          style={[styles.modalOverlay, { backgroundColor: "rgba(0,0,0,0.5)" }]}
+        >
           <TouchableOpacity style={{ flex: 1 }} onPress={closeProductModal} />
-          <View style={[styles.modalCard, { backgroundColor: colors.surface, flexDirection: 'column' }]}>
+          <View
+            style={[
+              styles.modalCard,
+              { backgroundColor: colors.surface, flexDirection: "column" },
+            ]}
+          >
             {/* Image Section */}
-            <View style={{ position: 'relative' }}>
+            <View style={{ position: "relative" }}>
               {images.length > 0 ? (
-                <Image source={{ uri: images[0] }} style={styles.modalImage} resizeMode="cover" />
+                <Image
+                  source={{ uri: images[0] }}
+                  style={styles.modalImage}
+                  resizeMode="cover"
+                />
               ) : null}
               <LinearGradient
-                colors={['transparent', 'rgba(255,255,255,1)']}
+                colors={["transparent", "rgba(255,255,255,1)"]}
                 style={styles.imageOverlay}
               />
-              <TouchableOpacity style={styles.modalCloseBtn} onPress={closeProductModal}>
+              <TouchableOpacity
+                style={styles.modalCloseBtn}
+                onPress={closeProductModal}
+              >
                 <Ionicons name="close" size={24} color="#000" />
               </TouchableOpacity>
             </View>
@@ -737,10 +999,19 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
             >
               {/* Content */}
               <View style={styles.modalBody}>
-                <Text style={[styles.modalTitle, { color: colors.text.primary }]}>{title}</Text>
+                <Text
+                  style={[styles.modalTitle, { color: colors.text.primary }]}
+                >
+                  {title}
+                </Text>
 
-                <Text style={[styles.modalDescription, { color: colors.text.secondary }]}>
-                  {description || t('noDescription')}
+                <Text
+                  style={[
+                    styles.modalDescription,
+                    { color: colors.text.secondary },
+                  ]}
+                >
+                  {description || t("noDescription")}
                 </Text>
 
                 <View style={styles.modalPriceContainer}>
@@ -752,25 +1023,31 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                     // Check for selected variation price override (e.g. Size: Medium = 12)
                     // We look for any selected option that has a price attached to its object
                     if (selectedVariations) {
-                      const variationKeys = Object.keys(selectedVariations).filter(k => k.endsWith('_obj'));
+                      const variationKeys = Object.keys(
+                        selectedVariations,
+                      ).filter((k) => k.endsWith("_obj"));
                       for (const key of variationKeys) {
                         const opt = selectedVariations[key];
                         if (opt && opt.price) {
                           // Assuming variation price REPLACES base price if it's a primary variant (like Size)
                           // If it's just an extra (like Cheese), it might be additive.
                           // Based on user JSON "Size" variations have full prices (8, 12, 16).
-                          // We'll treat the highest price found as the new Base if it's > basePrice to be safe, 
+                          // We'll treat the highest price found as the new Base if it's > basePrice to be safe,
                           // or just take the last one. Let's assume Size is the primary price driver.
                           basePrice = Number(opt.price);
                         }
                       }
                     }
 
-                    const discountPercent = Number(pricing.discount ?? raw.discount ?? 0);
+                    const discountPercent = Number(
+                      pricing.discount ?? raw.discount ?? 0,
+                    );
                     const taxRate = Number(pricing.taxRate ?? 0);
                     // Tax amount from backend is likely for default item. We must recalculate if base changed.
                     let taxAmount = Number(pricing.taxAmount ?? 0);
-                    let finalPrice = Number(pricing.finalPrice ?? raw.finalPrice ?? 0);
+                    let finalPrice = Number(
+                      pricing.finalPrice ?? raw.finalPrice ?? 0,
+                    );
 
                     // 2. Calculations for display
                     const discountAmount = (basePrice * discountPercent) / 100;
@@ -792,15 +1069,35 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                            Show Base Price (High Anchor) vs Discounted Base Price (The Deal).
                            Tax is secondary information.
                         */}
-                        <View style={{ flexDirection: 'row', alignItems: 'baseline', marginBottom: 4 }}>
+                        <View
+                          style={{
+                            flexDirection: "row",
+                            alignItems: "baseline",
+                            marginBottom: 4,
+                          }}
+                        >
                           {/* Discounted Price (The Hero) */}
-                          <Text style={[styles.modalPrice, { fontSize: 32, color: colors.primary }]}>
+                          <Text
+                            style={[
+                              styles.modalPrice,
+                              { fontSize: 32, color: colors.primary },
+                            ]}
+                          >
                             {formatCurrency(currency, discountedBase)}
                           </Text>
 
                           {/* Original Base Price (High Anchor) */}
                           {discountPercent > 0 && (
-                            <Text style={[styles.modalPriceOriginal, { fontSize: 20, textDecorationLine: 'line-through', opacity: 0.6 }]}>
+                            <Text
+                              style={[
+                                styles.modalPriceOriginal,
+                                {
+                                  fontSize: 20,
+                                  textDecorationLine: "line-through",
+                                  opacity: 0.6,
+                                },
+                              ]}
+                            >
                               {formatCurrency(currency, basePrice)}
                             </Text>
                           )}
@@ -808,168 +1105,404 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
                         {/* Discount Badge */}
                         {discountPercent > 0 && (
-                          <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 12 }}>
-                            <View style={[styles.modalBadge, { backgroundColor: '#4CAF50', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 6 }]}>
-                              <Text style={[styles.modalBadgeText, { fontSize: 13 }]}>SAVE {discountPercent}%</Text>
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              alignItems: "center",
+                              marginBottom: 12,
+                            }}
+                          >
+                            <View
+                              style={[
+                                styles.modalBadge,
+                                {
+                                  backgroundColor: "#4CAF50",
+                                  paddingHorizontal: 8,
+                                  paddingVertical: 4,
+                                  borderRadius: 6,
+                                },
+                              ]}
+                            >
+                              <Text
+                                style={[
+                                  styles.modalBadgeText,
+                                  { fontSize: 13 },
+                                ]}
+                              >
+                                SAVE {discountPercent}%
+                              </Text>
                             </View>
-                            <Text style={{ marginLeft: 8, fontSize: 13, color: '#4CAF50', fontFamily: 'Poppins-Medium' }}>
+                            <Text
+                              style={{
+                                marginLeft: 8,
+                                fontSize: 13,
+                                color: "#4CAF50",
+                                fontFamily: "Poppins-Medium",
+                              }}
+                            >
                               (-{formatCurrency(currency, discountAmount)})
                             </Text>
                           </View>
                         )}
 
-
                         {/* Breakdown for Transparency (Secondary) */}
-                        <View style={{
-                          marginTop: 8,
-                          paddingTop: 12,
-                          borderTopWidth: 1,
-                          borderColor: colors.border,
-                          marginBottom: 16
-                        }}>
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                            <Text style={{ fontSize: 12, fontFamily: 'Poppins-Regular', color: colors.text.secondary }}>Subtotal</Text>
-                            <Text style={{ fontSize: 12, fontFamily: 'Poppins-Medium', color: colors.text.primary }}>{formatCurrency(currency, discountedBase)}</Text>
+                        <View
+                          style={{
+                            marginTop: 8,
+                            paddingTop: 12,
+                            borderTopWidth: 1,
+                            borderColor: colors.border,
+                            marginBottom: 16,
+                          }}
+                        >
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              justifyContent: "space-between",
+                              marginBottom: 4,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                fontFamily: "Poppins-Regular",
+                                color: colors.text.secondary,
+                              }}
+                            >
+                              Subtotal
+                            </Text>
+                            <Text
+                              style={{
+                                fontSize: 12,
+                                fontFamily: "Poppins-Medium",
+                                color: colors.text.primary,
+                              }}
+                            >
+                              {formatCurrency(currency, discountedBase)}
+                            </Text>
                           </View>
 
                           {(taxAmount > 0 || taxRate > 0) && (
-                            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-                              <Text style={{ fontSize: 12, fontFamily: 'Poppins-Regular', color: colors.text.secondary }}>Tax {taxRate > 0 ? `(${taxRate}%)` : ''}</Text>
-                              <Text style={{ fontSize: 12, fontFamily: 'Poppins-Medium', color: colors.text.primary }}>{formatCurrency(currency, taxAmount)}</Text>
+                            <View
+                              style={{
+                                flexDirection: "row",
+                                justifyContent: "space-between",
+                                marginBottom: 8,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 12,
+                                  fontFamily: "Poppins-Regular",
+                                  color: colors.text.secondary,
+                                }}
+                              >
+                                Tax {taxRate > 0 ? `(${taxRate}%)` : ""}
+                              </Text>
+                              <Text
+                                style={{
+                                  fontSize: 12,
+                                  fontFamily: "Poppins-Medium",
+                                  color: colors.text.primary,
+                                }}
+                              >
+                                {formatCurrency(currency, taxAmount)}
+                              </Text>
                             </View>
                           )}
 
-                          <View style={{ height: 1, backgroundColor: colors.border, marginVertical: 4, opacity: 0.5 }} />
+                          <View
+                            style={{
+                              height: 1,
+                              backgroundColor: colors.border,
+                              marginVertical: 4,
+                              opacity: 0.5,
+                            }}
+                          />
 
-                          <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginTop: 4 }}>
-                            <Text style={{ fontSize: 14, fontFamily: 'Poppins-SemiBold', color: colors.text.primary }}>Total</Text>
-                            <Text style={{ fontSize: 14, fontFamily: 'Poppins-Bold', color: colors.text.primary }}>{formatCurrency(currency, displayTotal)}</Text>
+                          <View
+                            style={{
+                              flexDirection: "row",
+                              justifyContent: "space-between",
+                              marginTop: 4,
+                            }}
+                          >
+                            <Text
+                              style={{
+                                fontSize: 14,
+                                fontFamily: "Poppins-SemiBold",
+                                color: colors.text.primary,
+                              }}
+                            >
+                              Total
+                            </Text>
+                            <Text
+                              style={{
+                                fontSize: 14,
+                                fontFamily: "Poppins-Bold",
+                                color: colors.text.primary,
+                              }}
+                            >
+                              {formatCurrency(currency, displayTotal)}
+                            </Text>
                           </View>
                         </View>
                       </View>
                     );
                   })()}
                 </View>
-
               </View>
 
               {/* Add-ons Info Banner - Addons will be selected on separate screen */}
               {activeAddons.length > 0 && (
-                <View style={[styles.addonsBanner, { backgroundColor: colors.surface, borderColor: colors.border, borderWidth: 1, paddingVertical: 12 }]}>
-                  <View style={{ backgroundColor: colors.primary + '15', padding: 8, borderRadius: 20, marginRight: 12 }}>
-                    <Ionicons name="add-circle-outline" size={20} color={colors.primary} />
+                <View
+                  style={[
+                    styles.addonsBanner,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: colors.border,
+                      borderWidth: 1,
+                      paddingVertical: 12,
+                    },
+                  ]}
+                >
+                  <View
+                    style={{
+                      backgroundColor: colors.primary + "15",
+                      padding: 8,
+                      borderRadius: 20,
+                      marginRight: 12,
+                    }}
+                  >
+                    <Ionicons
+                      name="add-circle-outline"
+                      size={20}
+                      color={colors.primary}
+                    />
                   </View>
                   <View style={{ flex: 1 }}>
-                    <Text style={[styles.addonsBannerTitle, { color: colors.text.primary, fontSize: 14, marginBottom: 2 }]}>
-                      {t('extrasAvailable')}
+                    <Text
+                      style={[
+                        styles.addonsBannerTitle,
+                        {
+                          color: colors.text.primary,
+                          fontSize: 14,
+                          marginBottom: 2,
+                        },
+                      ]}
+                    >
+                      {t("extrasAvailable")}
                     </Text>
-                    <Text style={[styles.addonsBannerText, { color: colors.text.secondary, fontSize: 12 }]}>
-                      {t('addExtrasAfterCart')}
+                    <Text
+                      style={[
+                        styles.addonsBannerText,
+                        { color: colors.text.secondary, fontSize: 12 },
+                      ]}
+                    >
+                      {t("addExtrasAfterCart")}
                     </Text>
                   </View>
                 </View>
               )}
 
               {/* Variations Section */}
-              {((raw.variations || raw.options) && (raw.variations || raw.options).length > 0) && (
-                <View style={styles.modalVariations}>
-                  {(raw.variations || raw.options || []).map((variation, vIndex) => (
-                    <View key={vIndex} style={styles.variationGroup}>
-                      <Text style={[styles.variationTitle, { color: colors.text.primary }]}>
-                        {variation.name || variation.title || `Option ${vIndex + 1}`}
-                        {variation.required && <Text style={{ color: 'red' }}> *</Text>}
-                      </Text>
-                      <View style={styles.variationOptions}>
-                        {(variation.items || variation.options || []).map((opt, oIndex) => {
-                          const optId = opt.label || opt.name || opt.id || opt._id;
-                          const isSelected = selectedVariations[variation.name || variation.title || variation.id] === optId;
+              {(raw.variations || raw.options) &&
+                (raw.variations || raw.options).length > 0 && (
+                  <View style={styles.modalVariations}>
+                    {(raw.variations || raw.options || []).map(
+                      (variation, vIndex) => (
+                        <View key={vIndex} style={styles.variationGroup}>
+                          <Text
+                            style={[
+                              styles.variationTitle,
+                              { color: colors.text.primary },
+                            ]}
+                          >
+                            {variation.name ||
+                              variation.title ||
+                              `Option ${vIndex + 1}`}
+                            {variation.required && (
+                              <Text style={{ color: "red" }}> *</Text>
+                            )}
+                          </Text>
+                          <View style={styles.variationOptions}>
+                            {(variation.items || variation.options || []).map(
+                              (opt, oIndex) => {
+                                const optId =
+                                  opt.label || opt.name || opt.id || opt._id;
+                                const isSelected =
+                                  selectedVariations[
+                                    variation.name ||
+                                      variation.title ||
+                                      variation.id
+                                  ] === optId;
 
-                          // Price diff logic
-                          // Use raw.pricing or raw.price safely
-                          const base = Number(raw.pricing?.price ?? raw.price ?? 0);
-                          const optPrice = opt.price ? Number(opt.price) : 0;
+                                // Price diff logic
+                                // Use raw.pricing or raw.price safely
+                                const base = Number(
+                                  raw.pricing?.price ?? raw.price ?? 0,
+                                );
+                                const optPrice = opt.price
+                                  ? Number(opt.price)
+                                  : 0;
 
-                          // If option has explicit price, diff is optPrice - base
-                          // If option is just additive (no full price), then price is the diff itself
-                          // But per user data, options have full price (8, 12, 16).
-                          let priceDiff = 0;
-                          if (optPrice > 0) {
-                            priceDiff = optPrice - base;
-                          }
+                                // If option has explicit price, diff is optPrice - base
+                                // If option is just additive (no full price), then price is the diff itself
+                                // But per user data, options have full price (8, 12, 16).
+                                let priceDiff = 0;
+                                if (optPrice > 0) {
+                                  priceDiff = optPrice - base;
+                                }
 
-                          return (
-                            <TouchableOpacity
-                              key={oIndex}
-                              style={[
-                                styles.variationOptionChip,
-                                { borderColor: colors.border },
-                                isSelected && { borderColor: colors.primary, backgroundColor: colors.primary + '15' }
-                              ]}
-                              onPress={() => setSelectedVariations(prev => ({
-                                ...prev,
-                                [variation.name || variation.title || variation.id]: optId,
-                                [`${variation.name || variation.title || variation.id}_obj`]: opt
-                              }))}
-                            >
-                              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                                <Text style={[
-                                  styles.variationOptionText,
-                                  { color: colors.text.primary },
-                                  isSelected && { color: colors.primary, fontFamily: 'Poppins-SemiBold' }
-                                ]}>
-                                  {opt.label || opt.name || opt.value}
-                                </Text>
-                                {optPrice > 0 && (
-                                  <Text style={{
-                                    marginLeft: 4,
-                                    fontSize: 11,
-                                    color: isSelected ? colors.primary : colors.text.secondary,
-                                    fontFamily: 'Poppins-Regular'
-                                  }}>
-                                    ({formatCurrency(currency, optPrice)})
-                                  </Text>
-                                )}
-                              </View>
-                              {isSelected && <Ionicons name="checkmark-circle" size={18} color={colors.primary} style={{ marginLeft: 6 }} />}
-                            </TouchableOpacity>
-                          );
-                        })}
-                      </View>
-                    </View>
-                  ))}
-                </View>
-              )}
-
+                                return (
+                                  <TouchableOpacity
+                                    key={oIndex}
+                                    style={[
+                                      styles.variationOptionChip,
+                                      { borderColor: colors.border },
+                                      isSelected && {
+                                        borderColor: colors.primary,
+                                        backgroundColor: colors.primary + "15",
+                                      },
+                                    ]}
+                                    onPress={() =>
+                                      setSelectedVariations((prev) => ({
+                                        ...prev,
+                                        [variation.name ||
+                                        variation.title ||
+                                        variation.id]: optId,
+                                        [`${variation.name || variation.title || variation.id}_obj`]:
+                                          opt,
+                                      }))
+                                    }
+                                  >
+                                    <View
+                                      style={{
+                                        flexDirection: "row",
+                                        alignItems: "center",
+                                      }}
+                                    >
+                                      <Text
+                                        style={[
+                                          styles.variationOptionText,
+                                          { color: colors.text.primary },
+                                          isSelected && {
+                                            color: colors.primary,
+                                            fontFamily: "Poppins-SemiBold",
+                                          },
+                                        ]}
+                                      >
+                                        {opt.label || opt.name || opt.value}
+                                      </Text>
+                                      {optPrice > 0 && (
+                                        <Text
+                                          style={{
+                                            marginLeft: 4,
+                                            fontSize: 11,
+                                            color: isSelected
+                                              ? colors.primary
+                                              : colors.text.secondary,
+                                            fontFamily: "Poppins-Regular",
+                                          }}
+                                        >
+                                          ({formatCurrency(currency, optPrice)})
+                                        </Text>
+                                      )}
+                                    </View>
+                                    {isSelected && (
+                                      <Ionicons
+                                        name="checkmark-circle"
+                                        size={18}
+                                        color={colors.primary}
+                                        style={{ marginLeft: 6 }}
+                                      />
+                                    )}
+                                  </TouchableOpacity>
+                                );
+                              },
+                            )}
+                          </View>
+                        </View>
+                      ),
+                    )}
+                  </View>
+                )}
             </ScrollView>
-
 
             {/* Footer - Absolute Positioned, rendered after modal ready */}
             {modalReady && (
-              <View style={[styles.modalFooter, {
-                position: 'absolute',
-                bottom: 0,
-                left: 0,
-                right: 0,
-                backgroundColor: colors.surface,
-                borderTopWidth: 1,
-                borderTopColor: colors.border,
-                paddingBottom: Platform.OS === 'android' ? Math.max(24, insets.bottom + 20) : Math.max(16, insets.bottom)
-              }]}>
-                <View style={{ backgroundColor: colors.primary + '05', borderRadius: borderRadius.xl, padding: spacing.md }}>
-
+              <View
+                style={[
+                  styles.modalFooter,
+                  {
+                    position: "absolute",
+                    bottom: 0,
+                    left: 0,
+                    right: 0,
+                    backgroundColor: colors.surface,
+                    borderTopWidth: 1,
+                    borderTopColor: colors.border,
+                    paddingBottom:
+                      Platform.OS === "android"
+                        ? Math.max(24, insets.bottom + 20)
+                        : Math.max(16, insets.bottom),
+                  },
+                ]}
+              >
+                <View
+                  style={{
+                    backgroundColor: colors.primary + "05",
+                    borderRadius: borderRadius.xl,
+                    padding: spacing.md,
+                  }}
+                >
                   {/* Quantity Controls - Row Layout (Label Left, Controls Right) */}
-                  <View style={[styles.modalQuantitySection, { marginBottom: 16, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }]}>
-                    <Text style={[styles.modalQuantityLabel, { color: colors.text.primary }]}>{t('quantity') || 'Quantity'}</Text>
+                  <View
+                    style={[
+                      styles.modalQuantitySection,
+                      {
+                        marginBottom: 16,
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        alignItems: "center",
+                      },
+                    ]}
+                  >
+                    <Text
+                      style={[
+                        styles.modalQuantityLabel,
+                        { color: colors.text.primary },
+                      ]}
+                    >
+                      {t("quantity") || "Quantity"}
+                    </Text>
 
                     {/* Stock Check for Modal */}
                     {(raw.stock?.quantity ?? 999) <= 0 ? (
-                      <View style={{ paddingHorizontal: 12, paddingVertical: 6, backgroundColor: colors.border, borderRadius: 8 }}>
-                        <Text style={{ color: colors.text.secondary, fontWeight: 'bold' }}>{t('outOfStock') || 'Out of Stock'}</Text>
+                      <View
+                        style={{
+                          paddingHorizontal: 12,
+                          paddingVertical: 6,
+                          backgroundColor: colors.border,
+                          borderRadius: 8,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: colors.text.secondary,
+                            fontWeight: "bold",
+                          }}
+                        >
+                          {t("outOfStock") || "Out of Stock"}
+                        </Text>
                       </View>
                     ) : (
                       <View style={styles.modalQuantityControl}>
                         <TouchableOpacity
-                          style={[styles.modalQuantityBtn, { backgroundColor: colors.primary }]}
+                          style={[
+                            styles.modalQuantityBtn,
+                            { backgroundColor: colors.primary },
+                          ]}
                           onPress={() => {
                             if (quantity > 0) {
                               setModalQuantity(Math.max(0, quantity - 1));
@@ -979,21 +1512,35 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                         >
                           <Ionicons name="remove" size={22} color="#fff" />
                         </TouchableOpacity>
-                        <Text style={[styles.modalQuantityText, { color: colors.text.primary }]}>{quantity}</Text>
+                        <Text
+                          style={[
+                            styles.modalQuantityText,
+                            { color: colors.text.primary },
+                          ]}
+                        >
+                          {quantity}
+                        </Text>
                         <TouchableOpacity
-                          style={[styles.modalQuantityBtn, { backgroundColor: colors.primary }]}
+                          style={[
+                            styles.modalQuantityBtn,
+                            { backgroundColor: colors.primary },
+                          ]}
                           onPress={() => {
-                            const currentCartQty = itemsMap?.[activeProduct.id]?.quantity || 0;
-                            const maxStock = parseInt(raw.stock?.quantity ?? 0, 10);
+                            const currentCartQty =
+                              itemsMap?.[activeProduct.id]?.quantity || 0;
+                            const maxStock = parseInt(
+                              raw.stock?.quantity ?? 0,
+                              10,
+                            );
                             const nextQty = quantity + 1;
 
                             // Check if stock info is available
                             if (maxStock > 0) {
-                              if ((currentCartQty + nextQty) > maxStock) {
+                              if (currentCartQty + nextQty > maxStock) {
                                 setMaxQuantityData({
                                   maxStock: maxStock,
                                   currentCartQty: currentCartQty,
-                                  itemName: activeProduct?.name || 'Item'
+                                  itemName: activeProduct?.name || "Item",
                                 });
                                 setMaxQuantityModalVisible(true);
                                 return;
@@ -1013,8 +1560,11 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                     activeOpacity={0.9}
                     style={{
                       borderRadius: 16,
-                      opacity: (quantity > 0 && (raw.stock?.quantity ?? 999) > 0) ? 1 : 0.5,
-                      backgroundColor: colors.primary // Ensure background is visible
+                      opacity:
+                        quantity > 0 && (raw.stock?.quantity ?? 999) > 0
+                          ? 1
+                          : 0.5,
+                      backgroundColor: colors.primary, // Ensure background is visible
                     }}
                     onPress={async () => {
                       const stockQty = raw.stock?.quantity ?? 999;
@@ -1026,8 +1576,10 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                       // Validate quantity first
                       if (quantity === 0) {
                         setAlertConfig({
-                          title: t('error') || 'Error',
-                          message: t('pleaseAddQuantity') || 'Please add at least 1 item'
+                          title: t("error") || "Error",
+                          message:
+                            t("pleaseAddQuantity") ||
+                            "Please add at least 1 item",
                         });
                         setAlertVisible(true);
                         return;
@@ -1040,12 +1592,17 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                         // Check if ANY variation is not selected
                         // RELAXED: User requested optional variants. Only enforce if 'required' is explicitly true.
                         // If your data doesn't have 'required' property, this loop effectively becomes optional.
-                        const unselectedRequired = variations.filter(v => v.required && !selectedVariations[v.name || v.title || v.id]);
+                        const unselectedRequired = variations.filter(
+                          (v) =>
+                            v.required &&
+                            !selectedVariations[v.name || v.title || v.id],
+                        );
 
                         if (unselectedRequired.length > 0) {
                           setAlertConfig({
-                            title: t('selectionRequired') || 'Selection Required',
-                            message: `${t('pleaseSelect') || 'Please select'}: ${unselectedRequired[0].name || unselectedRequired[0].title || 'a variation'}`
+                            title:
+                              t("selectionRequired") || "Selection Required",
+                            message: `${t("pleaseSelect") || "Please select"}: ${unselectedRequired[0].name || unselectedRequired[0].title || "a variation"}`,
                           });
                           setAlertVisible(true);
                           return;
@@ -1079,8 +1636,8 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
                         // Retrieve detailed objects for selections
                         const selectedObjs = Object.keys(selectedVariations)
-                          .filter(k => k.endsWith('_obj'))
-                          .map(k => selectedVariations[k]);
+                          .filter((k) => k.endsWith("_obj"))
+                          .map((k) => selectedVariations[k]);
 
                         // Map selection to variant name for backend compatibility.
                         let targetVariantName = null;
@@ -1092,29 +1649,40 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                         let variationSku = null;
 
                         // Identify what was selected
-                        const selectedKeys = Object.keys(selectedVariations).filter(k => !k.endsWith('_obj'));
+                        const selectedKeys = Object.keys(
+                          selectedVariations,
+                        ).filter((k) => !k.endsWith("_obj"));
 
                         if (selectedKeys.length > 0) {
                           // Try to find the SKU from the fresh activeProduct data using the selected values
-                          const freshVariations = activeProduct._raw?.variations || activeProduct._raw?.options || [];
+                          const freshVariations =
+                            activeProduct._raw?.variations ||
+                            activeProduct._raw?.options ||
+                            [];
 
                           for (const key of selectedKeys) {
                             const selectedValue = selectedVariations[key]; // e.g., "VAR-SPI-MED-Z4D" or "Medium"
 
                             // Find the group
-                            const group = freshVariations.find(v => (v.name || v.title || v.id) === key);
+                            const group = freshVariations.find(
+                              (v) => (v.name || v.title || v.id) === key,
+                            );
                             if (group) {
                               // Find the option
-                              const options = group.items || group.options || [];
-                              const option = options.find(o =>
-                                (o.label || o.name || o.value) === selectedValue ||
-                                (o.id || o._id) === selectedValue ||
-                                (o.sku === selectedValue) // unlikely but possible
+                              const options =
+                                group.items || group.options || [];
+                              const option = options.find(
+                                (o) =>
+                                  (o.label || o.name || o.value) ===
+                                    selectedValue ||
+                                  (o.id || o._id) === selectedValue ||
+                                  o.sku === selectedValue, // unlikely but possible
                               );
 
                               if (option && option.sku) {
                                 variationSku = option.sku;
-                                targetVariantName = option.label || option.name || option.value;
+                                targetVariantName =
+                                  option.label || option.name || option.value;
                                 break; // Found a SKU, we are good
                               }
                             }
@@ -1123,9 +1691,12 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
                         // Fallback: use the object we have in state if re-lookup failed
                         if (!variationSku) {
-                          const skuOption = selectedObjs.find(o => o.sku);
+                          const skuOption = selectedObjs.find((o) => o.sku);
                           if (skuOption) {
-                            targetVariantName = skuOption.label || skuOption.name || skuOption.value;
+                            targetVariantName =
+                              skuOption.label ||
+                              skuOption.name ||
+                              skuOption.value;
                             variationSku = skuOption.sku;
                           }
                         }
@@ -1133,10 +1704,12 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                         // 2. If no SKU, check for "Size" or "Variations" (common primary attributes)
                         if (!targetVariantName) {
                           // Fallback: don't join with commas. Just pick the first significant one.
-                          // Ideally we'd pick the one that affects price the most? 
+                          // Ideally we'd pick the one that affects price the most?
                           // For now, pick the first one to avoid "A, B" errors.
                           const firstOpt = selectedObjs[0];
-                          if (firstOpt) targetVariantName = firstOpt.label || firstOpt.name || firstOpt.value;
+                          if (firstOpt)
+                            targetVariantName =
+                              firstOpt.label || firstOpt.name || firstOpt.value;
                         }
 
                         const variantName = targetVariantName || null;
@@ -1150,15 +1723,19 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                           variantName: variantName,
                           variationSku: variationSku, // Added SKU for backend
                           options: selectedVariations,
-                          addons: [] // Don't send addons here, let AddonsScreen handle it
+                          addons: [], // Don't send addons here, let AddonsScreen handle it
                         };
 
                         // Add the product to cart first (without addons)
-                        const result = await addItem(activeProduct, quantity, payload);
+                        const result = await addItem(
+                          activeProduct,
+                          quantity,
+                          payload,
+                        );
 
                         if (result && !result.success) {
                           // Check for different vendor error
-                          if (result.error === 'DIFFERENT_VENDOR') {
+                          if (result.error === "DIFFERENT_VENDOR") {
                             // Helper to safely fallback if t(key) returns key
                             const safeT = (key, fallback) => {
                               const val = t(key);
@@ -1166,16 +1743,23 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                             };
 
                             setAlertConfig({
-                              title: safeT('startNewBasket', 'Start new basket?'),
-                              message: safeT('clearCartConfirm', 'Your cart contains items from another restaurant. Do you want to clear it and add this item?'),
+                              title: safeT(
+                                "startNewBasket",
+                                "Start new basket?",
+                              ),
+                              message: safeT(
+                                "clearCartConfirm",
+                                "Your cart contains items from another restaurant. Do you want to clear it and add this item?",
+                              ),
                               buttons: [
                                 {
-                                  text: safeT('cancel', 'Cancel'),
-                                  style: 'cancel',
-                                  onPress: () => console.log('Cancelled new basket')
+                                  text: safeT("cancel", "Cancel"),
+                                  style: "cancel",
+                                  onPress: () =>
+                                    console.log("Cancelled new basket"),
                                 },
                                 {
-                                  text: safeT('clearAndAdd', 'Clear & Add'),
+                                  text: safeT("clearAndAdd", "Clear & Add"),
                                   onPress: async () => {
                                     try {
                                       // Clear all carts directly
@@ -1183,11 +1767,20 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                                       // Wait a tick for state to update
                                       setTimeout(async () => {
                                         // Retry adding
-                                        const retry = await addItem(activeProduct, quantity, payload);
+                                        const retry = await addItem(
+                                          activeProduct,
+                                          quantity,
+                                          payload,
+                                        );
                                         if (retry && !retry.success) {
                                           setAlertConfig({
-                                            title: safeT('error', 'Error'),
-                                            message: retry.message || safeT('addToCartFailed', 'Failed to add item')
+                                            title: safeT("error", "Error"),
+                                            message:
+                                              retry.message ||
+                                              safeT(
+                                                "addToCartFailed",
+                                                "Failed to add item",
+                                              ),
                                           });
                                           setAlertVisible(true);
                                         } else {
@@ -1196,30 +1789,48 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                                           if (hasAddons) {
                                             // ... navigate to addons
                                             setTimeout(() => {
-                                              const mongoProductId = raw._id || activeProduct._raw?._id || activeProduct.id;
-                                              navigation.navigate('Addons', {
-                                                product: { name: raw.name || activeProduct.name, id: mongoProductId },
+                                              const mongoProductId =
+                                                raw._id ||
+                                                activeProduct._raw?._id ||
+                                                activeProduct.id;
+                                              navigation.navigate("Addons", {
+                                                product: {
+                                                  name:
+                                                    raw.name ||
+                                                    activeProduct.name,
+                                                  id: mongoProductId,
+                                                },
                                                 productId: mongoProductId,
                                                 variantName: variantName,
                                                 addonGroupIds: addonGroupIds,
-                                                currency: raw.pricing?.currency || 'EUR'
+                                                currency:
+                                                  raw.pricing?.currency ||
+                                                  "EUR",
                                               });
                                             }, 300);
                                           }
                                         }
                                       }, 100);
                                     } catch (e) {
-                                      console.error('Failed to clear and add:', e);
+                                      console.error(
+                                        "Failed to clear and add:",
+                                        e,
+                                      );
                                     }
-                                  }
-                                }
-                              ]
+                                  },
+                                },
+                              ],
                             });
                             setAlertVisible(true);
                             return; // Stop execution, wait for user input
                           }
-                          console.warn('[RestaurantDetails] Add to cart failed:', result);
-                          throw new Error(result.message || 'Failed to add to cart');
+                          console.warn(
+                            "[RestaurantDetails] Add to cart failed:",
+                            result,
+                          );
+                          throw new Error(
+                            result.message || "Failed to add to cart",
+                          );
                         }
 
                         closeProductModal();
@@ -1229,9 +1840,12 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                           // Small delay to ensure modal is closed
                           setTimeout(() => {
                             // Use MongoDB _id for productId since backend looks up items by _id
-                            const mongoProductId = raw._id || activeProduct._raw?._id || activeProduct.id;
+                            const mongoProductId =
+                              raw._id ||
+                              activeProduct._raw?._id ||
+                              activeProduct.id;
 
-                            navigation.navigate('Addons', {
+                            navigation.navigate("Addons", {
                               product: {
                                 name: raw.name || activeProduct.name,
                                 id: mongoProductId,
@@ -1239,16 +1853,22 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                               productId: mongoProductId,
                               variantName: variantName,
                               addonGroupIds: addonGroupIds,
-                              currency: raw.pricing?.currency || 'EUR'
+                              currency: raw.pricing?.currency || "EUR",
                             });
                           }, 300);
                         }
                       } catch (error) {
-                        console.error('[RestaurantDetails] Add to cart error:', error);
+                        console.error(
+                          "[RestaurantDetails] Add to cart error:",
+                          error,
+                        );
                         setAlertConfig({
-                          title: t('error') || 'Error',
+                          title: t("error") || "Error",
                           // Show actual error message if available, otherwise fallback
-                          message: error.message || t('addToCartFailed') || 'Failed to add item to cart'
+                          message:
+                            error.message ||
+                            t("addToCartFailed") ||
+                            "Failed to add item to cart",
                         });
                         setAlertVisible(true);
                       } finally {
@@ -1258,28 +1878,47 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                     disabled={isUpdating || addingToCart || quantity === 0}
                   >
                     <LinearGradient
-                      colors={(quantity > 0) ? ['#EC407A', '#D81B60'] : ['#E0E0E0', '#BDBDBD']}
+                      colors={
+                        quantity > 0
+                          ? ["#EC407A", "#D81B60"]
+                          : ["#E0E0E0", "#BDBDBD"]
+                      }
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
                       style={styles.modalAddToCartBtn}
                     >
                       {addingToCart ? (
-                        <ActivityIndicator size="small" color="#fff" style={{ marginRight: 10 }} />
+                        <ActivityIndicator
+                          size="small"
+                          color="#fff"
+                          style={{ marginRight: 10 }}
+                        />
                       ) : (
-                        <Ionicons name="cart" size={22} color={quantity > 0 ? "#fff" : colors.text.light} style={{ marginRight: 10 }} />
+                        <Ionicons
+                          name="cart"
+                          size={22}
+                          color={quantity > 0 ? "#fff" : colors.text.light}
+                          style={{ marginRight: 10 }}
+                        />
                       )}
                       {/* Fixed width container for text to prevent layout jitter */}
-                      <View style={{ minWidth: 200, alignItems: 'center' }}>
-                        <Text style={[styles.modalAddToCartText, { color: quantity > 0 ? '#fff' : colors.text.light }]}>
+                      <View style={{ minWidth: 200, alignItems: "center" }}>
+                        <Text
+                          style={[
+                            styles.modalAddToCartText,
+                            {
+                              color: quantity > 0 ? "#fff" : colors.text.light,
+                            },
+                          ]}
+                        >
                           {addingToCart
-                            ? (t('adding') || 'Adding...')
+                            ? t("adding") || "Adding..."
                             : quantity > 0
                               ? (() => {
-                                const total = calculateModalTotal();
-                                return `${t('addToCart') || 'Add to cart'} • ${formatCurrency(currency, total)}`;
-                              })()
-                              : (t('addToCart') || 'Add to cart')
-                          }
+                                  const total = calculateModalTotal();
+                                  return `${t("addToCart") || "Add to cart"} • ${formatCurrency(currency, total)}`;
+                                })()
+                              : t("addToCart") || "Add to cart"}
                         </Text>
                       </View>
                     </LinearGradient>
@@ -1294,40 +1933,82 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   };
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
+    <SafeAreaView
+      style={[styles.container, { backgroundColor: colors.background }]}
+      edges={["top"]}
+    >
       <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        barStyle={isDarkMode ? "light-content" : "dark-content"}
         backgroundColor="transparent"
         translucent={true}
         animated={true}
       />
 
       {/* Header */}
-      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-        <TouchableOpacity style={[styles.headerButton, { backgroundColor: colors.background, borderColor: colors.border }]} onPress={() => navigation.goBack()}>
+      <View
+        style={[
+          styles.header,
+          { backgroundColor: colors.surface, borderBottomColor: colors.border },
+        ]}
+      >
+        <TouchableOpacity
+          style={[
+            styles.headerButton,
+            { backgroundColor: colors.background, borderColor: colors.border },
+          ]}
+          onPress={() => navigation.goBack()}
+        >
           <Ionicons name="arrow-back" size={22} color={colors.text.primary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text.primary }]} numberOfLines={1}>{displayName}</Text>
-        <TouchableOpacity style={[styles.headerButton, { backgroundColor: colors.background, borderColor: colors.border }]} onPress={() => setSearchVisible(!searchVisible)}>
+        <Text
+          style={[styles.headerTitle, { color: colors.text.primary }]}
+          numberOfLines={1}
+        >
+          {displayName}
+        </Text>
+        <TouchableOpacity
+          style={[
+            styles.headerButton,
+            { backgroundColor: colors.background, borderColor: colors.border },
+          ]}
+          onPress={() => setSearchVisible(!searchVisible)}
+        >
           <Ionicons name="search" size={22} color={colors.text.primary} />
         </TouchableOpacity>
       </View>
 
       {/* Search Bar */}
       {searchVisible && (
-        <View style={[styles.searchContainer, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
-          <Ionicons name="search" size={20} color={colors.text.secondary} style={{ marginRight: 8 }} />
+        <View
+          style={[
+            styles.searchContainer,
+            {
+              backgroundColor: colors.surface,
+              borderBottomColor: colors.border,
+            },
+          ]}
+        >
+          <Ionicons
+            name="search"
+            size={20}
+            color={colors.text.secondary}
+            style={{ marginRight: 8 }}
+          />
           <TextInput
             style={[styles.searchInput, { color: colors.text.primary }]}
-            placeholder={t('searchMenu') || 'Search menu...'}
+            placeholder={t("searchMenu") || "Search menu..."}
             placeholderTextColor={colors.text.secondary}
             value={searchQuery}
             onChangeText={setSearchQuery}
             autoFocus
           />
           {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery('')}>
-              <Ionicons name="close-circle" size={20} color={colors.text.secondary} />
+            <TouchableOpacity onPress={() => setSearchQuery("")}>
+              <Ionicons
+                name="close-circle"
+                size={20}
+                color={colors.text.secondary}
+              />
             </TouchableOpacity>
           )}
         </View>
@@ -1342,7 +2023,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
             onRefresh={onRefresh}
             colors={[colors.primary]}
             tintColor={colors.primary}
-            title={t('loading') || 'Loading...'}
+            title={t("loading") || "Loading..."}
             titleColor={colors.text.secondary}
           />
         }
@@ -1353,45 +2034,137 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
             source={
               restaurant._raw?.vendor?.storePhoto
                 ? { uri: restaurant._raw.vendor.storePhoto }
-                : (restaurant.image ? { uri: restaurant.image } : require('../assets/images/logonew.png'))
+                : restaurant.image
+                  ? { uri: restaurant.image }
+                  : require("../assets/images/logonew.png")
             }
             style={styles.restaurantImage}
             resizeMode="cover"
           />
           {/* Bottom gradient for blending */}
           <LinearGradient
-            colors={['transparent', 'rgba(0,0,0,0.06)']}
+            colors={["transparent", "rgba(0,0,0,0.06)"]}
             style={styles.heroBottomGradient}
           />
         </View>
 
-        {/* Glassmorphism Info Card — floating overlap */}
-        <View style={styles.glassInfoCard}>
-          <Text style={[styles.restaurantName, { color: colors.text.primary }]}>{displayName}</Text>
-          {displayLocation && (
-            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 6 }}>
-              <Ionicons name="location-outline" size={14} color={colors.text.secondary} />
-              <Text style={[styles.locationText, { color: colors.text.secondary }]}>
-                {displayLocation}
+        {/* Solid Info Card — floating overlap */}
+        <View
+          style={[
+            styles.glassInfoCardContainer,
+            { shadowColor: isDarkMode ? "#000" : "#888" },
+          ]}
+        >
+          <BlurView
+            intensity={60}
+            tint={isDarkMode ? "dark" : "light"}
+            style={[
+              styles.glassInfoCard,
+              {
+                backgroundColor: isDarkMode
+                  ? "rgba(30, 30, 30, 0.5)"
+                  : "rgba(255, 255, 255, 0.65)",
+                borderColor: isDarkMode
+                  ? "rgba(255, 255, 255, 0.1)"
+                  : "rgba(255, 255, 255, 0.6)",
+                borderWidth: 1,
+              },
+            ]}
+          >
+            <Text
+              style={[
+                styles.restaurantName,
+                { color: colors.text.primary, textAlign: "center" },
+              ]}
+            >
+              {displayName}
+            </Text>
+
+            <TouchableOpacity
+              style={styles.moreInfoBtn}
+              onPress={() => setVendorDetailsVisible(true)}
+            >
+              <Text
+                style={[styles.moreInfoText, { color: colors.text.secondary }]}
+              >
+                More info
               </Text>
+              <Ionicons
+                name="chevron-forward"
+                size={12}
+                color={colors.text.secondary}
+              />
+            </TouchableOpacity>
+
+            <View style={styles.restaurantMetaWrapper}>
+              <View style={styles.metaStat}>
+                <Ionicons
+                  name="star"
+                  size={14}
+                  color="#FFB300"
+                  style={{ marginRight: 4 }}
+                />
+                <Text
+                  style={[
+                    styles.metaStatText,
+                    { color: colors.text.secondary },
+                  ]}
+                >
+                  {ratingValue ? parseFloat(ratingValue).toFixed(1) : "New"}
+                </Text>
+              </View>
+              <View style={styles.metaDivider} />
+              <View style={styles.metaStat}>
+                <MaterialCommunityIcons
+                  name="bike-fast"
+                  size={14}
+                  color={colors.text.secondary}
+                  style={{ marginRight: 4 }}
+                />
+                <Text
+                  style={[
+                    styles.metaStatText,
+                    { color: colors.text.secondary },
+                  ]}
+                >
+                  25-40 min
+                </Text>
+              </View>
             </View>
-          )}
+          </BlurView>
         </View>
 
         {/* Category Tabs */}
         <ScrollView
           horizontal
           showsHorizontalScrollIndicator={false}
-          style={[styles.categoryTabs, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}
-          contentContainerStyle={{ paddingHorizontal: spacing.md, paddingVertical: spacing.sm }}
+          style={[
+            styles.categoryTabs,
+            {
+              backgroundColor: colors.surface,
+              borderBottomColor: colors.border,
+            },
+          ]}
+          contentContainerStyle={{
+            paddingHorizontal: spacing.md,
+            paddingVertical: spacing.sm,
+          }}
         >
           {menuCategories.map((category) => (
             <TouchableOpacity
               key={category}
               style={[
                 styles.categoryTab,
-                { backgroundColor: colors.background, borderColor: colors.border },
-                selectedCategory === category && { backgroundColor: colors.primary, borderColor: colors.primary },
+                {
+                  backgroundColor:
+                    selectedCategory === category
+                      ? colors.primary
+                      : colors.surface,
+                  borderColor:
+                    selectedCategory === category
+                      ? colors.primary
+                      : colors.border,
+                },
               ]}
               onPress={() => setSelectedCategory(category)}
             >
@@ -1399,10 +2172,10 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                 style={[
                   styles.categoryTabText,
                   { color: colors.text.secondary },
-                  selectedCategory === category && { color: '#fff' },
+                  selectedCategory === category && { color: "#fff" },
                 ]}
               >
-                {category === 'Popular' ? (t('popular') || 'Popular') : category}
+                {category === "Popular" ? t("popular") || "Popular" : category}
               </Text>
             </TouchableOpacity>
           ))}
@@ -1410,17 +2183,36 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
         {/* Menu Items */}
         <View style={{ padding: spacing.md }}>
-          <Text style={[styles.menuSectionTitle, { color: colors.text.primary }]}>
-            {searchQuery ? `${t('search') || 'Search'} (${getFilteredMenuItems().length})` : (t('menu') || 'Menu')}
+          <Text
+            style={[styles.menuSectionTitle, { color: colors.text.primary }]}
+          >
+            {searchQuery
+              ? `${t("search") || "Search"} (${getFilteredMenuItems().length})`
+              : t("menu") || "Menu"}
           </Text>
 
           {getFilteredMenuItems().length > 0 ? (
             getFilteredMenuItems().map((item) => renderMenuItem(item))
           ) : (
             <View style={styles.noResultsContainer}>
-              <Ionicons name="search-outline" size={64} color={colors.text.light} />
-              <Text style={[styles.noResultsText, { color: colors.text.primary }]}>{t('noItemsFound') || 'No items found'}</Text>
-              <Text style={[styles.noResultsSubtext, { color: colors.text.secondary }]}>{t('tryAdjustingFilters') || 'Try different keywords'}</Text>
+              <Ionicons
+                name="search-outline"
+                size={64}
+                color={colors.text.light}
+              />
+              <Text
+                style={[styles.noResultsText, { color: colors.text.primary }]}
+              >
+                {t("noItemsFound") || "No items found"}
+              </Text>
+              <Text
+                style={[
+                  styles.noResultsSubtext,
+                  { color: colors.text.secondary },
+                ]}
+              >
+                {t("tryAdjustingFilters") || "Try different keywords"}
+              </Text>
             </View>
           )}
         </View>
@@ -1430,26 +2222,657 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
       {/* Floating Cart Button */}
       {getTotalItems() > 0 && (
-        <View style={[styles.floatingCart, {
-          backgroundColor: colors.surface,
-          borderTopColor: colors.border,
-          paddingBottom: Math.max(16, insets.bottom + 16)
-        }]}>
+        <View
+          style={[
+            styles.floatingCart,
+            {
+              backgroundColor: colors.surface,
+              borderTopColor: colors.border,
+              paddingBottom: Math.max(16, insets.bottom + 16),
+            },
+          ]}
+        >
           <View>
-            <Text style={[styles.cartItemCount, { color: colors.text.secondary }]}>{getTotalItems()} {t('items') || 'items'}</Text>
-            <Text style={[styles.cartTotal, { color: colors.primary }]}>{formatCurrency(vendorCurrency, getTotalPrice())}</Text>
+            <Text
+              style={[styles.cartItemCount, { color: colors.text.secondary }]}
+            >
+              {getTotalItems()} {t("items") || "items"}
+            </Text>
+            <Text style={[styles.cartTotal, { color: colors.primary }]}>
+              {formatCurrency(vendorCurrency, getTotalPrice())}
+            </Text>
           </View>
           <TouchableOpacity
             style={[styles.viewCartButton, { backgroundColor: colors.primary }]}
-            onPress={() => navigation.navigate('Main', { screen: 'Cart' })}
+            onPress={() => navigation.navigate("Main", { screen: "Cart" })}
           >
-            <Text style={styles.viewCartButtonText}>{t('viewCart') || 'View Cart'}</Text>
-            <Ionicons name="arrow-forward" size={18} color="#fff" style={{ marginLeft: 6 }} />
+            <Text style={styles.viewCartButtonText}>
+              {t("viewCart") || "View Cart"}
+            </Text>
+            <Ionicons
+              name="arrow-forward"
+              size={18}
+              color="#fff"
+              style={{ marginLeft: 6 }}
+            />
           </TouchableOpacity>
         </View>
       )}
 
       {renderProductModal()}
+
+      {/* Vendor Details Modal */}
+      <Modal
+        visible={vendorDetailsVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setVendorDetailsVisible(false)}
+      >
+        <View style={styles.modalOverlay}>
+          <TouchableOpacity
+            style={{ flex: 1, width: "100%" }}
+            onPress={() => setVendorDetailsVisible(false)}
+          />
+          <View
+            style={[
+              styles.vendorDetailsCard,
+              {
+                backgroundColor: colors.surface,
+                paddingBottom: Math.max(30, insets.bottom + 10),
+              },
+            ]}
+          >
+            <View style={styles.vendorModalHeader}>
+              <TouchableOpacity
+                onPress={() => setVendorDetailsVisible(false)}
+                style={styles.vendorModalCloseBtn}
+              >
+                <Ionicons
+                  name="arrow-back"
+                  size={24}
+                  color={colors.text.primary}
+                />
+              </TouchableOpacity>
+              <TouchableOpacity style={styles.vendorModalShareBtn}>
+                <Ionicons
+                  name="share-social-outline"
+                  size={22}
+                  color={colors.text.primary}
+                />
+              </TouchableOpacity>
+            </View>
+
+            <ScrollView
+              style={{ flex: 1 }}
+              contentContainerStyle={{
+                paddingBottom: Math.max(160, insets.bottom + 120),
+              }}
+              showsVerticalScrollIndicator={false}
+              bounces={false}
+            >
+              <Text
+                style={[
+                  styles.vendorModalTitle,
+                  { color: colors.text.primary },
+                ]}
+              >
+                {displayName}
+              </Text>
+              <Text
+                style={[
+                  styles.vendorModalSubtitle,
+                  { color: colors.text.secondary },
+                ]}
+              >
+                {t("vendorContactMsg") === "vendorContactMsg"
+                  ? "Get in touch with the venue if you have allergies to learn about their ingredients and cooking methods."
+                  : t("vendorContactMsg")}
+              </Text>
+
+              {/* Info Items */}
+              <View style={styles.vendorInfoList}>
+                <View style={styles.vendorInfoItem}>
+                  <Ionicons
+                    name="time"
+                    size={20}
+                    color={colors.text.primary}
+                    style={styles.vendorInfoIcon}
+                  />
+                  <View style={styles.vendorInfoContent}>
+                    <Text
+                      style={[
+                        styles.vendorInfoLabel,
+                        { color: colors.text.primary },
+                      ]}
+                    >
+                      Open now
+                    </Text>
+                    <Text
+                      style={[
+                        styles.vendorInfoValue,
+                        { color: colors.text.secondary },
+                      ]}
+                    >
+                      {formattedHours}
+                    </Text>
+                  </View>
+                </View>
+
+                {(normVendor.contactNumber ||
+                  normVendor.phone ||
+                  restaurant._raw?.vendorId?.contactDetails?.phone) && (
+                  <View style={styles.vendorInfoItem}>
+                    <Ionicons
+                      name="call"
+                      size={20}
+                      color={colors.text.primary}
+                      style={styles.vendorInfoIcon}
+                    />
+                    <View style={styles.vendorInfoContent}>
+                      <Text
+                        style={[
+                          styles.vendorInfoLabel,
+                          { color: colors.text.primary },
+                        ]}
+                      >
+                        Call us
+                      </Text>
+                      <Text
+                        style={[
+                          styles.vendorInfoValue,
+                          { color: colors.text.secondary },
+                        ]}
+                      >
+                        {normVendor.contactNumber ||
+                          normVendor.phone ||
+                          restaurant._raw?.vendorId?.contactDetails?.phone}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+
+                {displayLocation && (
+                  <View style={styles.vendorInfoItem}>
+                    <Ionicons
+                      name="location"
+                      size={20}
+                      color={colors.text.primary}
+                      style={styles.vendorInfoIcon}
+                    />
+                    <View style={styles.vendorInfoContent}>
+                      <Text
+                        style={[
+                          styles.vendorInfoLabel,
+                          { color: colors.text.primary },
+                        ]}
+                      >
+                        View map
+                      </Text>
+                      <Text
+                        style={[
+                          styles.vendorInfoValue,
+                          { color: colors.text.secondary },
+                        ]}
+                      >
+                        {displayLocation}
+                      </Text>
+                    </View>
+                  </View>
+                )}
+              </View>
+
+              {/* Real Map Integration */}
+              {displayLocation && (
+                <View
+                  style={[
+                    styles.mapPlaceholder,
+                    {
+                      backgroundColor: isDarkMode ? "#222" : "#E0E0E0",
+                      borderRadius: 12,
+                    },
+                  ]}
+                >
+                  {vendorCoords ? (
+                    <TouchableOpacity
+                      activeOpacity={0.9}
+                      onPress={() => setFullMapVisible(true)}
+                    >
+                      <View pointerEvents="none">
+                        <MapView
+                          provider={PROVIDER_GOOGLE}
+                          style={{ width: "100%", height: 120, opacity: 0.9 }}
+                          initialRegion={{
+                            latitude: vendorCoords.latitude,
+                            longitude: vendorCoords.longitude,
+                            latitudeDelta: 0.005,
+                            longitudeDelta: 0.005,
+                          }}
+                          scrollEnabled={false}
+                          zoomEnabled={false}
+                          pitchEnabled={false}
+                          rotateEnabled={false}
+                        >
+                          <Marker coordinate={vendorCoords} />
+                        </MapView>
+                      </View>
+                    </TouchableOpacity>
+                  ) : (
+                    <View
+                      style={{
+                        width: "100%",
+                        height: 120,
+                        justifyContent: "center",
+                        alignItems: "center",
+                        opacity: 0.5,
+                      }}
+                    >
+                      <Ionicons
+                        name="map-outline"
+                        size={48}
+                        color={colors.text.secondary}
+                      />
+                    </View>
+                  )}
+                  <TouchableOpacity
+                    style={[
+                      styles.getDirectionsBtn,
+                      {
+                        backgroundColor: isDarkMode ? "#333" : "#fff",
+                        position: "absolute",
+                        bottom: 12,
+                        alignSelf: "center",
+                        paddingHorizontal: 16,
+                      },
+                    ]}
+                    onPress={() => {
+                      if (vendorCoords) {
+                        const url =
+                          Platform.OS === "ios"
+                            ? `http://maps.apple.com/?daddr=${vendorCoords.latitude},${vendorCoords.longitude}`
+                            : `https://www.google.com/maps/dir/?api=1&destination=${vendorCoords.latitude},${vendorCoords.longitude}`;
+                        Linking.openURL(url).catch((err) =>
+                          console.error("An error occurred", err),
+                        );
+                      }
+                    }}
+                  >
+                    <Ionicons
+                      name="navigate"
+                      size={18}
+                      color={colors.text.primary}
+                      style={{ marginRight: 8 }}
+                    />
+                    <Text
+                      style={[
+                        styles.getDirectionsText,
+                        { color: colors.text.primary },
+                      ]}
+                    >
+                      Get directions
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              )}
+
+              {/* Rating block */}
+              {ratingValue !== null && (
+                <View
+                  style={[
+                    styles.vendorRatingBlock,
+                    { borderTopColor: colors.border },
+                  ]}
+                >
+                  <Text
+                    style={[
+                      styles.vendorRatingScore,
+                      {
+                        backgroundColor: isDarkMode ? "#333" : "#f0f0f0",
+                        color: colors.text.primary,
+                      },
+                    ]}
+                  >
+                    {parseFloat(ratingValue).toFixed(1)}
+                  </Text>
+                  <View style={styles.vendorRatingRight}>
+                    <Text
+                      style={[
+                        styles.vendorRatingTitle,
+                        { color: colors.text.primary },
+                      ]}
+                    >
+                      Rating
+                    </Text>
+                    <Text
+                      style={[
+                        styles.vendorRatingSub,
+                        { color: colors.text.secondary },
+                      ]}
+                    >
+                      Based on{" "}
+                      {restaurant.ratingsCount ||
+                        restaurant._raw?.vendorId?.rating?.totalReviews ||
+                        restaurant._raw?.vendor?.rating?.totalReviews ||
+                        0}{" "}
+                      {(restaurant.ratingsCount ||
+                        restaurant._raw?.vendorId?.rating?.totalReviews ||
+                        restaurant._raw?.vendor?.rating?.totalReviews ||
+                        0) === 1
+                        ? "rating"
+                        : "ratings"}
+                    </Text>
+                  </View>
+                </View>
+              )}
+
+              {/* Other Details block */}
+              {(normVendor.businessDetails ||
+                restaurant._raw?.vendorId?.businessDetails ||
+                normVendor.registrationCode) && (
+                <View style={styles.otherDetailsContainer}>
+                  <Text
+                    style={[
+                      styles.otherDetailsTitle,
+                      { color: colors.text.primary },
+                    ]}
+                  >
+                    Other details
+                  </Text>
+
+                  {/* Legal Entity Name */}
+                  {(normVendor.businessDetails?.businessName ||
+                    restaurant._raw?.vendorId?.businessDetails
+                      ?.businessName) && (
+                    <View style={styles.otherDetailItem}>
+                      <Text
+                        style={[
+                          styles.otherDetailLabel,
+                          { color: colors.text.secondary },
+                        ]}
+                      >
+                        Legal entity name
+                      </Text>
+                      <Text
+                        style={[
+                          styles.otherDetailValue,
+                          { color: colors.text.primary },
+                        ]}
+                      >
+                        {normVendor.businessDetails?.businessName ||
+                          restaurant._raw?.vendorId?.businessDetails
+                            ?.businessName}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Address */}
+                  {displayLocation && (
+                    <View style={styles.otherDetailItem}>
+                      <Text
+                        style={[
+                          styles.otherDetailLabel,
+                          { color: colors.text.secondary },
+                        ]}
+                      >
+                        Address
+                      </Text>
+                      <Text
+                        style={[
+                          styles.otherDetailValue,
+                          { color: colors.text.primary },
+                        ]}
+                      >
+                        {displayLocation}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Phone */}
+                  {(normVendor.contactNumber ||
+                    normVendor.phone ||
+                    restaurant._raw?.vendorId?.contactDetails?.phone) && (
+                    <View style={styles.otherDetailItem}>
+                      <Text
+                        style={[
+                          styles.otherDetailLabel,
+                          { color: colors.text.secondary },
+                        ]}
+                      >
+                        Phone
+                      </Text>
+                      <Text
+                        style={[
+                          styles.otherDetailValue,
+                          { color: colors.text.primary },
+                        ]}
+                      >
+                        {normVendor.contactNumber ||
+                          normVendor.phone ||
+                          restaurant._raw?.vendorId?.contactDetails?.phone}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Email */}
+                  {(normVendor.contactDetails?.email ||
+                    restaurant._raw?.vendorId?.contactDetails?.email ||
+                    normVendor.email) && (
+                    <View style={styles.otherDetailItem}>
+                      <Text
+                        style={[
+                          styles.otherDetailLabel,
+                          { color: colors.text.secondary },
+                        ]}
+                      >
+                        Email
+                      </Text>
+                      <Text
+                        style={[
+                          styles.otherDetailValue,
+                          { color: colors.text.primary },
+                        ]}
+                      >
+                        {normVendor.contactDetails?.email ||
+                          restaurant._raw?.vendorId?.contactDetails?.email ||
+                          normVendor.email}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Registration Code */}
+                  {(normVendor.businessDetails?.registrationCode ||
+                    restaurant._raw?.vendorId?.businessDetails
+                      ?.registrationCode ||
+                    normVendor.registrationCode) && (
+                    <View style={styles.otherDetailItem}>
+                      <Text
+                        style={[
+                          styles.otherDetailLabel,
+                          { color: colors.text.secondary },
+                        ]}
+                      >
+                        Registration Code
+                      </Text>
+                      <Text
+                        style={[
+                          styles.otherDetailValue,
+                          { color: colors.text.primary },
+                        ]}
+                      >
+                        {normVendor.businessDetails?.registrationCode ||
+                          restaurant._raw?.vendorId?.businessDetails
+                            ?.registrationCode ||
+                          normVendor.registrationCode}
+                      </Text>
+                    </View>
+                  )}
+
+                  {/* Business Register Name */}
+                  {(normVendor.businessDetails?.businessRegisterName ||
+                    restaurant._raw?.vendorId?.businessDetails
+                      ?.businessRegisterName) && (
+                    <View style={styles.otherDetailItem}>
+                      <Text
+                        style={[
+                          styles.otherDetailLabel,
+                          { color: colors.text.secondary },
+                        ]}
+                      >
+                        Business Register Name
+                      </Text>
+                      <Text
+                        style={[
+                          styles.otherDetailValue,
+                          { color: colors.text.primary },
+                        ]}
+                      >
+                        {normVendor.businessDetails?.businessRegisterName ||
+                          restaurant._raw?.vendorId?.businessDetails
+                            ?.businessRegisterName}
+                      </Text>
+                    </View>
+                  )}
+
+                  <Text
+                    style={[
+                      styles.legalDisclaimer,
+                      { color: colors.text.secondary },
+                    ]}
+                  >
+                    The partner commits to only offer products that comply with
+                    the applicable rules of European Union law.
+                  </Text>
+                </View>
+              )}
+
+              {/* Explicit spacer to fix Android bottom clipping when scrolled to the end */}
+              <View style={{ height: Math.max(60, insets.bottom + 40) }} />
+            </ScrollView>
+          </View>
+        </View>
+      </Modal>
+
+      {/* Full Screen Map Modal */}
+      <Modal
+        visible={fullMapVisible}
+        transparent
+        animationType="slide"
+        onRequestClose={() => setFullMapVisible(false)}
+      >
+        <View style={{ flex: 1, backgroundColor: colors.background }}>
+          <View
+            style={{
+              paddingTop: insets.top || 40,
+              backgroundColor: colors.surface,
+              zIndex: 10,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.border,
+            }}
+          >
+            <View
+              style={{
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
+                height: 56,
+              }}
+            >
+              <TouchableOpacity
+                onPress={() => setFullMapVisible(false)}
+                style={{ position: "absolute", left: 8, padding: 8 }}
+              >
+                <Ionicons
+                  name="arrow-back"
+                  size={24}
+                  color={colors.text.primary}
+                />
+              </TouchableOpacity>
+              <Text
+                style={{
+                  fontSize: 18,
+                  fontFamily: "Poppins-SemiBold",
+                  color: colors.text.primary,
+                }}
+              >
+                Map
+              </Text>
+            </View>
+          </View>
+          {vendorCoords && fullMapReady && (
+            <MapView
+              provider={PROVIDER_GOOGLE}
+              style={{ flex: 1 }}
+              initialRegion={{
+                latitude: vendorCoords.latitude,
+                longitude: vendorCoords.longitude,
+                latitudeDelta: 0.005,
+                longitudeDelta: 0.005,
+              }}
+              showsUserLocation={true}
+            >
+              <Marker
+                coordinate={vendorCoords}
+                title={displayName}
+                description={displayLocation}
+              />
+            </MapView>
+          )}
+          <View
+            style={{
+              position: "absolute",
+              bottom: Math.max(40, insets.bottom + 20),
+              left: 0,
+              right: 0,
+              alignItems: "center",
+            }}
+          >
+            <TouchableOpacity
+              style={[
+                styles.getDirectionsBtn,
+                {
+                  backgroundColor: colors.primary,
+                  paddingHorizontal: 24,
+                  paddingVertical: 14,
+                  borderRadius: 24,
+                  flexDirection: "row",
+                  alignItems: "center",
+                  elevation: 4,
+                  shadowColor: "#000",
+                  shadowOffset: { width: 0, height: 2 },
+                  shadowOpacity: 0.3,
+                  shadowRadius: 4,
+                },
+              ]}
+              onPress={() => {
+                if (vendorCoords) {
+                  const url =
+                    Platform.OS === "ios"
+                      ? `http://maps.apple.com/?daddr=${vendorCoords.latitude},${vendorCoords.longitude}`
+                      : `https://www.google.com/maps/dir/?api=1&destination=${vendorCoords.latitude},${vendorCoords.longitude}`;
+                  Linking.openURL(url).catch((err) =>
+                    console.error("An error occurred", err),
+                  );
+                }
+              }}
+            >
+              <Ionicons
+                name="navigate"
+                size={20}
+                color="#fff"
+                style={{ marginRight: 8 }}
+              />
+              <Text
+                style={{
+                  color: "#fff",
+                  fontFamily: "Poppins-SemiBold",
+                  fontSize: 16,
+                }}
+              >
+                Get directions
+              </Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
 
       {/* Alert Modal */}
       <AlertModal
@@ -1477,14 +2900,14 @@ const styles = StyleSheet.create({
     flex: 1,
   },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.05,
     shadowRadius: 3,
@@ -1493,20 +2916,20 @@ const styles = StyleSheet.create({
     width: 40,
     height: 40,
     borderRadius: 20,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     borderWidth: 1,
   },
   headerTitle: {
     flex: 1,
     fontSize: fontSize.lg,
-    fontFamily: 'Poppins-SemiBold',
-    textAlign: 'center',
+    fontFamily: "Poppins-SemiBold",
+    textAlign: "center",
     marginHorizontal: spacing.sm,
   },
   searchContainer: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.sm,
     borderBottomWidth: 1,
@@ -1514,100 +2937,102 @@ const styles = StyleSheet.create({
   searchInput: {
     flex: 1,
     fontSize: fontSize.md,
-    fontFamily: 'Poppins-Regular',
+    fontFamily: "Poppins-Regular",
     paddingVertical: spacing.xs,
   },
   // ── Premium Vendor Hero ──
   vendorHero: {
-    position: 'relative',
+    position: "relative",
     marginHorizontal: 16,
     marginTop: 12,
     borderRadius: 24,
-    overflow: 'hidden',
+    overflow: "hidden",
     // Premium shadow
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 8 },
     shadowOpacity: 0.12,
     shadowRadius: 20,
     elevation: 6,
   },
   heroBottomGradient: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
     height: 50,
   },
   restaurantImage: {
-    width: '100%',
+    width: "100%",
     height: 200,
-    backgroundColor: '#f0f0f0',
+    backgroundColor: "#f0f0f0",
   },
-  // ── Glassmorphism Info Overlay ──
+  // ── Info Card Overlap ──
+  glassInfoCardContainer: {
+    marginHorizontal: 26,
+    marginTop: -40, // Float over hero image
+    marginBottom: 16,
+    borderRadius: 24,
+    // Clean shadow
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.12,
+    shadowRadius: 16,
+    elevation: 6,
+  },
   glassInfoCard: {
-    marginHorizontal: 28,
-    marginTop: -40,  // Float over hero image
-    padding: 18,
-    borderRadius: 20,
-    backgroundColor: 'rgba(255, 255, 255, 0.92)',
-    // Glass border
-    borderWidth: 1,
-    borderColor: 'rgba(255, 255, 255, 0.85)',
-    // Deep premium shadow
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.10,
-    shadowRadius: 24,
-    elevation: 8,
-    marginBottom: 8,
+    paddingVertical: 18,
+    paddingHorizontal: 16,
+    borderRadius: 24,
+    alignItems: "center",
+    overflow: "hidden",
   },
   restaurantName: {
     fontSize: 22,
-    fontFamily: 'Poppins-Bold',
+    fontFamily: "Poppins-Bold",
     letterSpacing: 0.15,
   },
   locationText: {
     fontSize: 13,
-    fontFamily: 'Poppins-Regular',
+    fontFamily: "Poppins-Regular",
     marginLeft: 5,
   },
   restaurantMeta: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginBottom: spacing.sm,
   },
   metaItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
   },
   metaText: {
     fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Medium',
+    fontFamily: "Poppins-Medium",
   },
   metaDot: {
     marginHorizontal: spacing.sm,
     fontSize: fontSize.sm,
   },
   deliveryInfo: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingTop: spacing.sm,
     marginTop: spacing.sm,
     borderTopWidth: 1,
+    borderColor: "#f0f0f0",
   },
   deliveryLabel: {
     fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Regular',
+    fontFamily: "Poppins-Regular",
   },
   deliveryValue: {
     fontSize: fontSize.md,
-    fontFamily: 'Poppins-Bold',
+    fontFamily: "Poppins-Bold",
   },
   offerBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    alignSelf: 'flex-start',
+    flexDirection: "row",
+    alignItems: "center",
+    alignSelf: "flex-start",
     paddingHorizontal: spacing.md,
     paddingVertical: spacing.xs,
     borderRadius: borderRadius.full,
@@ -1615,8 +3040,8 @@ const styles = StyleSheet.create({
   },
   offerText: {
     fontSize: fontSize.sm,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#fff',
+    fontFamily: "Poppins-SemiBold",
+    color: "#fff",
   },
   categoryTabs: {
     borderBottomWidth: 1,
@@ -1630,31 +3055,31 @@ const styles = StyleSheet.create({
   },
   categoryTabText: {
     fontSize: fontSize.md,
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: "Poppins-SemiBold",
   },
   menuSectionTitle: {
     fontSize: fontSize.xl,
-    fontFamily: 'Poppins-Bold',
+    fontFamily: "Poppins-Bold",
     marginBottom: spacing.md,
   },
   menuItem: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     padding: 12,
     borderRadius: 20,
     marginBottom: 14,
     borderWidth: 1,
     // Premium depth
     elevation: 4,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.08,
     shadowRadius: 16,
   },
   menuImageWrap: {
-    position: 'relative',
+    position: "relative",
     borderRadius: 16,
-    overflow: 'hidden',
+    overflow: "hidden",
   },
   menuItemImage: {
     width: 88,
@@ -1662,7 +3087,7 @@ const styles = StyleSheet.create({
     borderRadius: 16,
   },
   discountFlag: {
-    position: 'absolute',
+    position: "absolute",
     top: 6,
     left: 6,
     paddingHorizontal: 6,
@@ -1670,91 +3095,91 @@ const styles = StyleSheet.create({
     borderRadius: 8,
   },
   discountFlagText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 10,
-    fontFamily: 'Poppins-Bold',
+    fontFamily: "Poppins-Bold",
     letterSpacing: 0.3,
   },
   soldOutOverlay: {
     ...StyleSheet.absoluteFillObject,
-    backgroundColor: 'rgba(0,0,0,0.55)',
-    justifyContent: 'center',
-    alignItems: 'center',
+    backgroundColor: "rgba(0,0,0,0.55)",
+    justifyContent: "center",
+    alignItems: "center",
     borderRadius: 16,
   },
   soldOutText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 10,
-    fontFamily: 'Poppins-Bold',
+    fontFamily: "Poppins-Bold",
     letterSpacing: 1,
   },
   menuItemInfo: {
     flex: 1,
     paddingLeft: 14,
     paddingRight: 4,
-    justifyContent: 'center',
+    justifyContent: "center",
   },
   menuItemName: {
     fontSize: 15,
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: "Poppins-SemiBold",
     letterSpacing: 0.1,
     marginBottom: 3,
   },
   menuItemDescription: {
     fontSize: 12,
-    fontFamily: 'Poppins-Regular',
+    fontFamily: "Poppins-Regular",
     lineHeight: 17,
     marginBottom: 6,
   },
   lowStockText: {
     fontSize: 10,
-    color: '#E8850C',
-    fontFamily: 'Poppins-SemiBold',
+    color: "#E8850C",
+    fontFamily: "Poppins-SemiBold",
     marginBottom: 3,
   },
   priceRow: {
-    flexDirection: 'row',
-    alignItems: 'baseline',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    alignItems: "baseline",
+    flexWrap: "wrap",
   },
   menuItemPrice: {
     fontSize: 15,
-    fontFamily: 'Poppins-Bold',
+    fontFamily: "Poppins-Bold",
     letterSpacing: 0.2,
     marginRight: 6,
   },
   originalPrice: {
     fontSize: 12,
-    fontFamily: 'Poppins-Regular',
-    color: '#bbb',
-    textDecorationLine: 'line-through',
+    fontFamily: "Poppins-Regular",
+    color: "#bbb",
+    textDecorationLine: "line-through",
   },
   customizableTag: {
     fontSize: 10,
-    fontFamily: 'Poppins-Medium',
+    fontFamily: "Poppins-Medium",
     marginLeft: 4,
   },
   menuItemActions: {
     paddingLeft: 8,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   addButton: {
     width: 42,
     height: 42,
     borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     // Premium shadow glow
-    shadowColor: '#E91E63',
+    shadowColor: "#E91E63",
     shadowOffset: { width: 0, height: 4 },
     shadowOpacity: 0.25,
     shadowRadius: 8,
     elevation: 4,
   },
   quantityControl: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     borderRadius: borderRadius.full,
     borderWidth: 1,
     padding: 4,
@@ -1763,125 +3188,126 @@ const styles = StyleSheet.create({
     width: 32,
     height: 32,
     borderRadius: 16,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   quantityText: {
     marginHorizontal: spacing.sm,
     fontSize: fontSize.md,
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: "Poppins-SemiBold",
     minWidth: 24,
-    textAlign: 'center',
+    textAlign: "center",
   },
   quantityBadge: {
-    position: 'absolute',
+    position: "absolute",
     top: -6,
     right: -6,
     minWidth: 20,
     height: 20,
     borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
     paddingHorizontal: 4,
   },
   quantityBadgeText: {
     fontSize: 11,
-    fontFamily: 'Poppins-Bold',
+    fontFamily: "Poppins-Bold",
   },
   noResultsContainer: {
-    alignItems: 'center',
+    alignItems: "center",
     paddingVertical: 60,
   },
   noResultsText: {
     fontSize: fontSize.lg,
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: "Poppins-SemiBold",
     marginTop: spacing.md,
   },
   noResultsSubtext: {
     fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Regular',
+    fontFamily: "Poppins-Regular",
     marginTop: spacing.xs,
   },
   floatingCart: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
     paddingHorizontal: spacing.lg,
     paddingVertical: spacing.md,
     borderTopWidth: 1,
     elevation: 8,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: -2 },
     shadowOpacity: 0.15,
     shadowRadius: 8,
   },
   cartItemCount: {
     fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Regular',
+    fontFamily: "Poppins-Regular",
   },
   cartTotal: {
     fontSize: fontSize.xl,
-    fontFamily: 'Poppins-Bold',
+    fontFamily: "Poppins-Bold",
   },
   viewCartButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     paddingHorizontal: spacing.xl,
     paddingVertical: spacing.md,
     borderRadius: borderRadius.full,
     elevation: 2,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: 2 },
     shadowOpacity: 0.2,
     shadowRadius: 4,
   },
   viewCartButtonText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: fontSize.md,
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: "Poppins-SemiBold",
   },
   // Modal Styles
   modalOverlay: {
     flex: 1,
-    justifyContent: 'flex-end',
+    justifyContent: "flex-end",
+    backgroundColor: "rgba(0,0,0,0.5)",
   },
   modalCard: {
     borderTopLeftRadius: borderRadius.xxl,
     borderTopRightRadius: borderRadius.xxl,
-    width: '100%', // Ensure full width
-    maxHeight: '85%', // Reduced to ensure footer visible on all devices
-    overflow: 'hidden', // Ensure content doesn't bleed out
+    width: "100%", // Ensure full width
+    maxHeight: "85%", // Reduced to ensure footer visible on all devices
+    overflow: "hidden", // Ensure content doesn't bleed out
     elevation: 8,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOffset: { width: 0, height: -4 },
     shadowOpacity: 0.2,
     shadowRadius: 12,
   },
   modalCloseBtn: {
-    position: 'absolute',
+    position: "absolute",
     top: 10,
     right: 10,
     zIndex: 10,
-    backgroundColor: '#F5F5F5',
+    backgroundColor: "#F5F5F5",
     borderRadius: 20,
     padding: 8,
     elevation: 6,
-    shadowColor: '#000',
+    shadowColor: "#000",
     shadowOpacity: 0.3,
     shadowRadius: 6,
   },
   modalImage: {
-    width: '100%',
+    width: "100%",
     height: 280, // Taller for better product showcase
     borderTopLeftRadius: borderRadius.xxl,
     borderTopRightRadius: borderRadius.xxl,
   },
   imageOverlay: {
-    position: 'absolute',
+    position: "absolute",
     bottom: 0,
     left: 0,
     right: 0,
@@ -1892,13 +3318,13 @@ const styles = StyleSheet.create({
   },
   modalTitle: {
     fontSize: 26,
-    fontFamily: 'Poppins-Bold',
+    fontFamily: "Poppins-Bold",
     marginBottom: 12,
     letterSpacing: -0.5,
   },
   modalDescription: {
     fontSize: 14,
-    fontFamily: 'Poppins-Regular',
+    fontFamily: "Poppins-Regular",
     lineHeight: 26,
     marginBottom: 24,
   },
@@ -1908,59 +3334,59 @@ const styles = StyleSheet.create({
   // modalPriceLabel removed
   modalPrice: {
     fontSize: 28,
-    fontFamily: 'Poppins-Bold',
-    color: '#E91E63',
+    fontFamily: "Poppins-Bold",
+    color: "#E91E63",
     marginRight: 4,
   },
   modalPriceOriginal: {
     fontSize: 18,
-    fontFamily: 'Poppins-Regular',
-    textDecorationLine: 'line-through',
-    color: '#9E9E9E',
+    fontFamily: "Poppins-Regular",
+    textDecorationLine: "line-through",
+    color: "#9E9E9E",
     marginLeft: 8,
     opacity: 0.35,
   },
   modalBadge: {
-    backgroundColor: '#E91E63',
+    backgroundColor: "#E91E63",
     paddingHorizontal: 4,
     paddingVertical: 1,
     borderRadius: 4,
   },
   modalBadgeText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 12,
-    fontWeight: 'bold',
+    fontWeight: "bold",
   },
   modalQuantitySection: {
     marginBottom: 0,
   },
   modalQuantityLabel: {
     fontSize: 18,
-    fontFamily: 'Poppins-Medium',
+    fontFamily: "Poppins-Medium",
     marginBottom: 0,
   },
   modalQuantityControl: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "space-between",
     borderRadius: 12,
     borderWidth: 1,
-    borderColor: '#E0E0E0',
-    backgroundColor: '#FFFFFF',
+    borderColor: "#E0E0E0",
+    backgroundColor: "#FFFFFF",
     padding: 4,
   },
   modalQuantityBtn: {
     width: 48,
     height: 48,
     borderRadius: 10,
-    alignItems: 'center',
-    justifyContent: 'center',
+    alignItems: "center",
+    justifyContent: "center",
   },
   modalQuantityText: {
     fontSize: 20,
-    fontFamily: 'Poppins-Bold',
+    fontFamily: "Poppins-Bold",
     minWidth: 50,
-    textAlign: 'center',
+    textAlign: "center",
   },
   modalFooter: {
     paddingHorizontal: spacing.md,
@@ -1968,26 +3394,26 @@ const styles = StyleSheet.create({
     // paddingBottom is handled dynamically via style prop with insets
   },
   modalAddToCartBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'center',
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
     height: 56, // FIXED height for stability
     paddingVertical: 0,
     borderRadius: 16,
     elevation: 1,
-    shadowColor: '#E91E63',
+    shadowColor: "#E91E63",
     shadowOffset: { width: 0, height: 1 },
     shadowOpacity: 0.1,
     shadowRadius: 2,
   },
   modalAddToCartText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 18,
-    fontFamily: 'Poppins-Bold',
+    fontFamily: "Poppins-Bold",
   },
   modalOriginalPrice: {
     fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Regular',
+    fontFamily: "Poppins-Regular",
   },
   discountBadge: {
     paddingHorizontal: 6,
@@ -1995,9 +3421,9 @@ const styles = StyleSheet.create({
     borderRadius: 4,
   },
   discountText: {
-    color: '#fff',
+    color: "#fff",
     fontSize: 10,
-    fontFamily: 'Poppins-Bold',
+    fontFamily: "Poppins-Bold",
   },
   modalVariations: {
     paddingHorizontal: spacing.md,
@@ -2008,12 +3434,12 @@ const styles = StyleSheet.create({
   },
   variationTitle: {
     fontSize: fontSize.md,
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: "Poppins-SemiBold",
     marginBottom: spacing.sm,
   },
   variationOptions: {
-    flexDirection: 'row',
-    flexWrap: 'wrap',
+    flexDirection: "row",
+    flexWrap: "wrap",
   },
   variationOptionChip: {
     paddingHorizontal: spacing.md,
@@ -2021,18 +3447,18 @@ const styles = StyleSheet.create({
     borderRadius: 8, // Slightly softer radius
     borderWidth: 1,
     marginBottom: 8,
-    width: '100%', // Full width for vertical stacking which is clearer for complex options
-    flexDirection: 'row', // Align content
-    justifyContent: 'space-between',
-    alignItems: 'center',
+    width: "100%", // Full width for vertical stacking which is clearer for complex options
+    flexDirection: "row", // Align content
+    justifyContent: "space-between",
+    alignItems: "center",
   },
   variationOptionText: {
     fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Regular',
+    fontFamily: "Poppins-Regular",
   },
   addonsBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
+    flexDirection: "row",
+    alignItems: "center",
     marginHorizontal: spacing.md,
     marginTop: spacing.md,
     marginBottom: spacing.md, // Ensure space below too
@@ -2042,16 +3468,209 @@ const styles = StyleSheet.create({
   },
   addonsBannerTitle: {
     fontSize: fontSize.sm,
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: "Poppins-SemiBold",
     lineHeight: 20, // Better line height
   },
   addonsBannerText: {
     fontSize: fontSize.xs,
-    fontFamily: 'Poppins-Regular',
+    fontFamily: "Poppins-Regular",
     marginTop: 2,
     lineHeight: 16, // Better line height
+  },
+  moreInfoBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
+    marginBottom: 8,
+  },
+  moreInfoText: {
+    fontSize: 13,
+    fontFamily: "Poppins-Medium",
+    marginRight: 2,
+  },
+  restaurantMetaWrapper: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    marginTop: 4,
+  },
+  metaStat: {
+    flexDirection: "row",
+    alignItems: "center",
+  },
+  metaStatText: {
+    fontSize: 13,
+    fontFamily: "Poppins-Medium",
+  },
+  metaDivider: {
+    width: 1,
+    height: 12,
+    backgroundColor: "#E0E0E0",
+    marginHorizontal: 12,
+  },
+  vendorDetailsCard: {
+    backgroundColor: "#fff",
+    borderTopLeftRadius: 24,
+    borderTopRightRadius: 24,
+    minHeight: "70%",
+    maxHeight: "90%",
+    paddingTop: 8,
+    paddingHorizontal: 24,
+    width: "100%",
+    flex: 1, // Let it fill up the available maxHeight area naturally
+  },
+  vendorModalHeader: {
+    flexDirection: "row",
+    justifyContent: "space-between",
+    alignItems: "center",
+    paddingVertical: 16,
+  },
+  vendorModalCloseBtn: {
+    padding: 8,
+    marginLeft: -8, // better touch target
+  },
+  vendorModalShareBtn: {
+    padding: 8,
+    marginRight: -8,
+  },
+  vendorModalTitle: {
+    fontSize: 24,
+    fontFamily: "Poppins-Bold",
+    marginTop: 8,
+    marginBottom: 4,
+  },
+  vendorModalSubtitle: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+    lineHeight: 20,
+    marginBottom: 24,
+  },
+  vendorInfoList: {
+    marginBottom: 24,
+  },
+  vendorInfoItem: {
+    flexDirection: "row",
+    alignItems: "flex-start",
+    marginBottom: 20,
+  },
+  vendorInfoIcon: {
+    marginTop: 2,
+    marginRight: 16,
+  },
+  vendorInfoContent: {
+    flex: 1,
+  },
+  vendorInfoLabel: {
+    fontSize: 16,
+    fontFamily: "Poppins-SemiBold",
+    marginBottom: 2,
+  },
+  vendorInfoValue: {
+    fontSize: 14,
+    fontFamily: "Poppins-Regular",
+  },
+  mapPlaceholder: {
+    marginBottom: 24,
+    overflow: "hidden",
+  },
+  getDirectionsBtn: {
+    flexDirection: "row",
+    alignItems: "center",
+    justifyContent: "center",
+    paddingVertical: 14,
+    borderRadius: 24,
+    marginTop: 12,
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.1,
+    shadowRadius: 8,
+    elevation: 3,
+  },
+  getDirectionsText: {
+    fontSize: 15,
+    fontFamily: "Poppins-SemiBold", // Slightly bolder for better visibility
+    letterSpacing: 0.3,
+  },
+  serviceTypesContainer: {
+    marginBottom: 24,
+  },
+  serviceTypesTitle: {
+    fontSize: 18,
+    fontFamily: "Poppins-SemiBold",
+    marginBottom: 12,
+  },
+  serviceTypeItem: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 6,
+  },
+  serviceTypeBullet: {
+    fontSize: 16,
+    fontFamily: "Poppins-Bold",
+  },
+  serviceTypeText: {
+    fontSize: 15,
+    fontFamily: "Poppins-Regular",
+  },
+  vendorRatingBlock: {
+    flexDirection: "row",
+    alignItems: "center",
+    marginBottom: 24,
+  },
+  vendorRatingScore: {
+    fontSize: 26, // Slightly larger
+    fontFamily: "Poppins-Bold",
+    marginRight: 16,
+    paddingHorizontal: 16,
+    paddingVertical: 10,
+    borderRadius: 14, // Softer radius
+    overflow: "hidden",
+    textAlign: "center",
+    minWidth: 70,
+  },
+  vendorRatingRight: {
+    flex: 1,
+    justifyContent: "center",
+  },
+  vendorRatingTitle: {
+    fontSize: 19,
+    fontFamily: "Poppins-Bold", // Stronger title
+    marginBottom: 1,
+  },
+  vendorRatingSub: {
+    fontSize: 13.5,
+    fontFamily: "Poppins-Regular",
+    letterSpacing: 0.2,
+    lineHeight: 18,
+  },
+  otherDetailsContainer: {
+    marginTop: 8,
+    marginBottom: 40,
+  },
+  otherDetailsTitle: {
+    fontSize: 18,
+    fontFamily: "Poppins-Bold",
+    marginBottom: 16,
+  },
+  otherDetailItem: {
+    marginBottom: 16,
+  },
+  otherDetailLabel: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    marginBottom: 2,
+  },
+  otherDetailValue: {
+    fontSize: 14,
+    fontFamily: "Poppins-Medium",
+  },
+  legalDisclaimer: {
+    fontSize: 12,
+    fontFamily: "Poppins-Regular",
+    marginTop: 16,
+    lineHeight: 18,
   },
 });
 
 export default RestaurantDetailsScreen;
-
