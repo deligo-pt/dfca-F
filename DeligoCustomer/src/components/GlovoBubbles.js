@@ -13,7 +13,7 @@ import { useLanguage } from '../utils/LanguageContext';
 
 const { width } = Dimensions.get('window');
 
-const BubbleItem = ({ category, selectedId, onPress, colors, fixedWidth }) => {
+const BubbleItem = ({ category, selectedId, onPress, colors }) => {
     const [imageError, setImageError] = React.useState(false);
 
     if (!category) return null;
@@ -22,54 +22,59 @@ const BubbleItem = ({ category, selectedId, onPress, colors, fixedWidth }) => {
     const displayName = category.name || '';
     const iconUrl = category.image || category.icon || null;
 
-    const isImage =
+    const isValidImageUrl =
         iconUrl &&
-        !imageError &&
         typeof iconUrl === 'string' &&
-        (iconUrl.startsWith('http') || iconUrl.startsWith('file'));
+        iconUrl.trim().startsWith('http') &&
+        iconUrl.trim().length > 15;
+
+    const showImage = isValidImageUrl && !imageError;
 
     const fallbackLetter = displayName.charAt(0).toUpperCase();
-    const titleCaseName = displayName.charAt(0).toUpperCase() + displayName.slice(1).toLowerCase();
+
+    // Match CuisineChip selected styles
+    const backgroundColor = isSelected ? (colors.primaryLight || '#FFF0F0') : '#F5F5F5';
+    const borderColor = isSelected ? colors.primary : 'transparent';
+    const borderWidth = isSelected ? 2 : 0;
+    const textColor = isSelected ? colors.primary : (colors.text?.primary || '#1C1C1E');
 
     return (
         <TouchableOpacity
-            activeOpacity={0.8}
+            style={styles.containerStyle}
             onPress={() => onPress && onPress(category)}
-            style={[styles.bubbleItem, fixedWidth ? styles.bubbleItemFixed : styles.bubbleItemFlex]}
+            activeOpacity={0.7}
         >
-            <View style={styles.imageWrapper}>
-                {isImage ? (
+            <View style={[
+                styles.imageContainer,
+                {
+                    backgroundColor,
+                    borderColor,
+                    borderWidth
+                }
+            ]}>
+                {showImage ? (
                     <Image
                         source={{ uri: iconUrl }}
-                        style={styles.image}
-                        resizeMode="contain"
+                        style={styles.chipImage}
+                        resizeMode="cover"
                         onError={() => setImageError(true)}
                     />
-                ) : iconUrl && typeof iconUrl === 'string' ? (
-                    <Text style={styles.emoji}>
+                ) : iconUrl && typeof iconUrl === 'string' && !iconUrl.startsWith('http') ? (
+                    <Text style={styles.emojiIcon}>
                         {iconUrl}
                     </Text>
                 ) : (
-                    <Text style={[styles.emoji, { color: colors.primary }]}>
+                    <Text style={[styles.emojiIcon, { color: colors.primary }]}>
                         {fallbackLetter}
                     </Text>
                 )}
             </View>
-
             <Text
-                numberOfLines={1}
-                style={[
-                    styles.label,
-                    { color: isSelected ? '#000000' : '#6B6B6B' }
-                ]}
+                numberOfLines={2}
+                style={[styles.name, { color: textColor }]}
             >
-                {titleCaseName}
+                {displayName}
             </Text>
-
-            {/* Tiny dot indicator — minimal premium */}
-            {isSelected && (
-                <View style={styles.activeIndicator} />
-            )}
         </TouchableOpacity>
     );
 };
@@ -85,10 +90,8 @@ const PremiumCategories = ({
 
     if (!Array.isArray(categories) || categories.length === 0) return null;
 
-    const useScroll = categories.length > 3;
-
     return (
-        <View style={styles.container}>
+        <View style={styles.wrapper}>
             {showTitle && (
                 <View style={styles.header}>
                     <Text style={styles.title}>
@@ -97,45 +100,27 @@ const PremiumCategories = ({
                 </View>
             )}
 
-            <View style={styles.glassCard}>
-                {useScroll ? (
-                    <ScrollView
-                        horizontal
-                        showsHorizontalScrollIndicator={false}
-                        contentContainerStyle={styles.scrollContent}
-                    >
-                        {categories.map((category, index) => (
-                            <BubbleItem
-                                key={category.id || category.slug || index}
-                                category={category}
-                                selectedId={selectedId}
-                                onPress={onPress}
-                                colors={colors}
-                                fixedWidth={true}
-                            />
-                        ))}
-                    </ScrollView>
-                ) : (
-                    <View style={styles.rowContent}>
-                        {categories.map((category, index) => (
-                            <BubbleItem
-                                key={category.id || category.slug || index}
-                                category={category}
-                                selectedId={selectedId}
-                                onPress={onPress}
-                                colors={colors}
-                                fixedWidth={false}
-                            />
-                        ))}
-                    </View>
-                )}
-            </View>
+            <ScrollView
+                horizontal
+                showsHorizontalScrollIndicator={false}
+                contentContainerStyle={styles.scrollContent}
+            >
+                {categories.map((category, index) => (
+                    <BubbleItem
+                        key={category.id || category.slug || index}
+                        category={category}
+                        selectedId={selectedId}
+                        onPress={onPress}
+                        colors={colors}
+                    />
+                ))}
+            </ScrollView>
         </View>
     );
 };
 
 const styles = StyleSheet.create({
-    container: {
+    wrapper: {
         paddingVertical: 15,
     },
     header: {
@@ -145,75 +130,52 @@ const styles = StyleSheet.create({
     title: {
         fontSize: 22,
         fontWeight: '700',
-        fontFamily: 'Poppins-Bold', // keeping bold but sharp
+        fontFamily: 'Poppins-Bold',
         letterSpacing: 0.2,
-        color: '#1C1C1E', // Apple-esque dark gray
-    },
-    glassCard: {
-        marginHorizontal: 20,
-        borderRadius: 24,
-        paddingVertical: 14,
-
-        backgroundColor: '#FFFFFF',
-        borderWidth: 1,
-        borderColor: 'rgba(0, 0, 0, 0.04)',
-
-        shadowColor: '#000',
-        shadowOffset: { width: 0, height: 12 },
-        shadowOpacity: 0.08,
-        shadowRadius: 28,
-        elevation: 8,
-    },
-    rowContent: {
-        flexDirection: 'row',
-        alignItems: 'center',
-        paddingHorizontal: 8,
+        color: '#1C1C1E',
     },
     scrollContent: {
-        paddingHorizontal: 8,
+        paddingHorizontal: 20,
+        paddingBottom: 8,
+    },
+    containerStyle: {
+        width: 85,          // Fixed width for vertical column alignment
         alignItems: 'center',
+        marginRight: 8,
     },
-    bubbleItem: {
-        alignItems: 'center',
-        justifyContent: 'center',
-        paddingVertical: 12,
-        borderRadius: 16,
-        marginHorizontal: 4,
-    },
-    bubbleItemFlex: {
-        flex: 1,  // Spread evenly for ≤3 items
-    },
-    bubbleItemFixed: {
-        width: (width - 80) / 3,  // Fixed width for scrollable items
-    },
-    imageWrapper: {
-        width: 110,
-        height: 80,
+    imageContainer: {
+        width: 78,
+        height: 78,
+        borderRadius: 39, // Fully circular
         justifyContent: 'center',
         alignItems: 'center',
-        marginBottom: 12,
+        marginBottom: 8,
+        backgroundColor: '#FFFFFF',
+        overflow: 'hidden', // Clip image to circle
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 4 },
+        shadowOpacity: 0.08,
+        shadowRadius: 10,
+        elevation: 3,
     },
-    image: {
+    chipImage: {
         width: '100%',
-        height: '100%'
+        height: '100%',
     },
-    emoji: {
-        fontSize: 42,
+    emojiIcon: {
+        fontSize: 28,
         textAlign: 'center',
     },
-    label: {
+    name: {
+        fontSize: 12,
         fontFamily: 'Poppins-SemiBold',
-        fontSize: 16,
-        letterSpacing: 0.3,
-        textAlign: 'center'
-    },
-    activeIndicator: {
-        width: 6,
-        height: 6,
-        borderRadius: 3,
-        backgroundColor: '#1C1C1E',
+        fontWeight: '600',
+        textAlign: 'center',
+        width: '100%',
+        lineHeight: 16,
         marginTop: 6,
-    }
+        textTransform: 'uppercase',
+    },
 });
 
 export default PremiumCategories;

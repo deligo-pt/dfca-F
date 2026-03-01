@@ -4,6 +4,7 @@ import { spacing } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
+import { useLocation } from '../contexts/LocationContext';
 
 /**
  * RestaurantCard Component — Premium Glassmorphism Edition
@@ -16,6 +17,9 @@ import * as Location from 'expo-location';
  */
 const RestaurantCard = ({ restaurant, onPress }) => {
   const { colors, isDarkMode } = useTheme();
+  const { currentLocation } = useLocation();
+  const [estimatedTime, setEstimatedTime] = React.useState(null);
+  const [dynamicLocation, setDynamicLocation] = React.useState(null);
 
   // ---------------------------------------------------------------------------
   // Data Normalization
@@ -41,11 +45,30 @@ const RestaurantCard = ({ restaurant, onPress }) => {
   const vendorName = mergedVendor.vendorName || businessDetails.businessName || mergedVendor.businessName || p.vendorName || p.name || 'Unknown';
   const isVerified = mergedVendor.isVerified || false;
 
-  // Resolve ratings
-  let ratingValue = null;
-  if (typeof mergedVendor.rating === 'number') ratingValue = mergedVendor.rating;
-  else if (p.rating && typeof p.rating === 'number') ratingValue = p.rating;
-  else if (p.rating && typeof p.rating === 'object' && typeof p.rating.average === 'number') ratingValue = p.rating.average;
+  // Resolve ratings safely (handle string numbers and nested averages)
+  const extractRating = (val) => {
+    if (val === null || val === undefined) return null;
+    if (typeof val === 'object' && val !== null) {
+      if (val.average !== undefined) return extractRating(val.average);
+      return null;
+    }
+    const num = Number(val);
+    return !isNaN(num) ? num : null; // allow 0 exactly if it's explicitly 0
+  };
+
+  // Prioritize vendor's explicit rating over the wrapper product rating
+  let ratingValue =
+    extractRating(mergedVendor.rating) ||
+    extractRating(restaurant.vendor?.rating) ||
+    extractRating(p.vendorId?.rating) ||
+    extractRating(businessDetails?.rating) ||
+    extractRating(restaurant.rating) ||
+    extractRating(p.rating) ||
+    0;
+
+  // Format to 1 decimal place if it's a valid number
+  const isNew = ratingValue === 0;
+  ratingValue = ratingValue > 0 ? Number(ratingValue).toFixed(1) : 0;
 
   // Resolve tags
   const rawTags = Array.isArray(p.tags) ? p.tags : (p.tags || []);
@@ -58,9 +81,39 @@ const RestaurantCard = ({ restaurant, onPress }) => {
   const deliveryTime = mergedVendor.deliveryTime || p.deliveryTime || null;
 
   // ---------------------------------------------------------------------------
+  // Dynamic Delivery Time Calculation
+  // ---------------------------------------------------------------------------
+
+  React.useEffect(() => {
+    const lat1 = currentLocation?.latitude;
+    const lon1 = currentLocation?.longitude;
+    const lat2 = mergedVendor.latitude || p.latitude;
+    const lon2 = mergedVendor.longitude || p.longitude;
+
+    if (lat1 && lon1 && lat2 && lon2) {
+      // Haversine formula
+      const R = 6371; // Radius of the earth in km
+      const dLat = (lat2 - lat1) * (Math.PI / 180);
+      const dLon = (lon2 - lon1) * (Math.PI / 180);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distKm = R * c;
+
+      // Base formula: 10 mins prep time + 3 mins per km (20km/h average city speed)
+      const baseTime = Math.max(10, Math.round(distKm * 3) + 10);
+      setEstimatedTime(`${baseTime} - ${baseTime + 5} min`);
+    }
+  }, [currentLocation, mergedVendor.latitude, mergedVendor.longitude, p.latitude, p.longitude]);
+
+  // Priority: API dynamic calculation -> API static deliveryTime -> Fallback
+  const finalDeliveryTime = estimatedTime || deliveryTime || '15 - 20 min';
+
+  // ---------------------------------------------------------------------------
   // Location Logic
   // ---------------------------------------------------------------------------
-  const [dynamicLocation, setDynamicLocation] = React.useState(null);
 
   React.useEffect(() => {
     let mounted = true;
@@ -138,7 +191,7 @@ const RestaurantCard = ({ restaurant, onPress }) => {
         {isStoreOpen && (
           <View style={s.deliveryBadge}>
             <Ionicons name="time-outline" size={11} color="#fff" style={{ marginRight: 3 }} />
-            <Text style={s.deliveryText}>{deliveryTime || 'Standard'}</Text>
+            <Text style={s.deliveryText}>{finalDeliveryTime}</Text>
           </View>
         )}
       </View>

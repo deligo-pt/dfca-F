@@ -1,11 +1,12 @@
-import React from 'react';
+import React, { useCallback, useState } from 'react';
 import { useLanguage } from '../utils/LanguageContext';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { View, Text, TouchableOpacity, StyleSheet, StatusBar } from 'react-native';
+import { View, Text, TouchableOpacity, StyleSheet, StatusBar, ScrollView, RefreshControl } from 'react-native';
 import CartDetail from '../components/CartDetail';
 import { useTheme } from '../utils/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import { useCart } from '../contexts/CartContext';
+import { useFocusEffect } from '@react-navigation/native';
 
 /**
  * CartDetailScreen
@@ -22,8 +23,17 @@ export default function CartDetailScreen({ route, navigation }) {
   const { t } = useLanguage();
   const { vendorId } = route.params || {};
   const { colors, isDarkMode } = useTheme();
-  const { getVendorCart } = useCart();
+  const { getVendorCart, fetchCart, itemCount } = useCart();
   const vendor = getVendorCart(vendorId) || {};
+  const cart = getVendorCart(vendorId);
+  const cartItemCount = cart ? Object.keys(cart.items || {}).reduce((s, id) => s + (cart.items[id]?.quantity || 0), 0) : 0;
+
+  // Auto-refresh on screen focus
+  useFocusEffect(
+    useCallback(() => {
+      fetchCart({ force: true, silent: true });
+    }, [fetchCart])
+  );
 
   return (
     <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }} edges={['top']}>
@@ -33,13 +43,32 @@ export default function CartDetailScreen({ route, navigation }) {
         translucent={true}
         animated={true}
       />
-      <View style={[styles.header, { borderBottomColor: colors.border, backgroundColor: colors.surface }]}>
-        <TouchableOpacity style={styles.backBtn} onPress={() => navigation.goBack()}>
-          <Ionicons name="arrow-back" size={22} color={colors.text.primary} />
+
+      {/* Premium Header */}
+      <View style={[styles.header, { backgroundColor: colors.surface, borderBottomColor: colors.border }]}>
+        <TouchableOpacity
+          style={[styles.backBtn, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}
+          onPress={() => navigation.goBack()}
+          activeOpacity={0.7}
+        >
+          <Ionicons name="arrow-back" size={20} color={colors.text.primary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text.primary }]} numberOfLines={1}>{vendor.vendorName || t('yourCart')}</Text>
+
+        <View style={styles.headerCenter}>
+          <Text style={[styles.headerTitle, { color: colors.text.primary }]} numberOfLines={1}>
+            {vendor.vendorName || t('yourCart')}
+          </Text>
+          {cartItemCount > 0 && (
+            <Text style={[styles.headerSubtitle, { color: colors.text.secondary }]}>
+              {cartItemCount} {cartItemCount === 1 ? (t('item') || 'item') : (t('items') || 'items')}
+            </Text>
+          )}
+        </View>
+
+        {/* Spacer to balance the back button */}
         <View style={{ width: 40 }} />
       </View>
+
       <CartDetail vendorId={vendorId} navigation={navigation} />
     </SafeAreaView>
   );
@@ -50,17 +79,28 @@ const styles = StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     paddingHorizontal: 16,
-    paddingVertical: 12,
-    borderBottomWidth: 1,
+    paddingVertical: 14,
+    borderBottomWidth: 0.5,
   },
   backBtn: {
     width: 40,
-    alignItems: 'flex-start',
+    height: 40,
+    borderRadius: 12,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  headerCenter: {
+    flex: 1,
+    alignItems: 'center',
   },
   headerTitle: {
-    flex: 1,
-    textAlign: 'center',
     fontSize: 18,
-    fontFamily: 'Poppins-SemiBold',
+    fontFamily: 'Poppins-Bold',
+    letterSpacing: -0.3,
+  },
+  headerSubtitle: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    marginTop: -2,
   },
 });

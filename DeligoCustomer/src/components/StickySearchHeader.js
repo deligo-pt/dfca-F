@@ -12,14 +12,6 @@ import { spacing, fontSize } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
 import { LinearGradient } from 'expo-linear-gradient';
 
-// Selection of premium inspirational shop & food images (matching LocationHeader)
-const SHOP_IMAGES = [
-  'https://images.unsplash.com/photo-1578916171728-46686eac8d58?q=80&w=800&auto=format&fit=crop', // Grocery / Supermarket
-  'https://images.unsplash.com/photo-1554118811-1e0d58224f24?q=80&w=800&auto=format&fit=crop', // Cafe / Restaurant
-  'https://images.unsplash.com/photo-1509440159596-0249088772ff?q=80&w=800&auto=format&fit=crop', // Bakery
-  'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?q=80&w=800&auto=format&fit=crop', // Storefront
-  'https://images.unsplash.com/photo-1534723452862-4c874018d66d?q=80&w=800&auto=format&fit=crop', // Shopping Aisles
-];
 
 const STATUSBAR_HEIGHT = Platform.OS === 'android' ? StatusBar.currentHeight : 0;
 
@@ -51,14 +43,6 @@ const StickySearchHeader = ({
 }) => {
   const { colors, isDarkMode } = useTheme();
 
-  // State for dynamic background
-  const [bgImage, setBgImage] = useState(SHOP_IMAGES[0]);
-
-  useEffect(() => {
-    // Select a random image every time the component mounts
-    const randomImg = SHOP_IMAGES[Math.floor(Math.random() * SHOP_IMAGES.length)];
-    setBgImage(randomImg);
-  }, []);
 
   const headerOpacity = scrollY.interpolate({
     inputRange: [80, 150],
@@ -75,13 +59,6 @@ const StickySearchHeader = ({
         style={[styles(colors, isDarkMode).container, { paddingTop: paddingTop }]}
         pointerEvents={pointerEvents}
       >
-        <Image
-          source={{ uri: bgImage }}
-          style={StyleSheet.absoluteFillObject}
-          resizeMode="cover"
-          opacity={isDarkMode ? 0.2 : 0.35}
-        />
-
         <LinearGradient
           colors={['rgba(0,0,0,0.7)', 'rgba(0,0,0,0.2)', 'transparent']}
           style={{

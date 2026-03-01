@@ -5,6 +5,7 @@ import { useProducts } from '../contexts/ProductsContext';
 import { useTheme } from '../utils/ThemeContext';
 import { spacing, fontSize, borderRadius } from '../theme';
 import { useLanguage } from '../utils/LanguageContext';
+import { useLocation } from '../contexts/LocationContext';
 import formatCurrency from '../utils/currency';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 
@@ -23,6 +24,7 @@ export default function CartList({ navigation }) {
   const { cartsArray, getVendorSubtotal, clearVendorCartAndSync, enforceSingleVendor } = useCart();
   const { products } = useProducts();
   const { colors, isDarkMode } = useTheme();
+  const { currentLocation } = useLocation();
 
   // State to track which vendor's options menu is currently open
   const [menuForVendor, setMenuForVendor] = useState(null);
@@ -139,11 +141,64 @@ export default function CartList({ navigation }) {
           firstItem?.image ||
           null;
 
-        const finalDeliveryTime = cached?.deliveryTime ||
-          cart.vendorDeliveryTime ||
-          pcVendor?.deliveryTime ||
-          firstItem?._raw?.vendor?.deliveryTime ||
-          null;
+        const extractRating = (val) => {
+          if (val === null || val === undefined) return null;
+          if (typeof val === 'object' && val !== null) {
+            if (val.average !== undefined) return extractRating(val.average);
+            return null;
+          }
+          const num = Number(val);
+          return !isNaN(num) ? num : null;
+        };
+
+        const vendorLatSource = pcVendor?.latitude || firstItem?._raw?.vendor?.latitude;
+        const vendorLonSource = pcVendor?.longitude || firstItem?._raw?.vendor?.longitude;
+
+        let calculatedDeliveryTime = null;
+        if (currentLocation?.latitude && currentLocation?.longitude && vendorLatSource && vendorLonSource) {
+          const lat2 = parseFloat(vendorLatSource);
+          const lon2 = parseFloat(vendorLonSource);
+          if (!isNaN(lat2) && !isNaN(lon2)) {
+            const R = 6371; // Radius of the earth in km
+            const dLat = (lat2 - currentLocation.latitude) * (Math.PI / 180);
+            const dLon = (lon2 - currentLocation.longitude) * (Math.PI / 180);
+            const a =
+              Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+              Math.cos(currentLocation.latitude * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+              Math.sin(dLon / 2) * Math.sin(dLon / 2);
+            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+            const distKm = R * c;
+
+            const baseTime = Math.max(10, Math.round(distKm * 3) + 10);
+            calculatedDeliveryTime = `${baseTime} - ${baseTime + 5} min`;
+          }
+        }
+
+        const finalDeliveryTime = calculatedDeliveryTime || cached?.deliveryTime || cart.vendorDeliveryTime || pcVendor?.deliveryTime || firstItem?._raw?.vendor?.deliveryTime || '15 - 25 min';
+
+        const ratingSources = [
+          productContextMatch?.rating,
+          productContextMatch?._raw?.rating,
+          firstItem?.product?.productRating,
+          firstItem?.product?.vendorRating,
+          firstItem?._raw?.rating,
+          cached?.rating,
+          cart.vendorRating,
+          firstItem?._raw?.vendorId?.rating,
+          pcVendor?.rating,
+          pcVendor?.businessDetails?.rating,
+          firstItem?._raw?.vendor?.rating,
+          firstItem?._raw?.businessDetails?.rating,
+        ];
+
+        let finalVendorRating = null;
+        for (const r of ratingSources) {
+          const val = extractRating(r);
+          if (val !== null && val > 0) {
+            finalVendorRating = Number(val).toFixed(1);
+            break;
+          }
+        }
 
         const isMenuOpen = menuForVendor === cart.vendorId;
 
@@ -182,21 +237,21 @@ export default function CartList({ navigation }) {
                   </View>
 
                   <Text style={[styles.itemsSummary, { color: colors.text.secondary }]} numberOfLines={1}>
-                    {itemCount} item{itemCount !== 1 ? 's' : ''} • {formatCurrency(firstItem?.currency || '', subtotal)}
+                    {itemCount} item{itemCount !== 1 ? 's' : ''} • {formatCurrency(firstItem?.currency || '', cart.totals?.grandTotal ?? subtotal)}
                   </Text>
 
                   <View style={styles.deliveryRow}>
                     <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 12 }}>
-                      <Ionicons name="star" size={12} color="#FFA000" />
-                      <Text style={{ color: colors.text.primary, fontSize: 12, fontFamily: 'Poppins-Bold', marginLeft: 4 }}>
-                        {pcVendor && pcVendor.rating !== undefined && pcVendor.rating !== null ? Number(pcVendor.rating).toFixed(1) : (t('new') || 'New')}
+                      {finalVendorRating !== null && <Ionicons name="star" size={12} color="#FFA000" />}
+                      <Text style={{ color: finalVendorRating !== null ? colors.text.primary : '#FFA000', fontSize: 12, fontFamily: 'Poppins-Bold', marginLeft: 4 }}>
+                        {finalVendorRating !== null ? finalVendorRating : (t('new') || 'New')}
                       </Text>
                     </View>
 
                     <View style={{ flexDirection: 'row', alignItems: 'center' }}>
                       <MaterialCommunityIcons name="moped" size={14} color={colors.primary} style={{ marginRight: 4 }} />
                       <Text style={[styles.deliveryText, { color: colors.text.secondary }]}>
-                        {finalDeliveryTime || 'Standard'}
+                        {finalDeliveryTime}
                       </Text>
                     </View>
                   </View>
@@ -211,7 +266,7 @@ export default function CartList({ navigation }) {
                 >
                   <Text style={[styles.checkoutButtonText, { color: colors.text.white || '#fff' }]}>{t('goToCheckout')}</Text>
                   <View style={[styles.pricePill, { backgroundColor: 'rgba(255,255,255,0.2)' }]}>
-                    <Text style={[styles.pricePillText, { color: colors.text.white || '#fff' }]}>{formatCurrency(firstItem?.currency || '', subtotal)}</Text>
+                    <Text style={[styles.pricePillText, { color: colors.text.white || '#fff' }]}>{formatCurrency(firstItem?.currency || '', cart.totals?.grandTotal ?? subtotal)}</Text>
                   </View>
                 </TouchableOpacity>
               </View>

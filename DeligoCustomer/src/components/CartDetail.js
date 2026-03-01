@@ -1,11 +1,12 @@
 import React, { useState } from 'react';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
-import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, Image, Platform, ActivityIndicator } from 'react-native';
+import { View, Text, TouchableOpacity, TextInput, ScrollView, StyleSheet, Image, Platform, ActivityIndicator, RefreshControl } from 'react-native';
 import { useCart } from '../contexts/CartContext';
 import { useProducts } from '../contexts/ProductsContext';
 import { useTheme } from '../utils/ThemeContext';
 import { spacing, fontSize, borderRadius } from '../theme';
 import { useLanguage } from '../utils/LanguageContext';
+import { useLocation } from '../contexts/LocationContext';
 import formatCurrency from '../utils/currency';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import CheckoutAPI from '../utils/checkoutApi';
@@ -28,11 +29,13 @@ import AlertModal from './AlertModal';
 export default function CartDetail({ vendorId, navigation }) {
   const { t } = useLanguage();
   const insets = useSafeAreaInsets();
-  const { getVendorCart, updateQuantity, removeItem, setDeliveryInstructionsForVendor } = useCart();
+  const { getVendorCart, updateQuantity, removeItem, setDeliveryInstructionsForVendor, fetchCart } = useCart();
   const { products } = useProducts();
   const cart = getVendorCart(vendorId);
   const { colors, isDarkMode } = useTheme();
+  const { currentLocation } = useLocation();
   const [updatingItem, setUpdatingItem] = useState(null); // Tracks the item currently being modified to show a spinner
+  const [refreshing, setRefreshing] = useState(false);
   const [checkingOut, setCheckingOut] = useState(false);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState({
@@ -41,12 +44,70 @@ export default function CartDetail({ vendorId, navigation }) {
     buttons: []
   });
 
-  if (!cart) return <Text style={{ color: colors.text.secondary, padding: spacing.md }}>{t('noCartFound')}</Text>;
+  if (!cart) return (
+    <View style={{ flex: 1, backgroundColor: colors.background, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 32 }}>
+      <View style={{
+        width: 120,
+        height: 120,
+        borderRadius: 60,
+        backgroundColor: colors.primary + '10',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginBottom: 24,
+      }}>
+        <View style={{
+          width: 80,
+          height: 80,
+          borderRadius: 40,
+          backgroundColor: colors.primary + '18',
+          alignItems: 'center',
+          justifyContent: 'center',
+        }}>
+          <Ionicons name="bag-outline" size={40} color={colors.primary} />
+        </View>
+      </View>
+      <Text style={{
+        fontSize: 22,
+        fontFamily: 'Poppins-Bold',
+        color: colors.text.primary,
+        marginBottom: 8,
+        textAlign: 'center',
+      }}>{t('cartEmpty') || 'Your cart is empty'}</Text>
+      <Text style={{
+        fontSize: 14,
+        fontFamily: 'Poppins-Regular',
+        color: colors.text.secondary,
+        textAlign: 'center',
+        lineHeight: 22,
+        marginBottom: 32,
+      }}>{t('goAheadOrder') || 'Looks like you haven\'t added anything yet. Explore our menu and find something delicious!'}</Text>
+      <TouchableOpacity
+        style={{
+          flexDirection: 'row',
+          alignItems: 'center',
+          backgroundColor: colors.primary,
+          paddingHorizontal: 28,
+          paddingVertical: 14,
+          borderRadius: 16,
+          elevation: 4,
+          shadowColor: colors.primary,
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.3,
+          shadowRadius: 8,
+        }}
+        onPress={() => navigation?.goBack()}
+        activeOpacity={0.85}
+      >
+        <Ionicons name="restaurant-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
+        <Text style={{ color: '#fff', fontSize: 15, fontFamily: 'Poppins-SemiBold' }}>{t('browseFood') || 'Browse Food'}</Text>
+      </TouchableOpacity>
+    </View>
+  );
 
   const rawItems = Object.keys(cart.items || {}).map(id => ({ id, ...cart.items[id] }));
 
   // Enrich cart items with the latest product data from Context (images, names, price updates)
-  const items = rawItems.map(it => {
+  const items = rawItems.map((it) => {
     // 1. Start with existing cart data
     let p = it.product || {};
 
@@ -55,13 +116,14 @@ export default function CartDetail({ vendorId, navigation }) {
     if (products && products.length > 0) {
       const rawId = p.id || p._id || p.productId || it.productId || it.id;
       if (rawId) {
-        contextProduct = products.find(prod =>
-          prod.id === rawId ||
-          prod._id === rawId ||
-          prod._raw?._id === rawId ||
-          prod._raw?.productId === rawId ||
-          prod._raw?.id === rawId ||
-          (prod._raw && (prod._raw.productId === rawId || prod._raw.id === rawId))
+        contextProduct = products.find(
+          (prod) =>
+            prod.id === rawId ||
+            prod._id === rawId ||
+            prod._raw?._id === rawId ||
+            prod._raw?.productId === rawId ||
+            prod._raw?.id === rawId ||
+            (prod._raw && (prod._raw.productId === rawId || prod._raw.id === rawId)),
         );
       }
     }
@@ -75,48 +137,47 @@ export default function CartDetail({ vendorId, navigation }) {
         _raw: {
           ...(contextProduct._raw || {}),
           ...(p._raw || {}),
-          // Merge pricing: prioritize context pricing if cart pricing is structurally incomplete
           pricing: {
             ...(contextProduct._raw?.pricing || {}),
             ...(p._raw?.pricing || {}),
-            ...(p.pricing || {})
-          }
-        }
+            ...(p.pricing || {}),
+          },
+        },
       };
     }
 
-    // Standardize Pricing Structure
-    const pricing = p?._raw?.pricing || p?.pricing || {};
-    const basePrice = Number(pricing.price ?? p.price ?? 0) || 0;
-    const discountRaw = pricing.discount;
-    const taxRaw = pricing.tax;
+    const pricing = p._raw?.pricing || p.pricing || {};
+    const productPricing = it.productPricing || {};
 
-    // Normalize percentages (handle 0.1 vs 10)
-    const discountPercent = (discountRaw != null && !isNaN(Number(discountRaw))) ? (Number(discountRaw) <= 1 ? Number(discountRaw) * 100 : Number(discountRaw)) : 0;
-    const taxPercent = (taxRaw != null && !isNaN(Number(taxRaw))) ? (Number(taxRaw) <= 1 ? Number(taxRaw) * 100 : Number(taxRaw)) : 0;
+    // Prioritize backend's explicit prices
+    const basePrice = Number(it.price || productPricing.originalPrice || 0);
+    const discountPercent = Number(it.discountPercent || it.productPricing?.discountRate || 0);
+    const taxPercent = Number(it.taxPercent || productPricing.taxRate || 0);
 
-    const discountUnit = basePrice * (discountPercent / 100);
+    // Calculate line total from backend summary if available
+    const itemGrandTotal = Number(it.itemSummary?.grandTotal || 0);
+    const itemQty = Number(it.quantity || it.qty || 1);
+
+    // The "unit price" shown should be the final price for ONE item (including tax/discount)
+    const finalUnit = itemGrandTotal > 0 ? (itemGrandTotal / itemQty) : (it.finalUnit || 0);
+
+    const discountUnit = (basePrice * discountPercent) / 100;
     const afterDiscount = basePrice - discountUnit;
-    const taxUnit = afterDiscount * (taxPercent / 100);
-
-    // Determine final display price per unit
-    const finalUnitFromPricing = pricing.finalPrice != null ? Number(pricing.finalPrice) : null;
-    const finalUnit = Number.isFinite(finalUnitFromPricing) ? finalUnitFromPricing : (afterDiscount + taxUnit);
+    const taxUnit = (afterDiscount * taxPercent) / 100;
 
     return {
       ...it,
       product: p,
-      qty: it.quantity || 0,
-      currency: pricing.currency || p.currency || '',
+      qty: itemQty,
+      currency: it.currency || pricing.currency || p.currency || '',
       basePrice,
       discountPercent,
       discountUnit,
       afterDiscount,
       taxPercent,
       taxUnit,
-      finalUnit,
-      // Use backend provided subtotal if available for accurate reconciliation
-      backendSubtotal: it.subtotal ?? it.totalBeforeTax ?? null,
+      finalUnit: finalUnit > 0 ? finalUnit : (afterDiscount + taxUnit),
+      backendSubtotal: it.itemSummary?.grandTotal ?? it.subtotal ?? it.totalBeforeTax ?? null,
       addons: it.addons || [],
     };
   });
@@ -141,7 +202,7 @@ export default function CartDetail({ vendorId, navigation }) {
     if (it.taxAmount !== undefined && it.taxAmount !== null) {
       return s + Number(it.taxAmount);
     }
-    return s + (it.taxUnit * it.qty);
+    return s + it.taxUnit * it.qty;
   }, 0);
 
   // Resolve Vendor Details (Context > Cart > Item fallback)
@@ -179,10 +240,64 @@ export default function CartDetail({ vendorId, navigation }) {
     }
   }
 
+  const extractRating = (val) => {
+    if (val === null || val === undefined) return null;
+    if (typeof val === 'object' && val !== null) {
+      if (val.average !== undefined) return extractRating(val.average);
+      return null;
+    }
+    const num = Number(val);
+    return !isNaN(num) ? num : null;
+  };
+
   const finalVendorName = (pcVendor?.vendorName || pcVendor?.name) || (products && products.find(p => p.vendor?.vendorId === vendorId)?.name) || (cart.vendorName && !['Store', 'Vendor'].includes(cart.vendorName) ? cart.vendorName : null) || firstItem?.product?._raw?.vendor?.vendorName || t('vendor');
   const finalVendorImage = pcVendor?.storePhoto || pcVendor?.logo || pcVendor?.image || cart.vendorImage || firstItem?.product?.image || null;
-  const finalVendorRating = cart.vendorRating ?? pcVendor?.rating ?? firstItem?.product?._raw?.vendor?.rating ?? pcProduct?.rating ?? null;
-  const finalDeliveryTime = cart.vendorDeliveryTime || pcVendor?.deliveryTime || firstItem?.product?._raw?.vendor?.deliveryTime || pcProduct?.deliveryTime || null;
+
+  const ratingSources = [
+    pcProduct?.rating,
+    pcProduct?._raw?.rating,
+    firstItem?.product?.productRating,
+    firstItem?.product?.vendorRating,
+    firstItem?.product?._raw?.rating,
+    firstItem?.product?._raw?.vendorId?.rating,
+    pcVendor?.rating,
+    pcVendor?.businessDetails?.rating,
+    firstItem?.product?._raw?.vendor?.rating,
+    firstItem?.product?._raw?.businessDetails?.rating,
+    firstItem?.product?._raw?.vendorId?.businessDetails?.rating,
+    cart.vendorRating,
+    cart.vendor?.rating,
+  ];
+
+  let finalVendorRating = null;
+  for (const r of ratingSources) {
+    const val = extractRating(r);
+    if (val !== null && val > 0 && val <= 5) {
+      finalVendorRating = Number(val).toFixed(1);
+      break;
+    }
+  }
+
+  const vendorLat = pcVendor?.latitude || firstItem?.product?._raw?.vendor?.latitude;
+  const vendorLon = pcVendor?.longitude || firstItem?.product?._raw?.vendor?.longitude;
+
+  let calculatedDeliveryTime = null;
+  if (currentLocation?.latitude && currentLocation?.longitude && vendorLat && vendorLon) {
+    const R = 6371; // Radius of the earth in km
+    const dLat = (vendorLat - currentLocation.latitude) * (Math.PI / 180);
+    const dLon = (vendorLon - currentLocation.longitude) * (Math.PI / 180);
+    const a =
+      Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      Math.cos(currentLocation.latitude * (Math.PI / 180)) * Math.cos(vendorLat * (Math.PI / 180)) *
+      Math.sin(dLon / 2) * Math.sin(dLon / 2);
+    const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+    const distKm = R * c;
+
+    const baseTime = Math.max(10, Math.round(distKm * 3) + 10);
+    calculatedDeliveryTime = `${baseTime} - ${baseTime + 5} min`;
+  }
+
+  const finalDeliveryTime = calculatedDeliveryTime || cart.vendorDeliveryTime || pcVendor?.deliveryTime || firstItem?.product?._raw?.vendor?.deliveryTime || pcProduct?.deliveryTime || '15 - 25 min';
 
   const handleUpdateQuantity = async (itemId, delta) => {
     // Local Stock Check
@@ -277,7 +392,22 @@ export default function CartDetail({ vendorId, navigation }) {
   return (
     <View style={{ flex: 1, backgroundColor: colors.background }}>
       {/* Scrollable content */}
-      <ScrollView contentContainerStyle={{ paddingBottom: footerHeight }} showsVerticalScrollIndicator={false}>
+      <ScrollView
+        contentContainerStyle={{ paddingBottom: footerHeight }}
+        showsVerticalScrollIndicator={false}
+        refreshControl={
+          <RefreshControl
+            refreshing={refreshing}
+            onRefresh={async () => {
+              setRefreshing(true);
+              await fetchCart({ force: true });
+              setRefreshing(false);
+            }}
+            colors={[colors.primary]}
+            tintColor={colors.primary}
+          />
+        }
+      >
         {/* Vendor Header Card */}
         <View style={[styles.vendorCard, { backgroundColor: colors.surface, borderColor: colors.border }]}>
           {finalVendorImage ? (
@@ -292,8 +422,8 @@ export default function CartDetail({ vendorId, navigation }) {
             <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4 }}>
               <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: '#FFF8E1', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4, marginRight: 8 }}>
                 <Ionicons name="star" size={12} color="#FFA000" />
-                <Text style={{ color: '#FFA000', fontSize: 12, fontFamily: 'Poppins-Bold', marginLeft: 4 }}>
-                  {finalVendorRating !== null && finalVendorRating !== undefined ? Number(finalVendorRating).toFixed(1) : (t('new') || 'New')}
+                <Text style={{ color: finalVendorRating !== null ? colors.text.primary : '#FFA000', fontSize: 12, fontFamily: 'Poppins-Bold', marginLeft: 4 }}>
+                  {finalVendorRating !== null ? finalVendorRating : (t('new') || 'New')}
                 </Text>
               </View>
 

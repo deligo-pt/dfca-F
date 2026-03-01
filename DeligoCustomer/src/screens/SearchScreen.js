@@ -80,12 +80,20 @@ const SearchScreen = ({ navigation }) => {
             const name = (item.name || '').toLowerCase();
             const vendorName = (item.vendor?.vendorName || '').toLowerCase();
 
+            // Helper to safely lowercase strings and arrays
+            const safeLower = (val) => {
+                if (!val) return '';
+                if (typeof val === 'string') return val.toLowerCase();
+                if (Array.isArray(val)) return val.join(' ').toLowerCase();
+                return String(val).toLowerCase();
+            };
+
             // Raw data for deeper fields from MongoDB structure
             const raw = item._raw || {};
-            const description = (raw.description || '').toLowerCase();
-            const category = (raw.category || item.category || '').toLowerCase();
-            const subCategory = (raw.subCategory || '').toLowerCase();
-            const brand = (raw.brand || '').toLowerCase();
+            const description = safeLower(raw.description);
+            const category = safeLower(raw.category || item.category);
+            const subCategory = safeLower(raw.subCategory);
+            const brand = safeLower(raw.brand);
 
             // Check tags array
             const tags = Array.isArray(raw.tags) ? raw.tags.join(' ').toLowerCase() : (Array.isArray(item.categories) ? item.categories.join(' ').toLowerCase() : '');

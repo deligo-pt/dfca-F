@@ -8,14 +8,7 @@ import { useProfile } from '../contexts/ProfileContext';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
-// Selection of premium inspirational shop & food images
-const SHOP_IMAGES = [
-  'https://images.unsplash.com/photo-1578916171728-46686eac8d58?q=80&w=800&auto=format&fit=crop', // Grocery / Supermarket
-  'https://images.unsplash.com/photo-1554118811-1e0d58224f24?q=80&w=800&auto=format&fit=crop', // Cafe / Restaurant
-  'https://images.unsplash.com/photo-1509440159596-0249088772ff?q=80&w=800&auto=format&fit=crop', // Bakery
-  'https://images.unsplash.com/photo-1604719312566-8912e9227c6a?q=80&w=800&auto=format&fit=crop', // Storefront
-  'https://images.unsplash.com/photo-1534723452862-4c874018d66d?q=80&w=800&auto=format&fit=crop', // Shopping Aisles
-];
+
 
 /**
  * LocationHeader Component
@@ -41,14 +34,6 @@ const LocationHeader = ({
   const { user } = useProfile();
   const insets = useSafeAreaInsets();
 
-  // State for dynamic background
-  const [bgImage, setBgImage] = useState(SHOP_IMAGES[0]);
-
-  useEffect(() => {
-    // Select a random image every time the component mounts
-    const randomImg = SHOP_IMAGES[Math.floor(Math.random() * SHOP_IMAGES.length)];
-    setBgImage(randomImg);
-  }, []);
 
   const getGreeting = () => {
     const hour = new Date().getHours();
@@ -71,14 +56,6 @@ const LocationHeader = ({
 
       {/* Main Gradient-like Premium Background */}
       <View style={[styles(colors, isDarkMode).premiumBackground, { paddingTop: insets.top + spacing.sm }]}>
-
-        {/* Dynamic Shop Background Image blending with primary color */}
-        <Image
-          source={{ uri: bgImage }}
-          style={StyleSheet.absoluteFillObject}
-          resizeMode="cover"
-          opacity={isDarkMode ? 0.2 : 0.35}
-        />
 
         {/* Robust Dark Status Bar Gradient for Premium Visibility */}
         <LinearGradient

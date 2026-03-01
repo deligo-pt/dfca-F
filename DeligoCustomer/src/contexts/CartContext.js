@@ -142,9 +142,10 @@ function normalizeProductForCart(p) {
     currency: pricing.currency ?? raw.currency ?? raw.pricing?.currency ?? '',
     image: primaryImage,
     vendorId,
-    vendorName: vendorName || null,
+    vendorName: vendor.businessName || vendor.vendorName || raw.vendorName || null,
     vendorImage: vendor.storePhoto || vendor.logo || vendor.image || raw.vendorImage || raw.storePhoto || null,
-    vendorRating: (p.rating !== undefined && p.rating !== null) ? p.rating : (vendor.rating || vendor.averageRating || raw.vendorRating || (vendorId && typeof vendorId === 'object' ? vendorId.rating : null) || 0),
+    vendorRating: vendor.rating || vendor.averageRating || raw.vendorRating || (vendorId && typeof vendorId === 'object' ? (vendorId.rating || vendorId.businessDetails?.rating) : null) || null,
+    productRating: p.rating || raw.rating || null,
     vendorDeliveryTime: p.deliveryTime || vendor.deliveryTime || vendor.estimatedDeliveryTime || raw.vendorDeliveryTime || (vendorId && typeof vendorId === 'object' ? vendorId.deliveryTime : null) || null,
     _raw: raw,
   };
@@ -350,7 +351,24 @@ export const CartProvider = ({ children }) => {
     try {
       setSyncing(true);
 
-      const payload = { productId: p.id, quantity };
+      // Resolve the actual clean Mongo ID (Hex only)
+      const cleanProductId = p.productId || p._raw?._id || (p.id ? p.id.split('|')[0] : null);
+
+      console.log('[Cart] Syncing addItem to backend:', {
+        productId: cleanProductId,
+        quantity,
+        variationSku: options.variationSku,
+        variantName: options.variantName || options.selectedVariation
+      });
+
+      // Backend strictly expects quantity inside itemSummary.quantity
+      const payload = {
+        productId: cleanProductId,
+        itemSummary: { quantity: quantity }
+      };
+
+      // Also include top-level quantity to pass validation checks if any
+      payload.quantity = quantity;
 
       // Map variation/option data to backend expectation
       if (options.variantName) {
@@ -367,6 +385,7 @@ export const CartProvider = ({ children }) => {
       if (options.options) payload.options = options.options;
       if (options.addons) payload.addons = options.addons;
 
+      console.debug('[Cart] Full sync payload:', JSON.stringify([payload]));
       const res = await CartAPI.addToCart([payload]);
 
       if (!res.success) {
@@ -487,17 +506,17 @@ export const CartProvider = ({ children }) => {
       setSyncing(true);
 
       // Extract variation data needed for identification on backend
-      // Extract variation data directly from current state
       let variantName = null;
-      let variationSku = null; // CRITICAL: Required for products with variations
-      let realProductId = canonicalKey; // Default to key if lookup fails (fallback)
+      let variationSku = null;
+      let realProductId = null; // We need the actual Mongo ID
 
       const carts = state.carts || {};
       for (const vkey of Object.keys(carts)) {
         const cart = carts[vkey];
         if (cart.items && cart.items[canonicalKey]) {
           const item = cart.items[canonicalKey];
-          // Normalize variant name (handle object vs string)
+
+          // 1. Resolve variant name
           const rawVariant = item.selectedVariation;
           if (rawVariant && typeof rawVariant === 'object') {
             variantName = rawVariant.name || rawVariant.variantName || null;
@@ -505,12 +524,22 @@ export const CartProvider = ({ children }) => {
             variantName = rawVariant;
           }
 
-          // Extract variationSku - CRITICAL for backend identification
-          variationSku = item.variationSku || item.product?.variationSku || item.product?._raw?.variationSku || null;
+          // 2. Resolve variationSku - CRITICAL for backend identification
+          variationSku = item.variationSku ||
+            item.product?.variationSku ||
+            item.product?._raw?.variationSku ||
+            null;
 
-          // Extract the actual product ID from the item
-          if (item.product && item.product.id) {
-            realProductId = item.product.id;
+          // 3. Resolve the actual product ID (Hex only)
+          // Look into item.product.id first, as normalized product stores the hex ID there
+          realProductId = item.productId ||
+            item.product?.id ||
+            item.product?._raw?._id ||
+            null;
+
+          // If still missing, try to cleanse the canonicalKey (extract ID before |)
+          if (!realProductId && canonicalKey) {
+            realProductId = canonicalKey.split('|')[0];
           }
 
           if (!variantName && item.product) {
@@ -525,16 +554,32 @@ export const CartProvider = ({ children }) => {
         }
       }
 
+      // Final fallback for realProductId
+      if (!realProductId) {
+        realProductId = canonicalKey?.split('|')[0];
+      }
+
       const action = delta > 0 ? 'increment' : 'decrement';
-      // Use the actual product ID, not the internal composite key
-      // Pass variationSku for products with variations
+      const syncPayload = {
+        productId: realProductId,
+        quantity: Math.abs(delta),
+        action,
+        variantName,
+        variationSku
+      };
+
+      console.log('[Cart] Syncing update-quantity. Backend Payload:', JSON.stringify(syncPayload, null, 2));
+
+      // Backend expects: { productId, variationSku (optional), quantity, action }
       const res = await CartAPI.activateItem(realProductId, Math.abs(delta), action, variantName, variationSku);
+
+      console.log('[Cart] update-quantity response:', JSON.stringify(res, null, 2));
 
       if (!res.success) {
         console.warn('[Cart] API Sync Failed:', res);
         revertOptimisticUpdate(canonicalKey, delta, vendorId);
       } else {
-        console.log('[Cart] Quantity updated, refreshing subtotal');
+        console.log('[Cart] Quantity updated successfully, refreshing...');
         fetchCart({ force: true, silent: true });
       }
     } catch (error) {
@@ -634,8 +679,9 @@ export const CartProvider = ({ children }) => {
       setSyncing(true);
       const payloadObj = { productId };
       if (variantName) payloadObj.variantName = variantName;
-      // CRITICAL: Include variationSku if present for accurate deletion
-      if (targetItem?.variationSku) payloadObj.variationSku = targetItem.variationSku;
+      // CRITICAL: Include variationSku if present for accurate identification on backend
+      const vSku = targetItem?.variationSku || targetItem?.product?.variationSku || (targetItem?.product?._raw?.variationSku);
+      if (vSku) payloadObj.variationSku = vSku;
 
       if (options) payloadObj.options = options;
       if (addons) payloadObj.addons = addons;
@@ -684,7 +730,7 @@ export const CartProvider = ({ children }) => {
     // Construct bulk delete payload
     const itemsToDelete = Object.keys(vendorCart.items).map(itemId => {
       const item = vendorCart.items[itemId];
-      const realProductId = item.product?.id || itemId;
+      const realProductId = item.product?.id || item.product?._raw?._id || itemId;
 
       const payloadObj = { productId: realProductId };
       let variantName = item.selectedVariation;
@@ -701,7 +747,8 @@ export const CartProvider = ({ children }) => {
         }
       }
 
-      if (item.variationSku) payloadObj.variationSku = item.variationSku;
+      const vSku = item.variationSku || item.product?.variationSku || item.product?._raw?.variationSku;
+      if (vSku) payloadObj.variationSku = vSku;
       if (variantName) payloadObj.variantName = variantName;
       if (item.options) payloadObj.options = item.options;
       if (item.addons) payloadObj.addons = item.addons;
@@ -967,11 +1014,12 @@ export const CartProvider = ({ children }) => {
         };
       }, { addonsValue: 0, addonsTax: 0, itemsTax: 0, originalPriceTotal: 0 });
 
+      console.log('[Cart] fetchCart raw response totals data:', JSON.stringify(root?.data || root || {}).substring(0, 5000));
       console.debug('[Cart] fetchCart success', { itemCount: items.length });
 
-      // Determine source of totals. User JSON shows totals are inside 'data' object.
-      // But we also support flat structure if API changes.
+      // Determine source of totals.
       const cartData = (root?.data?.totalPrice !== undefined) ? root.data : (root?.totalPrice !== undefined ? root : {});
+      const cartCalc = root?.data?.cartCalculation || root?.cartCalculation || {};
 
       // Reconstruct local state grouped by vendor
       const newCarts = {};
@@ -981,19 +1029,16 @@ export const CartProvider = ({ children }) => {
         const normalized = normalizeProductForCart(rawProd);
         const vid = normalized.vendorId || rawProd.vendorId || rawProd.vendor?.vendorId || 'unknown_vendor';
         const vendorKey = String(vid);
-        const qty = Number(item.quantity ?? item.qty ?? item.count ?? 1) || 1;
+        const qty = Number(item.itemSummary?.quantity ?? item.quantity ?? item.qty ?? item.count ?? 1) || 1;
 
-        // Use backend _id if available, else synthesize key
-        let itemKey = item._id || item.id;
-        if (!itemKey || itemKey === normalized.id) {
-          const opts = {
-            variantName: item.variantName,
-            selectedVariation: item.selectedVariation,
-            addons: item.addons,
-            options: item.options
-          };
-          itemKey = generateCartItemKey(normalized.id, opts);
-        }
+        // ALWAYS use canonical item key for consistent mapping between menu and cart
+        const opts = {
+          variantName: item.variantName || item.selectedVariation,
+          variationSku: item.variationSku || item.product?.variationSku || item.product?._raw?.variationSku,
+          addons: item.addons,
+          options: item.options
+        };
+        const itemKey = generateCartItemKey(normalized.id, opts);
 
         if (!newCarts[vendorKey]) {
           newCarts[vendorKey] = {
@@ -1008,14 +1053,14 @@ export const CartProvider = ({ children }) => {
             // Map backend totals to the vendor cart
             // Assuming single-vendor cart response structure as per user JSON
             totals: {
-              totalPrice: cartData.totalPrice, // Items + Addons (Pre-tax, Post-Discount)
-              taxAmount: cartData.taxAmount, // Total Tax
-              discount: cartData.totalProductDiscount, // Total Discount
-              grandTotal: cartData.subtotal, // Final Pay Amount
+              totalPrice: cartCalc.taxableAmount ?? cartData.totalPrice ?? cartData.subtotal, // Taxable amount or Pre-tax
+              taxAmount: cartCalc.totalTaxAmount ?? cartData.taxAmount, // Total Tax
+              discount: cartCalc.totalProductDiscount ?? cartData.totalProductDiscount, // Total Discount
+              grandTotal: cartCalc.grandTotal ?? cartData.subtotal, // Final Pay Amount
               deliveryFee: cartData.deliveryCharge, // Delivery Fee
 
               // Granular Breakdown
-              itemsOriginalTotal: totalsCalc.originalPriceTotal, // Gross Items
+              itemsOriginalTotal: cartCalc.totalOriginalPrice ?? totalsCalc.originalPriceTotal, // Gross Items
               itemsTax: totalsCalc.itemsTax,
               addonsTotal: totalsCalc.addonsValue,
               addonsTax: totalsCalc.addonsTax,
@@ -1031,12 +1076,12 @@ export const CartProvider = ({ children }) => {
           }
           // Ensure totals are updated
           c.totals = {
-            totalPrice: cartData.totalPrice,
-            taxAmount: cartData.taxAmount,
-            discount: cartData.totalProductDiscount,
-            grandTotal: cartData.subtotal,
+            totalPrice: cartCalc.taxableAmount ?? cartData.totalPrice ?? cartData.subtotal,
+            taxAmount: cartCalc.totalTaxAmount ?? cartData.taxAmount,
+            discount: cartCalc.totalProductDiscount ?? cartData.totalProductDiscount,
+            grandTotal: cartCalc.grandTotal ?? cartData.subtotal,
             deliveryFee: cartData.deliveryCharge,
-            itemsOriginalTotal: totalsCalc.originalPriceTotal,
+            itemsOriginalTotal: cartCalc.totalOriginalPrice ?? totalsCalc.originalPriceTotal,
             itemsTax: totalsCalc.itemsTax,
             addonsTotal: totalsCalc.addonsValue,
             addonsTax: totalsCalc.addonsTax,
@@ -1051,7 +1096,13 @@ export const CartProvider = ({ children }) => {
           variationSku: item.variationSku, // CRITICAL: Persist SKU from backend
           addons: item.addons,
           options: item.options,
+          price: item.productPricing?.originalPrice ?? item.price ?? rawProd.price,
+          discountPercent: item.productPricing ? ((item.productPricing.productDiscountAmount / item.productPricing.originalPrice) * 100) : (item.discountPercent ?? rawProd.discountPercent),
+          taxPercent: item.productPricing?.taxRate ?? item.taxPercent ?? rawProd.taxPercent,
+          unitPrice: item.productPricing?.unitPrice ?? item.unitPrice,
           subtotal: item.subtotal ?? rawProd.subtotal,
+          itemSummary: item.itemSummary || rawProd.itemSummary,
+          productPricing: item.productPricing || rawProd.productPricing,
           totalBeforeTax: item.totalBeforeTax ?? rawProd.totalBeforeTax,
           taxAmount: item.taxAmount ?? rawProd.taxAmount,
         };

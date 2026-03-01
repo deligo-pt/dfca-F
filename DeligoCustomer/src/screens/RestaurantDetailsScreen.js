@@ -23,6 +23,7 @@ import {
   RefreshControl,
   InteractionManager,
   Linking,
+  Share,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import {
@@ -38,6 +39,7 @@ import { useTheme } from "../utils/ThemeContext";
 import { useProducts } from "../contexts/ProductsContext";
 import { useLanguage } from "../utils/LanguageContext";
 import { useCart } from "../contexts/CartContext";
+import { useLocation } from "../contexts/LocationContext";
 import formatCurrency from "../utils/currency";
 import * as Location from "expo-location";
 import AlertModal from "../components/AlertModal";
@@ -138,6 +140,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     updateQuantity: cartUpdateQuantity,
     itemsMap,
     clearAllCarts,
+    getVendorCart,
   } = useCart();
 
   // Alert modal state
@@ -276,6 +279,23 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     fetchProductDetails,
   } = useProducts();
 
+  const handleShare = async () => {
+    try {
+      const shareOptions = {
+        title: displayName,
+        message: `Check out ${displayName} on Deligo!\nLocation: ${displayLocation || 'Unknown'}\nRating: ${ratingValue ? parseFloat(ratingValue).toFixed(1) : 'New'}`,
+      };
+      // For iOS, url can be passed separately. Assuming no specific URL structure for now.
+      if (Platform.OS === 'ios') {
+        // shareOptions.url = `https://deligo.com/restaurant/${vendorId}`; 
+      }
+
+      await Share.share(shareOptions);
+    } catch (error) {
+      console.error("[RestaurantDetails] Share failed:", error);
+    }
+  };
+
   // Resolve vendor ID from various potential data structures
   // Access normalized vendor if available, else raw nested object, else raw flat props
   const normVendor = restaurant.vendor || {};
@@ -342,6 +362,39 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     rawLat && rawLng
       ? { latitude: parseFloat(rawLat), longitude: parseFloat(rawLng) }
       : null;
+
+  // ---------------------------------------------------------------------------
+  // Dynamic Delivery Time Calculation
+  // ---------------------------------------------------------------------------
+  const { currentLocation } = useLocation();
+  const [estimatedTime, setEstimatedTime] = useState(null);
+
+  useEffect(() => {
+    if (currentLocation && vendorCoords) {
+      const lat1 = currentLocation.latitude;
+      const lon1 = currentLocation.longitude;
+      const lat2 = vendorCoords.latitude;
+      const lon2 = vendorCoords.longitude;
+
+      // Haversine formula
+      const R = 6371; // Radius of the earth in km
+      const dLat = (lat2 - lat1) * (Math.PI / 180);
+      const dLon = (lon2 - lon1) * (Math.PI / 180);
+      const a =
+        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+        Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
+        Math.sin(dLon / 2) * Math.sin(dLon / 2);
+      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
+      const distKm = R * c;
+
+      // Base formula: 10 mins prep time + 3 mins per km (20km/h average city speed)
+      const baseTime = Math.max(10, Math.round(distKm * 3) + 10);
+      setEstimatedTime(`${baseTime} - ${baseTime + 5} min`);
+    }
+  }, [currentLocation, vendorCoords]);
+
+  const deliveryTimeProp = normVendor.deliveryTime || restaurant._raw?.deliveryTime || null;
+  const finalDeliveryTime = estimatedTime || deliveryTimeProp || "15 - 20 min";
 
   useEffect(() => {
     let mounted = true;
@@ -413,8 +466,8 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     );
     return productWithCurrency
       ? productWithCurrency._raw?.pricing?.currency ||
-          productWithCurrency.pricing?.currency ||
-          ""
+      productWithCurrency.pricing?.currency ||
+      ""
       : "";
   })();
 
@@ -547,45 +600,38 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     }, 0);
   };
 
-  const getTotalPrice = () =>
-    Object.keys(itemsMap || {}).reduce((s, id) => {
+  const getTotalPrice = () => {
+    const vc = getVendorCart ? getVendorCart(vendorId) : null;
+    if (vc && vc.totals && vc.totals.grandTotal !== undefined && vc.totals.grandTotal !== null) {
+      return Number(vc.totals.grandTotal);
+    }
+
+    return Object.keys(itemsMap || {}).reduce((s, id) => {
       const it = itemsMap[id];
       if (!it) return s;
       const vendorIdOfItem =
-        it.product.vendorId || it.product._raw?.vendor?.vendorId || it.vendorId;
+        it.product?.vendorId || it.product?._raw?.vendor?.vendorId || it.vendorId;
 
-      // Use backend subtotal if available (includes addons, discounts, etc.)
-      // Check multiple locations where subtotal might be stored
       const rawData = it.product?._raw || {};
-      const backendSubtotal =
-        it.subtotal ?? rawData.subtotal ?? rawData.totalBeforeTax;
+      const backendSubtotal = it.subtotal ?? rawData.subtotal ?? rawData.totalBeforeTax;
 
       let itemTotal = 0;
       if (backendSubtotal !== undefined && backendSubtotal !== null) {
         itemTotal = Number(backendSubtotal);
-        console.log(
-          `[RestaurantDetails] Using backend subtotal for ${it.product?.name}: ${itemTotal}`,
-        );
       } else {
-        // Fallback calculation if no backend subtotal
-        const basePrice = Number(
-          it.product.finalPrice ?? it.product.price ?? 0,
-        );
-        // Include addon prices from backend data or local state
+        const basePrice = Number(it.product?.finalPrice ?? it.product?.price ?? 0);
         const addons = rawData.addons || it.addons || [];
         const addonsTotal = addons.reduce(
           (sum, ad) => sum + Number(ad.price || 0) * (ad.quantity || 1),
           0,
         );
         itemTotal = basePrice * it.quantity + addonsTotal;
-        console.log(
-          `[RestaurantDetails] Calc fallback for ${it.product?.name}: base=${basePrice}, addons=${addonsTotal}, qty=${it.quantity} -> ${itemTotal}`,
-        );
       }
 
-      if (vendorIdOfItem && vendorIdOfItem === vendorId) return s + itemTotal;
+      if (vendorIdOfItem && String(vendorIdOfItem) === String(vendorId)) return s + itemTotal;
       return s;
     }, 0);
+  };
 
   // Filter menu items
   const getFilteredMenuItems = () => {
@@ -1332,9 +1378,9 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                                   opt.label || opt.name || opt.id || opt._id;
                                 const isSelected =
                                   selectedVariations[
-                                    variation.name ||
-                                      variation.title ||
-                                      variation.id
+                                  variation.name ||
+                                  variation.title ||
+                                  variation.id
                                   ] === optId;
 
                                 // Price diff logic
@@ -1369,8 +1415,8 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                                       setSelectedVariations((prev) => ({
                                         ...prev,
                                         [variation.name ||
-                                        variation.title ||
-                                        variation.id]: optId,
+                                          variation.title ||
+                                          variation.id]: optId,
                                         [`${variation.name || variation.title || variation.id}_obj`]:
                                           opt,
                                       }))
@@ -1674,7 +1720,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                               const option = options.find(
                                 (o) =>
                                   (o.label || o.name || o.value) ===
-                                    selectedValue ||
+                                  selectedValue ||
                                   (o.id || o._id) === selectedValue ||
                                   o.sku === selectedValue, // unlikely but possible
                               );
@@ -1915,9 +1961,9 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                             ? t("adding") || "Adding..."
                             : quantity > 0
                               ? (() => {
-                                  const total = calculateModalTotal();
-                                  return `${t("addToCart") || "Add to cart"} • ${formatCurrency(currency, total)}`;
-                                })()
+                                const total = calculateModalTotal();
+                                return `${t("addToCart") || "Add to cart"} • ${formatCurrency(currency, total)}`;
+                              })()
                               : t("addToCart") || "Add to cart"}
                         </Text>
                       </View>
@@ -2127,7 +2173,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                     { color: colors.text.secondary },
                   ]}
                 >
-                  25-40 min
+                  {finalDeliveryTime}
                 </Text>
               </View>
             </View>
@@ -2293,7 +2339,10 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                   color={colors.text.primary}
                 />
               </TouchableOpacity>
-              <TouchableOpacity style={styles.vendorModalShareBtn}>
+              <TouchableOpacity
+                style={styles.vendorModalShareBtn}
+                onPress={handleShare}
+              >
                 <Ionicons
                   name="share-social-outline"
                   size={22}
@@ -2361,35 +2410,35 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                 {(normVendor.contactNumber ||
                   normVendor.phone ||
                   restaurant._raw?.vendorId?.contactDetails?.phone) && (
-                  <View style={styles.vendorInfoItem}>
-                    <Ionicons
-                      name="call"
-                      size={20}
-                      color={colors.text.primary}
-                      style={styles.vendorInfoIcon}
-                    />
-                    <View style={styles.vendorInfoContent}>
-                      <Text
-                        style={[
-                          styles.vendorInfoLabel,
-                          { color: colors.text.primary },
-                        ]}
-                      >
-                        Call us
-                      </Text>
-                      <Text
-                        style={[
-                          styles.vendorInfoValue,
-                          { color: colors.text.secondary },
-                        ]}
-                      >
-                        {normVendor.contactNumber ||
-                          normVendor.phone ||
-                          restaurant._raw?.vendorId?.contactDetails?.phone}
-                      </Text>
+                    <View style={styles.vendorInfoItem}>
+                      <Ionicons
+                        name="call"
+                        size={20}
+                        color={colors.text.primary}
+                        style={styles.vendorInfoIcon}
+                      />
+                      <View style={styles.vendorInfoContent}>
+                        <Text
+                          style={[
+                            styles.vendorInfoLabel,
+                            { color: colors.text.primary },
+                          ]}
+                        >
+                          Call us
+                        </Text>
+                        <Text
+                          style={[
+                            styles.vendorInfoValue,
+                            { color: colors.text.secondary },
+                          ]}
+                        >
+                          {normVendor.contactNumber ||
+                            normVendor.phone ||
+                            restaurant._raw?.vendorId?.contactDetails?.phone}
+                        </Text>
+                      </View>
                     </View>
-                  </View>
-                )}
+                  )}
 
                 {displayLocation && (
                   <View style={styles.vendorInfoItem}>
@@ -2568,181 +2617,181 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
               {(normVendor.businessDetails ||
                 restaurant._raw?.vendorId?.businessDetails ||
                 normVendor.registrationCode) && (
-                <View style={styles.otherDetailsContainer}>
-                  <Text
-                    style={[
-                      styles.otherDetailsTitle,
-                      { color: colors.text.primary },
-                    ]}
-                  >
-                    Other details
-                  </Text>
+                  <View style={styles.otherDetailsContainer}>
+                    <Text
+                      style={[
+                        styles.otherDetailsTitle,
+                        { color: colors.text.primary },
+                      ]}
+                    >
+                      Other details
+                    </Text>
 
-                  {/* Legal Entity Name */}
-                  {(normVendor.businessDetails?.businessName ||
-                    restaurant._raw?.vendorId?.businessDetails
-                      ?.businessName) && (
-                    <View style={styles.otherDetailItem}>
-                      <Text
-                        style={[
-                          styles.otherDetailLabel,
-                          { color: colors.text.secondary },
-                        ]}
-                      >
-                        Legal entity name
-                      </Text>
-                      <Text
-                        style={[
-                          styles.otherDetailValue,
-                          { color: colors.text.primary },
-                        ]}
-                      >
-                        {normVendor.businessDetails?.businessName ||
-                          restaurant._raw?.vendorId?.businessDetails
-                            ?.businessName}
-                      </Text>
-                    </View>
-                  )}
+                    {/* Legal Entity Name */}
+                    {(normVendor.businessDetails?.businessName ||
+                      restaurant._raw?.vendorId?.businessDetails
+                        ?.businessName) && (
+                        <View style={styles.otherDetailItem}>
+                          <Text
+                            style={[
+                              styles.otherDetailLabel,
+                              { color: colors.text.secondary },
+                            ]}
+                          >
+                            Legal entity name
+                          </Text>
+                          <Text
+                            style={[
+                              styles.otherDetailValue,
+                              { color: colors.text.primary },
+                            ]}
+                          >
+                            {normVendor.businessDetails?.businessName ||
+                              restaurant._raw?.vendorId?.businessDetails
+                                ?.businessName}
+                          </Text>
+                        </View>
+                      )}
 
-                  {/* Address */}
-                  {displayLocation && (
-                    <View style={styles.otherDetailItem}>
-                      <Text
-                        style={[
-                          styles.otherDetailLabel,
-                          { color: colors.text.secondary },
-                        ]}
-                      >
-                        Address
-                      </Text>
-                      <Text
-                        style={[
-                          styles.otherDetailValue,
-                          { color: colors.text.primary },
-                        ]}
-                      >
-                        {displayLocation}
-                      </Text>
-                    </View>
-                  )}
+                    {/* Address */}
+                    {displayLocation && (
+                      <View style={styles.otherDetailItem}>
+                        <Text
+                          style={[
+                            styles.otherDetailLabel,
+                            { color: colors.text.secondary },
+                          ]}
+                        >
+                          Address
+                        </Text>
+                        <Text
+                          style={[
+                            styles.otherDetailValue,
+                            { color: colors.text.primary },
+                          ]}
+                        >
+                          {displayLocation}
+                        </Text>
+                      </View>
+                    )}
 
-                  {/* Phone */}
-                  {(normVendor.contactNumber ||
-                    normVendor.phone ||
-                    restaurant._raw?.vendorId?.contactDetails?.phone) && (
-                    <View style={styles.otherDetailItem}>
-                      <Text
-                        style={[
-                          styles.otherDetailLabel,
-                          { color: colors.text.secondary },
-                        ]}
-                      >
-                        Phone
-                      </Text>
-                      <Text
-                        style={[
-                          styles.otherDetailValue,
-                          { color: colors.text.primary },
-                        ]}
-                      >
-                        {normVendor.contactNumber ||
-                          normVendor.phone ||
-                          restaurant._raw?.vendorId?.contactDetails?.phone}
-                      </Text>
-                    </View>
-                  )}
+                    {/* Phone */}
+                    {(normVendor.contactNumber ||
+                      normVendor.phone ||
+                      restaurant._raw?.vendorId?.contactDetails?.phone) && (
+                        <View style={styles.otherDetailItem}>
+                          <Text
+                            style={[
+                              styles.otherDetailLabel,
+                              { color: colors.text.secondary },
+                            ]}
+                          >
+                            Phone
+                          </Text>
+                          <Text
+                            style={[
+                              styles.otherDetailValue,
+                              { color: colors.text.primary },
+                            ]}
+                          >
+                            {normVendor.contactNumber ||
+                              normVendor.phone ||
+                              restaurant._raw?.vendorId?.contactDetails?.phone}
+                          </Text>
+                        </View>
+                      )}
 
-                  {/* Email */}
-                  {(normVendor.contactDetails?.email ||
-                    restaurant._raw?.vendorId?.contactDetails?.email ||
-                    normVendor.email) && (
-                    <View style={styles.otherDetailItem}>
-                      <Text
-                        style={[
-                          styles.otherDetailLabel,
-                          { color: colors.text.secondary },
-                        ]}
-                      >
-                        Email
-                      </Text>
-                      <Text
-                        style={[
-                          styles.otherDetailValue,
-                          { color: colors.text.primary },
-                        ]}
-                      >
-                        {normVendor.contactDetails?.email ||
-                          restaurant._raw?.vendorId?.contactDetails?.email ||
-                          normVendor.email}
-                      </Text>
-                    </View>
-                  )}
+                    {/* Email */}
+                    {(normVendor.contactDetails?.email ||
+                      restaurant._raw?.vendorId?.contactDetails?.email ||
+                      normVendor.email) && (
+                        <View style={styles.otherDetailItem}>
+                          <Text
+                            style={[
+                              styles.otherDetailLabel,
+                              { color: colors.text.secondary },
+                            ]}
+                          >
+                            Email
+                          </Text>
+                          <Text
+                            style={[
+                              styles.otherDetailValue,
+                              { color: colors.text.primary },
+                            ]}
+                          >
+                            {normVendor.contactDetails?.email ||
+                              restaurant._raw?.vendorId?.contactDetails?.email ||
+                              normVendor.email}
+                          </Text>
+                        </View>
+                      )}
 
-                  {/* Registration Code */}
-                  {(normVendor.businessDetails?.registrationCode ||
-                    restaurant._raw?.vendorId?.businessDetails
-                      ?.registrationCode ||
-                    normVendor.registrationCode) && (
-                    <View style={styles.otherDetailItem}>
-                      <Text
-                        style={[
-                          styles.otherDetailLabel,
-                          { color: colors.text.secondary },
-                        ]}
-                      >
-                        Registration Code
-                      </Text>
-                      <Text
-                        style={[
-                          styles.otherDetailValue,
-                          { color: colors.text.primary },
-                        ]}
-                      >
-                        {normVendor.businessDetails?.registrationCode ||
-                          restaurant._raw?.vendorId?.businessDetails
-                            ?.registrationCode ||
-                          normVendor.registrationCode}
-                      </Text>
-                    </View>
-                  )}
+                    {/* Registration Code */}
+                    {(normVendor.businessDetails?.registrationCode ||
+                      restaurant._raw?.vendorId?.businessDetails
+                        ?.registrationCode ||
+                      normVendor.registrationCode) && (
+                        <View style={styles.otherDetailItem}>
+                          <Text
+                            style={[
+                              styles.otherDetailLabel,
+                              { color: colors.text.secondary },
+                            ]}
+                          >
+                            Registration Code
+                          </Text>
+                          <Text
+                            style={[
+                              styles.otherDetailValue,
+                              { color: colors.text.primary },
+                            ]}
+                          >
+                            {normVendor.businessDetails?.registrationCode ||
+                              restaurant._raw?.vendorId?.businessDetails
+                                ?.registrationCode ||
+                              normVendor.registrationCode}
+                          </Text>
+                        </View>
+                      )}
 
-                  {/* Business Register Name */}
-                  {(normVendor.businessDetails?.businessRegisterName ||
-                    restaurant._raw?.vendorId?.businessDetails
-                      ?.businessRegisterName) && (
-                    <View style={styles.otherDetailItem}>
-                      <Text
-                        style={[
-                          styles.otherDetailLabel,
-                          { color: colors.text.secondary },
-                        ]}
-                      >
-                        Business Register Name
-                      </Text>
-                      <Text
-                        style={[
-                          styles.otherDetailValue,
-                          { color: colors.text.primary },
-                        ]}
-                      >
-                        {normVendor.businessDetails?.businessRegisterName ||
-                          restaurant._raw?.vendorId?.businessDetails
-                            ?.businessRegisterName}
-                      </Text>
-                    </View>
-                  )}
+                    {/* Business Register Name */}
+                    {(normVendor.businessDetails?.businessRegisterName ||
+                      restaurant._raw?.vendorId?.businessDetails
+                        ?.businessRegisterName) && (
+                        <View style={styles.otherDetailItem}>
+                          <Text
+                            style={[
+                              styles.otherDetailLabel,
+                              { color: colors.text.secondary },
+                            ]}
+                          >
+                            Business Register Name
+                          </Text>
+                          <Text
+                            style={[
+                              styles.otherDetailValue,
+                              { color: colors.text.primary },
+                            ]}
+                          >
+                            {normVendor.businessDetails?.businessRegisterName ||
+                              restaurant._raw?.vendorId?.businessDetails
+                                ?.businessRegisterName}
+                          </Text>
+                        </View>
+                      )}
 
-                  <Text
-                    style={[
-                      styles.legalDisclaimer,
-                      { color: colors.text.secondary },
-                    ]}
-                  >
-                    The partner commits to only offer products that comply with
-                    the applicable rules of European Union law.
-                  </Text>
-                </View>
-              )}
+                    <Text
+                      style={[
+                        styles.legalDisclaimer,
+                        { color: colors.text.secondary },
+                      ]}
+                    >
+                      The partner commits to only offer products that comply with
+                      the applicable rules of European Union law.
+                    </Text>
+                  </View>
+                )}
 
               {/* Explicit spacer to fix Android bottom clipping when scrolled to the end */}
               <View style={{ height: Math.max(60, insets.bottom + 40) }} />
