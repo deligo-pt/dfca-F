@@ -601,15 +601,15 @@ const CategoriesScreen = ({ navigation }) => {
           ? [p.category]
           : [];
       const rawTags = Array.isArray(p._raw?.tags) ? p._raw.tags : [];
-      const allCats = [...new Set([...pCats, ...rawTags])];
 
       const targetCuisine = selectedCuisine
         ? String(selectedCuisine).toLowerCase().trim()
         : null;
 
-      const matchCuisine =
-        !targetCuisine ||
-        allCats.some((c) => {
+      let matchCuisine = !targetCuisine;
+
+      if (!matchCuisine) {
+        const checkCuisine = (c) => {
           if (!c) return false;
           if (typeof c === "string") {
             const s = c.toLowerCase().trim();
@@ -634,7 +634,23 @@ const CategoriesScreen = ({ navigation }) => {
             );
           }
           return false;
-        });
+        };
+
+        for (let i = 0; i < pCats.length; i++) {
+          if (checkCuisine(pCats[i])) {
+            matchCuisine = true;
+            break;
+          }
+        }
+        if (!matchCuisine) {
+          for (let i = 0; i < rawTags.length; i++) {
+            if (checkCuisine(rawTags[i])) {
+              matchCuisine = true;
+              break;
+            }
+          }
+        }
+      }
 
       return matchVendor && matchCuisine;
     });
@@ -747,14 +763,20 @@ const CategoriesScreen = ({ navigation }) => {
       const userLat = currentLocation?.latitude;
       const userLng = currentLocation?.longitude;
 
-      list.sort((a, b) => {
-        const latA = a.vendor?.latitude;
-        const lngA = a.vendor?.longitude;
-        const latB = b.vendor?.latitude;
-        const lngB = b.vendor?.longitude;
+      // Pre-calculate distance for sorting to avoid calling getDistance inside sort's O(N log N) loop
+      list.forEach((item) => {
+        item._distance = getDistance(
+          userLat,
+          userLng,
+          item.vendor?.latitude,
+          item.vendor?.longitude
+        );
+      });
 
-        const distA = getDistance(userLat, userLng, latA, lngA);
-        const distB = getDistance(userLat, userLng, latB, lngB);
+      list.sort((a, b) => {
+        const distA = a._distance;
+        const distB = b._distance;
+
         if (distA !== distB) return distA - distB;
         return String(a.name || "").localeCompare(String(b.name || ""));
       });
@@ -818,9 +840,10 @@ const CategoriesScreen = ({ navigation }) => {
         if (cuisineSlug) {
           const pCats = Array.isArray(p.categories) ? p.categories : [];
           const rawTags = Array.isArray(p._raw?.tags) ? p._raw.tags : [];
-          const allCats = [...new Set([...pCats, ...rawTags])];
 
-          const matchesCuisine = allCats.some((c) => {
+          let matchesCuisine = false;
+
+          const checkCuisine = (c) => {
             if (!c) return false;
             if (typeof c === "string") {
               const s = c.toLowerCase().trim();
@@ -837,7 +860,22 @@ const CategoriesScreen = ({ navigation }) => {
               );
             }
             return false;
-          });
+          };
+
+          for (let i = 0; i < pCats.length; i++) {
+            if (checkCuisine(pCats[i])) {
+              matchesCuisine = true;
+              break;
+            }
+          }
+          if (!matchesCuisine) {
+            for (let i = 0; i < rawTags.length; i++) {
+              if (checkCuisine(rawTags[i])) {
+                matchesCuisine = true;
+                break;
+              }
+            }
+          }
 
           if (!matchesCuisine) continue;
         }

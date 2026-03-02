@@ -125,6 +125,39 @@ class CheckoutAPI {
       return { success: false, error: error?.message || 'Network error' };
     }
   }
+
+  /**
+   * Create Reduniq payment intent
+   * @param {string} checkoutSummaryId
+   * @param {string} paymentMethod
+   * @returns {Promise}
+   */
+  static async createReduniqPaymentIntent(checkoutSummaryId, paymentMethod = 'CARD') {
+    try {
+      const url = `${BASE_API_URL}/payment/reduniq/create-payment-intent`;
+      const headers = await this.getHeaders();
+      const payload = { checkoutSummaryId, paymentMethod };
+
+      console.debug('[CheckoutAPI] POST', url, payload);
+
+      const response = await fetch(url, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify(payload),
+      });
+
+      const responseData = await response.json();
+
+      if (!response.ok) {
+        return { success: false, error: responseData?.message || 'Failed to create Reduniq payment', data: responseData };
+      }
+
+      return { success: true, data: responseData };
+    } catch (error) {
+      console.error('Checkout API - createReduniqPayment error:', error);
+      return { success: false, error: error?.message || 'Network error' };
+    }
+  }
 }
 
 export default CheckoutAPI;

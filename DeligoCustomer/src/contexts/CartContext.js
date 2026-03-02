@@ -403,6 +403,32 @@ export const CartProvider = ({ children }) => {
         return { success: false, message: res.error || 'Failed to add item' };
       }
 
+      // --- WORKAROUND FOR BACKEND BUG ---
+      // The backend 'addToCart' endpoint ignores the quantity parameter (inserts 1 item).
+      // If the user requested quantity > 1, we must increment by the remaining amount.
+      if (res.success && quantity > 1) {
+        console.log(`[Cart] Backend workaround: Incrementing by remaining ${quantity - 1}`);
+
+        try {
+          const incrementRes = await CartAPI.activateItem(
+            cleanProductId,
+            quantity - 1,
+            'increment',
+            payload.variantName,
+            payload.variationSku
+          );
+
+          if (!incrementRes.success) {
+            console.warn('[Cart] Workaround increment failed:', incrementRes);
+            // We could revert optimistic add here, but since 1 item DID get added successfully,
+            // the user might prefer to keep the 1 item. A force fetch will sync the correct actual UI state.
+          }
+        } catch (incErr) {
+          console.error('[Cart] Workaround increment exception:', incErr);
+        }
+      }
+      // --- END WORKAROUND ---
+
       // Success: Refresh cart to get accurate server-side calculations (taxes, subtotal)
       console.log('[Cart] Sync success, refreshing for accurate totals');
       fetchCart({ force: true, silent: true });
@@ -1065,7 +1091,8 @@ export const CartProvider = ({ children }) => {
               addonsTotal: totalsCalc.addonsValue,
               addonsTax: totalsCalc.addonsTax,
               deliveryTax: cartData.deliveryVatAmount, // Explicit delivery tax from backend
-            }
+            },
+            checkoutInfo: res.data // Store full backend response for downstream components (CartDetail, etc)
           };
         } else {
           // Merge better vendor info if available
@@ -1087,6 +1114,7 @@ export const CartProvider = ({ children }) => {
             addonsTax: totalsCalc.addonsTax,
             deliveryTax: cartData.deliveryVatAmount,
           };
+          c.checkoutInfo = res.data;
         }
 
         newCarts[vendorKey].items[itemKey] = {

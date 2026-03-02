@@ -161,6 +161,7 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     flex: 1,
+    marginRight: 10,
   },
   locationText: {
     color: colors.text.white || '#FFFFFF',
@@ -168,7 +169,7 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
     fontFamily: 'Poppins-Medium',
     marginLeft: 4,
     marginRight: 3,
-    flex: 1,
+    flexShrink: 1,
   },
   cartButtonTop: {
     width: 32,
@@ -179,6 +180,7 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
     borderRadius: 16,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.2)',
+    overflow: 'hidden',
   },
   searchRow: {
     flexDirection: 'row',

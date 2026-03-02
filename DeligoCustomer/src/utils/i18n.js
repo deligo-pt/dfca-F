@@ -726,6 +726,16 @@ export const translations = {
       continue: "Continue",
     },
     continue: "Continue",
+    lowStock: "Low Stock",
+    left: "left",
+    vendorContactMsg: "Please contact the vendor",
+    completePayment: "Complete Payment",
+    otherMethods: "Other Methods",
+    taxDelivery: "Delivery VAT",
+    productDiscount: "Product Discount",
+    orderTotal: "Order Total",
+    voucherApplied: "Voucher Applied",
+    finalPayable: "Final Payable",
   },
   pt: {
     // Common
@@ -1414,6 +1424,16 @@ export const translations = {
     sendMessageError: "Falha ao enviar mensagem",
     supportTeam: "Equipa de Suporte",
     activeNow: "Ativo agora",
+    lowStock: "Pouco Stock",
+    left: "restante",
+    vendorContactMsg: "Por favor, contate o restaurante",
+    completePayment: "Concluir Pagamento",
+    otherMethods: "Outros Métodos",
+    taxDelivery: "IVA de Entrega",
+    productDiscount: "Desconto de Produto",
+    orderTotal: "Total do Pedido",
+    voucherApplied: "Voucher Aplicado",
+    finalPayable: "Final a Pagar",
   },
 };
 

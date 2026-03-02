@@ -11,6 +11,7 @@ import {
   ActivityIndicator,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { WebView } from 'react-native-webview';
 import { spacing } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -129,7 +130,7 @@ const CheckoutScreen = ({ route, navigation }) => {
   const [checkoutResponse, setCheckoutResponse] = useState(null);
 
   // Missing States Restoration
-  const [selectedPayment, setSelectedPayment] = useState('card');
+  const [selectedPayment, setSelectedPayment] = useState('CARD');
   const [stripeReady, setStripeReady] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [tip, setTip] = useState(0);
@@ -141,6 +142,7 @@ const CheckoutScreen = ({ route, navigation }) => {
   // Success Modal State
   const [showSuccessModal, setShowSuccessModal] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
+  const [paymentUrl, setPaymentUrl] = useState(null);
 
   // NIF Modal State
   const [showNifModal, setShowNifModal] = useState(false);
@@ -751,7 +753,7 @@ const CheckoutScreen = ({ route, navigation }) => {
 
   // Extract values from server response FIRST so they are available for valid calculation
   const serverData = checkoutResponse?.data || checkoutResponse || {};
-  const serverTotal = serverData.subtotal ?? serverData.total ?? serverData.totalAmount ?? serverData.subTotal; // Fallback to subTotal if total missing (legacy)
+  const serverTotal = serverData.payoutSummary?.grandTotal ?? serverData.subtotal ?? serverData.total ?? serverData.totalAmount ?? serverData.subTotal; // Fallback to grandTotal first
 
   // Try to find explicit delivery fee
   const serverDeliveryFee = serverData.deliveryCharge ?? serverData.deliveryFee ?? serverData.delivery_fee ?? null;
@@ -835,12 +837,26 @@ const CheckoutScreen = ({ route, navigation }) => {
 
   const paymentMethods = [
     {
-      id: 'card',
+      id: 'CARD',
       name: t('creditDebitCard'),
       icon: 'credit-card-outline',
       badge: t('recommended'),
     },
-    { id: 'wallet', name: t('digitalWallet'), icon: 'wallet' },
+    {
+      id: 'MB_WAY',
+      name: 'MB WAY',
+      icon: 'cellphone-nfc'
+    },
+    {
+      id: 'APPLE_PAY',
+      name: 'Apple Pay',
+      icon: 'apple'
+    },
+    {
+      id: 'OTHER',
+      name: t('otherMethods') || 'Other Methods',
+      icon: 'dots-horizontal-circle-outline',
+    },
   ];
 
   // Helper: robustly extract checkoutSummaryId from various backend response shapes
@@ -887,56 +903,11 @@ const CheckoutScreen = ({ route, navigation }) => {
   };
 
   useEffect(() => {
-    let cancelled = false;
-
-    async function initStripe() {
-      const checkoutSummaryId = extractCheckoutSummaryId(checkoutResponse);
-
-      if (!checkoutSummaryId) {
-        console.warn('[CheckoutScreen] No checkoutSummaryId found in checkout response', {
-          availableKeys: Object.keys(checkoutResponse || {})
-        });
-        setStripeError('Checkout session not initialized. Please try again.');
-        return;
-      }
-
-      console.debug('[CheckoutScreen] Initializing Stripe with checkoutSummaryId:', checkoutSummaryId);
-
-      const res = await setupPaymentSheet(checkoutSummaryId);
-
-      if (cancelled) return;
-
-      if (!res.success) {
-        // Check if it's a Stripe connection error from backend
-        const errorMsg = res.error || '';
-        if (errorMsg.includes('StripeConnectionError') || errorMsg.includes('connection to Stripe')) {
-          setStripeError('Backend cannot connect to Stripe. Please check server configuration.');
-        } else if (errorMsg.includes('Payment intent not found')) {
-          setStripeError('Payment setup failed. Please contact support.');
-        } else {
-          setStripeError(errorMsg);
-        }
-      } else {
-        setStripeReady(true);
-      }
-    }
-
-    // Initialize Stripe once we have a checkoutResponse
-    if (checkoutResponse) {
-      initStripe();
-    }
-
-    return () => {
-      cancelled = true;
-    };
+    // Reduniq does not require initialization on the client side like Stripe.
+    // We just wait for the user to click "Place Order".
   }, [checkoutResponse, total]);
 
   const handlePlaceOrder = async () => {
-    if (!stripeReady) {
-      setStripeError(stripeError || 'Payment not ready. Please wait...');
-      return;
-    }
-
     const checkoutSummaryId = extractCheckoutSummaryId(checkoutResponse);
 
     if (!checkoutSummaryId) {
@@ -946,63 +917,64 @@ const CheckoutScreen = ({ route, navigation }) => {
 
     setIsProcessing(true);
 
-    // Step 1: Present payment sheet and process payment
-    const payRes = await openPaymentSheet();
+    // Step 1: Create Reduniq Payment Intent
+    // using selected payment mapping or fallback to CARD
+    const validPaymentMethods = ['CARD', 'MB_WAY', 'APPLE_PAY', 'OTHER'];
+    let paymentMethod = validPaymentMethods.includes(selectedPayment) ? selectedPayment : 'CARD';
+
+    console.debug('[CheckoutScreen] Creating Reduniq payment intent with:', { checkoutSummaryId, paymentMethod });
+
+    const payRes = await CheckoutAPI.createReduniqPaymentIntent(checkoutSummaryId, paymentMethod);
 
     if (!payRes.success) {
       setIsProcessing(false);
-      setStripeError(payRes.error);
+      setStripeError(payRes.error || 'Payment initiation failed. Please try again.');
       return;
     }
 
-    // Step 2: Create order with checkoutSummaryId and paymentIntentId
-    const { paymentIntentId } = payRes;
+    const responseData = payRes.data?.data || payRes.data;
+    const redirectUrl = responseData?.redirectUrl;
 
-    if (!paymentIntentId) {
-      console.error('[CheckoutScreen] Payment succeeded but no paymentIntentId returned');
+    if (!redirectUrl) {
+      console.error('[CheckoutScreen] Reduniq response missing redirectUrl:', responseData);
       setIsProcessing(false);
-      setStripeError('Payment succeeded but order creation failed. Please contact support.');
+      setStripeError('Payment gateway did not provide a redirect URL.');
       return;
     }
 
-    console.debug('[CheckoutScreen] Creating order with:', { checkoutSummaryId, paymentIntentId });
-
-    const orderRes = await OrderAPI.createOrder(checkoutSummaryId, paymentIntentId);
-
-    if (!orderRes.success) {
-      setIsProcessing(false);
-      setStripeError(orderRes.error || 'Failed to create order. Please contact support.');
-      console.error('[CheckoutScreen] Order creation failed:', orderRes);
-      return;
-    }
-
-    console.debug('[CheckoutScreen] Order created successfully:', orderRes.data);
-
-    // Step 3: Stop Spinner & Show Success
-    console.debug('[CheckoutScreen] Order success flow: Stop spinner');
+    // Step 2: Open the payment page in an in-app WebView
+    setPaymentUrl(redirectUrl);
     setIsProcessing(false);
-    setShowSuccessModal(true);
+  };
 
-    // Step 4: Clear Cart in Background
-    const targetVendorId = vendorId || (cartsArray && cartsArray.length > 0 ? cartsArray[0].vendorId : null);
+  const handlePaymentNavigationChange = (navState) => {
+    if (!navState.url) return;
+    const url = navState.url;
 
-    if (targetVendorId) {
-      // Don't await this, let it run in background to keep UI snappy
-      clearVendorCartAndSync(targetVendorId).catch(err => {
-        console.warn('[CheckoutScreen] Failed to clear cart after order:', err);
-      });
-    } else {
-      console.warn('[CheckoutScreen] Could not determine vendorId to clear cart');
+    if (url.includes('payment-success')) {
+      setPaymentUrl(null);
+      setIsProcessing(false);
+      setShowSuccessModal(true);
+
+      const targetVendorId = vendorId || (cartsArray && cartsArray.length > 0 ? cartsArray[0].vendorId : null);
+      if (targetVendorId) {
+        clearVendorCartAndSync(targetVendorId).catch(err => {
+          console.warn('[CheckoutScreen] Failed to clear cart after order:', err);
+        });
+      }
+
+      setTimeout(() => {
+        setShowSuccessModal(false);
+        navigation.reset({
+          index: 0,
+          routes: [{ name: 'Main', params: { screen: 'Orders' } }]
+        });
+      }, 2000);
+    } else if (url.includes('payment-failed')) {
+      setPaymentUrl(null);
+      setIsProcessing(false);
+      setStripeError(t('paymentFailed') || 'Payment failed or cancelled.');
     }
-
-    // Step 5: Navigate away
-    setTimeout(() => {
-      setShowSuccessModal(false);
-      navigation.reset({
-        index: 0,
-        routes: [{ name: 'Main', params: { screen: 'Orders' } }]
-      });
-    }, 2000);
   };
 
   const renderSuccessModal = () => (
@@ -1157,11 +1129,19 @@ const CheckoutScreen = ({ route, navigation }) => {
           </View>
           <View style={styles(colors).orderItemsContainer}>
             {cartItems.map((item, index) => {
-              // Priority: Backend Subtotal > Calculated Subtotal
-              // Check subtotal or totalPrice or totalBeforeTax or finalPrice*qty
-              const itemTotal = (item.subtotal !== undefined && item.subtotal !== null)
-                ? Number(item.subtotal)
-                : ((item.finalPrice || item.price || 0) + (item.addons || []).reduce((s, ad) => s + Number(ad.price || 0), 0)) * item.quantity;
+              // Priority: Backend GrandTotal > Backend Subtotal > Calculated Subtotal
+              const serverItem = (checkoutResponse?.items || []).find(
+                si => String(si.productId?._id || si.productId) === String(item.product?._id || item.product || item.id || item.productId)
+                  && (!item.variationSku || si.variationSku === item.variationSku)
+              );
+
+              const itemTotal = (serverItem?.itemSummary?.grandTotal !== undefined && serverItem?.itemSummary?.grandTotal !== null)
+                ? Number(serverItem.itemSummary.grandTotal)
+                : (item.subtotal !== undefined && item.subtotal !== null)
+                  ? Number(item.subtotal)
+                  : ((item.finalPrice || item.price || 0) + (item.addons || []).reduce((s, ad) => s + Number(ad.price || 0), 0)) * item.quantity;
+
+              console.debug(`[CheckoutScreen] Item Match for ${item.name}: serverItemFound=${!!serverItem}, serverItemTotal=${serverItem?.itemSummary?.grandTotal}, itemSubtotal=${item.subtotal}, finalItemTotal=${itemTotal}`);
 
               // Back-calculate unit price for display consistency
               // If backend gives total 25.3 for qty 3, unit is ~8.43
@@ -1374,12 +1354,7 @@ const CheckoutScreen = ({ route, navigation }) => {
         <View style={styles(colors).summarySection}>
           <View style={styles(colors).sectionHeader}>
             <View style={styles(colors).sectionTitleRow}>
-              <MaterialCommunityIcons
-                name="receipt-text"
-                size={20}
-                color={colors.primary}
-              />
-              <Text style={styles(colors).sectionTitle}>{t('paymentSummary')}</Text>
+              <Text style={styles(colors).sectionTitle}>🧾 {t('paymentSummary') || 'Payment Summary'}</Text>
             </View>
           </View>
 
@@ -1388,109 +1363,93 @@ const CheckoutScreen = ({ route, navigation }) => {
             <View style={styles(colors).summaryRow}>
               <Text style={styles(colors).summaryLabel}>{t('itemsPrice') || 'Items Price'}</Text>
               <Text style={styles(colors).summaryValue}>
-                {formatCurrency(currency, cart?.totals?.itemsOriginalTotal || 0)}
+                {formatCurrency(currency, checkoutResponse?.orderCalculation?.totalOriginalPrice || cart?.totals?.itemsOriginalTotal || 0)}
               </Text>
             </View>
 
-            {/* 2. Discount (Product Level) */}
-            {(cart?.totals?.discount > 0) && (
+            {/* 2. Product Discount */}
+            {(checkoutResponse?.orderCalculation?.totalProductDiscount > 0 || cart?.totals?.discount > 0) && (
               <View style={styles(colors).summaryRow}>
-                <Text style={styles(colors).summaryLabel}>{t('discount')}</Text>
+                <Text style={styles(colors).summaryLabel}>{t('productDiscount') || 'Product Discount'}</Text>
                 <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 13, color: '#4CAF50' }}>
-                  -{formatCurrency(currency, cart?.totals?.discount)}
+                  -{formatCurrency(currency, checkoutResponse?.orderCalculation?.totalProductDiscount || cart?.totals?.discount)}
                 </Text>
               </View>
             )}
 
-            {/* 3. Add-ons Price */}
-            {(cart?.totals?.addonsTotal > 0) && (
-              <View style={styles(colors).summaryRow}>
-                <Text style={styles(colors).summaryLabel}>{t('addons') || 'Add-ons'}</Text>
-                <Text style={styles(colors).summaryValue}>
-                  {formatCurrency(currency, cart?.totals?.addonsTotal)}
-                </Text>
-              </View>
-            )}
-
-            {/* Divider */}
-            <View style={styles(colors).divider} />
-
-            {/* 4. Subtotal (Net/Excl Tax) */}
+            {/* 3. Subtotal (Net/Excl Tax) */}
             <View style={styles(colors).summaryRow}>
               <Text style={styles(colors).summaryLabel}>{t('subtotalExclTax') || 'Subtotal (Excl. Tax)'}</Text>
               <Text style={styles(colors).summaryValue}>
-                {formatCurrency(currency, cart?.totals?.totalPrice || checkoutResponse?.totalPrice || 0)}
+                {formatCurrency(currency, (checkoutResponse?.orderCalculation?.totalOriginalPrice - (checkoutResponse?.orderCalculation?.totalProductDiscount || 0)) || cart?.totals?.totalPrice || 0)}
               </Text>
             </View>
 
-            {/* 5. Tax (Items) */}
-            {(cart?.totals?.itemsTax > 0 || (cart?.totals?.taxAmount > 0 && !cart?.totals?.itemsTax)) && (
+            {/* Spacing */}
+            <View style={{ height: 12 }} />
+
+            {/* 4. Tax (Items) */}
+            {(checkoutResponse?.orderCalculation?.totalTaxAmount > 0 || cart?.totals?.itemsTax > 0) && (
               <View style={styles(colors).summaryRow}>
                 <Text style={styles(colors).summaryLabel}>{t('taxItems') || 'Tax (Items)'}</Text>
                 <Text style={styles(colors).summaryValue}>
-                  {formatCurrency(currency, cart?.totals?.itemsTax || cart?.totals?.taxAmount || 0)}
+                  {formatCurrency(currency, checkoutResponse?.orderCalculation?.totalTaxAmount || cart?.totals?.itemsTax || 0)}
                 </Text>
               </View>
             )}
 
-            {/* 6. Tax (Add-ons) */}
-            {(cart?.totals?.addonsTax > 0) && (
-              <View style={styles(colors).summaryRow}>
-                <Text style={styles(colors).summaryLabel}>{t('taxAddons') || 'Tax (Add-ons)'}</Text>
-                <Text style={styles(colors).summaryValue}>
-                  {formatCurrency(currency, cart?.totals?.addonsTax)}
-                </Text>
-              </View>
-            )}
-
-            {/* 6.5. Tax (Delivery) - Explicit from Backend */}
-            {(cart?.totals?.deliveryTax > 0 || checkoutResponse?.deliveryVatAmount > 0) && (
-              <View style={styles(colors).summaryRow}>
-                <Text style={styles(colors).summaryLabel}>{t('taxDelivery') || 'Tax (Delivery)'}</Text>
-                <Text style={styles(colors).summaryValue}>
-                  {formatCurrency(currency, cart?.totals?.deliveryTax || checkoutResponse?.deliveryVatAmount)}
-                </Text>
-              </View>
-            )}
-
-            {/* 7. Delivery Fee */}
+            {/* 5. Delivery Fee */}
             <View style={styles(colors).summaryRow}>
               <Text style={styles(colors).summaryLabel}>{t('deliveryFee')}</Text>
               <Text style={styles(colors).summaryValue}>
-                {formatCurrency(currency, cart?.totals?.deliveryFee || checkoutResponse?.deliveryCharge || 0)}
+                {formatCurrency(currency, checkoutResponse?.delivery?.charge || checkoutResponse?.deliveryCharge || finalDeliveryFee || 0)}
               </Text>
             </View>
 
-            {/* 8. Voucher / Coupon Discount */}
-            {(checkoutResponse?.offerDiscount > 0 || (appliedPromo && appliedPromo.discount > 0)) && (
-              <View style={[styles(colors).summaryRow, {
-                marginTop: 8,
-                backgroundColor: '#ECFDF5',
-                padding: 8,
-                borderRadius: 8,
-                borderWidth: 1,
-                borderColor: '#10B981',
-                alignItems: 'center'
-              }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <MaterialCommunityIcons name="ticket-percent" size={16} color="#059669" style={{ marginRight: 6 }} />
-                  <Text style={{ fontFamily: 'Poppins-Medium', fontSize: 13, color: '#059669' }}>{t('voucher') || 'Voucher'}</Text>
-                </View>
-                <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 13, color: '#059669' }}>
-                  -{formatCurrency(currency, checkoutResponse?.offerDiscount || appliedPromo?.discount || 0)}
+            {/* 6. Delivery VAT */}
+            {(checkoutResponse?.delivery?.vatAmount > 0 || checkoutResponse?.deliveryVatAmount > 0) && (
+              <View style={styles(colors).summaryRow}>
+                <Text style={styles(colors).summaryLabel}>
+                  {t('taxDelivery') || 'Delivery VAT'} {checkoutResponse?.delivery?.vatRate ? `(${checkoutResponse.delivery.vatRate}%)` : ''}
+                </Text>
+                <Text style={styles(colors).summaryValue}>
+                  {formatCurrency(currency, checkoutResponse?.delivery?.vatAmount || checkoutResponse?.deliveryVatAmount || 0)}
                 </Text>
               </View>
             )}
 
-            <View style={styles(colors).divider} />
+            {/* ──────────────────────── Divider 1 */}
+            <View style={[styles(colors).divider, { marginVertical: 12, backgroundColor: colors.border, opacity: 0.6 }]} />
 
-            {/* 9. Total */}
+            {/* 7. Order Total (Before Voucher) */}
             <View style={styles(colors).summaryRow}>
-              <Text style={styles(colors).totalLabel}>{t('total')}</Text>
-              <Text style={styles(colors).totalValue}>
-                {formatCurrency(currency, checkoutResponse?.subtotal || cart?.totals?.grandTotal || 0)}
+              <Text style={[styles(colors).summaryLabel, { fontFamily: 'Poppins-Bold' }]}>{t('orderTotal') || 'Order Total'}</Text>
+              <Text style={[styles(colors).summaryValue, { fontFamily: 'Poppins-Bold' }]}>
+                {(() => {
+                  const voucherAmt = checkoutResponse?.orderCalculation?.totalOfferDiscount || checkoutResponse?.offerDiscount || 0;
+                  const grandTotal = checkoutResponse?.payoutSummary?.grandTotal || 0;
+                  // Order total before voucher is simply grandTotal + voucher discount
+                  return formatCurrency(currency, grandTotal + voucherAmt);
+                })()}
               </Text>
             </View>
+
+            {/* 8. Voucher Applied (If any) */}
+            {(checkoutResponse?.orderCalculation?.totalOfferDiscount > 0 || checkoutResponse?.offerDiscount > 0) && (
+              <View style={[styles(colors).summaryRow, { marginTop: 8 }]}>
+                <Text style={[styles(colors).summaryLabel, { color: '#059669' }]}>{t('voucherApplied') || 'Voucher Applied'}</Text>
+                <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 13, color: '#059669' }}>
+                  -{formatCurrency(currency, checkoutResponse?.orderCalculation?.totalOfferDiscount || checkoutResponse?.offerDiscount || 0)}
+                </Text>
+              </View>
+            )}
+
+            {/* Optional Fallback Total if No Voucher */}
+            {!(checkoutResponse?.orderCalculation?.totalOfferDiscount > 0 || checkoutResponse?.offerDiscount > 0) && (
+              <View style={{ marginTop: 12 }}>
+                {/* No special final payable needed, already shown as Order Total above or can repeat with emoji */}
+              </View>
+            )}
           </View>
         </View>
 
@@ -1582,10 +1541,10 @@ const CheckoutScreen = ({ route, navigation }) => {
           <TouchableOpacity
             style={[
               styles(colors).placeOrderBtn,
-              (isProcessing || initializingCheckout || !stripeReady) && styles(colors).placeOrderBtnDisabled,
+              (isProcessing || initializingCheckout) && styles(colors).placeOrderBtnDisabled,
             ]}
             onPress={handlePlaceOrder}
-            disabled={isProcessing || initializingCheckout || !stripeReady}
+            disabled={isProcessing || initializingCheckout}
             activeOpacity={0.85}
           >
             <Text style={styles(colors).placeOrderBtnText}>
@@ -1593,9 +1552,7 @@ const CheckoutScreen = ({ route, navigation }) => {
                 ? t('processing')
                 : initializingCheckout
                   ? t('preparingCheckout')
-                  : !stripeReady
-                    ? t('initializingPayment')
-                    : t('placeOrder')}
+                  : t('placeOrder')}
             </Text>
             <View style={styles(colors).placeOrderArrow}>
               <Ionicons
@@ -1613,6 +1570,29 @@ const CheckoutScreen = ({ route, navigation }) => {
 
       {renderProcessingModal()}
       {renderSuccessModal()}
+
+      {/* Payment WebView Modal */}
+      <Modal visible={!!paymentUrl} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setPaymentUrl(null)}>
+        <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+            <TouchableOpacity onPress={() => setPaymentUrl(null)}>
+              <Ionicons name="close" size={28} color={colors.text.primary} />
+            </TouchableOpacity>
+            <Text style={{ fontSize: 18, fontFamily: 'Poppins-SemiBold', marginLeft: 16, color: colors.text.primary }}>
+              {t('completePayment') || 'Complete Payment'}
+            </Text>
+          </View>
+          {paymentUrl && (
+            <WebView
+              source={{ uri: paymentUrl }}
+              onNavigationStateChange={handlePaymentNavigationChange}
+              startInLoadingState={true}
+              renderLoading={() => <ActivityIndicator size="large" color={colors.primary} style={{ flex: 1, position: 'absolute', top: '50%', left: '50%', marginTop: -20, marginLeft: -20 }} />}
+              style={{ flex: 1 }}
+            />
+          )}
+        </SafeAreaView>
+      </Modal>
 
       {/* NIF Modal */}
       <Modal
