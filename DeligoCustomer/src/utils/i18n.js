@@ -224,6 +224,14 @@ export const translations = {
     creditDebitCard: "Credit/Debit Card",
     digitalWallet: "Digital Wallet",
     recommended: "Recommended",
+    orderPlacedSuccessfully: "Order Placed Successfully!",
+    paymentConfirmedInfo: "Your payment was successful. We are now preparing your order.",
+    amountPaid: "Amount Paid",
+    estimatedDelivery: "Estimated Delivery",
+    viewOrderDetails: "View Order Details",
+    paymentFailed: "Payment Failed",
+    paymentFailedDescription: "Something went wrong with your transaction. Please try again.",
+    tryAgain: "Try Again",
 
     // Orders Screen
     ongoingOrders: "Ongoing Orders",
@@ -1434,6 +1442,14 @@ export const translations = {
     orderTotal: "Total do Pedido",
     voucherApplied: "Voucher Aplicado",
     finalPayable: "Final a Pagar",
+    orderPlacedSuccessfully: "Pedido Realizado com Sucesso!",
+    paymentConfirmedInfo: "O seu pagamento foi bem-sucedido. Estamos a preparar o seu pedido.",
+    amountPaid: "Valor Pago",
+    estimatedDelivery: "Entrega Estimada",
+    viewOrderDetails: "Ver Detalhes do Pedido",
+    paymentFailed: "Pagamento Falhou",
+    paymentFailedDescription: "Algo correu mal com a sua transação. Por favor, tente novamente.",
+    tryAgain: "Tentar Novamente",
   },
 };
 

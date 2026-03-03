@@ -32,6 +32,9 @@ export const API_CONFIG = {
   BASE_URL: API_BASE_URLS[ENVIRONMENT],
   API_VERSION: 'v1',
   TIMEOUT: 30000, // 30 seconds global timeout
+  frontend_urls: {
+    frontend_url_test_payment: 'https://deligo.pt', // Base URL for payment success/fail landing pages
+  },
 };
 
 /**

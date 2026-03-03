@@ -301,7 +301,10 @@ const OrdersScreen = ({ navigation }) => {
     };
 
     // Get items list as string
-    const itemsList = order.items?.map(item => `${item.quantity}x ${item.name}`).join(', ') || t('items') || 'items';
+    const itemsList = order.items?.map(item => {
+      const qty = item.itemSummary?.quantity ?? item.quantity ?? 1;
+      return `${qty}x ${item.name}`;
+    }).join(', ') || t('items') || 'items';
 
     // Use vendor image if available, else placeholder
     const restaurantImage = order.vendorImage
@@ -328,7 +331,7 @@ const OrdersScreen = ({ navigation }) => {
                 {order.vendorName || t('groceriesAndFood') || 'Groceries & Food'}
               </Text>
               <Text style={[styles.orderPrice, { color: colors.text.primary }]}>
-                €{Number(order.totalAmount ?? order.total ?? order.grandTotal ?? order.subTotal ?? order.subtotal ?? 0).toFixed(2)}
+                €{Number(order.payoutSummary?.grandTotal ?? order.totalAmount ?? order.total ?? order.grandTotal ?? 0).toFixed(2)}
               </Text>
             </View>
             <View style={styles.subHeaderRow}>

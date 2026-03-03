@@ -53,14 +53,14 @@ class OrderAPI {
    * @param {string} paymentIntentId - Stripe payment intent ID
    * @returns {Promise}
    */
-  static async createOrder(checkoutSummaryId, paymentIntentId) {
+  static async createOrder(checkoutSummaryId, paymentToken) {
     try {
       const url = `${BASE_API_URL}${API_ENDPOINTS.ORDERS.CREATE_ORDER}`;
       const headers = await this.getHeaders();
 
       const body = {
         checkoutSummaryId,
-        paymentIntentId,
+        paymentToken,
       };
 
       console.debug('[OrderAPI] POST', url, body);

@@ -26,7 +26,7 @@ import CheckoutAPI from '../utils/checkoutApi';
 import OrderAPI from '../utils/orderApi';
 import { customerApi } from '../utils/api';
 import AddressApi from '../utils/addressApi';
-import { API_ENDPOINTS } from '../constants/config';
+import { API_ENDPOINTS, API_CONFIG } from '../constants/config';
 import { getUserId, getUserData } from '../utils/auth';
 
 /**
@@ -141,6 +141,7 @@ const CheckoutScreen = ({ route, navigation }) => {
 
   // Success Modal State
   const [showSuccessModal, setShowSuccessModal] = useState(false);
+  const [showFailureModal, setShowFailureModal] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState(null);
 
@@ -863,21 +864,19 @@ const CheckoutScreen = ({ route, navigation }) => {
   const extractCheckoutSummaryId = (checkoutResponse) => {
     if (!checkoutResponse || typeof checkoutResponse !== 'object') return null;
     const candidatePaths = [
-      // direct keys
-      ['CheckoutSummaryId'],
+      // Priority 1: Specific checkout summary ID keys
       ['checkoutSummaryId'],
-      // nested under data
-      ['data', 'CheckoutSummaryId'],
+      ['CheckoutSummaryId'],
       ['data', 'checkoutSummaryId'],
-      // fallback to _id if explicit ID is missing
-      ['data', '_id'],
-      ['_id'],
-      // nested summary objects
-      ['data', 'checkoutSummary', '_id'],
-      ['checkoutSummary', '_id'],
-      // alternative snake/camel cases
+      ['data', 'CheckoutSummaryId'],
       ['checkout_summary_id'],
       ['data', 'checkout_summary_id'],
+      // Priority 2: Nested summary objects
+      ['data', 'checkoutSummary', '_id'],
+      ['checkoutSummary', '_id'],
+      // Priority 3: Fallback generic IDs (Low priority as they might be MongoDB IDs)
+      ['data', '_id'],
+      ['_id'],
     ];
     for (const path of candidatePaths) {
       let cur = checkoutResponse;
@@ -887,7 +886,8 @@ const CheckoutScreen = ({ route, navigation }) => {
           cur = cur[segment];
         } else { ok = false; break; }
       }
-      if (ok && cur && typeof cur === 'string') return cur;
+      // Allow strings and numbers
+      if (ok && (typeof cur === 'string' || typeof cur === 'number')) return String(cur);
     }
     // Try case-insensitive scan of top-level keys
     for (const k of Object.keys(checkoutResponse)) {
@@ -922,9 +922,23 @@ const CheckoutScreen = ({ route, navigation }) => {
     const validPaymentMethods = ['CARD', 'MB_WAY', 'APPLE_PAY', 'OTHER'];
     let paymentMethod = validPaymentMethods.includes(selectedPayment) ? selectedPayment : 'CARD';
 
-    console.debug('[CheckoutScreen] Creating Reduniq payment intent with:', { checkoutSummaryId, paymentMethod });
+    const config = API_CONFIG;
+    const returnUrlOk = `${config.frontend_urls.frontend_url_test_payment}/payment-success?token={token}&summaryId=${checkoutSummaryId}`;
+    const returnUrlError = `${config.frontend_urls.frontend_url_test_payment}/payment-failed?summaryId=${checkoutSummaryId}`;
 
-    const payRes = await CheckoutAPI.createReduniqPaymentIntent(checkoutSummaryId, paymentMethod);
+    console.debug('[CheckoutScreen] Creating Reduniq payment intent with:', {
+      checkoutSummaryId,
+      paymentMethod,
+      returnUrlOk,
+      returnUrlError
+    });
+
+    const payRes = await CheckoutAPI.createReduniqPaymentIntent(
+      checkoutSummaryId,
+      paymentMethod,
+      returnUrlOk,
+      returnUrlError
+    );
 
     if (!payRes.success) {
       setIsProcessing(false);
@@ -947,13 +961,57 @@ const CheckoutScreen = ({ route, navigation }) => {
     setIsProcessing(false);
   };
 
-  const handlePaymentNavigationChange = (navState) => {
-    if (!navState.url) return;
-    const url = navState.url;
+  const handlePaymentSuccess = async (url) => {
+    console.log('[CheckoutScreen] Processing Success. URL:', url);
 
-    if (url.includes('payment-success')) {
-      setPaymentUrl(null);
-      setIsProcessing(false);
+    // Set loading state while converting checkout to order
+    setIsProcessing(true);
+    setPaymentUrl(null);
+
+    let checkoutSummaryId = extractCheckoutSummaryId(checkoutResponse);
+    let paymentToken = 'REDUNIQ_SUCCESS';
+
+    // Parse parameters from URL if available
+    if (url && url.includes('?')) {
+      try {
+        const queryString = url.split('?')[1];
+        const pairs = queryString.split('&');
+        const params = {};
+        pairs.forEach(p => {
+          const [k, v] = p.split('=');
+          params[k] = decodeURIComponent(v || '');
+        });
+
+        if (params.summaryId) checkoutSummaryId = params.summaryId;
+
+        // Robust token extraction
+        // 1. Direct 'token' parameter
+        if (params.token && params.token !== '{token}') {
+          paymentToken = params.token;
+        }
+        // 2. Fallback: Scan URL for anything that looks like a token if 'token' param is placeholder
+        else {
+          const tokenMatch = url.match(/token=([a-zA-Z0-9_-]+)/);
+          if (tokenMatch && tokenMatch[1] !== '{token}') {
+            paymentToken = tokenMatch[1];
+          }
+        }
+      } catch (e) {
+        console.warn('[CheckoutScreen] Failed to parse success URL params:', e);
+      }
+    }
+
+    console.log('[CheckoutScreen] Delaying order confirmation to ensure gateway sync...');
+    await new Promise(resolve => setTimeout(resolve, 2000));
+
+    console.log('[CheckoutScreen] Confirming order with backend:', { checkoutSummaryId, paymentToken });
+
+    // Step 3: Convert Checkout to real Order
+    const orderRes = await OrderAPI.createOrder(checkoutSummaryId, paymentToken);
+
+    setIsProcessing(false);
+
+    if (orderRes.success) {
       setShowSuccessModal(true);
 
       const targetVendorId = vendorId || (cartsArray && cartsArray.length > 0 ? cartsArray[0].vendorId : null);
@@ -969,35 +1027,112 @@ const CheckoutScreen = ({ route, navigation }) => {
           index: 0,
           routes: [{ name: 'Main', params: { screen: 'Orders' } }]
         });
-      }, 2000);
+      }, 4000);
+    } else {
+      console.error('[CheckoutScreen] Failed to convert checkout to order:', orderRes.error);
+      setStripeError(orderRes.error || 'Payment was successful, but we failed to create your order. Please contact support.');
+      setShowFailureModal(true);
+    }
+  };
+
+  const handlePaymentFailure = (urlOrMsg) => {
+    let displayError = t('paymentFailedDescription') || 'Something went wrong with your transaction. Please try again.';
+    let errorCode = 'UNKNOWN';
+
+    console.log('[CheckoutScreen] Processing Failure. Input:', urlOrMsg);
+
+    if (typeof urlOrMsg === 'string' && urlOrMsg.includes('?')) {
+      try {
+        const queryString = urlOrMsg.split('?')[1];
+        const pairs = queryString.split('&');
+        const params = {};
+        pairs.forEach(p => {
+          const [k, v] = p.split('=');
+          params[k] = decodeURIComponent(v || '');
+        });
+
+        // Reduniq often sends 'message', 'errorMessage', 'reasonCode', or 'ResponseCode'
+        const reason = params.message || params.reason || params.error || params.errorMessage || params.status;
+        errorCode = params.errorCode || params.ResponseCode || params.status || 'FAIL';
+
+        if (reason) {
+          displayError = `${reason} (Code: ${errorCode})`;
+        } else if (errorCode !== 'UNKNOWN') {
+          displayError = `Payment refused by provider. Code: ${errorCode}`;
+        }
+      } catch (e) {
+        console.warn('[CheckoutScreen] Failed to parse failure URL details:', e);
+      }
+    } else if (typeof urlOrMsg === 'string' && urlOrMsg.length > 0 && !urlOrMsg.startsWith('http')) {
+      displayError = urlOrMsg;
+    }
+
+    console.error(`[CheckoutScreen] 🚨 PAYMENT FAILED 🚨\nURL/Msg: ${urlOrMsg}\nExtracted Error: ${displayError}`);
+
+    setPaymentUrl(null);
+    setIsProcessing(false);
+    setStripeError(displayError);
+    setShowFailureModal(true);
+  };
+
+  const handlePaymentNavigationChange = (navState) => {
+    if (!navState.url) return;
+    const url = navState.url;
+
+    console.debug('[CheckoutScreen] WebView Navigation:', url);
+
+    if (url.includes('payment-success')) {
+      handlePaymentSuccess(url);
     } else if (url.includes('payment-failed')) {
-      setPaymentUrl(null);
-      setIsProcessing(false);
-      setStripeError(t('paymentFailed') || 'Payment failed or cancelled.');
+      handlePaymentFailure(url);
     }
   };
 
   const renderSuccessModal = () => (
-    <Modal visible={showSuccessModal} transparent animationType="fade">
+    <Modal visible={showSuccessModal} transparent animationType="slide">
       <View style={styles(colors).modalOverlay}>
-        <View style={styles(colors).successModal}>
+        <View style={[styles(colors).successModal, { paddingBottom: 40 }]}>
           <View style={styles(colors).successIconContainer}>
-            <Ionicons name="checkmark-circle" size={80} color={colors.success} />
+            <View style={{
+              width: 100,
+              height: 100,
+              borderRadius: 50,
+              backgroundColor: '#E8F5E9',
+              alignItems: 'center',
+              justifyContent: 'center',
+              marginBottom: 10
+            }}>
+              <Ionicons name="checkmark-done-circle" size={80} color={colors.success} />
+            </View>
           </View>
-          <Text style={styles(colors).successTitle}>{t('orderPlaced')}</Text>
-          <Text style={styles(colors).successMessage}>{t('orderConfirmed')}</Text>
-          <View style={styles(colors).successDetails}>
-            <Text style={styles(colors).successDetailText}>{t('estimatedDeliveryTime')}: 25-35 {t('min')}</Text>
+          <Text style={styles(colors).successTitle}>{t('orderPlacedSuccessfully') === 'orderPlacedSuccessfully' ? 'Order Placed!' : t('orderPlacedSuccessfully')}</Text>
+          <Text style={styles(colors).successMessage}>
+            {t('paymentConfirmedInfo') === 'paymentConfirmedInfo' ? 'Your payment was successful. We are now preparing your order.' : t('paymentConfirmedInfo')}
+          </Text>
+          <View style={[styles(colors).successDetails, { backgroundColor: colors.background, padding: 16, borderRadius: 16, width: '100%', marginBottom: 24 }]}>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
+              <Text style={{ fontFamily: 'Poppins-Regular', color: colors.text.secondary }}>{t('amountPaid') || 'Amount Paid'}</Text>
+              <Text style={{ fontFamily: 'Poppins-Bold', color: colors.text.primary }}>{formatCurrency(currency, displayTotal)}</Text>
+            </View>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
+              <Text style={{ fontFamily: 'Poppins-Regular', color: colors.text.secondary }}>{t('estimatedDelivery') || 'Delivery Time'}</Text>
+              <Text style={{ fontFamily: 'Poppins-Bold', color: colors.primary }}>25-35 {t('min')}</Text>
+            </View>
           </View>
-          {/* Manual navigation button as fallback */}
+
           <TouchableOpacity
             style={{
-              marginTop: 24,
               backgroundColor: colors.primary,
-              paddingVertical: 14,
-              paddingHorizontal: 32,
+              paddingVertical: 16,
+              paddingHorizontal: 40,
               borderRadius: 30,
-              elevation: 2,
+              elevation: 4,
+              shadowColor: colors.primary,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.3,
+              shadowRadius: 8,
+              width: '100%',
+              alignItems: 'center'
             }}
             onPress={() => {
               setShowSuccessModal(false);
@@ -1008,7 +1143,47 @@ const CheckoutScreen = ({ route, navigation }) => {
             }}
           >
             <Text style={{ color: '#fff', fontFamily: 'Poppins-Bold', fontSize: 16 }}>
-              {t('trackOrder') || 'Track Order'} →
+              {t('viewOrderDetails') || 'View Order'}
+            </Text>
+          </TouchableOpacity>
+        </View>
+      </View>
+    </Modal>
+  );
+
+  const renderFailureModal = () => (
+    <Modal visible={showFailureModal} transparent animationType="fade">
+      <View style={styles(colors).modalOverlay}>
+        <View style={styles(colors).successModal}>
+          <View style={{
+            width: 90,
+            height: 90,
+            borderRadius: 45,
+            backgroundColor: '#FFEBEE',
+            alignItems: 'center',
+            justifyContent: 'center',
+            marginBottom: 20
+          }}>
+            <Ionicons name="close-circle" size={70} color="#F44336" />
+          </View>
+          <Text style={[styles(colors).successTitle, { color: '#D32F2F' }]}>{t('paymentFailed') === 'paymentFailed' ? 'Payment Failed' : t('paymentFailed')}</Text>
+          <Text style={styles(colors).successMessage}>
+            {stripeError === 'paymentFailedDescription' ? 'Something went wrong with your transaction. Please try again.' : stripeError}
+          </Text>
+
+          <TouchableOpacity
+            style={{
+              backgroundColor: '#D32F2F',
+              paddingVertical: 14,
+              paddingHorizontal: 32,
+              borderRadius: 30,
+              minWidth: 200,
+              alignItems: 'center'
+            }}
+            onPress={() => setShowFailureModal(false)}
+          >
+            <Text style={{ color: '#fff', fontFamily: 'Poppins-Bold', fontSize: 16 }}>
+              {t('tryAgain') || 'Try Again'}
             </Text>
           </TouchableOpacity>
         </View>
@@ -1570,6 +1745,7 @@ const CheckoutScreen = ({ route, navigation }) => {
 
       {renderProcessingModal()}
       {renderSuccessModal()}
+      {renderFailureModal()}
 
       {/* Payment WebView Modal */}
       <Modal visible={!!paymentUrl} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setPaymentUrl(null)}>
@@ -1586,7 +1762,38 @@ const CheckoutScreen = ({ route, navigation }) => {
             <WebView
               source={{ uri: paymentUrl }}
               onNavigationStateChange={handlePaymentNavigationChange}
+              onShouldStartLoadWithRequest={(request) => {
+                console.log('[CheckoutScreen] WebView Loading Request:', request.url);
+                // Intercept redirection before it loads the web page
+                if (request.url.includes('payment-success')) {
+                  handlePaymentSuccess(request.url);
+                  return false;
+                }
+                if (request.url.includes('payment-failed')) {
+                  handlePaymentFailure(request.url);
+                  return false;
+                }
+                return true;
+              }}
+              onError={(syntheticEvent) => {
+                const { nativeEvent } = syntheticEvent;
+                console.warn('[CheckoutScreen] WebView Error:', nativeEvent);
+                handlePaymentFailure(`WebView Error: ${nativeEvent.description}`);
+              }}
+              onHttpError={(syntheticEvent) => {
+                const { nativeEvent } = syntheticEvent;
+                console.warn('[CheckoutScreen] WebView HTTP Error:', nativeEvent);
+                if (nativeEvent.statusCode === 404) {
+                  handlePaymentFailure('Payment session expired or invalid (404). Please try again.');
+                }
+              }}
               startInLoadingState={true}
+              javaScriptEnabled={true}
+              domStorageEnabled={true}
+              thirdPartyCookiesEnabled={true}
+              userAgent="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
+              originWhitelist={['*']}
+              mixedContentMode="always"
               renderLoading={() => <ActivityIndicator size="large" color={colors.primary} style={{ flex: 1, position: 'absolute', top: '50%', left: '50%', marginTop: -20, marginLeft: -20 }} />}
               style={{ flex: 1 }}
             />

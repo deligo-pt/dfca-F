@@ -132,11 +132,16 @@ class CheckoutAPI {
    * @param {string} paymentMethod
    * @returns {Promise}
    */
-  static async createReduniqPaymentIntent(checkoutSummaryId, paymentMethod = 'CARD') {
+  static async createReduniqPaymentIntent(checkoutSummaryId, paymentMethod = 'CARD', returnUrlOk = null, returnUrlError = null) {
     try {
       const url = `${BASE_API_URL}/payment/reduniq/create-payment-intent`;
       const headers = await this.getHeaders();
-      const payload = { checkoutSummaryId, paymentMethod };
+      const payload = {
+        checkoutSummaryId,
+        paymentMethod,
+        returnUrlOk,
+        returnUrlError
+      };
 
       console.debug('[CheckoutAPI] POST', url, payload);
 

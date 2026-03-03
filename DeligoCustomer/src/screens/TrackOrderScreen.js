@@ -390,11 +390,13 @@ const TrackOrderScreen = ({ route, navigation }) => {
       if (typeof item.productId === 'object' && item.productId) {
         productName = item.productId.name || item.name || 'Product';
       }
+      const quantity = item.itemSummary?.quantity ?? (item.quantity || 1);
+      const subtotal = item.itemSummary?.grandTotal ?? item.subtotal ?? (item.price * (item.quantity || 1) || 0);
       return {
         name: productName,
-        quantity: item.quantity || 1,
-        price: item.price || item.subtotal / (item.quantity || 1) || 0,
-        subtotal: item.subtotal || item.price * (item.quantity || 1) || 0
+        quantity: quantity,
+        price: item.productPricing?.unitPrice ?? (item.price || (subtotal / quantity) || 0),
+        subtotal: subtotal
       };
     });
 
@@ -536,11 +538,13 @@ const TrackOrderScreen = ({ route, navigation }) => {
       restaurantCoordinates: restaurantCoords,
       items: normalizedItems,
       itemsText: itemsText,
-      subtotal: Number(data.totalPrice ?? data.itemsPrice ?? calculatedSubtotal ?? 0),
-      deliveryFee: Number(data.deliveryCharge ?? data.deliveryFee ?? 0),
+      totalItems: data.totalItems ?? normalizedItems.reduce((acc, item) => acc + (item.quantity || 1), 0),
+      subtotal: Number(data.orderCalculation?.taxableAmount ?? data.orderCalculation?.totalOriginalPrice ?? calculatedSubtotal ?? 0),
+      taxAmount: Number(data.orderCalculation?.totalTaxAmount ?? 0),
+      deliveryFee: Number(data.delivery?.totalDeliveryCharge ?? data.deliveryCharge ?? 0),
       serviceFee: data.serviceFee || 0,
       discount: data.discount || 0,
-      totalAmount: Number(data.totalAmount ?? data.total ?? data.grandTotal ?? data.subTotal ?? data.subtotal ?? 0),
+      totalAmount: Number(data.payoutSummary?.grandTotal ?? data.totalAmount ?? 0),
       estimatedTime: data.estimatedDeliveryTime || '',
       estimatedArrival: data.estimatedArrival || '',
       deliveryAddress: deliveryAddrStr || '',
@@ -1834,12 +1838,12 @@ const TrackOrderScreen = ({ route, navigation }) => {
             <Ionicons name="bag-handle" size={20} color={colors.primary} />
           </View>
           <View style={styles.summaryContent}>
-            <Text style={styles.summaryLabel}>{t('items')} ({orderData.items?.length || 0})</Text>
+            <Text style={styles.summaryLabel}>{t('items')} ({orderData.totalItems})</Text>
             {orderData.items?.map((item, index) => (
               <View key={index} style={styles.itemRow}>
                 <Text style={styles.itemQuantity}>{item.quantity || 1}x</Text>
                 <Text style={styles.itemName}>{item.name || item}</Text>
-                <Text style={styles.itemPrice}>€{item.price ? item.price.toFixed(2) : '0.00'}</Text>
+                <Text style={styles.itemPrice}>€{item.subtotal ? item.subtotal.toFixed(2) : '0.00'}</Text>
               </View>
             ))}
           </View>
@@ -1862,6 +1866,13 @@ const TrackOrderScreen = ({ route, navigation }) => {
               <Text style={styles.billLabel}>{t('deliveryFee')}</Text>
               <Text style={styles.billValue}>€{orderData.deliveryFee ? orderData.deliveryFee.toFixed(2) : '0.00'}</Text>
             </View>
+
+            {orderData.taxAmount > 0 && (
+              <View style={styles.billRow}>
+                <Text style={styles.billLabel}>{t('tax') || 'Tax'}</Text>
+                <Text style={styles.billValue}>€{orderData.taxAmount.toFixed(2)}</Text>
+              </View>
+            )}
 
             {orderData.discount > 0 && (
               <View style={styles.billRow}>
