@@ -5,6 +5,7 @@ import { getAccessToken, getRefreshToken, removeAccessToken, removeRefreshToken,
 import { BASE_API_URL, API_ENDPOINTS } from '../../constants/config';
 import { useTheme } from '../../utils/ThemeContext';
 import { useLanguage } from '../../utils/LanguageContext';
+import { LinearGradient } from 'expo-linear-gradient';
 const API_URL = `${BASE_API_URL}${API_ENDPOINTS.PROFILE.GET}`;
 
 const LOGOUT_URL = `${BASE_API_URL}${API_ENDPOINTS.AUTH.LOGOUT}`;
@@ -147,7 +148,7 @@ export const performLogout = async () => {
  * @param {Object} props.navigation - Navigation prop.
  */
 export default function UserProfileCard({ user: userProp, navigation }) {
-    const { colors } = useTheme();
+    const { colors, isDarkMode } = useTheme();
     const { t } = useLanguage();
     const [profile, setProfile] = useState(userProp || null);
     const [loading, setLoading] = useState(!userProp);
@@ -238,38 +239,63 @@ export default function UserProfileCard({ user: userProp, navigation }) {
     const contact = profile.contactNumber || profile.phone || profile.mobile || t('notProvided');
 
     return (
-        <View style={[styles.card, { backgroundColor: colors?.surface || '#fff', shadowColor: colors?.shadow || '#000' }]}>
-            <View style={[styles.avatarContainer, { shadowColor: colors?.shadow || '#000' }]}>
-                <Image source={avatarSource} style={[styles.avatar, { borderColor: colors?.border || 'transparent' }]} />
-            </View>
-
-            <View style={styles.contentColumn}>
-                <View style={styles.info}>
-                    <View style={styles.nameRow}>
-                        <Text style={[styles.name, { color: colors?.text?.primary }]} numberOfLines={2} ellipsizeMode="tail">{fullName || t('unnamedUser')}</Text>
-                        {(profile.verified || profile.isVerified) && (
-                            <Ionicons name="checkmark-circle" size={16} color={colors?.success || '#4CAF50'} style={styles.verifiedIcon} />
-                        )}
-                    </View>
-                    <Text style={[styles.meta, { color: colors?.text?.secondary }]}>{email}</Text>
-                    <Text style={[styles.meta, { color: colors?.text?.secondary }]}>{contact}</Text>
+        <View style={[{
+            marginHorizontal: 16,
+            marginTop: 24,
+            marginBottom: 12,
+            borderRadius: 24,
+            padding: 20,
+            backgroundColor: colors?.surface || '#fff',
+            elevation: 6,
+            shadowColor: '#000',
+            shadowOffset: { width: 0, height: 6 },
+            shadowOpacity: 0.05,
+            shadowRadius: 10,
+            borderWidth: 1,
+            borderColor: isDarkMode ? '#2A2A2A' : '#F0F0F0'
+        }]}>
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ width: 72, height: 72, borderRadius: 36, borderWidth: 3, borderColor: 'rgba(220,49,115,0.15)', overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: isDarkMode ? '#2A2A2A' : '#F5F5F5', marginRight: 16 }}>
+                    <Image source={avatarSource} style={{ width: 72, height: 72, borderRadius: 36 }} resizeMode="cover" />
                 </View>
 
-                <View style={[styles.divider, { backgroundColor: colors?.border || '#eee' }]} />
+                <View style={{ flex: 1, justifyContent: 'center' }}>
+                    <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 2 }}>
+                        <Text style={{ fontSize: 20, fontFamily: 'Poppins-Bold', color: colors?.text?.primary, letterSpacing: -0.5 }} numberOfLines={1}>{fullName || t('unnamedUser')}</Text>
+                        {(profile.verified || profile.isVerified) && (
+                            <Ionicons name="checkmark-circle" size={18} color={colors?.success || '#4CAF50'} style={{ marginLeft: 6 }} />
+                        )}
+                    </View>
 
-                {navigation && (
-                    <TouchableOpacity
-                        onPress={() => navigation.navigate('EditProfile', { user: profile })}
-                        style={[styles.longButton, { backgroundColor: colors?.primary }]}
-                        accessibilityLabel={t('editProfile')}
-                        accessibilityRole="button"
-                        hitSlop={{ top: 8, left: 8, right: 8, bottom: 8 }}
-                    >
-                        <Ionicons name="create-outline" size={16} color="#fff" style={{ marginRight: 10 }} />
-                        <Text style={styles.longButtonText}>{t('editProfile')}</Text>
-                    </TouchableOpacity>
-                )}
+                    <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#F5F5F5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start', marginBottom: 6 }}>
+                        <Ionicons name="mail" size={12} color={colors?.text?.secondary} style={{ marginRight: 6 }} />
+                        <Text style={{ fontSize: 11, fontFamily: 'Poppins-Medium', color: colors?.text?.secondary }}>{email}</Text>
+                    </View>
+
+                    {contact !== t('notProvided') && (
+                        <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#F5F5F5', paddingHorizontal: 8, paddingVertical: 4, borderRadius: 8, alignSelf: 'flex-start' }}>
+                            <Ionicons name="call" size={12} color={colors?.text?.secondary} style={{ marginRight: 6 }} />
+                            <Text style={{ fontSize: 11, fontFamily: 'Poppins-Medium', color: colors?.text?.secondary }}>{contact}</Text>
+                        </View>
+                    )}
+                </View>
             </View>
+
+            <View style={{ height: 1, backgroundColor: isDarkMode ? '#333' : '#F0F0F0', marginVertical: 16 }} />
+
+            {navigation && (
+                <TouchableOpacity onPress={() => navigation.navigate('EditProfile', { user: profile })} activeOpacity={0.8}>
+                    <LinearGradient
+                        colors={['#DC3173', '#ef5a92']}
+                        start={{ x: 0, y: 0 }}
+                        end={{ x: 1, y: 0 }}
+                        style={{ height: 48, borderRadius: 16, flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}
+                    >
+                        <Ionicons name="create-outline" size={18} color="#fff" style={{ marginRight: 8 }} />
+                        <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 15, color: '#fff' }}>{t('editProfile')}</Text>
+                    </LinearGradient>
+                </TouchableOpacity>
+            )}
         </View>
     );
 }

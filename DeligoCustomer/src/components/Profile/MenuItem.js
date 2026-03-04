@@ -18,7 +18,7 @@ import { useTheme } from '../../utils/ThemeContext';
  * @param {string} [props.iconColor] - Custom icon color override.
  */
 const MenuItem = ({ iconName, title, subtitle, onPress, showDivider = true, iconColor }) => {
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
   const [pressed, setPressed] = useState(false);
 
   // Fallback color logic for the chevron icon
@@ -27,18 +27,27 @@ const MenuItem = ({ iconName, title, subtitle, onPress, showDivider = true, icon
   return (
     <>
       <TouchableOpacity
-        style={styles.menuItem}
+        style={[{
+          flexDirection: 'row',
+          alignItems: 'center',
+          paddingHorizontal: 20,
+          paddingVertical: 14,
+        }]}
         onPress={onPress}
         onPressIn={() => setPressed(true)}
         onPressOut={() => setPressed(false)}
         activeOpacity={0.8}
       >
-        {/* Icon Container with visual feedback on press */}
-        <View style={[
-          styles.menuIconContainer,
-          { backgroundColor: colors.surface, borderColor: colors.border },
-          pressed && [styles.menuIconContainerPressed, { backgroundColor: colors.border }]
-        ]}>
+        {/* Icon Container with subtle background shape matching order icons */}
+        <View style={[{
+          width: 44,
+          height: 44,
+          borderRadius: 22,
+          alignItems: 'center',
+          justifyContent: 'center',
+          marginRight: 16,
+          backgroundColor: pressed ? (isDarkMode ? '#333' : '#F0F0F0') : (isDarkMode ? 'rgba(255,255,255,0.06)' : '#FFF0F5'),
+        }]}>
           <Ionicons
             name={iconName}
             size={22}
@@ -46,19 +55,21 @@ const MenuItem = ({ iconName, title, subtitle, onPress, showDivider = true, icon
           />
         </View>
 
-        <View style={styles.menuTextContainer}>
-          <Text style={[styles.menuText, { color: colors.text.primary }]}>{title}</Text>
+        <View style={{ flex: 1 }}>
+          <Text style={[{ fontSize: 16, fontFamily: 'Poppins-SemiBold', color: colors.text.primary }]}>{title}</Text>
           {subtitle && (
-            <Text style={[styles.menuSubtitle, { color: colors.text.secondary }]}>{subtitle}</Text>
+            <Text style={[{ fontSize: 13, fontFamily: 'Poppins-Regular', color: colors.text.secondary, marginTop: 2 }]}>{subtitle}</Text>
           )}
         </View>
 
-        <Ionicons name="chevron-forward" size={20} color={chevronColor} />
+        <View style={{ width: 32, height: 32, borderRadius: 16, backgroundColor: isDarkMode ? '#2A2A2A' : '#F9F9F9', alignItems: 'center', justifyContent: 'center' }}>
+          <Ionicons name="chevron-forward" size={16} color={chevronColor} />
+        </View>
       </TouchableOpacity>
 
       {/* Conditional Divider for list separation */}
       {showDivider && (
-        <View style={[styles.menuDivider, { backgroundColor: colors.border }]} />
+        <View style={[{ height: 1, backgroundColor: isDarkMode ? '#333' : '#F0F0F0', marginLeft: 80, marginRight: 20 }]} />
       )}
     </>
   );

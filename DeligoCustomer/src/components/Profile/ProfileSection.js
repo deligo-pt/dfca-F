@@ -14,10 +14,24 @@ import { useTheme } from '../../utils/ThemeContext';
  * @returns {JSX.Element} The rendered ProfileSection component
  */
 const ProfileSection = ({ title, children }) => {
-  const { colors } = useTheme();
+  const { colors, isDarkMode } = useTheme();
 
   return (
-    <View style={[styles.card, { backgroundColor: colors.surface }]}>
+    <View style={[{
+      backgroundColor: colors.surface,
+      marginHorizontal: 16,
+      marginBottom: 16,
+      borderRadius: 24,
+      elevation: 4,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.04,
+      shadowRadius: 10,
+      borderWidth: 1,
+      borderColor: '#F0F0F0', // Or dynamically check isDarkMode inside
+      paddingVertical: 8,
+      overflow: 'hidden'
+    }, { borderColor: colors.border }]}>
       <Text style={[styles.sectionTitle, { color: colors.text.secondary }]}>{title}</Text>
       {children}
     </View>

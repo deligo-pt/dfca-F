@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import {
   View,
   Text,
@@ -9,9 +9,13 @@ import {
   StatusBar,
   TextInput,
   ActivityIndicator,
+  Animated,
+  Dimensions,
+  Platform,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
+import { LinearGradient } from 'expo-linear-gradient';
 import { spacing } from '../theme';
 import { useTheme } from '../utils/ThemeContext';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -144,6 +148,20 @@ const CheckoutScreen = ({ route, navigation }) => {
   const [showFailureModal, setShowFailureModal] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState(null);
+
+  // CTA shimmer animation
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
+  useEffect(() => {
+    const shimmer = Animated.loop(
+      Animated.timing(shimmerAnim, {
+        toValue: 1,
+        duration: 3500,
+        useNativeDriver: true,
+      })
+    );
+    shimmer.start();
+    return () => shimmer.stop();
+  }, []);
 
   // NIF Modal State
   const [showNifModal, setShowNifModal] = useState(false);
@@ -1203,7 +1221,7 @@ const CheckoutScreen = ({ route, navigation }) => {
   );
 
   return (
-    <SafeAreaView style={styles(colors).container} edges={['top']}>
+    <SafeAreaView style={styles(colors).container} edges={['bottom', 'left', 'right']}>
       <StatusBar
         barStyle={isDarkMode ? 'light-content' : 'dark-content'}
         backgroundColor="transparent"
@@ -1212,20 +1230,25 @@ const CheckoutScreen = ({ route, navigation }) => {
       />
 
       {/* Header */}
-      <View style={styles(colors).header}>
-        <TouchableOpacity
-          style={styles(colors).backButton}
-          onPress={() => navigation.goBack()}
+      <View style={[styles(colors).headerContainer]}>
+        <LinearGradient
+          colors={isDarkMode ? ['#1A0A15', '#1A0A15'] : ['#FFF5F8', '#FFE8F0']}
+          style={[styles(colors).headerGradient, { paddingTop: insets.top + 16 }]}
         >
-          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
-        </TouchableOpacity>
-        <View style={styles(colors).headerCenter}>
-          <Text style={styles(colors).headerTitle}>{cart?.vendorName || cartData?.vendorName || t('checkout')}</Text>
-          <Text style={styles(colors).headerSubtitle}>
-            {cartItems.length} {cartItems.length === 1 ? t('item') : t('items')} • {t('estimated')} 25-35 {t('min')}
-          </Text>
-        </View>
-        <View style={styles(colors).headerRight} />
+          <TouchableOpacity
+            style={styles(colors).backButton}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+          </TouchableOpacity>
+          <View style={styles(colors).headerCenter}>
+            <Text style={styles(colors).headerTitle}>{cart?.vendorName || cartData?.vendorName || t('checkout')}</Text>
+            <Text style={styles(colors).headerSubtitle}>
+              {cartItems.length} {cartItems.length === 1 ? t('item') : t('items')} • {t('estimated')} 25-35 {t('min')}
+            </Text>
+          </View>
+          <View style={styles(colors).headerRight} />
+        </LinearGradient>
       </View>
 
       <ScrollView
@@ -1325,8 +1348,8 @@ const CheckoutScreen = ({ route, navigation }) => {
               return (
                 <View key={item.id || index} style={styles(colors).orderItemRow}>
                   <View style={styles(colors).orderItemLeft}>
-                    <View style={styles(colors).quantityBadge}>
-                      <Text style={styles(colors).quantityText}>{item.quantity}</Text>
+                    <View style={{ backgroundColor: isDarkMode ? 'rgba(220,49,115,0.15)' : 'rgba(220,49,115,0.08)', width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginRight: 12, marginTop: 2 }}>
+                      <Text style={{ fontSize: 13, fontFamily: 'Poppins-Bold', color: colors.primary }}>{item.quantity}x</Text>
                     </View>
                     <View style={{ flex: 1 }}>
                       <Text style={styles(colors).itemNameText} numberOfLines={2}>
@@ -1706,7 +1729,6 @@ const CheckoutScreen = ({ route, navigation }) => {
             </View>
           )
         }
-
         {/* Place Order Button */}
         <View style={styles(colors).checkoutButtonContainer}>
           <View style={styles(colors).totalBarInline}>
@@ -1714,33 +1736,69 @@ const CheckoutScreen = ({ route, navigation }) => {
             <Text style={styles(colors).totalBarAmount}>{formatCurrency(currency, displayTotal)}</Text>
           </View>
           <TouchableOpacity
-            style={[
-              styles(colors).placeOrderBtn,
-              (isProcessing || initializingCheckout) && styles(colors).placeOrderBtnDisabled,
-            ]}
+            style={{ borderRadius: 18, overflow: 'hidden', opacity: (isProcessing || initializingCheckout) ? 0.7 : 1 }}
             onPress={handlePlaceOrder}
             disabled={isProcessing || initializingCheckout}
-            activeOpacity={0.85}
+            activeOpacity={0.88}
           >
-            <Text style={styles(colors).placeOrderBtnText}>
-              {isProcessing
-                ? t('processing')
-                : initializingCheckout
-                  ? t('preparingCheckout')
-                  : t('placeOrder')}
-            </Text>
-            <View style={styles(colors).placeOrderArrow}>
-              <Ionicons
-                name={isProcessing ? 'hourglass-outline' : 'arrow-forward'}
-                size={20}
-                color="#FFFFFF"
-              />
-            </View>
+            <LinearGradient
+              colors={['#DC3173', '#B51D5C', '#A8154E']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                height: 54,
+                paddingHorizontal: 20,
+              }}
+            >
+              {/* Shimmer overlay */}
+              <Animated.View
+                style={{
+                  position: 'absolute', top: 0, bottom: 0, width: 60,
+                  transform: [{ translateX: shimmerAnim.interpolate({ inputRange: [0, 1], outputRange: [-100, Dimensions.get('window').width + 800] }) }],
+                }}
+              >
+                <LinearGradient
+                  colors={['transparent', 'rgba(255,255,255,0.25)', 'rgba(255,255,255,0.35)', 'rgba(255,255,255,0.25)', 'transparent']}
+                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  style={{ flex: 1 }}
+                />
+              </Animated.View>
+
+              {isProcessing || initializingCheckout ? (
+                <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
+              ) : null}
+              <Text style={[styles(colors).placeOrderBtnText, { marginRight: 10, marginBottom: Platform.OS === 'ios' ? 0 : 2 }]}>
+                {isProcessing
+                  ? t('processing')
+                  : initializingCheckout
+                    ? t('preparingCheckout')
+                    : t('placeOrder')}
+              </Text>
+              {!isProcessing && !initializingCheckout && (
+                <View style={{
+                  width: 30,
+                  height: 30,
+                  backgroundColor: '#fff',
+                  borderRadius: 15,
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}>
+                  <Ionicons
+                    name="arrow-forward"
+                    size={18}
+                    color={colors.primary}
+                  />
+                </View>
+              )}
+            </LinearGradient>
           </TouchableOpacity>
         </View>
 
-        {/* Bottom Spacing for safe area */}
-        <View style={{ height: Math.max(100, insets.bottom + 90) }} />
+        {/* Bottom Spacing */}
+        <View style={{ height: Math.max(100, insets.bottom + 40) }} />
       </ScrollView >
 
       {renderProcessingModal()}
@@ -1950,20 +2008,21 @@ const styles = (colors) => StyleSheet.create({
     flex: 1,
     backgroundColor: colors.background,
   },
-  header: {
+  headerContainer: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 8,
+    zIndex: 100,
+  },
+  headerGradient: {
     flexDirection: 'row',
     alignItems: 'center',
     justifyContent: 'space-between',
-    paddingHorizontal: spacing.lg,
-    paddingVertical: 16,
-    backgroundColor: colors.surface,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
-    elevation: 2,
+    paddingHorizontal: 20,
+    paddingTop: 16,
+    paddingBottom: 24,
   },
   backButton: {
     width: 40,
@@ -2004,15 +2063,15 @@ const styles = (colors) => StyleSheet.create({
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.surface,
-    marginHorizontal: spacing.lg,
-    marginBottom: 12,
-    padding: spacing.lg,
-    borderRadius: 16,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 20,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 6,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -2055,15 +2114,15 @@ const styles = (colors) => StyleSheet.create({
   },
   section: {
     backgroundColor: colors.surface,
-    marginHorizontal: spacing.lg,
-    marginBottom: 12,
-    padding: spacing.lg,
-    borderRadius: 16,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.04,
-    shadowRadius: 3,
-    elevation: 1,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 20,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 6,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -2182,10 +2241,10 @@ const styles = (colors) => StyleSheet.create({
     marginRight: 12,
     marginTop: 2,
     shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 3,
-    elevation: 2,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.2,
+    shadowRadius: 6,
+    elevation: 3,
   },
   quantityText: {
     fontSize: 13,
@@ -2403,15 +2462,15 @@ const styles = (colors) => StyleSheet.create({
   },
   summarySection: {
     backgroundColor: colors.surface,
-    marginHorizontal: spacing.lg,
-    marginBottom: 12,
-    padding: spacing.lg,
-    borderRadius: 16,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    marginHorizontal: 16,
+    marginBottom: 16,
+    padding: 20,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 6,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -2477,16 +2536,16 @@ const styles = (colors) => StyleSheet.create({
   },
   checkoutButtonContainer: {
     backgroundColor: colors.surface,
-    marginHorizontal: spacing.lg,
-    marginTop: 12,
-    marginBottom: 12,
-    padding: spacing.lg,
-    borderRadius: 16,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.06,
-    shadowRadius: 4,
-    elevation: 2,
+    marginHorizontal: 16,
+    marginTop: 16,
+    marginBottom: 16,
+    padding: 20,
+    borderRadius: 24,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 6,
     borderWidth: 1,
     borderColor: colors.border,
   },
@@ -2526,15 +2585,22 @@ const styles = (colors) => StyleSheet.create({
     backgroundColor: colors.primary,
     paddingHorizontal: 28,
     paddingVertical: 16,
-    borderRadius: 16,
+    borderRadius: 20,
     shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
+    shadowOffset: { width: 0, height: 6 },
     shadowOpacity: 0.3,
-    shadowRadius: 8,
+    shadowRadius: 10,
     elevation: 6,
   },
   placeOrderBtnDisabled: {
     opacity: 0.6,
+  },
+  shimmerEffect: {
+    position: 'absolute',
+    top: 0, bottom: 0, left: 0,
+    width: 200,
+    backgroundColor: 'rgba(255,255,255,0.25)',
+    transform: [{ skewX: '-20deg' }],
   },
   placeOrderBtnText: {
     fontSize: 16,

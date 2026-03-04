@@ -5,7 +5,7 @@
  * view product details, and add items to their cart.
  */
 
-import React, { useState, useEffect, useCallback } from "react";
+import React, { useState, useEffect, useCallback, useRef } from "react";
 import {
   View,
   Text,
@@ -24,6 +24,8 @@ import {
   InteractionManager,
   Linking,
   Share,
+  Animated,
+  Dimensions,
 } from "react-native";
 import { useFocusEffect } from "@react-navigation/native";
 import {
@@ -174,6 +176,45 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
   // State for active add-ons display
   const [activeAddons, setActiveAddons] = useState([]);
+
+  // ── Heartbeat + Shimmer animation refs (must be at component level) ──
+  const heartbeatAnim = useRef(new Animated.Value(1)).current;
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    if (productModalVisible && modalQuantity > 0) {
+      // Heartbeat: 1 → 1.04 → 1 → 1.025 → 1
+      const heartbeat = Animated.loop(
+        Animated.sequence([
+          Animated.timing(heartbeatAnim, { toValue: 1.04, duration: 150, useNativeDriver: true }),
+          Animated.timing(heartbeatAnim, { toValue: 1, duration: 150, useNativeDriver: true }),
+          Animated.timing(heartbeatAnim, { toValue: 1.025, duration: 120, useNativeDriver: true }),
+          Animated.timing(heartbeatAnim, { toValue: 1, duration: 120, useNativeDriver: true }),
+          Animated.delay(1800),
+        ])
+      );
+      heartbeat.start();
+
+      return () => {
+        heartbeat.stop();
+      };
+    } else {
+      heartbeatAnim.setValue(1);
+    }
+  }, [productModalVisible, modalQuantity]);
+
+  // Global shimmer for bottom buttons
+  useEffect(() => {
+    const shimmer = Animated.loop(
+      Animated.timing(shimmerAnim, {
+        toValue: 1,
+        duration: 3500,
+        useNativeDriver: true,
+      })
+    );
+    shimmer.start();
+    return () => shimmer.stop();
+  }, []);
 
   // Max Quantity Modal State
   const [maxQuantityModalVisible, setMaxQuantityModalVisible] = useState(false);
@@ -1000,6 +1041,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
       return base * quantity;
     };
 
+
     return (
       <Modal
         visible={productModalVisible}
@@ -1007,969 +1049,460 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
         animationType="slide"
         onRequestClose={closeProductModal}
       >
-        <View
-          style={[styles.modalOverlay, { backgroundColor: "rgba(0,0,0,0.5)" }]}
-        >
-          <TouchableOpacity style={{ flex: 1 }} onPress={closeProductModal} />
-          <View
-            style={[
-              styles.modalCard,
-              { backgroundColor: colors.surface, flexDirection: "column" },
-            ]}
-          >
-            {/* Image Section */}
-            <View style={{ position: "relative" }}>
-              {images.length > 0 ? (
-                <Image
-                  source={{ uri: images[0] }}
-                  style={styles.modalImage}
-                  resizeMode="cover"
-                />
-              ) : null}
-              <LinearGradient
-                colors={["transparent", "rgba(255,255,255,1)"]}
-                style={styles.imageOverlay}
-              />
+        <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+          {/* Dim backdrop */}
+          <TouchableOpacity
+            style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }}
+            onPress={closeProductModal}
+            activeOpacity={1}
+          />
+
+          {/* Bottom Sheet */}
+          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+
+            {/* Handle bar + Close button */}
+            <View style={styles.modalHandleRow}>
+              {/* Spacer for symmetry */}
+              <View style={{ width: 36 }} />
+              {/* Handle */}
+              <View style={[styles.modalHandle, { backgroundColor: isDarkMode ? '#555' : '#D5D5D5' }]} />
+              {/* Close X button */}
               <TouchableOpacity
-                style={styles.modalCloseBtn}
                 onPress={closeProductModal}
+                activeOpacity={0.7}
+                style={{
+                  width: 36,
+                  height: 36,
+                  borderRadius: 18,
+                  backgroundColor: isDarkMode ? '#2A2A2A' : '#F0F0F0',
+                  alignItems: 'center',
+                  justifyContent: 'center',
+                }}
               >
-                <Ionicons name="close" size={24} color="#000" />
+                <Ionicons name="close" size={20} color={isDarkMode ? '#AAA' : '#555'} />
               </TouchableOpacity>
             </View>
 
+            {/* ScrollView — everything scrolls */}
             <ScrollView
-              style={{ flexShrink: 1, flexGrow: 1 }}
-              contentContainerStyle={{ paddingBottom: 200 }}
+              style={{ flex: 1 }}
+              contentContainerStyle={{ paddingBottom: 100 }}
               showsVerticalScrollIndicator={false}
+              bounces={true}
             >
-              {/* Content */}
-              <View style={styles.modalBody}>
-                <Text
-                  style={[styles.modalTitle, { color: colors.text.primary }]}
-                >
-                  {title}
-                </Text>
-
-                <Text
-                  style={[
-                    styles.modalDescription,
-                    { color: colors.text.secondary },
-                  ]}
-                >
-                  {description || t("noDescription")}
-                </Text>
-
-                <View style={styles.modalPriceContainer}>
-                  {(() => {
-                    // 1. Determine Base Price & Details
-                    const pricing = raw.pricing || {};
-                    let basePrice = Number(pricing.price ?? raw.price ?? 0);
-
-                    // Check for selected variation price override (e.g. Size: Medium = 12)
-                    // We look for any selected option that has a price attached to its object
-                    if (selectedVariations) {
-                      const variationKeys = Object.keys(
-                        selectedVariations,
-                      ).filter((k) => k.endsWith("_obj"));
-                      for (const key of variationKeys) {
-                        const opt = selectedVariations[key];
-                        if (opt && opt.price) {
-                          // Assuming variation price REPLACES base price if it's a primary variant (like Size)
-                          // If it's just an extra (like Cheese), it might be additive.
-                          // Based on user JSON "Size" variations have full prices (8, 12, 16).
-                          // We'll treat the highest price found as the new Base if it's > basePrice to be safe,
-                          // or just take the last one. Let's assume Size is the primary price driver.
-                          basePrice = Number(opt.price);
-                        }
-                      }
-                    }
-
-                    const discountPercent = Number(
-                      pricing.discount ?? raw.discount ?? 0,
-                    );
-                    const taxRate = Number(pricing.taxRate ?? 0);
-                    // Tax amount from backend is likely for default item. We must recalculate if base changed.
-                    let taxAmount = Number(pricing.taxAmount ?? 0);
-                    let finalPrice = Number(
-                      pricing.finalPrice ?? raw.finalPrice ?? 0,
-                    );
-
-                    // 2. Calculations for display
-                    const discountAmount = (basePrice * discountPercent) / 100;
-                    const discountedBase = basePrice - discountAmount;
-
-                    // Recalculate Tax if we are using dynamic base
-                    // If we have taxRate, we should recalculate taxAmount on the discounted base
-                    if (taxRate > 0) {
-                      taxAmount = (discountedBase * taxRate) / 100;
-                    }
-
-                    // Recalculate Final Price
-                    const displayTotal = discountedBase + taxAmount;
-
-                    return (
-                      <View>
-                        {/* 
-                           PSYCHOLOGY UI: 
-                           Show Base Price (High Anchor) vs Discounted Base Price (The Deal).
-                           Tax is secondary information.
-                        */}
-                        <View
-                          style={{
-                            flexDirection: "row",
-                            alignItems: "baseline",
-                            marginBottom: 4,
-                          }}
-                        >
-                          {/* Discounted Price (The Hero) */}
-                          <Text
-                            style={[
-                              styles.modalPrice,
-                              { fontSize: 32, color: colors.primary },
-                            ]}
-                          >
-                            {formatCurrency(currency, discountedBase)}
-                          </Text>
-
-                          {/* Original Base Price (High Anchor) */}
-                          {discountPercent > 0 && (
-                            <Text
-                              style={[
-                                styles.modalPriceOriginal,
-                                {
-                                  fontSize: 20,
-                                  textDecorationLine: "line-through",
-                                  opacity: 0.6,
-                                },
-                              ]}
-                            >
-                              {formatCurrency(currency, basePrice)}
-                            </Text>
-                          )}
-                        </View>
-
-                        {/* Discount Badge */}
-                        {discountPercent > 0 && (
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              alignItems: "center",
-                              marginBottom: 12,
-                            }}
-                          >
-                            <View
-                              style={[
-                                styles.modalBadge,
-                                {
-                                  backgroundColor: "#4CAF50",
-                                  paddingHorizontal: 8,
-                                  paddingVertical: 4,
-                                  borderRadius: 6,
-                                },
-                              ]}
-                            >
-                              <Text
-                                style={[
-                                  styles.modalBadgeText,
-                                  { fontSize: 13 },
-                                ]}
-                              >
-                                SAVE {discountPercent}%
-                              </Text>
-                            </View>
-                            <Text
-                              style={{
-                                marginLeft: 8,
-                                fontSize: 13,
-                                color: "#4CAF50",
-                                fontFamily: "Poppins-Medium",
-                              }}
-                            >
-                              (-{formatCurrency(currency, discountAmount)})
-                            </Text>
-                          </View>
-                        )}
-
-                        {/* Breakdown for Transparency (Secondary) */}
-                        <View
-                          style={{
-                            marginTop: 8,
-                            paddingTop: 12,
-                            borderTopWidth: 1,
-                            borderColor: colors.border,
-                            marginBottom: 16,
-                          }}
-                        >
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              justifyContent: "space-between",
-                              marginBottom: 4,
-                            }}
-                          >
-                            <Text
-                              style={{
-                                fontSize: 12,
-                                fontFamily: "Poppins-Regular",
-                                color: colors.text.secondary,
-                              }}
-                            >
-                              Subtotal
-                            </Text>
-                            <Text
-                              style={{
-                                fontSize: 12,
-                                fontFamily: "Poppins-Medium",
-                                color: colors.text.primary,
-                              }}
-                            >
-                              {formatCurrency(currency, discountedBase)}
-                            </Text>
-                          </View>
-
-                          {(taxAmount > 0 || taxRate > 0) && (
-                            <View
-                              style={{
-                                flexDirection: "row",
-                                justifyContent: "space-between",
-                                marginBottom: 8,
-                              }}
-                            >
-                              <Text
-                                style={{
-                                  fontSize: 12,
-                                  fontFamily: "Poppins-Regular",
-                                  color: colors.text.secondary,
-                                }}
-                              >
-                                Tax {taxRate > 0 ? `(${taxRate}%)` : ""}
-                              </Text>
-                              <Text
-                                style={{
-                                  fontSize: 12,
-                                  fontFamily: "Poppins-Medium",
-                                  color: colors.text.primary,
-                                }}
-                              >
-                                {formatCurrency(currency, taxAmount)}
-                              </Text>
-                            </View>
-                          )}
-
-                          <View
-                            style={{
-                              height: 1,
-                              backgroundColor: colors.border,
-                              marginVertical: 4,
-                              opacity: 0.5,
-                            }}
-                          />
-
-                          <View
-                            style={{
-                              flexDirection: "row",
-                              justifyContent: "space-between",
-                              marginTop: 4,
-                            }}
-                          >
-                            <Text
-                              style={{
-                                fontSize: 14,
-                                fontFamily: "Poppins-SemiBold",
-                                color: colors.text.primary,
-                              }}
-                            >
-                              Total
-                            </Text>
-                            <Text
-                              style={{
-                                fontSize: 14,
-                                fontFamily: "Poppins-Bold",
-                                color: colors.text.primary,
-                              }}
-                            >
-                              {formatCurrency(currency, displayTotal)}
-                            </Text>
-                          </View>
-                        </View>
-                      </View>
-                    );
-                  })()}
-                </View>
+              {/* ── Rounded hero image — Design 3 centered ── */}
+              <View style={styles.modalImageCenter}>
+                {images.length > 0 ? (
+                  <Image
+                    source={{ uri: images[0] }}
+                    style={styles.modalImage}
+                    resizeMode="cover"
+                  />
+                ) : (
+                  <View style={[styles.modalImage, { backgroundColor: isDarkMode ? '#2A2A2A' : '#F5F5F5', alignItems: 'center', justifyContent: 'center' }]}>
+                    <Ionicons name="fast-food" size={64} color={isDarkMode ? '#555' : '#CCC'} />
+                  </View>
+                )}
               </View>
 
-              {/* Add-ons Info Banner - Addons will be selected on separate screen */}
-              {activeAddons.length > 0 && (
-                <View
-                  style={[
-                    styles.addonsBanner,
-                    {
-                      backgroundColor: colors.surface,
-                      borderColor: colors.border,
-                      borderWidth: 1,
-                      paddingVertical: 12,
-                    },
-                  ]}
-                >
-                  <View
-                    style={{
-                      backgroundColor: colors.primary + "15",
-                      padding: 8,
-                      borderRadius: 20,
-                      marginRight: 12,
-                    }}
-                  >
-                    <Ionicons
-                      name="add-circle-outline"
-                      size={20}
-                      color={colors.primary}
-                    />
+              {/* ── Info pills strip — Design 3 style ── */}
+              <View style={styles.modalInfoPills}>
+                {raw.category?.name ? (
+                  <View style={[styles.infoPill, { backgroundColor: isDarkMode ? '#1A2E1A' : '#E8F5E9' }]}>
+                    <Ionicons name="restaurant" size={12} color="#388E3C" style={{ marginRight: 4 }} />
+                    <Text style={[styles.infoPillText, { color: '#388E3C' }]}>{raw.category.name}</Text>
                   </View>
-                  <View style={{ flex: 1 }}>
-                    <Text
-                      style={[
-                        styles.addonsBannerTitle,
-                        {
-                          color: colors.text.primary,
-                          fontSize: 14,
-                          marginBottom: 2,
-                        },
-                      ]}
-                    >
-                      {t("extrasAvailable")}
+                ) : null}
+                {raw.attributes?.weight ? (
+                  <View style={[styles.infoPill, { backgroundColor: isDarkMode ? '#1A1A2E' : '#EDE7F6' }]}>
+                    <Ionicons name="scale-outline" size={12} color="#5E35B1" style={{ marginRight: 4 }} />
+                    <Text style={[styles.infoPillText, { color: '#5E35B1' }]}>{raw.attributes.weight}{raw.attributes.weightUnit || 'g'}</Text>
+                  </View>
+                ) : null}
+                {raw.attributes?.isNonVeg !== undefined ? (
+                  <View style={[styles.infoPill, { backgroundColor: raw.attributes.isNonVeg ? (isDarkMode ? '#2E1A1A' : '#FFEBEE') : (isDarkMode ? '#1A2E1A' : '#E8F5E9') }]}>
+                    <View style={{ width: 10, height: 10, borderRadius: 2, borderWidth: 1.5, borderColor: raw.attributes.isNonVeg ? '#D32F2F' : '#388E3C', alignItems: 'center', justifyContent: 'center', marginRight: 4 }}>
+                      <View style={{ width: 5, height: 5, borderRadius: 3, backgroundColor: raw.attributes.isNonVeg ? '#D32F2F' : '#388E3C' }} />
+                    </View>
+                    <Text style={[styles.infoPillText, { color: raw.attributes.isNonVeg ? '#D32F2F' : '#388E3C' }]}>
+                      {raw.attributes.isNonVeg ? 'Non-Veg' : 'Veg'}
                     </Text>
-                    <Text
-                      style={[
-                        styles.addonsBannerText,
-                        { color: colors.text.secondary, fontSize: 12 },
-                      ]}
-                    >
-                      {t("addExtrasAfterCart")}
+                  </View>
+                ) : null}
+                {raw.rating?.totalReviews > 0 ? (
+                  <View style={[styles.infoPill, { backgroundColor: isDarkMode ? '#2E2E1A' : '#FFF8E1' }]}>
+                    <Ionicons name="star" size={12} color="#F9A825" style={{ marginRight: 4 }} />
+                    <Text style={[styles.infoPillText, { color: '#F57F17' }]}>{raw.rating.average}</Text>
+                  </View>
+                ) : null}
+                {raw.attributes?.isOrganic ? (
+                  <View style={[styles.infoPill, { backgroundColor: isDarkMode ? '#1A2E1A' : '#E8F5E9' }]}>
+                    <Ionicons name="leaf" size={12} color="#2E7D32" style={{ marginRight: 4 }} />
+                    <Text style={[styles.infoPillText, { color: '#2E7D32' }]}>Organic</Text>
+                  </View>
+                ) : null}
+                {raw.attributes?.spiceLevel > 0 ? (
+                  <View style={[styles.infoPill, { backgroundColor: isDarkMode ? '#2E1A1A' : '#FBE9E7' }]}>
+                    <Ionicons name="flame" size={12} color="#E64A19" style={{ marginRight: 4 }} />
+                    <Text style={[styles.infoPillText, { color: '#E64A19' }]}>
+                      {'🌶'.repeat(Math.min(raw.attributes.spiceLevel, 3))}
+                    </Text>
+                  </View>
+                ) : null}
+              </View>
+
+              {/* ── Title + Price Row — Design 2 style (title LEFT, price RIGHT) ── */}
+              {(() => {
+                const pricing = raw.pricing || {};
+                let basePrice = Number(pricing.price ?? raw.price ?? 0);
+                if (selectedVariations) {
+                  Object.keys(selectedVariations).filter(k => k.endsWith('_obj')).forEach(key => {
+                    const opt = selectedVariations[key];
+                    if (opt && opt.price) basePrice = Number(opt.price);
+                  });
+                }
+                const discountPercent = Number(pricing.discount ?? raw.discount ?? 0);
+                const discountAmount = (basePrice * discountPercent) / 100;
+                const discountedBase = basePrice - discountAmount;
+                const taxRate = Number(pricing.taxRate ?? 0);
+                const taxAmount = taxRate > 0 ? (discountedBase * taxRate) / 100 : Number(pricing.taxAmount ?? 0);
+                const finalPrice = discountedBase + taxAmount;
+
+                return (
+                  <>
+                    {/* Title + Price — Design 2 inline */}
+                    <View style={styles.modalTitlePriceRow}>
+                      {/* Title LEFT */}
+                      <View style={{ flex: 1, marginRight: 12 }}>
+                        <Text style={[styles.modalTitle, { color: colors.text.primary }]} numberOfLines={2}>
+                          {title}
+                        </Text>
+                      </View>
+                      {/* Price RIGHT */}
+                      <View style={{ alignItems: 'flex-end' }}>
+                        <Text style={[styles.modalPrice, { color: colors.primary }]}>
+                          {formatCurrency(currency, discountedBase)}
+                        </Text>
+                        {discountPercent > 0 && (
+                          <Text style={styles.modalPriceOriginal}>
+                            {formatCurrency(currency, basePrice)}
+                          </Text>
+                        )}
+                      </View>
+                    </View>
+
+                    {/* Save pill — below title row */}
+                    {discountPercent > 0 && (
+                      <View style={{ flexDirection: 'row', alignItems: 'center', paddingHorizontal: 20, marginBottom: 8 }}>
+                        <Ionicons name="pricetag" size={11} color="#DC3173" style={{ marginRight: 3 }} />
+                        <Text style={{ fontSize: 12, fontFamily: 'Poppins-Medium', color: '#DC3173' }}>
+                          Save {formatCurrency(currency, discountAmount)} ({Math.round(discountPercent)}% off)
+                        </Text>
+                      </View>
+                    )}
+
+                    {/* Quantity controls inline — same row as price info */}
+                    <View style={styles.modalPriceQtyRow}>
+                      <View style={{ flex: 1 }} />
+
+                      {/* Quantity controls */}
+                      {(raw.stock?.quantity ?? 999) > 0 ? (
+                        <View style={styles.modalQtyInline}>
+                          <TouchableOpacity
+                            style={[styles.modalQtyInlineBtn, {
+                              backgroundColor: quantity <= 1 ? (isDarkMode ? '#2A2A2A' : '#F3F3F3') : colors.primary,
+                              borderWidth: quantity <= 1 ? 1 : 0,
+                              borderColor: isDarkMode ? '#444' : '#E0E0E0',
+                            }]}
+                            onPress={() => { if (quantity > 0) setModalQuantity(Math.max(0, quantity - 1)); }}
+                            disabled={quantity === 0}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons name={quantity <= 1 ? 'trash-outline' : 'remove'} size={16} color={quantity <= 1 ? (isDarkMode ? '#888' : '#666') : '#fff'} />
+                          </TouchableOpacity>
+                          <Text style={[styles.modalQtyInlineText, { color: colors.text.primary }]}>{quantity}</Text>
+                          <TouchableOpacity
+                            style={[styles.modalQtyInlineBtn, { backgroundColor: colors.primary }]}
+                            onPress={() => {
+                              const currentCartQty = itemsMap?.[activeProduct.id]?.quantity || 0;
+                              const maxStock = parseInt(raw.stock?.quantity ?? 0, 10);
+                              if (maxStock > 0 && (currentCartQty + quantity + 1 > maxStock)) {
+                                setMaxQuantityData({ maxStock, currentCartQty, itemName: activeProduct?.name || 'Item' });
+                                setMaxQuantityModalVisible(true);
+                                return;
+                              }
+                              setModalQuantity(quantity + 1);
+                            }}
+                            activeOpacity={0.8}
+                          >
+                            <Ionicons name="add" size={16} color="#fff" />
+                          </TouchableOpacity>
+                        </View>
+                      ) : (
+                        <View style={styles.outOfStockBadge}>
+                          <Text style={styles.outOfStockText}>{t('outOfStock') || 'Out of Stock'}</Text>
+                        </View>
+                      )}
+                    </View>
+
+                    {/* ── Price Breakdown Card ── */}
+                    {(taxRate > 0 || taxAmount > 0) && (
+                      <View style={[styles.priceBreakdownCard, { backgroundColor: isDarkMode ? '#1E1E1E' : '#FAFAFA', borderColor: isDarkMode ? '#333' : '#F0F0F0' }]}>
+                        <View style={styles.priceBreakdownRow}>
+                          <Text style={[styles.priceBreakdownLabel, { color: colors.text.secondary }]}>Subtotal</Text>
+                          <Text style={[styles.priceBreakdownValue, { color: colors.text.primary }]}>{formatCurrency(currency, discountedBase)}</Text>
+                        </View>
+                        {taxRate > 0 && (
+                          <View style={styles.priceBreakdownRow}>
+                            <Text style={[styles.priceBreakdownLabel, { color: colors.text.secondary }]}>Tax ({taxRate}%)</Text>
+                            <Text style={[styles.priceBreakdownValue, { color: colors.text.primary }]}>{formatCurrency(currency, taxAmount)}</Text>
+                          </View>
+                        )}
+                        <View style={[styles.priceBreakdownDivider, { backgroundColor: isDarkMode ? '#333' : '#EAEAEA' }]} />
+                        <View style={styles.priceBreakdownRow}>
+                          <Text style={[styles.priceBreakdownTotal, { color: colors.text.primary }]}>Total (per item)</Text>
+                          <Text style={[styles.priceBreakdownTotal, { color: colors.primary }]}>{formatCurrency(currency, finalPrice)}</Text>
+                        </View>
+                      </View>
+                    )}
+                  </>
+                );
+              })()}
+
+              {/* ── Divider ── */}
+              <View style={[styles.modalDivider, { backgroundColor: colors.border, marginHorizontal: 20 }]} />
+
+              {/* ── Stock Info ── */}
+              {raw.stock && (
+                <View style={styles.modalSection}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', gap: 8 }}>
+                    <View style={[styles.stockDot, { backgroundColor: (raw.stock.quantity ?? 0) > 0 ? '#4CAF50' : '#F44336' }]} />
+                    <Text style={[styles.stockText, { color: colors.text.secondary }]}>
+                      {(raw.stock.quantity ?? 0) > 0
+                        ? `${raw.stock.availabilityStatus || 'In Stock'} • ${raw.stock.quantity} ${raw.stock.unit || 'pcs'} available`
+                        : t('outOfStock') || 'Out of Stock'}
                     </Text>
                   </View>
                 </View>
               )}
 
-              {/* Variations Section */}
-              {(raw.variations || raw.options) &&
-                (raw.variations || raw.options).length > 0 && (
-                  <View style={styles.modalVariations}>
-                    {(raw.variations || raw.options || []).map(
-                      (variation, vIndex) => (
-                        <View key={vIndex} style={styles.variationGroup}>
-                          <Text
-                            style={[
-                              styles.variationTitle,
-                              { color: colors.text.primary },
-                            ]}
-                          >
-                            {variation.name ||
-                              variation.title ||
-                              `Option ${vIndex + 1}`}
-                            {variation.required && (
-                              <Text style={{ color: "red" }}> *</Text>
-                            )}
-                          </Text>
-                          <View style={styles.variationOptions}>
-                            {(variation.items || variation.options || []).map(
-                              (opt, oIndex) => {
-                                const optId =
-                                  opt.label || opt.name || opt.id || opt._id;
-                                const isSelected =
-                                  selectedVariations[
-                                  variation.name ||
-                                  variation.title ||
-                                  variation.id
-                                  ] === optId;
-
-                                // Price diff logic
-                                // Use raw.pricing or raw.price safely
-                                const base = Number(
-                                  raw.pricing?.price ?? raw.price ?? 0,
-                                );
-                                const optPrice = opt.price
-                                  ? Number(opt.price)
-                                  : 0;
-
-                                // If option has explicit price, diff is optPrice - base
-                                // If option is just additive (no full price), then price is the diff itself
-                                // But per user data, options have full price (8, 12, 16).
-                                let priceDiff = 0;
-                                if (optPrice > 0) {
-                                  priceDiff = optPrice - base;
-                                }
-
-                                return (
-                                  <TouchableOpacity
-                                    key={oIndex}
-                                    style={[
-                                      styles.variationOptionChip,
-                                      { borderColor: colors.border },
-                                      isSelected && {
-                                        borderColor: colors.primary,
-                                        backgroundColor: colors.primary + "15",
-                                      },
-                                    ]}
-                                    onPress={() =>
-                                      setSelectedVariations((prev) => ({
-                                        ...prev,
-                                        [variation.name ||
-                                          variation.title ||
-                                          variation.id]: optId,
-                                        [`${variation.name || variation.title || variation.id}_obj`]:
-                                          opt,
-                                      }))
-                                    }
-                                  >
-                                    <View
-                                      style={{
-                                        flexDirection: "row",
-                                        alignItems: "center",
-                                      }}
-                                    >
-                                      <Text
-                                        style={[
-                                          styles.variationOptionText,
-                                          { color: colors.text.primary },
-                                          isSelected && {
-                                            color: colors.primary,
-                                            fontFamily: "Poppins-SemiBold",
-                                          },
-                                        ]}
-                                      >
-                                        {opt.label || opt.name || opt.value}
-                                      </Text>
-                                      {optPrice > 0 && (
-                                        <Text
-                                          style={{
-                                            marginLeft: 4,
-                                            fontSize: 11,
-                                            color: isSelected
-                                              ? colors.primary
-                                              : colors.text.secondary,
-                                            fontFamily: "Poppins-Regular",
-                                          }}
-                                        >
-                                          ({formatCurrency(currency, optPrice)})
-                                        </Text>
-                                      )}
-                                    </View>
-                                    {isSelected && (
-                                      <Ionicons
-                                        name="checkmark-circle"
-                                        size={18}
-                                        color={colors.primary}
-                                        style={{ marginLeft: 6 }}
-                                      />
-                                    )}
-                                  </TouchableOpacity>
-                                );
-                              },
-                            )}
-                          </View>
-                        </View>
-                      ),
-                    )}
+              {/* ── Add-ons Banner ── */}
+              {activeAddons.length > 0 && (
+                <View style={[styles.addonsBanner, { backgroundColor: isDarkMode ? '#1A0810' : '#FFF5F8', borderColor: '#FEE2F0', marginHorizontal: 20, marginBottom: 12 }]}>
+                  <View style={{ backgroundColor: '#FEE2F0', width: 32, height: 32, borderRadius: 16, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                    <Ionicons name="sparkles-outline" size={16} color="#DC3173" />
                   </View>
-                )}
+                  <View style={{ flex: 1 }}>
+                    <Text style={[styles.addonsBannerTitle, { color: colors.text.primary, fontSize: 13 }]}>{t('extrasAvailable')}</Text>
+                    <Text style={[styles.addonsBannerText, { color: colors.text.secondary, fontSize: 12 }]}>{t('addExtrasAfterCart')}</Text>
+                  </View>
+                </View>
+              )}
+
+              {/* ── Details Section ── */}
+              {description ? (
+                <View style={styles.modalSection}>
+                  <Text style={[styles.modalSectionTitle, { color: colors.text.primary }]}>
+                    <Ionicons name="document-text-outline" size={16} color={colors.text.primary} />{' '}Details
+                  </Text>
+                  <Text style={[styles.modalDescription, { color: colors.text.secondary }]}>{description}</Text>
+                </View>
+              ) : null}
+
+              {/* ── Brand ── */}
+              {raw.brand ? (
+                <View style={styles.modalSection}>
+                  <Text style={[styles.modalSectionTitle, { color: colors.text.primary }]}>
+                    <Ionicons name="ribbon-outline" size={16} color={colors.text.primary} />{' '}Brand
+                  </Text>
+                  <Text style={[styles.modalDescription, { color: colors.text.secondary }]}>{raw.brand}</Text>
+                </View>
+              ) : null}
+
+              {/* ── Customize / Variations ── */}
+              {(raw.variations || raw.options) && (raw.variations || raw.options).length > 0 && (
+                <View style={styles.modalSection}>
+                  <Text style={[styles.modalSectionTitle, { color: colors.text.primary }]}>
+                    <Ionicons name="options-outline" size={16} color={colors.text.primary} />{' '}Customize
+                  </Text>
+                  {(raw.variations || raw.options || []).map((variation, vIndex) => (
+                    <View key={vIndex} style={{ marginBottom: 14 }}>
+                      <View style={{ flexDirection: 'row', alignItems: 'center', marginBottom: 8 }}>
+                        <Text style={{ fontSize: 14, fontFamily: 'Poppins-SemiBold', color: colors.text.secondary, flex: 1 }}>
+                          {variation.name || variation.title || `Option ${vIndex + 1}`}
+                        </Text>
+                        {variation.required && (
+                          <View style={styles.requiredBadge}>
+                            <Text style={styles.requiredBadgeText}>Required</Text>
+                          </View>
+                        )}
+                      </View>
+                      {(variation.items || variation.options || []).map((opt, oIndex) => {
+                        const optId = opt.label || opt.name || opt.id || opt._id;
+                        const isSelected = selectedVariations[variation.name || variation.title || variation.id] === optId;
+                        const optPrice = opt.price ? Number(opt.price) : 0;
+                        return (
+                          <TouchableOpacity
+                            key={oIndex}
+                            style={[styles.variationOptionRow, { borderColor: isSelected ? colors.primary + '50' : (isDarkMode ? '#2A2A2A' : '#EFEFEF'), backgroundColor: isSelected ? (isDarkMode ? '#1E0A14' : '#FFF0F5') : 'transparent' }]}
+                            onPress={() => setSelectedVariations(prev => ({
+                              ...prev,
+                              [variation.name || variation.title || variation.id]: optId,
+                              [`${variation.name || variation.title || variation.id}_obj`]: opt,
+                            }))}
+                            activeOpacity={0.7}
+                          >
+                            <View style={[styles.radioOuter, { borderColor: isSelected ? colors.primary : (isDarkMode ? '#555' : '#CCC') }]}>
+                              {isSelected && <View style={[styles.radioInner, { backgroundColor: colors.primary }]} />}
+                            </View>
+                            <Text style={[styles.variationOptionText, { color: colors.text.primary, flex: 1 }, isSelected && { color: colors.primary, fontFamily: 'Poppins-SemiBold' }]}>
+                              {opt.label || opt.name || opt.value}
+                            </Text>
+                            {optPrice > 0 && (
+                              <Text style={{ fontSize: 13, fontFamily: 'Poppins-Medium', color: colors.text.secondary }}>
+                                +{formatCurrency(currency, optPrice)}
+                              </Text>
+                            )}
+                          </TouchableOpacity>
+                        );
+                      })}
+                    </View>
+                  ))}
+                </View>
+              )}
             </ScrollView>
 
-            {/* Footer - Absolute Positioned, rendered after modal ready */}
+            {/* ── STICKY FOOTER: Full-width ADD TO CART ── */}
             {modalReady && (
-              <View
-                style={[
-                  styles.modalFooter,
-                  {
-                    position: "absolute",
-                    bottom: 0,
-                    left: 0,
-                    right: 0,
-                    backgroundColor: colors.surface,
-                    borderTopWidth: 1,
-                    borderTopColor: colors.border,
-                    paddingBottom:
-                      Platform.OS === "android"
-                        ? Math.max(24, insets.bottom + 20)
-                        : Math.max(16, insets.bottom),
-                  },
-                ]}
-              >
-                <View
-                  style={{
-                    backgroundColor: colors.primary + "05",
-                    borderRadius: borderRadius.xl,
-                    padding: spacing.md,
-                  }}
-                >
-                  {/* Quantity Controls - Row Layout (Label Left, Controls Right) */}
-                  <View
-                    style={[
-                      styles.modalQuantitySection,
-                      {
-                        marginBottom: 16,
-                        flexDirection: "row",
-                        justifyContent: "space-between",
-                        alignItems: "center",
-                      },
-                    ]}
-                  >
-                    <Text
-                      style={[
-                        styles.modalQuantityLabel,
-                        { color: colors.text.primary },
-                      ]}
-                    >
-                      {t("quantity") || "Quantity"}
-                    </Text>
-
-                    {/* Stock Check for Modal */}
-                    {(raw.stock?.quantity ?? 999) <= 0 ? (
-                      <View
-                        style={{
-                          paddingHorizontal: 12,
-                          paddingVertical: 6,
-                          backgroundColor: colors.border,
-                          borderRadius: 8,
-                        }}
-                      >
-                        <Text
-                          style={{
-                            color: colors.text.secondary,
-                            fontWeight: "bold",
-                          }}
-                        >
-                          {t("outOfStock") || "Out of Stock"}
-                        </Text>
-                      </View>
-                    ) : (
-                      <View style={styles.modalQuantityControl}>
-                        <TouchableOpacity
-                          style={[
-                            styles.modalQuantityBtn,
-                            { backgroundColor: colors.primary },
-                          ]}
-                          onPress={() => {
-                            if (quantity > 0) {
-                              setModalQuantity(Math.max(0, quantity - 1));
-                            }
-                          }}
-                          disabled={quantity === 0}
-                        >
-                          <Ionicons name="remove" size={22} color="#fff" />
-                        </TouchableOpacity>
-                        <Text
-                          style={[
-                            styles.modalQuantityText,
-                            { color: colors.text.primary },
-                          ]}
-                        >
-                          {quantity}
-                        </Text>
-                        <TouchableOpacity
-                          style={[
-                            styles.modalQuantityBtn,
-                            { backgroundColor: colors.primary },
-                          ]}
-                          onPress={() => {
-                            const currentCartQty =
-                              itemsMap?.[activeProduct.id]?.quantity || 0;
-                            const maxStock = parseInt(
-                              raw.stock?.quantity ?? 0,
-                              10,
-                            );
-                            const nextQty = quantity + 1;
-
-                            // Check if stock info is available
-                            if (maxStock > 0) {
-                              if (currentCartQty + nextQty > maxStock) {
-                                setMaxQuantityData({
-                                  maxStock: maxStock,
-                                  currentCartQty: currentCartQty,
-                                  itemName: activeProduct?.name || "Item",
-                                });
-                                setMaxQuantityModalVisible(true);
-                                return;
-                              }
-                            }
-
-                            setModalQuantity(quantity + 1);
-                          }}
-                        >
-                          <Ionicons name="add" size={22} color="#fff" />
-                        </TouchableOpacity>
-                      </View>
-                    )}
-                  </View>
-
+              <View style={[styles.modalFooter, {
+                backgroundColor: colors.surface,
+                borderTopColor: isDarkMode ? '#2A2A2A' : '#F0F0F0',
+                paddingBottom: Platform.OS === 'android' ? Math.max(18, insets.bottom + 10) : Math.max(14, insets.bottom),
+              }]}>
+                {/* Animated heartbeat wrapper */}
+                <Animated.View style={{
+                  transform: [{ scale: quantity > 0 ? heartbeatAnim : 1 }],
+                }}>
                   <TouchableOpacity
-                    activeOpacity={0.9}
-                    style={{
-                      borderRadius: 16,
-                      opacity:
-                        quantity > 0 && (raw.stock?.quantity ?? 999) > 0
-                          ? 1
-                          : 0.5,
-                      backgroundColor: colors.primary, // Ensure background is visible
-                    }}
+                    style={{ opacity: (quantity > 0 && (raw.stock?.quantity ?? 999) > 0) ? 1 : 0.38, borderRadius: 16, overflow: 'hidden' }}
                     onPress={async () => {
                       const stockQty = raw.stock?.quantity ?? 999;
-                      if (stockQty <= 0) return;
-
-                      // Prevent double-tap
-                      if (addingToCart) return;
-
-                      // Validate quantity first
-                      if (quantity === 0) {
-                        setAlertConfig({
-                          title: t("error") || "Error",
-                          message:
-                            t("pleaseAddQuantity") ||
-                            "Please add at least 1 item",
-                        });
-                        setAlertVisible(true);
-                        return;
-                      }
-
-                      // Enhanced validation: Check if product has variations and ALL are selected
+                      if (stockQty <= 0 || addingToCart || quantity === 0) return;
                       const variations = raw.variations || raw.options || [];
-
                       if (variations.length > 0) {
-                        // Check if ANY variation is not selected
-                        // RELAXED: User requested optional variants. Only enforce if 'required' is explicitly true.
-                        // If your data doesn't have 'required' property, this loop effectively becomes optional.
-                        const unselectedRequired = variations.filter(
-                          (v) =>
-                            v.required &&
-                            !selectedVariations[v.name || v.title || v.id],
-                        );
-
+                        const unselectedRequired = variations.filter(v => v.required && !selectedVariations[v.name || v.title || v.id]);
                         if (unselectedRequired.length > 0) {
-                          setAlertConfig({
-                            title:
-                              t("selectionRequired") || "Selection Required",
-                            message: `${t("pleaseSelect") || "Please select"}: ${unselectedRequired[0].name || unselectedRequired[0].title || "a variation"}`,
-                          });
+                          setAlertConfig({ title: t('selectionRequired') || 'Required', message: `${t('pleaseSelect') || 'Please select'}: ${unselectedRequired[0].name || unselectedRequired[0].title || 'a variation'}` });
                           setAlertVisible(true);
                           return;
                         }
                       }
-
-                      // Start loading
                       setAddingToCart(true);
-
                       try {
-                        // Validate Add-on requirements
-                        // Validation relaxed to prevent blocking valid flows due to backend data mismatch.
-                        /*
-                        for (const group of activeAddons) {
-                          if (group.minSelectable > 0) {
-                            const groupSelections = selectedAddons[group._id] || {};
-                            // Check total items count for "select X items" requirement
-                            const totalCount = Object.values(groupSelections).reduce((s, o) => s + (o.quantity || 0), 0);
-              
-                            if (totalCount < group.minSelectable) {
-                              setAlertConfig({
-                                title: t('selectionRequired') || 'Selection Required',
-                                message: `${t('pleaseSelect') || 'Please select at least'} ${group.minSelectable} ${t('from') || 'from'} ${group.title || group.name}`
-                              });
-                              setAlertVisible(true);
-                              return;
-                            }
-                          }
-                        }
-                        */
-
-                        // Retrieve detailed objects for selections
-                        const selectedObjs = Object.keys(selectedVariations)
-                          .filter((k) => k.endsWith("_obj"))
-                          .map((k) => selectedVariations[k]);
-
-                        // Map selection to variant name for backend compatibility.
-                        let targetVariantName = null;
-
-                        // 1. Look for option with explicit SKU
-                        // CRITICAL FIX: If selectedObjs comes from initial "lite" product data, it might miss SKU.
-                        // We must re-lookup the selection in the *current* activeProduct (which is likely fresh now).
-
-                        let variationSku = null;
-
-                        // Identify what was selected
-                        const selectedKeys = Object.keys(
-                          selectedVariations,
-                        ).filter((k) => !k.endsWith("_obj"));
-
+                        const selectedObjs = Object.keys(selectedVariations).filter(k => k.endsWith('_obj')).map(k => selectedVariations[k]);
+                        let targetVariantName = null, variationSku = null;
+                        const selectedKeys = Object.keys(selectedVariations).filter(k => !k.endsWith('_obj'));
                         if (selectedKeys.length > 0) {
-                          // Try to find the SKU from the fresh activeProduct data using the selected values
-                          const freshVariations =
-                            activeProduct._raw?.variations ||
-                            activeProduct._raw?.options ||
-                            [];
-
+                          const freshVars = activeProduct._raw?.variations || activeProduct._raw?.options || [];
                           for (const key of selectedKeys) {
-                            const selectedValue = selectedVariations[key]; // e.g., "VAR-SPI-MED-Z4D" or "Medium"
-
-                            // Find the group
-                            const group = freshVariations.find(
-                              (v) => (v.name || v.title || v.id) === key,
-                            );
-                            if (group) {
-                              // Find the option
-                              const options =
-                                group.items || group.options || [];
-                              const option = options.find(
-                                (o) =>
-                                  (o.label || o.name || o.value) ===
-                                  selectedValue ||
-                                  (o.id || o._id) === selectedValue ||
-                                  o.sku === selectedValue, // unlikely but possible
-                              );
-
-                              if (option && option.sku) {
-                                variationSku = option.sku;
-                                targetVariantName =
-                                  option.label || option.name || option.value;
-                                break; // Found a SKU, we are good
-                              }
+                            const grp = freshVars.find(v => (v.name || v.title || v.id) === key);
+                            if (grp) {
+                              const opts = grp.items || grp.options || [];
+                              const opt = opts.find(o => (o.label || o.name || o.value) === selectedVariations[key] || (o.id || o._id) === selectedVariations[key] || o.sku === selectedVariations[key]);
+                              if (opt && opt.sku) { variationSku = opt.sku; targetVariantName = opt.label || opt.name || opt.value; break; }
                             }
                           }
                         }
-
-                        // Fallback: use the object we have in state if re-lookup failed
-                        if (!variationSku) {
-                          const skuOption = selectedObjs.find((o) => o.sku);
-                          if (skuOption) {
-                            targetVariantName =
-                              skuOption.label ||
-                              skuOption.name ||
-                              skuOption.value;
-                            variationSku = skuOption.sku;
-                          }
-                        }
-
-                        // 2. If no SKU, check for "Size" or "Variations" (common primary attributes)
-                        if (!targetVariantName) {
-                          // Fallback: don't join with commas. Just pick the first significant one.
-                          // Ideally we'd pick the one that affects price the most?
-                          // For now, pick the first one to avoid "A, B" errors.
-                          const firstOpt = selectedObjs[0];
-                          if (firstOpt)
-                            targetVariantName =
-                              firstOpt.label || firstOpt.name || firstOpt.value;
-                        }
-
+                        if (!variationSku) { const so = selectedObjs.find(o => o.sku); if (so) { targetVariantName = so.label || so.name || so.value; variationSku = so.sku; } }
+                        if (!targetVariantName) { const fo = selectedObjs[0]; if (fo) targetVariantName = fo.label || fo.name || fo.value; }
                         const variantName = targetVariantName || null;
-
-                        // Check if product has addon groups
                         const addonGroupIds = raw.addonGroups || [];
                         const hasAddons = addonGroupIds.length > 0;
-
-                        // Payload for cart - addons will be handled on separate screen
-                        const payload = {
-                          variantName: variantName,
-                          variationSku: variationSku, // Added SKU for backend
-                          options: selectedVariations,
-                          addons: [], // Don't send addons here, let AddonsScreen handle it
-                        };
-
-                        // Add the product to cart first (without addons)
-                        const result = await addItem(
-                          activeProduct,
-                          quantity,
-                          payload,
-                        );
-
+                        const payload = { variantName, variationSku, options: selectedVariations, addons: [] };
+                        const result = await addItem(activeProduct, quantity, payload);
                         if (result && !result.success) {
-                          // Check for different vendor error
-                          if (result.error === "DIFFERENT_VENDOR") {
-                            // Helper to safely fallback if t(key) returns key
-                            const safeT = (key, fallback) => {
-                              const val = t(key);
-                              return val === key ? fallback : val;
-                            };
-
+                          if (result.error === 'DIFFERENT_VENDOR') {
+                            const safeT = (k, f) => { const v = t(k); return v === k ? f : v; };
                             setAlertConfig({
-                              title: safeT(
-                                "startNewBasket",
-                                "Start new basket?",
-                              ),
-                              message: safeT(
-                                "clearCartConfirm",
-                                "Your cart contains items from another restaurant. Do you want to clear it and add this item?",
-                              ),
+                              title: safeT('startNewBasket', 'Start new basket?'),
+                              message: safeT('clearCartConfirm', 'Your cart has items from another restaurant. Clear it?'),
                               buttons: [
+                                { text: safeT('cancel', 'Cancel'), style: 'cancel', onPress: () => { } },
                                 {
-                                  text: safeT("cancel", "Cancel"),
-                                  style: "cancel",
-                                  onPress: () =>
-                                    console.log("Cancelled new basket"),
-                                },
-                                {
-                                  text: safeT("clearAndAdd", "Clear & Add"),
-                                  onPress: async () => {
+                                  text: safeT('clearAndAdd', 'Clear & Add'), onPress: async () => {
                                     try {
-                                      // Clear all carts directly
                                       await clearAllCarts();
-                                      // Wait a tick for state to update
                                       setTimeout(async () => {
-                                        // Retry adding
-                                        const retry = await addItem(
-                                          activeProduct,
-                                          quantity,
-                                          payload,
-                                        );
-                                        if (retry && !retry.success) {
-                                          setAlertConfig({
-                                            title: safeT("error", "Error"),
-                                            message:
-                                              retry.message ||
-                                              safeT(
-                                                "addToCartFailed",
-                                                "Failed to add item",
-                                              ),
-                                          });
-                                          setAlertVisible(true);
-                                        } else {
-                                          // Success path - same as below
-                                          closeProductModal();
-                                          if (hasAddons) {
-                                            // ... navigate to addons
-                                            setTimeout(() => {
-                                              const mongoProductId =
-                                                raw._id ||
-                                                activeProduct._raw?._id ||
-                                                activeProduct.id;
-                                              navigation.navigate("Addons", {
-                                                product: {
-                                                  name:
-                                                    raw.name ||
-                                                    activeProduct.name,
-                                                  id: mongoProductId,
-                                                },
-                                                productId: mongoProductId,
-                                                variantName: variantName,
-                                                addonGroupIds: addonGroupIds,
-                                                currency:
-                                                  raw.pricing?.currency ||
-                                                  "EUR",
-                                              });
-                                            }, 300);
-                                          }
-                                        }
+                                        const retry = await addItem(activeProduct, quantity, payload);
+                                        if (retry && !retry.success) { setAlertConfig({ title: safeT('error', 'Error'), message: retry.message || 'Failed' }); setAlertVisible(true); }
+                                        else { closeProductModal(); if (hasAddons) { setTimeout(() => { const mid = raw._id || activeProduct._raw?._id || activeProduct.id; navigation.navigate('Addons', { product: { name: raw.name || activeProduct.name, id: mid }, productId: mid, variantName, addonGroupIds, currency: raw.pricing?.currency || 'EUR' }); }, 300); } }
                                       }, 100);
-                                    } catch (e) {
-                                      console.error(
-                                        "Failed to clear and add:",
-                                        e,
-                                      );
-                                    }
-                                  },
+                                    } catch (e) { console.error(e); }
+                                  }
                                 },
                               ],
                             });
                             setAlertVisible(true);
-                            return; // Stop execution, wait for user input
+                            return;
                           }
-                          console.warn(
-                            "[RestaurantDetails] Add to cart failed:",
-                            result,
-                          );
-                          throw new Error(
-                            result.message || "Failed to add to cart",
-                          );
+                          throw new Error(result.message || 'Failed to add to cart');
                         }
-
                         closeProductModal();
-
-                        // If product has addons, navigate to AddonsScreen
-                        if (hasAddons) {
-                          // Small delay to ensure modal is closed
-                          setTimeout(() => {
-                            // Use MongoDB _id for productId since backend looks up items by _id
-                            const mongoProductId =
-                              raw._id ||
-                              activeProduct._raw?._id ||
-                              activeProduct.id;
-
-                            navigation.navigate("Addons", {
-                              product: {
-                                name: raw.name || activeProduct.name,
-                                id: mongoProductId,
-                              },
-                              productId: mongoProductId,
-                              variantName: variantName,
-                              addonGroupIds: addonGroupIds,
-                              currency: raw.pricing?.currency || "EUR",
-                            });
-                          }, 300);
-                        }
+                        if (hasAddons) { setTimeout(() => { const mid = raw._id || activeProduct._raw?._id || activeProduct.id; navigation.navigate('Addons', { product: { name: raw.name || activeProduct.name, id: mid }, productId: mid, variantName, addonGroupIds, currency: raw.pricing?.currency || 'EUR' }); }, 300); }
                       } catch (error) {
-                        console.error(
-                          "[RestaurantDetails] Add to cart error:",
-                          error,
-                        );
-                        setAlertConfig({
-                          title: t("error") || "Error",
-                          // Show actual error message if available, otherwise fallback
-                          message:
-                            error.message ||
-                            t("addToCartFailed") ||
-                            "Failed to add item to cart",
-                        });
+                        console.error('[RestaurantDetails] Add to cart error:', error);
+                        setAlertConfig({ title: t('error') || 'Error', message: error.message || t('addToCartFailed') || 'Failed to add item to cart' });
                         setAlertVisible(true);
-                      } finally {
-                        setAddingToCart(false);
-                      }
+                      } finally { setAddingToCart(false); }
                     }}
                     disabled={isUpdating || addingToCart || quantity === 0}
+                    activeOpacity={0.88}
                   >
                     <LinearGradient
-                      colors={
-                        quantity > 0
-                          ? ["#EC407A", "#D81B60"]
-                          : ["#E0E0E0", "#BDBDBD"]
-                      }
+                      colors={quantity > 0 ? ['#DC3173', '#A8154E'] : ['#CCCCCC', '#BBBBBB']}
                       start={{ x: 0, y: 0 }}
                       end={{ x: 1, y: 0 }}
-                      style={styles.modalAddToCartBtn}
+                      style={styles.modalAddToCartGradient}
                     >
-                      {addingToCart ? (
-                        <ActivityIndicator
-                          size="small"
-                          color="#fff"
-                          style={{ marginRight: 10 }}
-                        />
-                      ) : (
-                        <Ionicons
-                          name="cart"
-                          size={22}
-                          color={quantity > 0 ? "#fff" : colors.text.light}
-                          style={{ marginRight: 10 }}
-                        />
-                      )}
-                      {/* Fixed width container for text to prevent layout jitter */}
-                      <View style={{ minWidth: 200, alignItems: "center" }}>
-                        <Text
-                          style={[
-                            styles.modalAddToCartText,
-                            {
-                              color: quantity > 0 ? "#fff" : colors.text.light,
-                            },
-                          ]}
+                      {/* Glossy shimmer sweep overlay */}
+                      {quantity > 0 && (
+                        <Animated.View
+                          style={{
+                            position: 'absolute',
+                            top: 0,
+                            bottom: 0,
+                            width: 60,
+                            transform: [{
+                              translateX: shimmerAnim.interpolate({
+                                inputRange: [0, 1],
+                                outputRange: [-100, Dimensions.get('window').width + 800],
+                              }),
+                            }],
+                          }}
                         >
-                          {addingToCart
-                            ? t("adding") || "Adding..."
-                            : quantity > 0
-                              ? (() => {
-                                const total = calculateModalTotal();
-                                return `${t("addToCart") || "Add to cart"} • ${formatCurrency(currency, total)}`;
-                              })()
-                              : t("addToCart") || "Add to cart"}
-                        </Text>
-                      </View>
+                          <LinearGradient
+                            colors={['transparent', 'rgba(255,255,255,0.25)', 'rgba(255,255,255,0.35)', 'rgba(255,255,255,0.25)', 'transparent']}
+                            start={{ x: 0, y: 0 }}
+                            end={{ x: 1, y: 0 }}
+                            style={{ flex: 1, borderRadius: 30 }}
+                          />
+                        </Animated.View>
+                      )}
+                      {addingToCart ? (
+                        <ActivityIndicator size="small" color="#fff" />
+                      ) : (
+                        <>
+                          <Ionicons name="cart" size={22} color={quantity > 0 ? '#fff' : '#888'} style={{ marginRight: 10 }} />
+                          <Text style={[styles.modalAddToCartText, { color: quantity > 0 ? '#fff' : '#888' }]}>
+                            {quantity > 0
+                              ? `${t('addToCart') || 'ADD TO CART'} \u2022 ${formatCurrency(currency, calculateModalTotal())}`
+                              : t('addToCart') || 'ADD TO CART'}
+                          </Text>
+                        </>
+                      )}
                     </LinearGradient>
                   </TouchableOpacity>
-                </View>
+                </Animated.View>
               </View>
             )}
           </View>
@@ -1981,7 +1514,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   return (
     <SafeAreaView
       style={[styles.container, { backgroundColor: colors.background }]}
-      edges={["top"]}
+      edges={["bottom", "left", "right"]}
     >
       <StatusBar
         barStyle={isDarkMode ? "light-content" : "dark-content"}
@@ -1991,36 +1524,30 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
       />
 
       {/* Header */}
-      <View
-        style={[
-          styles.header,
-          { backgroundColor: colors.surface, borderBottomColor: colors.border },
-        ]}
-      >
-        <TouchableOpacity
-          style={[
-            styles.headerButton,
-            { backgroundColor: colors.background, borderColor: colors.border },
-          ]}
-          onPress={() => navigation.goBack()}
+      <View style={[styles.headerContainer]}>
+        <LinearGradient
+          colors={isDarkMode ? ['#1A0A15', '#1A0A15'] : ['#FFF5F8', '#FFE8F0']}
+          style={[styles.headerGradient, { paddingTop: insets.top + 16 }]}
         >
-          <Ionicons name="arrow-back" size={22} color={colors.text.primary} />
-        </TouchableOpacity>
-        <Text
-          style={[styles.headerTitle, { color: colors.text.primary }]}
-          numberOfLines={1}
-        >
-          {displayName}
-        </Text>
-        <TouchableOpacity
-          style={[
-            styles.headerButton,
-            { backgroundColor: colors.background, borderColor: colors.border },
-          ]}
-          onPress={() => setSearchVisible(!searchVisible)}
-        >
-          <Ionicons name="search" size={22} color={colors.text.primary} />
-        </TouchableOpacity>
+          <TouchableOpacity
+            style={[styles.headerButton, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}
+            onPress={() => navigation.goBack()}
+          >
+            <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+          </TouchableOpacity>
+          <Text
+            style={[styles.headerTitle, { color: colors.text.primary }]}
+            numberOfLines={1}
+          >
+            {displayName}
+          </Text>
+          <TouchableOpacity
+            style={[styles.headerButton, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}
+            onPress={() => setSearchVisible(!searchVisible)}
+          >
+            <Ionicons name="search" size={20} color={colors.text.primary} />
+          </TouchableOpacity>
+        </LinearGradient>
       </View>
 
       {/* Search Bar */}
@@ -2289,18 +1816,54 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
             </Text>
           </View>
           <TouchableOpacity
-            style={[styles.viewCartButton, { backgroundColor: colors.primary }]}
+            style={[styles.viewCartButton, { backgroundColor: 'transparent', paddingVertical: 0, paddingHorizontal: 0, width: 140 }]}
             onPress={() => navigation.navigate("Main", { screen: "Cart" })}
+            activeOpacity={0.88}
           >
-            <Text style={styles.viewCartButtonText}>
-              {t("viewCart") || "View Cart"}
-            </Text>
-            <Ionicons
-              name="arrow-forward"
-              size={18}
-              color="#fff"
-              style={{ marginLeft: 6 }}
-            />
+            <LinearGradient
+              colors={['#DC3173', '#A8154E']}
+              start={{ x: 0, y: 0 }}
+              end={{ x: 1, y: 0 }}
+              style={{
+                flex: 1,
+                width: '100%',
+                flexDirection: 'row',
+                alignItems: 'center',
+                justifyContent: 'center',
+                borderRadius: 20,
+              }}
+            >
+              <Animated.View
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  bottom: 0,
+                  width: 60,
+                  transform: [{
+                    translateX: shimmerAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-100, Dimensions.get('window').width + 800],
+                    }),
+                  }],
+                }}
+              >
+                <LinearGradient
+                  colors={['transparent', 'rgba(255,255,255,0.25)', 'rgba(255,255,255,0.35)', 'rgba(255,255,255,0.25)', 'transparent']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={{ flex: 1, borderRadius: 20 }}
+                />
+              </Animated.View>
+              <Text style={styles.viewCartButtonText}>
+                {t("viewCart") || "View Cart"}
+              </Text>
+              <Ionicons
+                name="arrow-forward"
+                size={18}
+                color="#fff"
+                style={{ marginLeft: 6 }}
+              />
+            </LinearGradient>
           </TouchableOpacity>
         </View>
       )}
@@ -2948,18 +2511,21 @@ const styles = StyleSheet.create({
   container: {
     flex: 1,
   },
-  header: {
+  headerContainer: {
+    shadowColor: "#000",
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 8,
+    zIndex: 100,
+  },
+  headerGradient: {
     flexDirection: "row",
     alignItems: "center",
     justifyContent: "space-between",
-    paddingHorizontal: spacing.md,
-    paddingVertical: spacing.sm,
-    borderBottomWidth: 1,
-    elevation: 2,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.05,
-    shadowRadius: 3,
+    paddingHorizontal: 16,
+    paddingTop: 16,
+    paddingBottom: 24,
   },
   headerButton: {
     width: 40,
@@ -2967,7 +2533,6 @@ const styles = StyleSheet.create({
     borderRadius: 20,
     alignItems: "center",
     justifyContent: "center",
-    borderWidth: 1,
   },
   headerTitle: {
     flex: 1,
@@ -3318,193 +2883,264 @@ const styles = StyleSheet.create({
     fontSize: fontSize.md,
     fontFamily: "Poppins-SemiBold",
   },
-  // Modal Styles
+  // ── Clean Modal Styles (Frutti Pizza inspired) ──
   modalOverlay: {
     flex: 1,
-    justifyContent: "flex-end",
-    backgroundColor: "rgba(0,0,0,0.5)",
+    justifyContent: 'flex-end',
+    backgroundColor: 'rgba(0,0,0,0.45)',
   },
   modalCard: {
-    borderTopLeftRadius: borderRadius.xxl,
-    borderTopRightRadius: borderRadius.xxl,
-    width: "100%", // Ensure full width
-    maxHeight: "85%", // Reduced to ensure footer visible on all devices
-    overflow: "hidden", // Ensure content doesn't bleed out
-    elevation: 8,
-    shadowColor: "#000",
-    shadowOffset: { width: 0, height: -4 },
+    height: '92%',
+    width: '100%',
+    borderTopLeftRadius: 28,
+    borderTopRightRadius: 28,
+    overflow: 'hidden',
+    elevation: 20,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: -6 },
     shadowOpacity: 0.2,
-    shadowRadius: 12,
+    shadowRadius: 20,
+    flexDirection: 'column',
   },
-  modalCloseBtn: {
-    position: "absolute",
-    top: 10,
-    right: 10,
-    zIndex: 10,
-    backgroundColor: "#F5F5F5",
-    borderRadius: 20,
-    padding: 8,
-    elevation: 6,
-    shadowColor: "#000",
-    shadowOpacity: 0.3,
-    shadowRadius: 6,
+  modalHandleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingTop: 12,
+    paddingBottom: 4,
+    paddingHorizontal: 16,
+  },
+  modalHandle: {
+    width: 40,
+    height: 4,
+    borderRadius: 2,
+  },
+  // Centered image
+  modalImageCenter: {
+    alignItems: 'center',
+    marginVertical: 16,
   },
   modalImage: {
-    width: "100%",
-    height: 280, // Taller for better product showcase
-    borderTopLeftRadius: borderRadius.xxl,
-    borderTopRightRadius: borderRadius.xxl,
+    width: 200,
+    height: 200,
+    borderRadius: 100,
+    overflow: 'hidden',
+    elevation: 10,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.18,
+    shadowRadius: 12,
+    borderWidth: 3,
+    borderColor: 'rgba(220,49,115,0.15)',
   },
-  imageOverlay: {
-    position: "absolute",
-    bottom: 0,
-    left: 0,
-    right: 0,
-    height: 60,
-  },
-  modalBody: {
-    padding: spacing.lg,
-  },
+  // Title
   modalTitle: {
-    fontSize: 26,
-    fontFamily: "Poppins-Bold",
-    marginBottom: 12,
-    letterSpacing: -0.5,
+    fontSize: 22,
+    fontFamily: 'Poppins-Bold',
+    letterSpacing: -0.4,
+    lineHeight: 30,
+  },
+  // Info pills strip
+  modalInfoPills: {
+    flexDirection: 'row',
+    flexWrap: 'wrap',
+    justifyContent: 'center',
+    gap: 8,
+    paddingHorizontal: 20,
+    marginBottom: 16,
+  },
+  infoPill: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 10,
+    paddingVertical: 5,
+    borderRadius: 16,
+  },
+  infoPillText: {
+    fontSize: 12,
+    fontFamily: 'Poppins-Medium',
+  },
+  // Price + Qty Row
+  modalPriceQtyRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: 20,
+    paddingVertical: 8,
+    marginBottom: 4,
+  },
+  modalPrice: {
+    fontSize: 28,
+    fontFamily: 'Poppins-Bold',
+    letterSpacing: -0.3,
+  },
+  modalPriceOriginal: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Regular',
+    textDecorationLine: 'line-through',
+    color: '#9E9E9E',
+  },
+  // Inline qty controls
+  modalQtyInline: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+  },
+  modalQtyInlineBtn: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    alignItems: 'center',
+    justifyContent: 'center',
+    elevation: 2,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 1 },
+    shadowOpacity: 0.12,
+    shadowRadius: 3,
+  },
+  modalQtyInlineText: {
+    fontSize: 18,
+    fontFamily: 'Poppins-Bold',
+    minWidth: 26,
+    textAlign: 'center',
+  },
+  // Price breakdown card
+  priceBreakdownCard: {
+    marginHorizontal: 20,
+    borderRadius: 14,
+    padding: 14,
+    marginBottom: 8,
+    borderWidth: 1,
+  },
+  priceBreakdownRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: 6,
+  },
+  priceBreakdownLabel: {
+    fontSize: 13,
+    fontFamily: 'Poppins-Regular',
+  },
+  priceBreakdownValue: {
+    fontSize: 13,
+    fontFamily: 'Poppins-Medium',
+  },
+  priceBreakdownDivider: {
+    height: 1,
+    marginVertical: 6,
+  },
+  priceBreakdownTotal: {
+    fontSize: 15,
+    fontFamily: 'Poppins-Bold',
+  },
+  // Stock info
+  stockDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  stockText: {
+    fontSize: 13,
+    fontFamily: 'Poppins-Regular',
+  },
+  // Divider
+  modalDivider: {
+    height: 1,
+    marginVertical: 12,
+    opacity: 0.35,
+  },
+  // Section
+  modalSection: {
+    paddingHorizontal: 20,
+    marginBottom: 14,
+  },
+  modalSectionTitle: {
+    fontSize: 17,
+    fontFamily: 'Poppins-Bold',
+    marginBottom: 6,
+    letterSpacing: -0.2,
   },
   modalDescription: {
     fontSize: 14,
-    fontFamily: "Poppins-Regular",
-    lineHeight: 26,
-    marginBottom: 24,
+    fontFamily: 'Poppins-Regular',
+    lineHeight: 22,
   },
-  modalPriceContainer: {
-    marginBottom: spacing.md,
-  },
-  // modalPriceLabel removed
-  modalPrice: {
-    fontSize: 28,
-    fontFamily: "Poppins-Bold",
-    color: "#E91E63",
-    marginRight: 4,
-  },
-  modalPriceOriginal: {
-    fontSize: 18,
-    fontFamily: "Poppins-Regular",
-    textDecorationLine: "line-through",
-    color: "#9E9E9E",
-    marginLeft: 8,
-    opacity: 0.35,
-  },
-  modalBadge: {
-    backgroundColor: "#E91E63",
-    paddingHorizontal: 4,
-    paddingVertical: 1,
-    borderRadius: 4,
-  },
-  modalBadgeText: {
-    color: "#fff",
-    fontSize: 12,
-    fontWeight: "bold",
-  },
-  modalQuantitySection: {
-    marginBottom: 0,
-  },
-  modalQuantityLabel: {
-    fontSize: 18,
-    fontFamily: "Poppins-Medium",
-    marginBottom: 0,
-  },
-  modalQuantityControl: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "space-between",
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: "#E0E0E0",
-    backgroundColor: "#FFFFFF",
-    padding: 4,
-  },
-  modalQuantityBtn: {
-    width: 48,
-    height: 48,
-    borderRadius: 10,
-    alignItems: "center",
-    justifyContent: "center",
-  },
-  modalQuantityText: {
-    fontSize: 20,
-    fontFamily: "Poppins-Bold",
-    minWidth: 50,
-    textAlign: "center",
-  },
-  modalFooter: {
-    paddingHorizontal: spacing.md,
-    paddingTop: spacing.md,
-    // paddingBottom is handled dynamically via style prop with insets
-  },
-  modalAddToCartBtn: {
-    flexDirection: "row",
-    alignItems: "center",
-    justifyContent: "center",
-    height: 56, // FIXED height for stability
-    paddingVertical: 0,
-    borderRadius: 16,
-    elevation: 1,
-    shadowColor: "#E91E63",
-    shadowOffset: { width: 0, height: 1 },
-    shadowOpacity: 0.1,
-    shadowRadius: 2,
-  },
-  modalAddToCartText: {
-    color: "#fff",
-    fontSize: 18,
-    fontFamily: "Poppins-Bold",
-  },
-  modalOriginalPrice: {
-    fontSize: fontSize.sm,
-    fontFamily: "Poppins-Regular",
-  },
-  discountBadge: {
-    paddingHorizontal: 6,
-    paddingVertical: 2,
-    borderRadius: 4,
-  },
-  discountText: {
-    color: "#fff",
-    fontSize: 10,
-    fontFamily: "Poppins-Bold",
-  },
-  modalVariations: {
-    paddingHorizontal: spacing.md,
-    marginTop: spacing.md,
-  },
-  variationGroup: {
-    marginBottom: spacing.md,
-  },
-  variationTitle: {
-    fontSize: fontSize.md,
-    fontFamily: "Poppins-SemiBold",
-    marginBottom: spacing.sm,
-  },
-  variationOptions: {
-    flexDirection: "row",
-    flexWrap: "wrap",
-  },
-  variationOptionChip: {
-    paddingHorizontal: spacing.md,
-    paddingVertical: 12, // More breathable vertical padding
-    borderRadius: 8, // Slightly softer radius
+  // Variations
+  variationGroup: { marginBottom: 4 },
+  variationHeaderRow: { flexDirection: 'row', alignItems: 'center', marginBottom: 4 },
+  variationTitle: { fontSize: 14, fontFamily: 'Poppins-SemiBold' },
+  requiredBadge: { backgroundColor: '#FFF3E0', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 12 },
+  requiredBadgeText: { fontSize: 10, fontFamily: 'Poppins-Medium', color: '#E65100' },
+  variationOptionRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingVertical: 13,
+    paddingHorizontal: 14,
+    borderRadius: 14,
     borderWidth: 1,
     marginBottom: 8,
-    width: "100%", // Full width for vertical stacking which is clearer for complex options
-    flexDirection: "row", // Align content
-    justifyContent: "space-between",
-    alignItems: "center",
   },
-  variationOptionText: {
-    fontSize: fontSize.sm,
-    fontFamily: "Poppins-Regular",
+  radioOuter: { width: 22, height: 22, borderRadius: 11, borderWidth: 2, alignItems: 'center', justifyContent: 'center', marginRight: 12 },
+  radioInner: { width: 10, height: 10, borderRadius: 5 },
+  variationOptionText: { fontSize: 15, fontFamily: 'Poppins-Regular' },
+  variationOptions: { flexDirection: 'row', flexWrap: 'wrap' },
+  variationOptionChip: { paddingHorizontal: 12, paddingVertical: 10, borderRadius: 8, borderWidth: 1, marginBottom: 8, width: '100%', flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
+  // Footer
+  modalFooter: {
+    paddingHorizontal: 16,
+    paddingTop: 10,
+    borderTopWidth: 1,
   },
+  modalAddToCartGradient: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    height: 56,
+    paddingHorizontal: 20,
+  },
+  modalAddToCartText: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Bold',
+    letterSpacing: 0.5,
+  },
+  outOfStockBadge: { paddingHorizontal: 16, paddingVertical: 10, backgroundColor: '#FFE5E5', borderRadius: 22 },
+  outOfStockText: { color: '#D32F2F', fontFamily: 'Poppins-SemiBold', fontSize: 13 },
+  // Legacy compatibility stubs
+  modalQtyRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  modalQtyBtn: { width: 42, height: 42, borderRadius: 21, alignItems: 'center', justifyContent: 'center' },
+  modalQtyText: { fontSize: 20, fontFamily: 'Poppins-Bold', minWidth: 28, textAlign: 'center' },
+  modalAddToCartBtn: { flex: 1, borderRadius: 16, overflow: 'hidden' },
+  modalPriceContainer: { marginBottom: 0 },
+  modalPriceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+  modalBadge: { backgroundColor: '#E91E63', paddingHorizontal: 4, paddingVertical: 1, borderRadius: 4 },
+  modalBadgeText: { color: '#fff', fontSize: 12, fontWeight: 'bold' },
+  modalQuantityLabel: { fontSize: 17, fontFamily: 'Poppins-SemiBold' },
+  modalQuantityControl: { flexDirection: 'row', alignItems: 'center', borderRadius: 50 },
+  modalQuantityBtn: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  modalQuantityText: { fontSize: 20, fontFamily: 'Poppins-Bold', minWidth: 44, textAlign: 'center' },
+  modalDiscountPill: { backgroundColor: '#E8F5E9', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 20 },
+  modalDiscountPillText: { color: '#2E7D32', fontSize: 12, fontFamily: 'Poppins-Bold' },
+  modalOriginalPrice: { fontSize: 14, fontFamily: 'Poppins-Regular' },
+  discountBadge: { paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 },
+  discountText: { color: '#fff', fontSize: 10, fontFamily: 'Poppins-Bold' },
+  modalVariations: { paddingHorizontal: 16, marginTop: 8 },
+  imageOverlay: { position: 'absolute', bottom: 0, left: 0, right: 0, height: 60 },
+  imageTopOverlay: { position: 'absolute', top: 0, left: 0, right: 0, height: 60 },
+  modalCloseBtn: { backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 20, width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  modalFavBtn: { backgroundColor: 'rgba(0,0,0,0.25)', borderRadius: 20, width: 36, height: 36, alignItems: 'center', justifyContent: 'center' },
+  modalHeroContainer: { height: 280, width: '100%', position: 'relative', overflow: 'visible', justifyContent: 'flex-start' },
+  modalHeroTopRow: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 16, zIndex: 10 },
+  modalHeroTitle: { flex: 1, textAlign: 'center', fontSize: 20, fontFamily: 'Poppins-Bold', color: '#fff', paddingHorizontal: 8 },
+  modalImageWrapper: { position: 'absolute', bottom: -30, left: 0, right: 0, alignItems: 'center', zIndex: 20 },
+  modalContentCard: { flex: 1, borderTopLeftRadius: 28, borderTopRightRadius: 28, marginTop: -28, paddingTop: 40, paddingHorizontal: 20, zIndex: 5 },
+  modalInfoStrip: { flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 8, marginBottom: 4 },
+  modalImageDiscountBadge: { position: 'absolute', bottom: 12, right: 16, backgroundColor: 'rgba(255,255,255,0.22)', borderRadius: 20, paddingHorizontal: 10, paddingVertical: 5 },
+  modalImageDiscountText: { color: '#fff', fontSize: 13, fontFamily: 'Poppins-Bold' },
+  modalTitlePriceRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'flex-start', paddingHorizontal: 20, marginBottom: 6, marginTop: 4 },
+  modalSavingRow: { flexDirection: 'row', marginBottom: 10 },
+  modalSavingPill: { flexDirection: 'row', alignItems: 'center', backgroundColor: '#FEE2F0', borderRadius: 12, paddingHorizontal: 10, paddingVertical: 4 },
+  modalSavingText: { fontSize: 12, fontFamily: 'Poppins-Medium', color: '#DC3173' },
   addonsBanner: {
     flexDirection: "row",
     alignItems: "center",
@@ -3632,9 +3268,9 @@ const styles = StyleSheet.create({
     marginTop: 12,
     shadowColor: "#000",
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.1,
-    shadowRadius: 8,
-    elevation: 3,
+    shadowOpacity: 0.15,
+    shadowRadius: 10,
+    elevation: 8,
   },
   getDirectionsText: {
     fontSize: 15,

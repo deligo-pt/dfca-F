@@ -25,6 +25,7 @@ import {
   AppState,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
+import { LinearGradient } from 'expo-linear-gradient';
 import MapView, { Marker, Polyline, PROVIDER_GOOGLE } from 'react-native-maps';
 import * as Location from 'expo-location';
 import { spacing, fontSize, borderRadius } from '../theme';
@@ -1551,113 +1552,92 @@ const TrackOrderScreen = ({ route, navigation }) => {
 
   const renderOrderProgress = () => {
     return (
-      <View style={styles.progressContainer}>
-        <View style={styles.progressHeader}>
-          <Text style={styles.progressTitle}>{t('orderStatus')}</Text>
-        </View>
+      <View style={{ paddingHorizontal: 16, marginTop: 12, marginBottom: 24 }}>
+        <Text style={{ fontSize: 20, fontFamily: 'Poppins-Bold', color: colors.text.primary, marginBottom: 20 }}>{t('orderStatus')}</Text>
 
-        {/* Stages Container - Premium Vertical Layout */}
-        <View style={styles.stagesContainer}>
+        <View style={{
+          backgroundColor: colors.surface,
+          borderRadius: 24,
+          elevation: 4,
+          shadowColor: '#000',
+          shadowOffset: { width: 0, height: 4 },
+          shadowOpacity: 0.05,
+          shadowRadius: 10,
+          borderWidth: 1,
+          borderColor: isDarkMode ? '#2A2A2A' : '#F0F0F0',
+          padding: 20
+        }}>
           {orderStages.map((stage, index) => {
             const completed = isStageCompleted(stage.id);
             const current = isCurrentStage(stage.id);
             const isLast = index === orderStages.length - 1;
 
             return (
-              <View key={stage.id} style={styles.stageItem}>
+              <View key={stage.id} style={{ flexDirection: 'row', minHeight: 60 }}>
                 {/* Left Timeline Column */}
-                <View style={styles.stageIconContainer}>
-                  {/* Top Connector Line (connects to previous) */}
+                <View style={{ alignItems: 'center', width: 40, marginRight: 16 }}>
+                  {/* Top Connector Line */}
                   {index > 0 && (
-                    <View style={[
-                      styles.stageConnectorTop,
-                      { backgroundColor: completed || current ? colors.primary : colors.border }
-                    ]} />
+                    <View style={{ width: 2, height: 16, backgroundColor: completed || current ? colors.primary : (isDarkMode ? '#333' : '#F0F0F0'), borderBottomLeftRadius: 2, borderBottomRightRadius: 2 }} />
                   )}
 
                   {/* Icon Circle */}
-                  <View
-                    style={[
-                      styles.stageIconWrapper,
-                      completed && styles.stageIconCompleted,
-                      current && styles.stageIconCurrent,
-                      !completed && !current && styles.stageIconPending
-                    ]}
-                  >
-                    {current ? (
-                      // Active Pulse Effect
-                      <View style={styles.activePulseContainer}>
-                        <Animated.View style={[
-                          styles.pulseRing,
-                          {
+                  <View style={{ flex: 1, justifyContent: 'center', marginVertical: 4 }}>
+                    <View
+                      style={{
+                        width: 36, height: 36, borderRadius: 18,
+                        backgroundColor: (completed || current) ? colors.primary : (isDarkMode ? 'rgba(255,255,255,0.06)' : '#F5F5F5'),
+                        alignItems: 'center', justifyContent: 'center',
+                        borderWidth: current ? 3 : 0,
+                        borderColor: 'rgba(220,49,115,0.2)'
+                      }}
+                    >
+                      {current ? (
+                        <View style={{ alignItems: 'center', justifyContent: 'center' }}>
+                          <Animated.View style={{
+                            position: 'absolute', width: '100%', height: '100%', borderRadius: 18, borderWidth: 2,
                             borderColor: colors.primary,
-                            transform: [{
-                              scale: activeStagePulse.interpolate({
-                                inputRange: [0, 1],
-                                outputRange: [1, 1.5]
-                              })
-                            }],
-                            opacity: activeStagePulse.interpolate({
-                              inputRange: [0, 1],
-                              outputRange: [0.6, 0]
-                            })
-                          }
-                        ]} />
-                        <Ionicons name={stage.icon} size={18} color={colors.text.white} />
-                      </View>
-                    ) : (
-                      // Standard Icon
-                      stage.iconLibrary === 'Ionicons' ? (
-                        <Ionicons
-                          name={completed ? 'checkmark' : stage.icon}
-                          size={18}
-                          color={completed ? colors.text.white : colors.text.light}
-                        />
+                            transform: [{ scale: activeStagePulse.interpolate({ inputRange: [0, 1], outputRange: [1, 1.5] }) }],
+                            opacity: activeStagePulse.interpolate({ inputRange: [0, 1], outputRange: [0.6, 0] })
+                          }} />
+                          <Ionicons name={stage.icon} size={16} color={colors.text.white} />
+                        </View>
                       ) : (
-                        <MaterialIcons
-                          name={completed ? 'check' : stage.icon}
-                          size={18}
-                          color={completed ? colors.text.white : colors.text.light}
-                        />
-                      )
-                    )}
+                        stage.iconLibrary === 'Ionicons' ? (
+                          <Ionicons name={completed ? 'checkmark' : stage.icon} size={16} color={completed ? colors.text.white : colors.text.light} />
+                        ) : (
+                          <MaterialIcons name={completed ? 'check' : stage.icon} size={16} color={completed ? colors.text.white : colors.text.light} />
+                        )
+                      )}
+                    </View>
                   </View>
 
-                  {/* Bottom Connector Line (connects to next) */}
+                  {/* Bottom Connector Line */}
                   {!isLast && (
-                    <View style={[
-                      styles.stageConnectorBottom,
-                      { backgroundColor: completed ? colors.primary : colors.border }
-                    ]} />
+                    <View style={{ width: 2, height: 16, backgroundColor: completed ? colors.primary : (isDarkMode ? '#333' : '#F0F0F0'), borderTopLeftRadius: 2, borderTopRightRadius: 2 }} />
                   )}
                 </View>
 
                 {/* Right Content Column */}
-                <View style={[styles.stageContent, { opacity: (completed || current) ? 1 : 0.6 }]}>
-                  <Text
-                    style={[
-                      styles.stageTitle,
-                      current && styles.stageTitleActive,
-                      completed && styles.stageTitleCompleted
-                    ]}
-                  >
+                <View style={{ flex: 1, paddingBottom: 20, paddingTop: index > 0 ? 0 : 4, opacity: (completed || current) ? 1 : 0.5 }}>
+                  <Text style={{ fontSize: 16, fontFamily: current ? 'Poppins-Bold' : 'Poppins-SemiBold', color: current ? colors.primary : colors.text.primary, letterSpacing: -0.3 }}>
                     {stage.title}
                   </Text>
 
-                  <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 2 }}>
                     {(stage.id === 'accepted' && (order?.orderStatus === 'AWAITING_PARTNER' || order?.orderStatus === 'DISPATCHING')) && (
                       <ActivityIndicator size="small" color={colors.primary} style={{ marginRight: 8 }} />
                     )}
-                    <Text style={[styles.stageSubtitle, { flex: 1 }]} numberOfLines={2}>
+                    <Text style={{ fontSize: 13, fontFamily: 'Poppins-Regular', color: colors.text.secondary }} numberOfLines={2}>
                       {stage.subtitle && stage.subtitle !== 'findingDriver' ? stage.subtitle : (t('findingDriver') !== 'findingDriver' ? t('findingDriver') : 'Finding delivery partner...')}
                     </Text>
                   </View>
 
                   {/* Current Status Badge Indicator */}
                   {current && currentStatus !== 'delivered' && currentStatus !== 'cancelled' && (
-                    <View style={styles.currentBadge}>
-                      <View style={styles.pulseDot} />
-                      <Text style={styles.currentBadgeText}>{t('inProgress')}</Text>
+                    <View style={{ marginTop: 8, flexDirection: 'row', alignItems: 'center', backgroundColor: colors.primary + '15', alignSelf: 'flex-start', paddingHorizontal: 10, paddingVertical: 4, borderRadius: 12 }}>
+                      <View style={{ width: 6, height: 6, borderRadius: 3, backgroundColor: colors.primary, marginRight: 6 }} />
+                      <Text style={{ fontSize: 11, fontFamily: 'Poppins-Bold', color: colors.primary }}>{t('inProgress')}</Text>
                     </View>
                   )}
                 </View>
@@ -1672,237 +1652,218 @@ const TrackOrderScreen = ({ route, navigation }) => {
 
 
   const renderDriverInfo = () => (
-    <View style={styles.driverContainer}>
-      <View style={styles.driverHeader}>
-        <Text style={styles.sectionTitle}>{t('deliveryRider')}</Text>
-        {orderData.driverTotalDeliveries > 0 && (
-          <View style={styles.driverStats}>
-            <Text style={styles.driverStatsText}>
-              {orderData.driverTotalDeliveries}+ {t('deliveries')}
+    <View style={[styles.driverContainer, {
+      backgroundColor: colors.surface,
+      borderColor: isDarkMode ? '#2A2A2A' : '#F0F0F0',
+      borderWidth: 1,
+      borderRadius: 24,
+      elevation: 6,
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.06,
+      shadowRadius: 12,
+      padding: 16,
+      marginBottom: 20
+    }]}>
+      <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+        <View style={{ width: 56, height: 56, borderRadius: 28, borderWidth: 2, borderColor: 'rgba(220,49,115,0.15)', overflow: 'hidden', alignItems: 'center', justifyContent: 'center', backgroundColor: isDarkMode ? '#2A2A2A' : '#F5F5F5' }}>
+          <Ionicons name="bicycle" size={28} color={colors.primary} />
+        </View>
+
+        <View style={{ marginLeft: 14, flex: 1 }}>
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Text style={{ fontSize: 18, fontFamily: 'Poppins-Bold', color: colors.text.primary }} numberOfLines={1}>
+              {orderData.driverName === t('awaitingDriver') ? (t('assigningDriver') || 'Assigning Driver...') : orderData.driverName}
             </Text>
+            {isDriverLive ? (
+              <View style={{ backgroundColor: '#E8F5E9', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
+                <Text style={{ fontSize: 10, fontFamily: 'Poppins-Bold', color: '#4CAF50' }}>LIVE</Text>
+              </View>
+            ) : null}
+          </View>
+
+          <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 4, flexWrap: 'wrap', gap: 6 }}>
+            {orderData.driverRating > 0 && orderData.driverName !== t('awaitingDriver') && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#FFF8E1', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, gap: 4 }}>
+                <Ionicons name="star" size={11} color="#FFA000" />
+                <Text style={{ fontSize: 11, fontFamily: 'Poppins-Medium', color: '#FFA000' }}>{orderData.driverRating}</Text>
+              </View>
+            )}
+            {(orderData.vehicleType || orderData.driverName !== t('awaitingDriver')) && (
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#F5F5F5', paddingHorizontal: 8, paddingVertical: 3, borderRadius: 8, gap: 4 }}>
+                <Ionicons name="bicycle" size={11} color={colors.text.secondary} />
+                <Text style={{ fontSize: 11, fontFamily: 'Poppins-Medium', color: colors.text.secondary }}>
+                  {orderData.vehicleType || t('delivery') || 'Delivery'}
+                </Text>
+              </View>
+            )}
+          </View>
+        </View>
+
+        {orderData.driverName !== t('awaitingDriver') && (
+          <View style={{ flexDirection: 'row', gap: 8 }}>
+            <TouchableOpacity style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: colors.primary + '15', alignItems: 'center', justifyContent: 'center' }} onPress={handleCallDriver}>
+              <Ionicons name="call" size={18} color={colors.primary} />
+            </TouchableOpacity>
           </View>
         )}
       </View>
 
-      <View style={styles.driverCard}>
-        <View style={styles.driverLeft}>
-          <View style={styles.driverAvatar}>
-            <Ionicons name="person" size={32} color={colors.primary} />
-            <View style={styles.onlineBadge}>
-              <View style={[styles.onlineDot, { backgroundColor: isDriverLive ? '#4CAF50' : '#BDBDBD' }]} />
-            </View>
-          </View>
-          <View style={styles.driverInfo}>
-            <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-              <Text style={styles.driverName}>{orderData.driverName}</Text>
-              {isDriverLive ? (
-                <View style={{ backgroundColor: '#E8F5E9', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                  <Text style={{ fontSize: 10, fontFamily: 'Poppins-Bold', color: '#4CAF50' }}>LIVE</Text>
-                </View>
-              ) : (
-                <View style={{ backgroundColor: '#F5F5F5', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 4 }}>
-                  <Text style={{ fontSize: 10, fontFamily: 'Poppins-Bold', color: '#757575' }}>OFFLINE</Text>
-                </View>
-              )}
-            </View>
-            {(orderData.driverRating > 0 || orderData.vehicleType) && (
-              <View style={styles.driverRating}>
-                {orderData.driverRating > 0 && (
-                  <>
-                    <Ionicons name="star" size={14} color="#FFD700" />
-                    <Text style={styles.driverRatingText}>{orderData.driverRating}</Text>
-                  </>
-                )}
-                {orderData.vehicleType && (
-                  <Text style={styles.driverVehicle}>{orderData.driverRating > 0 ? '• ' : ''}{orderData.vehicleType}</Text>
-                )}
-              </View>
-            )}
-            {(orderData.vehicleNumber || orderData.vehicleColor) && (
-              <View style={styles.vehicleInfo}>
-                <Ionicons name="car-sport" size={12} color={colors.text.light} />
-                {orderData.vehicleNumber && (
-                  <Text style={styles.vehicleNumber}>{orderData.vehicleNumber}</Text>
-                )}
-                {orderData.vehicleNumber && orderData.vehicleColor && (
-                  <Text style={styles.vehicleDot}>•</Text>
-                )}
-                {orderData.vehicleColor && (
-                  <Text style={styles.vehicleColor}>{orderData.vehicleColor}</Text>
-                )}
-              </View>
-            )}
-            {orderData.driverPhone ? (
-              <View style={styles.vehicleInfo}>
-                <Ionicons name="call" size={12} color={colors.text.light} />
-                <Text style={styles.vehicleNumber}>{orderData.driverPhone}</Text>
-              </View>
-            ) : null}
-          </View>
-        </View>
-
-        <View style={styles.driverActions}>
-          <TouchableOpacity
-            style={styles.driverActionButton}
-            onPress={handleCallDriver}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="call" size={20} color={colors.primary} />
-            <Text style={styles.actionButtonLabel}>{t('call')}</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={styles.driverActionButton}
-            onPress={handleMessageDriver}
-            activeOpacity={0.7}
-          >
-            <Ionicons name="chatbubble" size={20} color={colors.primary} />
-            <Text style={styles.actionButtonLabel}>{t('chat')}</Text>
-          </TouchableOpacity>
-        </View>
-      </View>
-
       {/* Driver Status - only show if we have real data */}
       {driverLocation && (
-        <View style={styles.driverStatusBar}>
-          <View style={styles.statusItem}>
-            <Ionicons name="navigate" size={16} color={colors.success} />
-            <Text style={styles.statusText}>{t('headingToYou')}</Text>
-          </View>
-          {driverEta && (
-            <>
-              <View style={styles.statusDivider} />
-              <View style={styles.statusItem}>
+        <>
+          <View style={{ height: 1, backgroundColor: isDarkMode ? '#2A2A2A' : '#F0F0F0', marginVertical: 14 }} />
+          <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'center' }}>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginRight: 16 }}>
+              <Ionicons name="navigate" size={16} color={colors.success} />
+              <Text style={{ fontSize: 13, fontFamily: 'Poppins-Medium', color: colors.text.primary, marginLeft: 6 }}>{t('headingToYou') || 'Heading to you'}</Text>
+            </View>
+            {driverEta && (
+              <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                <View style={{ width: 1, height: 12, backgroundColor: colors.border, marginHorizontal: 12 }} />
                 <Ionicons name="speedometer" size={16} color={colors.info} />
-                <Text style={styles.statusText}>~{driverEta} {t('minAway')}</Text>
+                <Text style={{ fontSize: 13, fontFamily: 'Poppins-Medium', color: colors.text.primary, marginLeft: 6 }}>~{driverEta} {t('minAway') || 'min away'}</Text>
               </View>
-            </>
-          )}
-        </View>
+            )}
+          </View>
+        </>
       )}
     </View>
   );
 
   const renderOrderSummary = () => (
     <View style={styles.summaryContainer}>
-      <View style={styles.summaryHeader}>
+      <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 16, paddingHorizontal: 16 }}>
         <View>
-          <Text style={styles.sectionTitle}>{t('orderDetails')}</Text>
-          <Text style={styles.orderNumber}>{orderData.orderNumber}</Text>
+          <Text style={{ fontSize: 20, fontFamily: 'Poppins-Bold', color: colors.text.primary }}>{t('orderDetails') || 'Order Details'}</Text>
+          <Text style={{ fontSize: 13, fontFamily: 'Poppins-Medium', color: colors.text.secondary }}>{orderData.orderNumber}</Text>
         </View>
-        <View style={styles.orderDateContainer}>
-          <Text style={styles.orderDate}>{orderData.orderDate}</Text>
-          <Text style={styles.orderTime}>{orderData.orderTime}</Text>
+        <View style={{ alignItems: 'flex-end' }}>
+          <Text style={{ fontSize: 13, fontFamily: 'Poppins-SemiBold', color: colors.text.primary }}>{orderData.orderDate}</Text>
+          <Text style={{ fontSize: 12, fontFamily: 'Poppins-Regular', color: colors.text.secondary }}>{orderData.orderTime}</Text>
         </View>
       </View>
 
-      <View style={styles.summaryCard}>
+      <View style={{
+        backgroundColor: colors.surface,
+        marginHorizontal: 16,
+        borderRadius: 24,
+        elevation: 6,
+        shadowColor: '#000',
+        shadowOffset: { width: 0, height: 6 },
+        shadowOpacity: 0.05,
+        shadowRadius: 10,
+        borderWidth: 1,
+        borderColor: isDarkMode ? '#2A2A2A' : '#F0F0F0',
+        padding: 20
+      }}>
         {/* Restaurant Info */}
-        <View style={styles.summarySection}>
-          <View style={styles.summaryIconContainer}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16 }}>
+          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#FFF0F5', alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
             <MaterialIcons name="restaurant" size={20} color={colors.primary} />
           </View>
-          <View style={styles.summaryContent}>
-            <Text style={styles.summaryLabel}>{t('restaurant')}</Text>
-            <Text style={styles.summaryValue}>{orderData.restaurantName}</Text>
-            <Text style={styles.summarySubtext}>{orderData.restaurantAddress}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 12, fontFamily: 'Poppins-Medium', color: colors.text.secondary }}>{t('restaurant')}</Text>
+            <Text style={{ fontSize: 16, fontFamily: 'Poppins-Bold', color: colors.text.primary }}>{orderData.restaurantName}</Text>
+            <Text style={{ fontSize: 13, fontFamily: 'Poppins-Regular', color: colors.text.secondary }}>{orderData.restaurantAddress}</Text>
           </View>
         </View>
 
-        <View style={styles.summaryDivider} />
+        <View style={{ height: 1, backgroundColor: isDarkMode ? '#333' : '#F0F0F0', marginVertical: 16 }} />
 
         {/* Delivery Address */}
-        <View style={styles.summarySection}>
-          <View style={styles.summaryIconContainer}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16 }}>
+          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#FFF0F5', alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
             <Ionicons name="location" size={20} color={colors.primary} />
           </View>
-          <View style={styles.summaryContent}>
-            <Text style={styles.summaryLabel}>{t('deliveryTo')}</Text>
-            <Text style={styles.summaryValue}>{orderData.deliveryAddress}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 12, fontFamily: 'Poppins-Medium', color: colors.text.secondary }}>{t('deliveryTo')}</Text>
+            <Text style={{ fontSize: 14, fontFamily: 'Poppins-SemiBold', color: colors.text.primary, marginVertical: 4 }}>{orderData.deliveryAddress}</Text>
             {orderData.deliveryLandmark && (
-              <Text style={styles.summarySubtext}>📍 {orderData.deliveryLandmark}</Text>
+              <Text style={{ fontSize: 13, fontFamily: 'Poppins-Regular', color: colors.text.secondary }}>📍 {orderData.deliveryLandmark}</Text>
             )}
             {orderData.deliveryInstructions && (
-              <View style={styles.instructionsBadge}>
-                <Ionicons name="information-circle" size={12} color={colors.info} />
-                <Text style={styles.instructionsText}>{orderData.deliveryInstructions}</Text>
+              <View style={{ flexDirection: 'row', alignItems: 'center', backgroundColor: isDarkMode ? '#333' : '#F5F5F5', padding: 8, borderRadius: 8, marginTop: 8 }}>
+                <Ionicons name="information-circle" size={14} color={colors.info} />
+                <Text style={{ fontSize: 12, fontFamily: 'Poppins-Medium', color: colors.text.primary, marginLeft: 6 }}>{orderData.deliveryInstructions}</Text>
               </View>
             )}
           </View>
         </View>
 
-        <View style={styles.summaryDivider} />
+        <View style={{ height: 1, backgroundColor: isDarkMode ? '#333' : '#F0F0F0', marginVertical: 16 }} />
 
         {/* Order Items */}
-        <View style={styles.summarySection}>
-          <View style={styles.summaryIconContainer}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start', marginBottom: 16 }}>
+          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#FFF0F5', alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
             <Ionicons name="bag-handle" size={20} color={colors.primary} />
           </View>
-          <View style={styles.summaryContent}>
-            <Text style={styles.summaryLabel}>{t('items')} ({orderData.totalItems})</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 12, fontFamily: 'Poppins-Medium', color: colors.text.secondary, marginBottom: 8 }}>{t('items')} ({orderData.totalItems})</Text>
             {orderData.items?.map((item, index) => (
-              <View key={index} style={styles.itemRow}>
-                <Text style={styles.itemQuantity}>{item.quantity || 1}x</Text>
-                <Text style={styles.itemName}>{item.name || item}</Text>
-                <Text style={styles.itemPrice}>€{item.subtotal ? item.subtotal.toFixed(2) : '0.00'}</Text>
+              <View key={index} style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', paddingVertical: 4 }}>
+                <View style={{ flexDirection: 'row', alignItems: 'center', flex: 1, paddingRight: 10 }}>
+                  <View style={{ backgroundColor: isDarkMode ? 'rgba(220,49,115,0.15)' : 'rgba(220,49,115,0.08)', width: 24, height: 24, borderRadius: 6, alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
+                    <Text style={{ fontSize: 12, fontFamily: 'Poppins-Bold', color: colors.primary }}>{item.quantity || 1}x</Text>
+                  </View>
+                  <Text style={{ fontSize: 14, fontFamily: 'Poppins-Medium', color: colors.text.primary }} numberOfLines={2}>{item.name || item}</Text>
+                </View>
+                <Text style={{ fontSize: 14, fontFamily: 'Poppins-SemiBold', color: colors.text.primary }}>€{item.subtotal ? item.subtotal.toFixed(2) : '0.00'}</Text>
               </View>
             ))}
           </View>
         </View>
 
-        <View style={styles.summaryDivider} />
+        <View style={{ height: 1, backgroundColor: isDarkMode ? '#333' : '#F0F0F0', marginVertical: 16 }} />
 
         {/* Payment Breakdown */}
-        <View style={styles.summarySection}>
-          <View style={styles.summaryIconContainer}>
+        <View style={{ flexDirection: 'row', alignItems: 'flex-start' }}>
+          <View style={{ width: 40, height: 40, borderRadius: 20, backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#FFF0F5', alignItems: 'center', justifyContent: 'center', marginRight: 16 }}>
             <Ionicons name="receipt" size={20} color={colors.primary} />
           </View>
-          <View style={styles.summaryContent}>
-            <Text style={styles.summaryLabel}>{t('billSummary')}</Text>
-            <View style={styles.billRow}>
-              <Text style={styles.billLabel}>{t('subtotal')}</Text>
-              <Text style={styles.billValue}>€{orderData.subtotal ? orderData.subtotal.toFixed(2) : '0.00'}</Text>
+          <View style={{ flex: 1 }}>
+            <Text style={{ fontSize: 12, fontFamily: 'Poppins-Medium', color: colors.text.secondary, marginBottom: 8 }}>{t('billSummary')}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
+              <Text style={{ fontSize: 14, fontFamily: 'Poppins-Regular', color: colors.text.secondary }}>{t('subtotal')}</Text>
+              <Text style={{ fontSize: 14, fontFamily: 'Poppins-Medium', color: colors.text.primary }}>€{orderData.subtotal ? orderData.subtotal.toFixed(2) : '0.00'}</Text>
             </View>
-            <View style={styles.billRow}>
-              <Text style={styles.billLabel}>{t('deliveryFee')}</Text>
-              <Text style={styles.billValue}>€{orderData.deliveryFee ? orderData.deliveryFee.toFixed(2) : '0.00'}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
+              <Text style={{ fontSize: 14, fontFamily: 'Poppins-Regular', color: colors.text.secondary }}>{t('deliveryFee')}</Text>
+              <Text style={{ fontSize: 14, fontFamily: 'Poppins-Medium', color: colors.text.primary }}>€{orderData.deliveryFee ? orderData.deliveryFee.toFixed(2) : '0.00'}</Text>
             </View>
 
             {orderData.taxAmount > 0 && (
-              <View style={styles.billRow}>
-                <Text style={styles.billLabel}>{t('tax') || 'Tax'}</Text>
-                <Text style={styles.billValue}>€{orderData.taxAmount.toFixed(2)}</Text>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
+                <Text style={{ fontSize: 14, fontFamily: 'Poppins-Regular', color: colors.text.secondary }}>{t('tax') || 'Tax'}</Text>
+                <Text style={{ fontSize: 14, fontFamily: 'Poppins-Medium', color: colors.text.primary }}>€{orderData.taxAmount.toFixed(2)}</Text>
               </View>
             )}
 
             {orderData.discount > 0 && (
-              <View style={styles.billRow}>
-                <Text style={styles.billLabelDiscount}>
+              <View style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 4 }}>
+                <Text style={{ fontSize: 14, fontFamily: 'Poppins-Regular', color: colors.success }}>
                   {t('discount')} ({orderData.promoCode || 'PROMO'})
                 </Text>
-                <Text style={styles.billValueDiscount}>-€{orderData.discount ? orderData.discount.toFixed(2) : '0.00'}</Text>
+                <Text style={{ fontSize: 14, fontFamily: 'Poppins-Medium', color: colors.success }}>-€{orderData.discount ? orderData.discount.toFixed(2) : '0.00'}</Text>
               </View>
             )}
 
-            <View style={styles.billDivider} />
-            <View style={styles.billRow}>
-              <Text style={styles.totalLabel}>{t('totalAmount')}</Text>
-              <Text style={styles.totalAmount}>€{orderData.totalAmount ? orderData.totalAmount.toFixed(2) : '0.00'}</Text>
+            <View style={{ height: 1, backgroundColor: isDarkMode ? '#333' : '#F0F0F0', marginVertical: 12 }} />
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ fontSize: 16, fontFamily: 'Poppins-Bold', color: colors.text.primary }}>{t('totalAmount')}</Text>
+              <Text style={{ fontSize: 18, fontFamily: 'Poppins-Bold', color: colors.primary }}>€{orderData.totalAmount ? orderData.totalAmount.toFixed(2) : '0.00'}</Text>
             </View>
-          </View>
-        </View>
 
-        <View style={styles.summaryDivider} />
-
-        {/* Payment Method */}
-        <View style={styles.summarySection}>
-          <View style={styles.summaryIconContainer}>
-            <Ionicons name="card" size={20} color={colors.primary} />
-          </View>
-          <View style={styles.summaryContent}>
-            <Text style={styles.summaryLabel}>{t('paymentMethod')}</Text>
-            <Text style={styles.summaryValue}>{orderData.paymentMethod}</Text>
-            <View style={styles.paidBadge}>
-              <Text style={styles.paidText}>{t('paid')}</Text>
+            <View style={{ flexDirection: 'row', alignItems: 'center', marginTop: 12 }}>
+              <View style={{ backgroundColor: isDarkMode ? '#333' : '#F5F5F5', paddingHorizontal: 12, paddingVertical: 6, borderRadius: 12, flex: 1, flexDirection: 'row', justifyContent: 'space-between' }}>
+                <Text style={{ fontSize: 13, fontFamily: 'Poppins-Medium', color: colors.text.secondary }}>{t('paymentMethod') || 'Method'}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={{ fontSize: 13, fontFamily: 'Poppins-Bold', color: colors.text.primary, marginRight: 8 }}>{orderData.paymentMethod}</Text>
+                  <View style={{ backgroundColor: colors.success + '15', paddingHorizontal: 6, paddingVertical: 2, borderRadius: 6 }}>
+                    <Text style={{ fontSize: 10, fontFamily: 'Poppins-Bold', color: colors.success }}>{t('paid') || 'PAID'}</Text>
+                  </View>
+                </View>
+              </View>
             </View>
           </View>
         </View>
