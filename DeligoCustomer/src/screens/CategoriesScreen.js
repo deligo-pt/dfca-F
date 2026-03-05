@@ -35,6 +35,7 @@ import { useCart } from "../contexts/CartContext";
 import { useLocation } from "../contexts/LocationContext";
 import { useProfile } from "../contexts/ProfileContext";
 import formatCurrency from "../utils/currency";
+import { formatMinutesToUX } from "../utils/timeFormat";
 
 /**
  * CategoriesScreen
@@ -254,7 +255,7 @@ const CategoriesScreen = ({ navigation }) => {
           (typeof p.rating === "number" ? p.rating : p.rating.average)) ||
         vendorRating ||
         0,
-      deliveryTime: p.deliveryTime || "",
+      deliveryTime: formatMinutesToUX(p.deliveryTime || ""),
       distance: p.distance || "",
       deliveryFee: formatCurrency(p.pricing?.currency || "", price),
       offer:
@@ -971,10 +972,14 @@ const CategoriesScreen = ({ navigation }) => {
   };
 
   useEffect(() => {
-    // Fetch location on mount if not already set
-    if (!currentLocation && !locationLoading) {
-      getCurrentLocation();
-    }
+    // Only auto-fetch location if user has not disabled Location Services
+    (async () => {
+      const locationPref = await StorageService.getItem('location_enabled');
+      if (locationPref === 'false') return;
+      if (!currentLocation && !locationLoading) {
+        getCurrentLocation();
+      }
+    })();
   }, []);
 
   // PromoCarousel refresh trigger

@@ -7,6 +7,7 @@ import { spacing, fontSize, borderRadius } from '../theme';
 import { useLanguage } from '../utils/LanguageContext';
 import { useLocation } from '../contexts/LocationContext';
 import formatCurrency from '../utils/currency';
+import { formatMinutesToUX } from '../utils/timeFormat';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 
@@ -96,7 +97,7 @@ export default function CartList({ navigation }) {
             const baseTime = Math.max(10, Math.round(distKm * 3) + 10); calculatedDeliveryTime = `${baseTime} - ${baseTime + 5} min`;
           }
         }
-        const finalDeliveryTime = calculatedDeliveryTime || cached?.deliveryTime || cart.vendorDeliveryTime || pcVendor?.deliveryTime || firstItem?._raw?.vendor?.deliveryTime || '15 - 25 min';
+        const finalDeliveryTime = formatMinutesToUX(calculatedDeliveryTime || cached?.deliveryTime || cart.vendorDeliveryTime || pcVendor?.deliveryTime || firstItem?._raw?.vendor?.deliveryTime || '15 - 25 min');
 
         const ratingSources = [productContextMatch?.rating, productContextMatch?._raw?.rating, firstItem?.product?.productRating, firstItem?.product?.vendorRating, firstItem?._raw?.rating, cached?.rating, cart.vendorRating, firstItem?._raw?.vendorId?.rating, pcVendor?.rating, pcVendor?.businessDetails?.rating, firstItem?._raw?.vendor?.rating, firstItem?._raw?.businessDetails?.rating];
         let finalVendorRating = null;

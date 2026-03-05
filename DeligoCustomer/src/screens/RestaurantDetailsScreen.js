@@ -43,6 +43,7 @@ import { useLanguage } from "../utils/LanguageContext";
 import { useCart } from "../contexts/CartContext";
 import { useLocation } from "../contexts/LocationContext";
 import formatCurrency from "../utils/currency";
+import { formatMinutesToUX } from "../utils/timeFormat";
 import * as Location from "expo-location";
 import AlertModal from "../components/AlertModal";
 import MaxQuantityModal from "../components/MaxQuantityModal";
@@ -173,6 +174,9 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const [modalReady, setModalReady] = useState(false); // For fixing footer position on first render
 
   const [selectedVariations, setSelectedVariations] = useState({});
+
+  // Full-screen image state
+  const [fullScreenImage, setFullScreenImage] = useState(null);
 
   // State for active add-ons display
   const [activeAddons, setActiveAddons] = useState([]);
@@ -435,7 +439,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   }, [currentLocation, vendorCoords]);
 
   const deliveryTimeProp = normVendor.deliveryTime || restaurant._raw?.deliveryTime || null;
-  const finalDeliveryTime = estimatedTime || deliveryTimeProp || "15 - 20 min";
+  const finalDeliveryTime = formatMinutesToUX(estimatedTime || deliveryTimeProp || "15 - 20 min");
 
   useEffect(() => {
     let mounted = true;
@@ -677,7 +681,25 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   // Filter menu items
   const getFilteredMenuItems = () => {
     let items = vendorProducts;
-    // "All" shows everything - no filtering
+
+    // If searching, ignore category filter and search through ALL items
+    if (searchQuery.trim()) {
+      const q = searchQuery.toLowerCase();
+      return items.filter((item) => {
+        const rawItem = item._raw || {};
+        const itemName = (
+          rawItem.product?.name ||
+          rawItem.name ||
+          rawItem.productName ||
+          item.name ||
+          ""
+        ).toLowerCase();
+        const desc = (rawItem.description || rawItem.slug || "").toLowerCase();
+        return itemName.includes(q) || desc.includes(q);
+      });
+    }
+
+    // No search query, apply category filter normally
     if (selectedCategory === "All") {
       // No filter - show all items
     } else if (selectedCategory === "Popular") {
@@ -697,20 +719,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
       });
     }
 
-    if (!searchQuery.trim()) return items;
-    const q = searchQuery.toLowerCase();
-    return items.filter((item) => {
-      const rawItem = item._raw || {};
-      const itemName = (
-        rawItem.product?.name ||
-        rawItem.name ||
-        rawItem.productName ||
-        item.name ||
-        ""
-      ).toLowerCase();
-      const desc = (rawItem.description || rawItem.slug || "").toLowerCase();
-      return itemName.includes(q) || desc.includes(q);
-    });
+    return items;
   };
 
   const calculateModalTotal = () => {
@@ -1049,10 +1058,10 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
         animationType="slide"
         onRequestClose={closeProductModal}
       >
-        <View style={{ flex: 1, backgroundColor: 'transparent' }}>
+        <View style={styles.modalOverlay}>
           {/* Dim backdrop */}
           <TouchableOpacity
-            style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.45)' }}
+            style={{ flex: 1, width: '100%' }}
             onPress={closeProductModal}
             activeOpacity={1}
           />
@@ -1093,11 +1102,13 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
               {/* ── Rounded hero image — Design 3 centered ── */}
               <View style={styles.modalImageCenter}>
                 {images.length > 0 ? (
-                  <Image
-                    source={{ uri: images[0] }}
-                    style={styles.modalImage}
-                    resizeMode="cover"
-                  />
+                  <TouchableOpacity activeOpacity={0.9} onPress={() => setFullScreenImage(images[0])}>
+                    <Image
+                      source={{ uri: images[0] }}
+                      style={styles.modalImage}
+                      resizeMode="cover"
+                    />
+                  </TouchableOpacity>
                 ) : (
                   <View style={[styles.modalImage, { backgroundColor: isDarkMode ? '#2A2A2A' : '#F5F5F5', alignItems: 'center', justifyContent: 'center' }]}>
                     <Ionicons name="fast-food" size={64} color={isDarkMode ? '#555' : '#CCC'} />
@@ -1435,7 +1446,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                                       setTimeout(async () => {
                                         const retry = await addItem(activeProduct, quantity, payload);
                                         if (retry && !retry.success) { setAlertConfig({ title: safeT('error', 'Error'), message: retry.message || 'Failed' }); setAlertVisible(true); }
-                                        else { closeProductModal(); if (hasAddons) { setTimeout(() => { const mid = raw._id || activeProduct._raw?._id || activeProduct.id; navigation.navigate('Addons', { product: { name: raw.name || activeProduct.name, id: mid }, productId: mid, variantName, addonGroupIds, currency: raw.pricing?.currency || 'EUR' }); }, 300); } }
+                                        else { closeProductModal(); if (hasAddons) { setTimeout(() => { const mid = raw._id || activeProduct._raw?._id || activeProduct.id; navigation.navigate('Addons', { product: { name: raw.name || activeProduct.name, id: mid }, productId: mid, variantName, variationSku, addonGroupIds, currency: raw.pricing?.currency || 'EUR' }); }, 300); } }
                                       }, 100);
                                     } catch (e) { console.error(e); }
                                   }
@@ -1448,7 +1459,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                           throw new Error(result.message || 'Failed to add to cart');
                         }
                         closeProductModal();
-                        if (hasAddons) { setTimeout(() => { const mid = raw._id || activeProduct._raw?._id || activeProduct.id; navigation.navigate('Addons', { product: { name: raw.name || activeProduct.name, id: mid }, productId: mid, variantName, addonGroupIds, currency: raw.pricing?.currency || 'EUR' }); }, 300); }
+                        if (hasAddons) { setTimeout(() => { const mid = raw._id || activeProduct._raw?._id || activeProduct.id; navigation.navigate('Addons', { product: { name: raw.name || activeProduct.name, id: mid }, productId: mid, variantName, variationSku, addonGroupIds, currency: raw.pricing?.currency || 'EUR' }); }, 300); }
                       } catch (error) {
                         console.error('[RestaurantDetails] Add to cart error:', error);
                         setAlertConfig({ title: t('error') || 'Error', message: error.message || t('addToCartFailed') || 'Failed to add item to cart' });
@@ -1550,40 +1561,68 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
         </LinearGradient>
       </View>
 
-      {/* Search Bar */}
+      {/* Premium Search Bar */}
       {searchVisible && (
         <View
-          style={[
-            styles.searchContainer,
-            {
-              backgroundColor: colors.surface,
-              borderBottomColor: colors.border,
-            },
-          ]}
+          style={{
+            paddingHorizontal: 16,
+            paddingVertical: 12,
+            backgroundColor: colors.background,
+            zIndex: 10,
+          }}
         >
-          <Ionicons
-            name="search"
-            size={20}
-            color={colors.text.secondary}
-            style={{ marginRight: 8 }}
-          />
-          <TextInput
-            style={[styles.searchInput, { color: colors.text.primary }]}
-            placeholder={t("searchMenu") || "Search menu..."}
-            placeholderTextColor={colors.text.secondary}
-            value={searchQuery}
-            onChangeText={setSearchQuery}
-            autoFocus
-          />
-          {searchQuery.length > 0 && (
-            <TouchableOpacity onPress={() => setSearchQuery("")}>
-              <Ionicons
-                name="close-circle"
-                size={20}
-                color={colors.text.secondary}
-              />
-            </TouchableOpacity>
-          )}
+          <View
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              backgroundColor: isDarkMode ? '#252525' : '#FFFFFF',
+              borderRadius: 16,
+              paddingHorizontal: 16,
+              height: 52,
+              borderWidth: 1,
+              borderColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(220, 49, 115, 0.1)',
+              shadowColor: colors.primary,
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.08,
+              shadowRadius: 10,
+              elevation: 4,
+            }}
+          >
+            <Ionicons
+              name="search"
+              size={22}
+              color={colors.primary}
+              style={{ marginRight: 12 }}
+            />
+            <TextInput
+              style={{
+                flex: 1,
+                fontSize: 15,
+                fontFamily: 'Poppins-Regular',
+                color: colors.text.primary,
+                paddingVertical: 0, // Fix Android text alignment
+              }}
+              placeholder={t("searchMenu") || "Search menu..."}
+              placeholderTextColor={colors.text.light || '#999'}
+              value={searchQuery}
+              onChangeText={setSearchQuery}
+              autoFocus
+              selectionColor={colors.primary}
+            />
+            {searchQuery.length > 0 && (
+              <TouchableOpacity
+                onPress={() => setSearchQuery("")}
+                style={{ padding: 6, marginRight: -6 }}
+                hitSlop={{ top: 10, right: 10, bottom: 10, left: 10 }}
+              >
+                <Ionicons
+                  name="close-circle"
+                  size={20}
+                  color={colors.text.light || '#999'}
+                />
+              </TouchableOpacity>
+            )}
+          </View>
         </View>
       )}
 
@@ -1601,158 +1640,162 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
           />
         }
       >
-        {/* Premium Vendor Header */}
-        <View style={styles.vendorHero}>
-          <Image
-            source={
-              restaurant._raw?.vendor?.storePhoto
-                ? { uri: restaurant._raw.vendor.storePhoto }
-                : restaurant.image
-                  ? { uri: restaurant.image }
-                  : require("../assets/images/logonew.png")
-            }
-            style={styles.restaurantImage}
-            resizeMode="cover"
-          />
-          {/* Bottom gradient for blending */}
-          <LinearGradient
-            colors={["transparent", "rgba(0,0,0,0.06)"]}
-            style={styles.heroBottomGradient}
-          />
-        </View>
-
-        {/* Solid Info Card — floating overlap */}
-        <View
-          style={[
-            styles.glassInfoCardContainer,
-            { shadowColor: isDarkMode ? "#000" : "#888" },
-          ]}
-        >
-          <BlurView
-            intensity={60}
-            tint={isDarkMode ? "dark" : "light"}
-            style={[
-              styles.glassInfoCard,
-              {
-                backgroundColor: isDarkMode
-                  ? "rgba(30, 30, 30, 0.5)"
-                  : "rgba(255, 255, 255, 0.65)",
-                borderColor: isDarkMode
-                  ? "rgba(255, 255, 255, 0.1)"
-                  : "rgba(255, 255, 255, 0.6)",
-                borderWidth: 1,
-              },
-            ]}
-          >
-            <Text
-              style={[
-                styles.restaurantName,
-                { color: colors.text.primary, textAlign: "center" },
-              ]}
-            >
-              {displayName}
-            </Text>
-
-            <TouchableOpacity
-              style={styles.moreInfoBtn}
-              onPress={() => setVendorDetailsVisible(true)}
-            >
-              <Text
-                style={[styles.moreInfoText, { color: colors.text.secondary }]}
-              >
-                More info
-              </Text>
-              <Ionicons
-                name="chevron-forward"
-                size={12}
-                color={colors.text.secondary}
+        {!searchVisible && (
+          <>
+            {/* Premium Vendor Header */}
+            <View style={styles.vendorHero}>
+              <Image
+                source={
+                  restaurant._raw?.vendor?.storePhoto
+                    ? { uri: restaurant._raw.vendor.storePhoto }
+                    : restaurant.image
+                      ? { uri: restaurant.image }
+                      : require("../assets/images/logonew.png")
+                }
+                style={styles.restaurantImage}
+                resizeMode="cover"
               />
-            </TouchableOpacity>
-
-            <View style={styles.restaurantMetaWrapper}>
-              <View style={styles.metaStat}>
-                <Ionicons
-                  name="star"
-                  size={14}
-                  color="#FFB300"
-                  style={{ marginRight: 4 }}
-                />
-                <Text
-                  style={[
-                    styles.metaStatText,
-                    { color: colors.text.secondary },
-                  ]}
-                >
-                  {ratingValue ? parseFloat(ratingValue).toFixed(1) : "New"}
-                </Text>
-              </View>
-              <View style={styles.metaDivider} />
-              <View style={styles.metaStat}>
-                <MaterialCommunityIcons
-                  name="bike-fast"
-                  size={14}
-                  color={colors.text.secondary}
-                  style={{ marginRight: 4 }}
-                />
-                <Text
-                  style={[
-                    styles.metaStatText,
-                    { color: colors.text.secondary },
-                  ]}
-                >
-                  {finalDeliveryTime}
-                </Text>
-              </View>
+              {/* Bottom gradient for blending */}
+              <LinearGradient
+                colors={["transparent", "rgba(0,0,0,0.06)"]}
+                style={styles.heroBottomGradient}
+              />
             </View>
-          </BlurView>
-        </View>
 
-        {/* Category Tabs */}
-        <ScrollView
-          horizontal
-          showsHorizontalScrollIndicator={false}
-          style={[
-            styles.categoryTabs,
-            {
-              backgroundColor: colors.surface,
-              borderBottomColor: colors.border,
-            },
-          ]}
-          contentContainerStyle={{
-            paddingHorizontal: spacing.md,
-            paddingVertical: spacing.sm,
-          }}
-        >
-          {menuCategories.map((category) => (
-            <TouchableOpacity
-              key={category}
+            {/* Solid Info Card — floating overlap */}
+            <View
               style={[
-                styles.categoryTab,
-                {
-                  backgroundColor:
-                    selectedCategory === category
-                      ? colors.primary
-                      : colors.surface,
-                  borderColor:
-                    selectedCategory === category
-                      ? colors.primary
-                      : colors.border,
-                },
+                styles.glassInfoCardContainer,
+                { shadowColor: isDarkMode ? "#000" : "#888" },
               ]}
-              onPress={() => setSelectedCategory(category)}
             >
-              <Text
+              <BlurView
+                intensity={60}
+                tint={isDarkMode ? "dark" : "light"}
                 style={[
-                  styles.categoryTabText,
-                  { color: colors.text.secondary },
-                  selectedCategory === category && { color: "#fff" },
+                  styles.glassInfoCard,
+                  {
+                    backgroundColor: isDarkMode
+                      ? "rgba(30, 30, 30, 0.5)"
+                      : "rgba(255, 255, 255, 0.65)",
+                    borderColor: isDarkMode
+                      ? "rgba(255, 255, 255, 0.1)"
+                      : "rgba(255, 255, 255, 0.6)",
+                    borderWidth: 1,
+                  },
                 ]}
               >
-                {category === "Popular" ? t("popular") || "Popular" : category}
-              </Text>
-            </TouchableOpacity>
-          ))}
-        </ScrollView>
+                <Text
+                  style={[
+                    styles.restaurantName,
+                    { color: colors.text.primary, textAlign: "center" },
+                  ]}
+                >
+                  {displayName}
+                </Text>
+
+                <TouchableOpacity
+                  style={styles.moreInfoBtn}
+                  onPress={() => setVendorDetailsVisible(true)}
+                >
+                  <Text
+                    style={[styles.moreInfoText, { color: colors.text.secondary }]}
+                  >
+                    More info
+                  </Text>
+                  <Ionicons
+                    name="chevron-forward"
+                    size={12}
+                    color={colors.text.secondary}
+                  />
+                </TouchableOpacity>
+
+                <View style={styles.restaurantMetaWrapper}>
+                  <View style={styles.metaStat}>
+                    <Ionicons
+                      name="star"
+                      size={14}
+                      color="#FFB300"
+                      style={{ marginRight: 4 }}
+                    />
+                    <Text
+                      style={[
+                        styles.metaStatText,
+                        { color: colors.text.secondary },
+                      ]}
+                    >
+                      {ratingValue ? parseFloat(ratingValue).toFixed(1) : "New"}
+                    </Text>
+                  </View>
+                  <View style={styles.metaDivider} />
+                  <View style={styles.metaStat}>
+                    <MaterialCommunityIcons
+                      name="bike-fast"
+                      size={14}
+                      color={colors.text.secondary}
+                      style={{ marginRight: 4 }}
+                    />
+                    <Text
+                      style={[
+                        styles.metaStatText,
+                        { color: colors.text.secondary },
+                      ]}
+                    >
+                      {finalDeliveryTime}
+                    </Text>
+                  </View>
+                </View>
+              </BlurView>
+            </View>
+
+            {/* Category Tabs */}
+            <ScrollView
+              horizontal
+              showsHorizontalScrollIndicator={false}
+              style={[
+                styles.categoryTabs,
+                {
+                  backgroundColor: colors.surface,
+                  borderBottomColor: colors.border,
+                },
+              ]}
+              contentContainerStyle={{
+                paddingHorizontal: spacing.md,
+                paddingVertical: spacing.sm,
+              }}
+            >
+              {menuCategories.map((category) => (
+                <TouchableOpacity
+                  key={category}
+                  style={[
+                    styles.categoryTab,
+                    {
+                      backgroundColor:
+                        selectedCategory === category
+                          ? colors.primary
+                          : colors.surface,
+                      borderColor:
+                        selectedCategory === category
+                          ? colors.primary
+                          : colors.border,
+                    },
+                  ]}
+                  onPress={() => setSelectedCategory(category)}
+                >
+                  <Text
+                    style={[
+                      styles.categoryTabText,
+                      { color: colors.text.secondary },
+                      selectedCategory === category && { color: "#fff" },
+                    ]}
+                  >
+                    {category === "Popular" ? t("popular") || "Popular" : category}
+                  </Text>
+                </TouchableOpacity>
+              ))}
+            </ScrollView>
+          </>
+        )}
 
         {/* Menu Items */}
         <View style={{ padding: spacing.md }}>
@@ -1816,7 +1859,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
             </Text>
           </View>
           <TouchableOpacity
-            style={[styles.viewCartButton, { backgroundColor: 'transparent', paddingVertical: 0, paddingHorizontal: 0, width: 140 }]}
+            style={{ borderRadius: 24, overflow: 'hidden', elevation: 4, shadowColor: '#DC3173', shadowOffset: { width: 0, height: 4 }, shadowOpacity: 0.3, shadowRadius: 8 }}
             onPress={() => navigation.navigate("Main", { screen: "Cart" })}
             activeOpacity={0.88}
           >
@@ -1825,12 +1868,12 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={{
-                flex: 1,
-                width: '100%',
                 flexDirection: 'row',
                 alignItems: 'center',
                 justifyContent: 'center',
-                borderRadius: 20,
+                height: 48,
+                paddingHorizontal: 24,
+                minWidth: 160,
               }}
             >
               <Animated.View
@@ -1851,7 +1894,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                   colors={['transparent', 'rgba(255,255,255,0.25)', 'rgba(255,255,255,0.35)', 'rgba(255,255,255,0.25)', 'transparent']}
                   start={{ x: 0, y: 0 }}
                   end={{ x: 1, y: 0 }}
-                  style={{ flex: 1, borderRadius: 20 }}
+                  style={{ flex: 1, borderRadius: 24 }}
                 />
               </Animated.View>
               <Text style={styles.viewCartButtonText}>
@@ -1869,6 +1912,30 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
       )}
 
       {renderProductModal()}
+
+      {/* Vendor Details Modal */}
+      <Modal
+        visible={!!fullScreenImage}
+        transparent
+        animationType="fade"
+        onRequestClose={() => setFullScreenImage(null)}
+      >
+        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.9)', justifyContent: 'center', alignItems: 'center' }}>
+          <TouchableOpacity
+            style={{ position: 'absolute', top: Math.max(40, insets.top + 10), right: 20, zIndex: 10, padding: 8 }}
+            onPress={() => setFullScreenImage(null)}
+          >
+            <Ionicons name="close-circle" size={36} color="#fff" />
+          </TouchableOpacity>
+          {fullScreenImage && (
+            <Image
+              source={{ uri: fullScreenImage }}
+              style={{ width: Dimensions.get('window').width, height: 400 }}
+              resizeMode="contain"
+            />
+          )}
+        </View>
+      </Modal>
 
       {/* Vendor Details Modal */}
       <Modal

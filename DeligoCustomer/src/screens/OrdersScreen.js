@@ -166,6 +166,9 @@ const OrdersScreen = ({ navigation }) => {
     const totalItems = order.items?.reduce((s, it) => s + (it.itemSummary?.quantity ?? it.quantity ?? 1), 0) || 0;
     const finalPrice = Number(order.payoutSummary?.grandTotal ?? order.totalAmount ?? order.total ?? order.grandTotal ?? 0).toFixed(2);
     const vendorImgSrc = order.vendorImage ? { uri: order.vendorImage } : null;
+    // Order number: prefer explicit orderNumber field, fallback to last 8 chars of _id
+    const rawId = order.orderNumber || order.orderId || order._id || '';
+    const orderNum = rawId.length > 8 ? rawId.slice(-8).toUpperCase() : rawId.toUpperCase();
 
     return (
       <TouchableOpacity
@@ -193,16 +196,33 @@ const OrdersScreen = ({ navigation }) => {
                 {order.vendorName || t('groceriesAndFood') || 'Deligo Order'}
               </Text>
 
-              <View style={styles.infoPillsRow}>
+              {/* Single row: date + order number */}
+              <View style={[styles.infoPillsRow, { marginTop: 8 }]}>
+                {/* Date */}
                 <View style={[styles.infoPill, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#F5F5F5' }]}>
                   <Ionicons name="calendar-outline" size={11} color={colors.text.secondary} />
-                  <Text style={[styles.infoPillText, { color: colors.text.secondary }]}>{formatDate(order.createdAt)} • {formatTime(order.createdAt)}</Text>
+                  <Text style={[styles.infoPillText, { color: colors.text.secondary }]}>
+                    {formatDate(order.createdAt)} • {formatTime(order.createdAt)}
+                  </Text>
                 </View>
+
+                {/* Order number chip */}
+                {orderNum ? (
+                  <View style={[styles.infoPill, {
+                    marginLeft: 10,
+                    backgroundColor: isDarkMode ? 'rgba(220,49,115,0.18)' : 'rgba(220,49,115,0.09)',
+                  }]}>
+                    <Text style={[styles.infoPillText, { color: colors.primary, fontFamily: 'Poppins-Bold', letterSpacing: 0.3 }]}>
+                      #{orderNum}
+                    </Text>
+                  </View>
+                ) : null}
               </View>
             </View>
           </View>
 
-          <View style={{ alignItems: 'flex-end' }}>
+          {/* Price — top aligned */}
+          <View style={{ alignItems: 'flex-end', justifyContent: 'flex-start' }}>
             <Text style={[styles.orderPrice, { color: colors.primary }]}>€{finalPrice}</Text>
           </View>
         </View>
@@ -441,6 +461,9 @@ const styles = StyleSheet.create({
     fontSize: 11,
     fontFamily: 'Poppins-Medium',
     marginLeft: 4,
+  },
+  orderNumPill: {
+    marginLeft: 6,
   },
   orderPrice: {
     fontSize: 18,

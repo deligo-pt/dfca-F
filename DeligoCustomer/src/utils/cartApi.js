@@ -288,7 +288,8 @@ class CartAPI {
    * @param {string} optionId - The add-on option ID
    * @param {string} action - 'increment' or 'decrement'
    */
-  static async updateAddonQuantity(productId, variantName, optionId, action = 'increment') {
+  static async updateAddonQuantity(productId, variantName, optionId, action = 'increment', variationSku = null) {
+    console.log('[CartAPI] updateAddonQuantity called with:', { productId, variantName, optionId, action, variationSku });
     try {
       const url = `${BASE_API_URL}${API_ENDPOINTS.CART.UPDATE_ADDON_QUANTITY}`;
       const headers = await this.getHeaders();
@@ -297,7 +298,8 @@ class CartAPI {
         productId,
         variantName,
         optionId,
-        action
+        action,
+        ...(variationSku ? { variationSku } : {})
       };
 
       console.debug('[CartAPI] PATCH (Addon)', url, payload);
@@ -312,10 +314,17 @@ class CartAPI {
 
       if (!response.ok) {
         const errorMessage = responseData?.message || responseData?.error || 'Failed to update addon quantity';
-        console.error('Cart API - Update addon error:', {
-          status: response.status,
-          data: responseData
-        });
+        if (response.status < 500) {
+          console.warn('Cart API - Update addon warning:', {
+            status: response.status,
+            data: responseData
+          });
+        } else {
+          console.error('Cart API - Update addon error:', {
+            status: response.status,
+            data: responseData
+          });
+        }
         return { success: false, error: errorMessage, status: response.status };
       }
       return { success: true, data: responseData };

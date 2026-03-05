@@ -131,6 +131,7 @@ export const translations = {
     gotIt: "Got It",
     yourCartHas: "You have",
     adding: "adding",
+    actionFailed: "Action Failed",
 
     // Addons Screen
     customize: "Customize",
@@ -847,8 +848,10 @@ export const translations = {
     inYourCart: "No seu carrinho",
     availableToAdd: "Disponível para adicionar",
     gotIt: "Entendido",
+    limitReached: "Limite Atingido",
     yourCartHas: "Você tem",
     adding: "a adicionar",
+    actionFailed: "Ação Falhou",
 
     // Addons Screen
     customize: "Personalizar",

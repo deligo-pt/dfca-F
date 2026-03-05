@@ -12,6 +12,7 @@ import {
   Animated,
   Dimensions,
   Platform,
+  KeyboardAvoidingView,
 } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { WebView } from 'react-native-webview';
@@ -25,6 +26,7 @@ import { useProducts } from '../contexts/ProductsContext';
 import { useLocation } from '../contexts/LocationContext';
 import { useProfile } from '../contexts/ProfileContext';
 import formatCurrency from '../utils/currency';
+import { formatMinutesToUX } from '../utils/timeFormat';
 import { setupPaymentSheet, openPaymentSheet } from '../utils/stripeService';
 import CheckoutAPI from '../utils/checkoutApi';
 import OrderAPI from '../utils/orderApi';
@@ -479,7 +481,7 @@ const CheckoutScreen = ({ route, navigation }) => {
         customerPhone: currentUser?.contactNumber || currentUser?.phone || currentUser?.mobile || '',
         vendorId: vendorId,
         // Optional fields from original req
-        estimatedDeliveryTime: "25-35 min",
+        estimatedDeliveryTime: formatMinutesToUX("25-35 min"),
         discount: 0, // Placeholder
         nif: nifValue || currentUser?.NIF || '',
         NIF: nifValue || currentUser?.NIF || ''
@@ -1244,7 +1246,7 @@ const CheckoutScreen = ({ route, navigation }) => {
           <View style={styles(colors).headerCenter}>
             <Text style={styles(colors).headerTitle}>{cart?.vendorName || cartData?.vendorName || t('checkout')}</Text>
             <Text style={styles(colors).headerSubtitle}>
-              {cartItems.length} {cartItems.length === 1 ? t('item') : t('items')} • {t('estimated')} 25-35 {t('min')}
+              {cartItems.length} {cartItems.length === 1 ? t('item') : t('items')} • {t('estimated')} {formatMinutesToUX("25-35 min")}
             </Text>
           </View>
           <View style={styles(colors).headerRight} />
@@ -1263,7 +1265,7 @@ const CheckoutScreen = ({ route, navigation }) => {
           </View>
           <View style={styles(colors).deliveryTimeContent}>
             <Text style={styles(colors).deliveryTimeLabel}>{t('deliveryTime')}</Text>
-            <Text style={styles(colors).deliveryTimeValue}>25-35 {t('min')}</Text>
+            <Text style={styles(colors).deliveryTimeValue}>{formatMinutesToUX("25-35 min")}</Text>
           </View>
           <View style={styles(colors).deliveryTimeBadge}>
             <Ionicons name="flash" size={14} color="#FFA000" />
@@ -1866,137 +1868,142 @@ const CheckoutScreen = ({ route, navigation }) => {
         animationType="slide"
         onRequestClose={handleSkipNif}
       >
-        <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
-          <View style={{
-            backgroundColor: isDarkMode ? '#1E1E1E' : '#FFFFFF',
-            borderTopLeftRadius: 28,
-            borderTopRightRadius: 28,
-            padding: 32,
-            paddingBottom: 40,
-            shadowColor: "#000",
-            shadowOffset: { width: 0, height: -4 },
-            shadowOpacity: 0.1,
-            shadowRadius: 8,
-            elevation: 10,
-          }}>
-            {/* Header Icon */}
-            <View style={{ alignItems: 'center', marginBottom: 20 }}>
-              <View style={{
-                width: 60,
-                height: 60,
-                borderRadius: 30,
-                backgroundColor: isDarkMode ? '#333' : '#F0F9FF',
-                justifyContent: 'center',
-                alignItems: 'center',
-                marginBottom: 16
-              }}>
-                <Ionicons name="card-outline" size={32} color={colors.primary} />
-              </View>
-              <Text style={{
-                fontSize: 22,
-                fontFamily: 'Poppins-Bold',
-                color: colors.text.primary,
-                textAlign: 'center',
-                marginBottom: 8
-              }}>
-                Add Tax ID (NIF)
-              </Text>
-              <Text style={{
-                fontSize: 15,
-                fontFamily: 'Poppins-Regular',
-                color: colors.text.secondary,
-                textAlign: 'center',
-                lineHeight: 22,
-                paddingHorizontal: 10
-              }}>
-                For invoice purposes, please add your Tax ID (NIF) or skip this step.
-              </Text>
-            </View>
-
-            {/* Input Field */}
-            <View style={{ marginBottom: 24 }}>
-              <Text style={{
-                fontSize: 13,
-                fontFamily: 'Poppins-Medium',
-                color: colors.text.secondary,
-                marginBottom: 8,
-                marginLeft: 4
-              }}>
-                NIF / Fiscal Number
-              </Text>
-              <TextInput
-                style={{
-                  backgroundColor: isDarkMode ? '#2C2C2C' : '#F8F9FA',
-                  borderRadius: 16,
-                  padding: 18,
-                  fontSize: 16,
-                  fontFamily: 'Poppins-Regular',
+        <KeyboardAvoidingView
+          behavior="padding"
+          style={{ flex: 1 }}
+        >
+          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
+            <View style={{
+              backgroundColor: isDarkMode ? '#1E1E1E' : '#FFFFFF',
+              borderTopLeftRadius: 28,
+              borderTopRightRadius: 28,
+              padding: 32,
+              paddingBottom: 40,
+              shadowColor: "#000",
+              shadowOffset: { width: 0, height: -4 },
+              shadowOpacity: 0.1,
+              shadowRadius: 8,
+              elevation: 10,
+            }}>
+              {/* Header Icon */}
+              <View style={{ alignItems: 'center', marginBottom: 20 }}>
+                <View style={{
+                  width: 60,
+                  height: 60,
+                  borderRadius: 30,
+                  backgroundColor: isDarkMode ? '#333' : '#F0F9FF',
+                  justifyContent: 'center',
+                  alignItems: 'center',
+                  marginBottom: 16
+                }}>
+                  <Ionicons name="card-outline" size={32} color={colors.primary} />
+                </View>
+                <Text style={{
+                  fontSize: 22,
+                  fontFamily: 'Poppins-Bold',
                   color: colors.text.primary,
-                  borderWidth: 1.5,
-                  borderColor: nifValue ? colors.primary : (isDarkMode ? '#444' : '#E0E0E0')
-                }}
-                placeholder="123 456 789"
-                placeholderTextColor={colors.text.disabled}
-                value={nifValue}
-                onChangeText={setNifValue}
-                keyboardType="numeric"
-                maxLength={9}
-                autoFocus={true}
-              />
-            </View>
-
-            {/* Action Buttons */}
-            <View style={{ gap: 12 }}>
-              <TouchableOpacity
-                onPress={handleUpdateNif}
-                disabled={isUpdatingNif}
-                style={{
-                  backgroundColor: colors.primary,
-                  paddingVertical: 18,
-                  borderRadius: 16,
-                  alignItems: 'center',
-                  shadowColor: colors.primary,
-                  shadowOffset: { width: 0, height: 4 },
-                  shadowOpacity: 0.2,
-                  shadowRadius: 8,
-                  elevation: 4,
-                  flexDirection: 'row',
-                  justifyContent: 'center'
-                }}
-              >
-                {isUpdatingNif ? (
-                  <ActivityIndicator color="#FFF" style={{ marginRight: 8 }} />
-                ) : null}
-                <Text style={{
-                  fontFamily: 'Poppins-SemiBold',
-                  fontSize: 16,
-                  color: '#FFF'
+                  textAlign: 'center',
+                  marginBottom: 8
                 }}>
-                  Save & Continue
+                  Add Tax ID (NIF)
                 </Text>
-              </TouchableOpacity>
-
-              <TouchableOpacity
-                onPress={handleSkipNif}
-                disabled={isUpdatingNif}
-                style={{
-                  paddingVertical: 16,
-                  borderRadius: 16,
-                  alignItems: 'center',
-                  backgroundColor: 'transparent'
-                }}
-              >
                 <Text style={{
-                  fontFamily: 'Poppins-Medium',
                   fontSize: 15,
-                  color: colors.text.secondary
+                  fontFamily: 'Poppins-Regular',
+                  color: colors.text.secondary,
+                  textAlign: 'center',
+                  lineHeight: 22,
+                  paddingHorizontal: 10
                 }}>
-                  Skip for now
+                  For invoice purposes, please add your Tax ID (NIF) or skip this step.
                 </Text>
-              </TouchableOpacity>
+              </View>
+
+              {/* Input Field */}
+              <View style={{ marginBottom: 24 }}>
+                <Text style={{
+                  fontSize: 13,
+                  fontFamily: 'Poppins-Medium',
+                  color: colors.text.secondary,
+                  marginBottom: 8,
+                  marginLeft: 4
+                }}>
+                  NIF / Fiscal Number
+                </Text>
+                <TextInput
+                  style={{
+                    backgroundColor: isDarkMode ? '#2C2C2C' : '#F8F9FA',
+                    borderRadius: 16,
+                    padding: 18,
+                    fontSize: 16,
+                    fontFamily: 'Poppins-Regular',
+                    color: colors.text.primary,
+                    borderWidth: 1.5,
+                    borderColor: nifValue ? colors.primary : (isDarkMode ? '#444' : '#E0E0E0')
+                  }}
+                  placeholder="123 456 789"
+                  placeholderTextColor={colors.text.disabled}
+                  value={nifValue}
+                  onChangeText={setNifValue}
+                  keyboardType="numeric"
+                  maxLength={9}
+                  autoFocus={true}
+                />
+              </View>
+
+              {/* Action Buttons */}
+              <View style={{ gap: 12 }}>
+                <TouchableOpacity
+                  onPress={handleUpdateNif}
+                  disabled={isUpdatingNif}
+                  style={{
+                    backgroundColor: colors.primary,
+                    paddingVertical: 18,
+                    borderRadius: 16,
+                    alignItems: 'center',
+                    shadowColor: colors.primary,
+                    shadowOffset: { width: 0, height: 4 },
+                    shadowOpacity: 0.2,
+                    shadowRadius: 8,
+                    elevation: 4,
+                    flexDirection: 'row',
+                    justifyContent: 'center'
+                  }}
+                >
+                  {isUpdatingNif ? (
+                    <ActivityIndicator color="#FFF" style={{ marginRight: 8 }} />
+                  ) : null}
+                  <Text style={{
+                    fontFamily: 'Poppins-SemiBold',
+                    fontSize: 16,
+                    color: '#FFF'
+                  }}>
+                    Save & Continue
+                  </Text>
+                </TouchableOpacity>
+
+                <TouchableOpacity
+                  onPress={handleSkipNif}
+                  disabled={isUpdatingNif}
+                  style={{
+                    paddingVertical: 16,
+                    borderRadius: 16,
+                    alignItems: 'center',
+                    backgroundColor: 'transparent'
+                  }}
+                >
+                  <Text style={{
+                    fontFamily: 'Poppins-Medium',
+                    fontSize: 15,
+                    color: colors.text.secondary
+                  }}>
+                    Skip for now
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
           </View>
-        </View>
+        </KeyboardAvoidingView>
       </Modal>
 
     </SafeAreaView >

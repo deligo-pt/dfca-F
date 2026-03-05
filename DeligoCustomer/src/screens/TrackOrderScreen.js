@@ -33,6 +33,7 @@ import { Ionicons, MaterialIcons, MaterialCommunityIcons } from '@expo/vector-ic
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme, darkMapStyle } from '../utils/ThemeContext';
 import { useSocket } from '../contexts/SocketContext';
+import { formatMinutesToUX } from '../utils/timeFormat';
 import { API_ENDPOINTS } from '../constants/config';
 
 const { height } = Dimensions.get('window');
@@ -546,7 +547,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
       serviceFee: data.serviceFee || 0,
       discount: data.discount || 0,
       totalAmount: Number(data.payoutSummary?.grandTotal ?? data.totalAmount ?? 0),
-      estimatedTime: data.estimatedDeliveryTime || '',
+      estimatedTime: formatMinutesToUX(data.estimatedDeliveryTime || ''),
       estimatedArrival: data.estimatedArrival || '',
       deliveryAddress: deliveryAddrStr || '',
       deliveryLandmark: data.deliveryAddress?.landmark || '',
@@ -1469,7 +1470,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
         <View style={styles.etaBadge}>
           <Ionicons name="time-outline" size={18} color={colors.text.white} />
           <Text style={styles.etaText}>
-            {driverEta ? `${driverEta} min` : orderData.estimatedTime}
+            {driverEta ? formatMinutesToUX(driverEta) : orderData.estimatedTime}
           </Text>
         </View>
 
@@ -1985,7 +1986,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
               <View style={styles.fullscreenEtaBadge}>
                 <Ionicons name="time-outline" size={20} color={colors.text.white} />
                 <Text style={styles.fullscreenEtaText}>
-                  {driverEta ? `${driverEta} min` : orderData.estimatedTime}
+                  {driverEta ? formatMinutesToUX(driverEta) : orderData.estimatedTime}
                 </Text>
               </View>
 

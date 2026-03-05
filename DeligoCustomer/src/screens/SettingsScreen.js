@@ -6,12 +6,16 @@
  */
 
 import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Modal, StatusBar, Alert } from 'react-native';
+import { View, Text, StyleSheet, ScrollView, TouchableOpacity, Switch, Modal, StatusBar, Alert, Linking } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
+import * as Notifications from 'expo-notifications';
+import * as Location from 'expo-location';
 import { useLanguage } from '../utils/LanguageContext';
 import { useTheme } from '../utils/ThemeContext';
 import CustomModal from '../components/CustomModal';
+import StorageService from '../utils/storage';
+import firebaseNotificationService from '../services/firebaseNotificationService';
 
 const SettingsScreen = ({ navigation }) => {
   const { language, changeLanguage, t } = useLanguage();
@@ -26,7 +30,123 @@ const SettingsScreen = ({ navigation }) => {
   const [showLanguageModal, setShowLanguageModal] = useState(false);
   const [deleteModalVisible, setDeleteModalVisible] = useState(false);
 
-  // Synchronize local state with global theme context
+  // State for generic Custom Modal (used for permissions/settings alerts)
+  const [permissionModal, setPermissionModal] = useState({
+    visible: false,
+    title: '',
+    message: '',
+    onConfirm: () => { },
+  });
+
+  // ── On mount: read saved prefs + sync with actual OS permission status ──
+  useEffect(() => {
+    (async () => {
+      try {
+        // Notifications
+        const { status: notifStatus } = await Notifications.getPermissionsAsync();
+        const savedNotif = await StorageService.getItem('notifications_enabled');
+        const notifEnabled = notifStatus === 'granted' && savedNotif !== 'false';
+        // Location
+        const { status: locStatus } = await Location.getForegroundPermissionsAsync();
+        const savedLoc = await StorageService.getItem('location_enabled');
+        const locEnabled = locStatus === 'granted' && savedLoc !== 'false';
+
+        setSettings(prev => ({
+          ...prev,
+          notifications: notifEnabled,
+          locationServices: locEnabled,
+        }));
+      } catch (e) { /* ignore */ }
+    })();
+  }, []);
+
+  // ── Toggle Notifications ──
+  const handleNotificationsToggle = async () => {
+    const current = settings.notifications;
+    if (!current) {
+      // Turning ON → request permission
+      const { status } = await Notifications.requestPermissionsAsync();
+      if (status === 'granted') {
+        setSettings(prev => ({ ...prev, notifications: true }));
+        await StorageService.setItem('notifications_enabled', 'true');
+        // Re-initialize FCM token and register with backend
+        firebaseNotificationService.reinitializeAfterPermission();
+      } else {
+        setPermissionModal({
+          visible: true,
+          title: t('notifications') || 'Notifications',
+          message: 'Please enable notifications in your device settings.',
+          onConfirm: () => {
+            setPermissionModal(prev => ({ ...prev, visible: false }));
+            Linking.openSettings();
+          }
+        });
+      }
+    } else {
+      // Turning OFF → save pref; direct user to OS settings to fully revoke
+      setSettings(prev => ({ ...prev, notifications: false }));
+      await StorageService.setItem('notifications_enabled', 'false');
+      setPermissionModal({
+        visible: true,
+        title: t('notifications') || 'Notifications',
+        message: 'To fully disable notifications, turn them off in device settings.',
+        onConfirm: () => {
+          setPermissionModal(prev => ({ ...prev, visible: false }));
+          Linking.openSettings();
+        }
+      });
+    }
+  };
+
+  // ── Toggle Location ──
+  const handleLocationToggle = async () => {
+    const current = settings.locationServices;
+    if (!current) {
+      // Turning ON → request permission
+      const { status } = await Location.requestForegroundPermissionsAsync();
+      if (status === 'granted') {
+        setSettings(prev => ({ ...prev, locationServices: true }));
+        await StorageService.setItem('location_enabled', 'true');
+      } else {
+        setPermissionModal({
+          visible: true,
+          title: t('locationServices') || 'Location Services',
+          message: 'Please enable location access in your device settings.',
+          onConfirm: () => {
+            setPermissionModal(prev => ({ ...prev, visible: false }));
+            Linking.openSettings();
+          }
+        });
+      }
+    } else {
+      // Turning OFF → save pref + open settings (can't revoke programmatically)
+      setSettings(prev => ({ ...prev, locationServices: false }));
+      await StorageService.setItem('location_enabled', 'false');
+      setPermissionModal({
+        visible: true,
+        title: t('locationServices') || 'Location Services',
+        message: 'To disable location access, please change the permission in your device settings.',
+        onConfirm: () => {
+          setPermissionModal(prev => ({ ...prev, visible: false }));
+          Linking.openSettings();
+        }
+      });
+    }
+  };
+
+  const toggleSetting = (key) => {
+    if (key === 'darkMode') {
+      toggleTheme();
+    } else if (key === 'notifications') {
+      handleNotificationsToggle();
+    } else if (key === 'locationServices') {
+      handleLocationToggle();
+    } else {
+      setSettings(prev => ({ ...prev, [key]: !prev[key] }));
+    }
+  };
+
+  // Synchronize darkMode with global theme context
   useEffect(() => {
     setSettings(prev => ({ ...prev, darkMode: isDarkMode }));
   }, [isDarkMode]);
@@ -35,14 +155,6 @@ const SettingsScreen = ({ navigation }) => {
     { code: 'en', name: t('english'), flag: '🇬🇧' },
     { code: 'pt', name: t('portuguese'), flag: '🇵🇹' },
   ];
-
-  const toggleSetting = (key) => {
-    if (key === 'darkMode') {
-      toggleTheme();
-    } else {
-      setSettings(prev => ({ ...prev, [key]: !prev[key] }));
-    }
-  };
 
   const handleLanguageSelect = async (lang) => {
     await changeLanguage(lang.code);
@@ -418,6 +530,16 @@ const SettingsScreen = ({ navigation }) => {
         onlyConfirm={true}
         confirmText="OK"
       />
+      <CustomModal
+        visible={permissionModal.visible}
+        title={permissionModal.title}
+        message={permissionModal.message}
+        onConfirm={permissionModal.onConfirm}
+        onCancel={() => setPermissionModal(prev => ({ ...prev, visible: false }))}
+        confirmText={t('openSettings') || 'Open Settings'}
+        cancelText={t('cancel') || 'Cancel'}
+      />
+
     </SafeAreaView>
   );
 };

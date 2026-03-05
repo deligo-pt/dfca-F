@@ -1,7 +1,8 @@
-import React, { useState, useEffect } from 'react';
-import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView, ActivityIndicator, Platform } from 'react-native';
+import React, { useState, useEffect, useRef } from 'react';
+import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView, ActivityIndicator, Platform, Animated, Dimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
+import { LinearGradient } from 'expo-linear-gradient';
 import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
 import { useCart } from '../contexts/CartContext';
@@ -36,6 +37,7 @@ const AddonsScreen = ({ route, navigation }) => {
     product,           // The product that was added to cart
     productId,         // Product ID used in cart
     variantName,       // Selected variant name
+    variationSku,      // Selected variation SKU
     addonGroupIds,     // Array of addon group IDs to fetch
     currency = 'EUR'
   } = route.params || {};
@@ -44,6 +46,24 @@ const AddonsScreen = ({ route, navigation }) => {
   const [saving, setSaving] = useState(false);
   const [addonGroups, setAddonGroups] = useState([]);
   const [selectedAddons, setSelectedAddons] = useState({}); // { groupId: { optionId: { ...opt, quantity } } }
+
+  // Bring cart context in
+  const { cart } = useCart();
+
+  // Shimmer animation for button
+  const shimmerAnim = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    const shimmer = Animated.loop(
+      Animated.timing(shimmerAnim, {
+        toValue: 1,
+        duration: 3500,
+        useNativeDriver: true,
+      })
+    );
+    shimmer.start();
+    return () => shimmer.stop();
+  }, []);
 
   // Fetch addon groups on mount
   useEffect(() => {
@@ -190,6 +210,22 @@ const AddonsScreen = ({ route, navigation }) => {
 
   // Save addons to cart via API
   const handleSaveAddons = async () => {
+    // Attempt auto-recovery of variationSku if missing
+    let resolvedVariationSku = variationSku;
+    if (!resolvedVariationSku && productId && cart) {
+      const cartItem = (cart.items || []).find(i => String(i.productId?._id || i.productId) === String(productId));
+      if (cartItem && cartItem.variationSku) {
+        resolvedVariationSku = cartItem.variationSku;
+      } else {
+        // If we can't find it directly, try checking raw cart format
+        const rawItems = cart.items ? Object.values(cart.items) : [];
+        const matched = rawItems.find(i => i.productId === productId || i.id === productId);
+        if (matched && matched.variationSku) {
+          resolvedVariationSku = matched.variationSku;
+        }
+      }
+    }
+
     // Validate required groups
     for (const group of addonGroups) {
       if (group.minSelectable > 0) {
@@ -227,18 +263,52 @@ const AddonsScreen = ({ route, navigation }) => {
 
     setSaving(true);
     try {
+      let hasError = false;
+      let errorMessage = '';
+
       // Call update-addon-quantity API for each addon unit
-      // Optimization: Could we batch this? The API seems to be one-by-one or via looping.
-      // Existing logic used loops. preserving that safetly.
       for (const addon of addonUpdates) {
         for (let i = 0; i < addon.quantity; i++) {
-          await CartAPI.updateAddonQuantity(
+          const res = await CartAPI.updateAddonQuantity(
             productId,
-            variantName || 'Standard',
+            variantName === null ? undefined : (variantName || 'Standard'),
             addon.optionId,
-            'increment'
+            'increment',
+            resolvedVariationSku === null ? undefined : resolvedVariationSku
           );
+
+          if (res && !res.success) {
+            hasError = true;
+            errorMessage = res.error?.message || res.error || 'Failed to update addon';
+            break;
+          }
         }
+        if (hasError) break;
+      }
+
+      if (hasError) {
+        setSaving(false);
+
+        let displayTitle = t('actionFailed');
+        if (displayTitle === 'actionFailed') displayTitle = t('error') !== 'error' ? t('error') : 'Action Failed';
+
+        let displayMessage = errorMessage;
+        if (displayMessage.includes('Maximum selection limit')) {
+          displayMessage = t('limitReached') !== 'limitReached'
+            ? t('limitReached')
+            : 'Maximum selection limit reached for this item.';
+        }
+
+        Toast.show({
+          type: 'error',
+          position: 'top',
+          topOffset: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 0) + 20,
+          visibilityTime: 4000,
+          text1: displayTitle,
+          text2: displayMessage
+        });
+        await fetchCart({ force: true }).catch(() => { });
+        return; // Don't go back, stay on screen so user can correct
       }
 
       console.log('[AddonsScreen] Successfully added addons');
@@ -280,23 +350,32 @@ const AddonsScreen = ({ route, navigation }) => {
   }
 
   return (
-    <SafeAreaView style={[styles.container, { backgroundColor: colors.background }]} edges={['top']}>
-      <StatusBar barStyle={isDarkMode ? 'light-content' : 'dark-content'} backgroundColor={colors.background} />
+    <View style={[styles.container, { backgroundColor: colors.background }]}>
+      <StatusBar translucent backgroundColor="transparent" barStyle={isDarkMode ? 'light-content' : 'dark-content'} />
 
-      {/* Modern Header */}
-      <View style={[styles.header, { backgroundColor: colors.background }]}>
-        <TouchableOpacity style={styles.closeButton} onPress={() => navigation.goBack()}>
-          <Ionicons name="close" size={24} color={colors.text.primary} />
-        </TouchableOpacity>
-        <View style={styles.headerTitleContainer}>
-          <Text style={[styles.headerTitle, { color: colors.text.primary }]}>{t('customize') || 'Customize'}</Text>
-          <Text style={[styles.headerSubtitle, { color: colors.text.secondary }]} numberOfLines={1}>
-            {product?.name}
-          </Text>
-        </View>
-        <TouchableOpacity onPress={handleSkip}>
-          <Text style={[styles.skipButtonText, { color: colors.text.secondary }]}>{t('skip') || 'Skip'}</Text>
-        </TouchableOpacity>
+      {/* ═══════ PREMIUM HEADER — Gradient accent ═══════ */}
+      <View style={[styles.headerContainer]}>
+        <LinearGradient
+          colors={isDarkMode ? ['#1A0A15', '#1A0A15'] : ['#FFF5F8', '#FFE8F0']}
+          style={[styles.header, { paddingTop: Math.max(insets.top, 24) + 12, borderBottomWidth: 0 }]}
+        >
+          <TouchableOpacity
+            style={[styles.closeButton, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.08)' : 'rgba(0,0,0,0.04)' }]}
+            onPress={() => navigation.goBack()}
+            activeOpacity={0.7}
+          >
+            <Ionicons name="close" size={24} color={colors.text.primary} />
+          </TouchableOpacity>
+          <View style={styles.headerTitleContainer}>
+            <Text style={[styles.headerTitle, { color: colors.text.primary }]}>{t('customize') || 'Customize'}</Text>
+            <Text style={[styles.headerSubtitle, { color: colors.text.secondary }]} numberOfLines={1}>
+              {product?.name}
+            </Text>
+          </View>
+          <TouchableOpacity style={styles.skipBtn} onPress={handleSkip}>
+            <Text style={[styles.skipButtonText, { color: colors.primary }]}>{t('skip') || 'Skip'}</Text>
+          </TouchableOpacity>
+        </LinearGradient>
       </View>
 
       <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 + insets.bottom }]} showsVerticalScrollIndicator={false}>
@@ -354,14 +433,14 @@ const AddonsScreen = ({ route, navigation }) => {
                 </Text>
 
                 {/* Options List */}
-                <View style={[styles.optionsList, { borderTopColor: colors.border }]}>
+                <View style={[styles.optionsList]}>
                   {(group.options || []).map((opt) => {
                     const isSelected = !!groupSelections[opt._id];
 
                     return (
                       <TouchableOpacity
                         key={opt._id}
-                        style={[styles.optionRow, { borderBottomColor: colors.border }]}
+                        style={[styles.optionRow, { borderBottomColor: isDarkMode ? 'rgba(255,255,255,0.05)' : 'rgba(0,0,0,0.04)' }]}
                         onPress={() => toggleAddon(group, opt)}
                         activeOpacity={0.6}
                       >
@@ -446,37 +525,78 @@ const AddonsScreen = ({ route, navigation }) => {
       {/* Sticky Bottom Footer */}
       <View style={[styles.footer, {
         backgroundColor: colors.surface,
-        borderTopColor: colors.border,
-        paddingBottom: insets.bottom + 16
+        borderTopColor: isDarkMode ? '#2A2A2A' : '#F0F0F0',
+        paddingBottom: Platform.OS === 'android' ? Math.max(18, insets.bottom + 10) : Math.max(14, insets.bottom),
       }]}>
-        {addonTotal > 0 && (
-          <Text style={[styles.taxText, { color: colors.text.secondary }]}>
-            {/* Tax display removed from here as per request */}
-          </Text>
-        )}
         <TouchableOpacity
-          style={[
-            styles.actionButton,
-            { backgroundColor: isValid ? colors.primary : colors.disabled || '#E0E0E0' }
-          ]}
+          style={{ opacity: isValid ? 1 : 0.4, borderRadius: 16, overflow: 'hidden' }}
           onPress={handleSaveAddons}
           disabled={saving || !isValid}
-          activeOpacity={0.8}
+          activeOpacity={0.88}
         >
-          {saving ? (
-            <ActivityIndicator color="#FFF" />
-          ) : (
-            <View style={{ alignItems: 'center', justifyContent: 'center', width: '100%' }}>
-              <Text style={styles.actionButtonText}>
-                {addonTotal > 0
-                  ? `${t('addToOrder') || 'Add to Order'} • ${formatCurrency(currency, addonTotal)}`
-                  : (t('saveContinu') || 'Save & Continue')}
-              </Text>
-            </View>
-          )}
+          <LinearGradient
+            colors={isValid ? ['#DC3173', '#A8154E'] : ['#CCCCCC', '#BBBBBB']}
+            start={{ x: 0, y: 0 }}
+            end={{ x: 1, y: 0 }}
+            style={{
+              flexDirection: 'row',
+              alignItems: 'center',
+              justifyContent: 'center',
+              height: 54,
+              paddingHorizontal: 20,
+            }}
+          >
+            {/* Shimmer sweep overlay */}
+            {isValid && (
+              <Animated.View
+                style={{
+                  position: 'absolute',
+                  top: 0,
+                  bottom: 0,
+                  width: 60,
+                  transform: [{
+                    translateX: shimmerAnim.interpolate({
+                      inputRange: [0, 1],
+                      outputRange: [-100, Dimensions.get('window').width + 100],
+                    }),
+                  }],
+                }}
+              >
+                <LinearGradient
+                  colors={['transparent', 'rgba(255,255,255,0.25)', 'rgba(255,255,255,0.35)', 'rgba(255,255,255,0.25)', 'transparent']}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
+                  style={{ flex: 1 }}
+                />
+              </Animated.View>
+            )}
+
+            {saving ? (
+              <ActivityIndicator color="#FFF" style={{ marginRight: 8 }} />
+            ) : null}
+
+            <Text style={[styles.actionButtonText, { marginRight: 8, marginBottom: Platform.OS === 'ios' ? 0 : 2 }]}>
+              {addonTotal > 0
+                ? `${t('addToOrder') || 'Add to Order'} • ${formatCurrency(currency, addonTotal)}`
+                : (t('saveContinu') || 'Save & Continue')}
+            </Text>
+
+            {!saving && isValid && (
+              <View style={{
+                width: 30,
+                height: 30,
+                backgroundColor: '#fff',
+                borderRadius: 15,
+                alignItems: 'center',
+                justifyContent: 'center',
+              }}>
+                <Ionicons name="arrow-forward" size={18} color="#A8154E" style={{ marginLeft: 2 }} />
+              </View>
+            )}
+          </LinearGradient>
         </TouchableOpacity>
       </View>
-    </SafeAreaView>
+    </View>
   );
 };
 
@@ -502,8 +622,11 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
   },
   closeButton: {
-    padding: 8,
-    marginLeft: -8,
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
   },
   headerTitleContainer: {
     flex: 1,
@@ -626,21 +749,22 @@ const styles = StyleSheet.create({
     shadowRadius: 10,
     zIndex: 999,
   },
-  actionButton: {
-    height: 54,
-    borderRadius: 27,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: '#000', // Shadow for the button itself
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 8,
-    elevation: 4,
-  },
   actionButtonText: {
     color: '#FFF',
     fontSize: 16,
     fontFamily: 'Poppins-Bold',
+  },
+  headerContainer: {
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.05,
+    shadowRadius: 10,
+    elevation: 8,
+    zIndex: 100,
+  },
+  skipBtn: {
+    paddingHorizontal: 8,
+    paddingVertical: 4,
   },
   taxText: {
     textAlign: 'center',

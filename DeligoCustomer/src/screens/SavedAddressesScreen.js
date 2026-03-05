@@ -179,7 +179,7 @@ const SavedAddressesScreen = ({ navigation, route }) => {
         ]}
         onPress={() => onSelect ? handleSelect(address) : handleToggleStatus(address._id, address.isActive)}
         activeOpacity={0.9}
-        disabled={isActive} // If active, maybe disable click if not in select mode? Or allow click to nothing.
+        // disabled={isActive} // Removed to allow interaction even if active (UX clarity)
       >
         <View style={themeStyles.cardContent}>
           {/* Left Icon Section */}

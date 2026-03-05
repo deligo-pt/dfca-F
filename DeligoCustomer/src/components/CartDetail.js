@@ -8,6 +8,7 @@ import { spacing, fontSize, borderRadius } from '../theme';
 import { useLanguage } from '../utils/LanguageContext';
 import { useLocation } from '../contexts/LocationContext';
 import formatCurrency from '../utils/currency';
+import { formatMinutesToUX } from '../utils/timeFormat';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import CheckoutAPI from '../utils/checkoutApi';
@@ -170,7 +171,7 @@ export default function CartDetail({ vendorId, navigation }) {
       calculatedDeliveryTime = `${baseTime} - ${baseTime + 5} min`;
     }
   }
-  const finalDeliveryTime = calculatedDeliveryTime || cart.vendorDeliveryTime || pcVendor?.deliveryTime || firstItem?.product?._raw?.vendor?.deliveryTime || pcProduct?.deliveryTime || '15 - 25 min';
+  const finalDeliveryTime = formatMinutesToUX(calculatedDeliveryTime || cart.vendorDeliveryTime || pcVendor?.deliveryTime || firstItem?.product?._raw?.vendor?.deliveryTime || pcProduct?.deliveryTime || '15 - 25 min');
 
   // ── Handlers ──
   const handleUpdateQuantity = async (itemId, delta) => {

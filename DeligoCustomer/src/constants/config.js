@@ -203,11 +203,16 @@ export const TIMEOUT_CONFIG = {
   LONG: 60000,    // Heavy operations (uploads, complex reports)
 };
 
+export const GOOGLE_MAPS_CONFIG = {
+  apiKey: 'AIzaSyCZ1jixNYbSRM21Uq82a6KXNO_FSpLUwaQ',
+};
+
 export default {
   API_CONFIG,
   BASE_API_URL,
   API_ENDPOINTS,
   HTTP_STATUS,
   TIMEOUT_CONFIG,
+  GOOGLE_MAPS_CONFIG,
 };
 

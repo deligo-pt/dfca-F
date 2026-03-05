@@ -2,6 +2,8 @@ import React, { useMemo } from 'react';
 import { View, Text, TextInput, TouchableOpacity, StyleSheet, ScrollView, Modal, ActivityIndicator } from 'react-native';
 import { Ionicons } from '@expo/vector-icons';
 import MapView, { PROVIDER_GOOGLE } from 'react-native-maps';
+import { GooglePlacesAutocomplete } from 'react-native-google-places-autocomplete';
+import { GOOGLE_MAPS_CONFIG } from '../../constants/config';
 import { useTheme, darkMapStyle } from '../../utils/ThemeContext';
 import { useLanguage } from '../../utils/LanguageContext';
 
@@ -98,6 +100,8 @@ const LocationDetails = ({
       paddingHorizontal: 16,
       paddingTop: 16,
       paddingBottom: 12,
+      zIndex: 5000, // Ensure dropdown appears above other content
+      elevation: 5000,
     },
     internationalSearchBar: {
       flexDirection: 'row',
@@ -757,56 +761,113 @@ const LocationDetails = ({
       </Modal>
 
       {!isMapFullScreen && (
+        <View style={styles.internationalSearchContainer}>
+          <GooglePlacesAutocomplete
+            placeholder={t('searchBusinessAddress')}
+            fetchDetails={true}
+            onPress={(data, details = null) => {
+              if (details) {
+                const { lat, lng } = details.geometry.location;
+                setMapRegion({
+                  latitude: lat,
+                  longitude: lng,
+                  latitudeDelta: 0.005,
+                  longitudeDelta: 0.005,
+                });
+                setMarkerCoordinate({
+                  latitude: lat,
+                  longitude: lng,
+                });
+
+                // Extract address components
+                const addressComponents = details.address_components;
+                let street = '';
+                let city = '';
+                let postalCode = '';
+                let state = '';
+                let country = '';
+
+                addressComponents.forEach(component => {
+                  const types = component.types;
+                  if (types.includes('route')) {
+                    street = component.long_name;
+                  } else if (types.includes('locality')) {
+                    city = component.long_name;
+                  } else if (types.includes('postal_code')) {
+                    postalCode = component.long_name;
+                  } else if (types.includes('administrative_area_level_1')) {
+                    state = component.long_name;
+                  } else if (types.includes('country')) {
+                    country = component.long_name;
+                  }
+                });
+
+                setStreetAddress(street || data.description);
+                setCity(city);
+                setPostalCode(postalCode);
+                setState(state);
+                setCountry(country);
+              }
+            }}
+            query={{
+              key: GOOGLE_MAPS_CONFIG.apiKey,
+              language: 'en',
+            }}
+            styles={{
+              container: {
+                flex: 0,
+              },
+              textInputContainer: {
+                backgroundColor: colors.surface,
+                borderWidth: 1,
+                borderColor: colors.border,
+                borderRadius: 12,
+                paddingHorizontal: 8,
+              },
+              textInput: {
+                height: 48,
+                color: colors.text.primary,
+                fontSize: 16,
+                backgroundColor: 'transparent',
+              },
+              predefinedPlacesDescription: {
+                color: '#1faadb',
+              },
+              listView: {
+                backgroundColor: colors.surface,
+                borderRadius: 12,
+                marginTop: 8,
+                elevation: 5,
+                shadowColor: '#000',
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.25,
+                shadowRadius: 3.84,
+                zIndex: 1000,
+              },
+              row: {
+                backgroundColor: colors.surface,
+                padding: 13,
+                height: 44,
+                flexDirection: 'row',
+              },
+              description: {
+                color: colors.text.primary,
+              },
+            }}
+            enablePoweredByContainer={false}
+            nearbyPlacesAPI="GooglePlacesSearch"
+            debounce={400}
+          />
+        </View>
+      )}
+
+      {!isMapFullScreen && (
         <ScrollView
           style={styles.professionalScrollView}
           showsVerticalScrollIndicator={false}
           contentContainerStyle={styles.professionalScrollContent}
+          keyboardShouldPersistTaps="handled"
         >
-          <View style={styles.internationalSearchContainer}>
-            <View style={[styles.internationalSearchBar, { backgroundColor: colors.surface, borderColor: colors.border }]}>
-              <Ionicons name="search" size={20} color={colors.text.light} />
-              <TextInput
-                style={[styles.internationalSearchInput, { color: colors.text.primary }]}
-                placeholder={t('searchBusinessAddress')}
-                placeholderTextColor={colors.text.light}
-                value={searchLocation}
-                onChangeText={setSearchLocation}
-                onSubmitEditing={searchAddress}
-                returnKeyType="search"
-                editable={!isLoadingLocation}
-              />
-              {searchLocation.length > 0 ? (
-                <View style={styles.searchBarActions}>
-                  <TouchableOpacity
-                    onPress={() => setSearchLocation('')}
-                    style={styles.searchClearButton}
-                  >
-                    <Ionicons name="close-circle" size={20} color={colors.text.light} />
-                  </TouchableOpacity>
-                  <TouchableOpacity
-                    onPress={searchAddress}
-                    style={[styles.searchGoButton, { backgroundColor: colors.primary }]}
-                    disabled={isLoadingLocation}
-                  >
-                    {isLoadingLocation ? (
-                      <ActivityIndicator size="small" color={colors.text.white} />
-                    ) : (
-                      <Ionicons name="arrow-forward" size={18} color={colors.text.white} />
-                    )}
-                  </TouchableOpacity>
-                </View>
-              ) : null}
-            </View>
-            {isLoadingLocation && (
-              <View style={styles.professionalHelpContent}>
-                <Text style={[styles.professionalHelpTitle, { color: colors.text.primary }]}>{t('needHelp')}</Text>
-                <Text style={[styles.professionalHelpText, { color: colors.text.secondary }]}>
-                  {t('contactSupportText')}
-                </Text>
-              </View>
-            )}
-          </View>
-
           <View style={styles.quickActionsRow}>
             <TouchableOpacity
               style={[styles.quickActionButton, {

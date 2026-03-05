@@ -55,6 +55,21 @@ export const LocationProvider = ({ children }) => {
      */
     useEffect(() => {
         const init = async () => {
+            // Respect in-app Location Services toggle FIRST
+            const locationPref = await StorageService.getItem('location_enabled');
+            if (locationPref === 'false') {
+                console.log('[Location] Location Services disabled by user — skipping all location data.');
+                // Clear any previously stored address from state so UI shows nothing
+                setAddress('');
+                setDetailedAddress('');
+                setCity('');
+                setPostalCode('');
+                setState('');
+                setCountry('');
+                setCurrentLocation(null);
+                return;
+            }
+
             // Load stored location first for instant UI
             const hasLocation = await loadStoredLocationData();
 
@@ -109,8 +124,15 @@ export const LocationProvider = ({ children }) => {
         setLoading(true);
         setError(null);
         try {
+            // Respect in-app Location Services toggle
+            const locationPref = await StorageService.getItem('location_enabled');
+            if (locationPref === 'false') {
+                console.log('[Location] Location Services disabled by user — skipping.');
+                setLoading(false);
+                return null;
+            }
+
             // Request permissions implicitly if not already granted
-            // Note: Best practice is to handle this in a dedicated permission flow (e.g. PermissionsScreen)
             let { status } = await Location.requestForegroundPermissionsAsync();
             if (status !== 'granted') {
                 setError('Permission to access location was denied');

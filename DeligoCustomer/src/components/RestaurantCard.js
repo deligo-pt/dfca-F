@@ -5,6 +5,7 @@ import { useTheme } from '../utils/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useLocation } from '../contexts/LocationContext';
+import { formatMinutesToUX } from '../utils/timeFormat';
 
 /**
  * RestaurantCard Component — Premium Glassmorphism Edition
@@ -109,7 +110,7 @@ const RestaurantCard = ({ restaurant, onPress }) => {
   }, [currentLocation, mergedVendor.latitude, mergedVendor.longitude, p.latitude, p.longitude]);
 
   // Priority: API dynamic calculation -> API static deliveryTime -> Fallback
-  const finalDeliveryTime = estimatedTime || deliveryTime || '15 - 20 min';
+  const finalDeliveryTime = formatMinutesToUX(estimatedTime || deliveryTime || '15 - 20 min');
 
   // ---------------------------------------------------------------------------
   // Location Logic
