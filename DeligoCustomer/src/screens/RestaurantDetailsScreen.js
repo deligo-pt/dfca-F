@@ -734,6 +734,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     );
 
     // Check for selected variation price override
+    let hasVariationOverride = false;
     if (selectedVariations) {
       const variationKeys = Object.keys(selectedVariations).filter((k) =>
         k.endsWith("_obj"),
@@ -742,24 +743,29 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
         const opt = selectedVariations[key];
         if (opt && opt.price) {
           basePrice = Number(opt.price);
+          hasVariationOverride = true;
         }
       }
     }
 
-    // Recalculate based on (new) basePrice
     const discount = Number(pricing.discount ?? raw.discount ?? 0);
-    const taxRate = Number(pricing.taxRate ?? 0);
+    const taxRate = Number(pricing.taxRate ?? raw.taxRate ?? 0);
 
     let effectivePrice = basePrice;
 
-    // 1. Apply Discount
-    if (discount > 0) {
-      effectivePrice = basePrice - (basePrice * discount) / 100;
-    }
+    // Direct from backend - no frontend math!
+    if (!hasVariationOverride && pricing.finalPrice !== undefined && pricing.finalPrice !== null) {
+      effectivePrice = Number(pricing.finalPrice);
+    } else if (hasVariationOverride) {
+      // 1. Apply Discount
+      if (discount > 0) {
+        effectivePrice = basePrice - (basePrice * discount) / 100;
+      }
 
-    // 2. Apply Tax (on discounted price)
-    if (taxRate > 0) {
-      effectivePrice += (effectivePrice * taxRate) / 100;
+      // 2. Apply Tax (on discounted price)
+      if (taxRate > 0) {
+        effectivePrice += (effectivePrice * taxRate) / 100;
+      }
     }
 
     let total = effectivePrice * modalQuantity;
@@ -811,13 +817,14 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
       raw.product?.name || raw.name || raw.productName || product.name || "";
     const image = product.image || (Array.isArray(raw.images) && raw.images[0]);
 
-    // Pricing logic
+    // Pricing logic (No frontend calculation)
     const price = Number(raw.pricing?.price ?? raw.price ?? product.price ?? 0);
     const discount = Number(raw.pricing?.discount ?? raw.discount ?? 0);
 
-    let finalPrice = Number(raw.pricing?.finalPrice ?? raw.finalPrice ?? price);
-    if (discount > 0 && finalPrice === price) {
-      finalPrice = price - (price * discount) / 100;
+    // Direct from backend
+    let finalPrice = price;
+    if (discount > 0 && raw.pricing && raw.pricing.discountedBasePrice !== undefined && raw.pricing.discountedBasePrice !== null) {
+      finalPrice = Number(raw.pricing.discountedBasePrice);
     }
 
     const currency = raw.pricing?.currency ?? "";
@@ -1015,36 +1022,36 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     const isUpdating = updatingProductId === activeProduct.id;
 
     // Helper to calculate total price dynamically
-    const calculateModalTotal = () => {
+    const calculateModalTotalInner = () => {
       let base = Number(
         raw.pricing?.price ?? raw.price ?? activeProduct.price ?? 0,
       );
 
+      let hasVariationOverride = false;
       // 1. Variations override
       if (selectedVariations) {
         Object.values(selectedVariations).forEach((val) => {
           if (val && typeof val === "object" && val.price) {
             base = Math.max(base, Number(val.price));
+            hasVariationOverride = true;
           }
         });
       }
 
-      // 2. Addons additive
-      // We don't have direct access to 'selectedAddons' map here easily unless we passed it or it's in scope.
-      // Assuming 'selectedVariations' might contain addons or we skip addons for now to fix crash.
-      // Wait, let's look for how addons are stored. They seem to be in a separate screen or missing here.
-      // The error said "selectedAddons doesn't exist", implying it WAS used.
-      // I'll make this safe: base * quantity.
+      // Direct from backend - no frontend math!
+      if (!hasVariationOverride && raw.pricing?.finalPrice !== undefined && raw.pricing?.finalPrice !== null) {
+        base = Number(raw.pricing.finalPrice);
+      } else if (hasVariationOverride) {
+        const discount = Number(raw.pricing?.discount ?? raw.discount ?? 0);
+        if (discount > 0) {
+          base = base - (base * discount) / 100;
+        }
 
-      const discount = Number(raw.pricing?.discount ?? raw.discount ?? 0);
-      if (discount > 0) {
-        base = base - (base * discount) / 100;
-      }
-
-      // Add tax
-      const taxRate = Number(raw.pricing?.taxRate ?? 0);
-      if (taxRate > 0) {
-        base += (base * taxRate) / 100;
+        // Add tax
+        const taxRate = Number(raw.pricing?.taxRate ?? raw.taxRate ?? 0);
+        if (taxRate > 0) {
+          base += (base * taxRate) / 100;
+        }
       }
 
       return base * quantity;
@@ -1166,18 +1173,37 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
               {(() => {
                 const pricing = raw.pricing || {};
                 let basePrice = Number(pricing.price ?? raw.price ?? 0);
+
+                // Keep variation logic as is since user can choose different add-ons/variations
+                let hasVariationOverride = false;
                 if (selectedVariations) {
                   Object.keys(selectedVariations).filter(k => k.endsWith('_obj')).forEach(key => {
                     const opt = selectedVariations[key];
-                    if (opt && opt.price) basePrice = Number(opt.price);
+                    if (opt && opt.price) {
+                      basePrice = Number(opt.price);
+                      hasVariationOverride = true;
+                    }
                   });
                 }
                 const discountPercent = Number(pricing.discount ?? raw.discount ?? 0);
-                const discountAmount = (basePrice * discountPercent) / 100;
-                const discountedBase = basePrice - discountAmount;
-                const taxRate = Number(pricing.taxRate ?? 0);
-                const taxAmount = taxRate > 0 ? (discountedBase * taxRate) / 100 : Number(pricing.taxAmount ?? 0);
-                const finalPrice = discountedBase + taxAmount;
+
+                // Keep variation logic as is since user can choose different add-ons/variations
+                let discountedBase = basePrice;
+                if (!hasVariationOverride && pricing.discountedBasePrice !== undefined && pricing.discountedBasePrice !== null) {
+                  discountedBase = Number(pricing.discountedBasePrice);
+                } else if (hasVariationOverride && discountPercent > 0) {
+                  discountedBase = basePrice - (basePrice * discountPercent) / 100;
+                }
+
+                const discountAmount = basePrice - discountedBase;
+                const taxRate = Number(pricing.taxRate ?? raw.taxRate ?? 0);
+                const taxAmount = Number(pricing.taxAmount ?? 0);
+                let finalPrice = Number(pricing.finalPrice ?? raw.finalPrice ?? discountedBase);
+
+                // If it's a variation with different price, calculate naive finalPrice
+                if (hasVariationOverride) {
+                  finalPrice = discountedBase + taxAmount;
+                }
 
                 return (
                   <>
@@ -1388,7 +1414,10 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
               <View style={[styles.modalFooter, {
                 backgroundColor: colors.surface,
                 borderTopColor: isDarkMode ? '#2A2A2A' : '#F0F0F0',
-                paddingBottom: Platform.OS === 'android' ? Math.max(18, insets.bottom + 10) : Math.max(14, insets.bottom),
+                paddingBottom: Platform.OS === 'android' ? Math.max(34, insets.bottom + 20) : Math.max(24, insets.bottom),
+                paddingTop: 16,
+                zIndex: 999, // Ensure it stays on top of content
+                elevation: 10,
               }]}>
                 {/* Animated heartbeat wrapper */}
                 <Animated.View style={{
@@ -1506,7 +1535,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                           <Ionicons name="cart" size={22} color={quantity > 0 ? '#fff' : '#888'} style={{ marginRight: 10 }} />
                           <Text style={[styles.modalAddToCartText, { color: quantity > 0 ? '#fff' : '#888' }]}>
                             {quantity > 0
-                              ? `${t('addToCart') || 'ADD TO CART'} \u2022 ${formatCurrency(currency, calculateModalTotal())}`
+                              ? `${t('addToCart') || 'ADD TO CART'} \u2022 ${formatCurrency(currency, calculateModalTotalInner())}`
                               : t('addToCart') || 'ADD TO CART'}
                           </Text>
                         </>

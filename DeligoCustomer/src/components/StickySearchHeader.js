@@ -91,11 +91,10 @@ const StickySearchHeader = ({
             activeOpacity={0.7}
           >
             <LinearGradient
-              colors={['rgba(255, 255, 255, 0.3)', 'rgba(255, 255, 255, 0.05)']}
-              style={StyleSheet.absoluteFill}
-              borderRadius={16}
+              colors={['rgba(255, 255, 255, 0.25)', 'rgba(255, 255, 255, 0.05)']}
+              style={[StyleSheet.absoluteFill, { borderRadius: 21 }]}
             />
-            <Ionicons name="cart-outline" size={18} color={colors.text.white || '#FFFFFF'} />
+            <Ionicons name="cart-outline" size={20} color={colors.text.white || '#FFFFFF'} />
             {cartItemCount > 0 && (
               <View style={styles(colors, isDarkMode).badge}>
                 <Text style={styles(colors, isDarkMode).badgeText}>{cartItemCount > 99 ? '99+' : cartItemCount}</Text>
@@ -154,7 +153,7 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
     alignItems: 'center',
     justifyContent: 'space-between',
     marginBottom: spacing.xs,
-    height: 38,
+    height: 48, // Increased for larger buttons
     zIndex: 2,
   },
   locationButton: {
@@ -162,35 +161,37 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
     alignItems: 'center',
     flex: 1,
     marginRight: 10,
+    paddingVertical: 4,
   },
   locationText: {
     color: colors.text.white || '#FFFFFF',
-    fontSize: 11,
-    fontFamily: 'Poppins-Medium',
-    marginLeft: 4,
+    fontSize: 13, // Slightly larger for readability
+    fontFamily: 'Poppins-Bold', // Stronger font for location
+    marginLeft: 6,
     marginRight: 3,
     flexShrink: 1,
   },
   cartButtonTop: {
-    width: 32,
-    height: 32,
+    width: 42, // Larger tap target
+    height: 42,
     alignItems: 'center',
     justifyContent: 'center',
     position: 'relative',
-    borderRadius: 16,
+    borderRadius: 21,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.2)',
-    overflow: 'hidden',
+    borderColor: 'rgba(255,255,255,0.3)',
+    // REMOVED: overflow: 'hidden', to fix badge clipping
   },
   searchRow: {
     flexDirection: 'row',
     alignItems: 'center',
     zIndex: 2,
+    marginTop: 4,
   },
   backButton: {
-    width: 38,
-    height: 38,
-    borderRadius: 19,
+    width: 42,
+    height: 42,
+    borderRadius: 21,
     backgroundColor: 'rgba(255, 255, 255, 0.2)',
     alignItems: 'center',
     justifyContent: 'center',
@@ -200,18 +201,18 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
     flex: 1,
     shadowColor: '#000',
     shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.15,
-    shadowRadius: 12,
-    elevation: 5,
+    shadowOpacity: 0.12,
+    shadowRadius: 10,
+    elevation: 4,
   },
   searchContainer: {
     flexDirection: 'row',
     alignItems: 'center',
-    borderRadius: 24,
+    borderRadius: 26, // More rounded
     paddingHorizontal: spacing.md,
-    paddingVertical: spacing.xs + 4,
+    paddingVertical: Platform.OS === 'ios' ? 12 : 8,
     borderWidth: 1,
-    borderColor: 'rgba(255,255,255,0.6)',
+    borderColor: 'rgba(255,255,255,0.7)',
   },
   bottomCurve: {
     position: 'absolute',
@@ -225,18 +226,18 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
   },
   searchContainerFocused: {
     shadowOpacity: 0.15,
-    elevation: 8,
+    elevation: 6,
   },
   searchIcon: {
     marginRight: spacing.sm,
   },
   input: {
     flex: 1,
-    fontSize: fontSize.sm,
-    fontFamily: 'Poppins-Regular',
+    fontSize: 14, // Slightly larger
+    fontFamily: 'Poppins-Medium',
     color: colors.text.primary,
     padding: 0,
-    height: 32,
+    height: 38,
   },
   clearButton: {
     padding: spacing.xs - 2,
@@ -244,24 +245,26 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
   },
   badge: {
     position: 'absolute',
-    top: 0,
-    right: -2,
-    backgroundColor: '#FFD700',
-    borderRadius: 9,
-    minWidth: 18,
-    height: 18,
+    top: -4,
+    right: -4,
+    backgroundColor: '#FFD700', // Gold/Yellow
+    borderRadius: 11,
+    minWidth: 20,
+    height: 20,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 4,
-    borderWidth: 2,
-    borderColor: colors.primary,
+    borderWidth: 1.5,
+    borderColor: colors.primary, // Matches background for "cutout" look
+    zIndex: 10,
   },
   badgeText: {
-    color: colors.text.primary,
-    fontSize: 9,
+    color: '#000', // Darker text on yellow for contrast
+    fontSize: 10,
     fontFamily: 'Poppins-Bold',
     includeFontPadding: false,
     textAlignVertical: 'center',
+    marginTop: Platform.OS === 'android' ? -1 : 0, // Visual centering adjust
   },
   suggestionsWrapper: {
     position: 'absolute',

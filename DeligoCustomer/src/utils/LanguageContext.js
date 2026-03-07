@@ -5,7 +5,7 @@
  * language switching capabilities using persistent storage.
  */
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useMemo } from 'react';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { getLanguageTranslations } from './i18n';
 
@@ -21,7 +21,9 @@ export const useLanguage = () => {
 
 export const LanguageProvider = ({ children }) => {
   const [language, setLanguage] = useState('en');
-  const [translations, setTranslations] = useState(getLanguageTranslations('en'));
+
+  // Use useMemo to stay synced with i18n file changes during dev
+  const translations = useMemo(() => getLanguageTranslations(language), [language]);
 
   useEffect(() => {
     loadLanguage();
@@ -31,7 +33,7 @@ export const LanguageProvider = ({ children }) => {
     try {
       const savedLanguage = await AsyncStorage.getItem('app_language');
       if (savedLanguage) {
-        changeLanguage(savedLanguage);
+        setLanguage(savedLanguage);
       }
     } catch (error) {
       console.log('Error loading language:', error);
@@ -41,20 +43,24 @@ export const LanguageProvider = ({ children }) => {
   const changeLanguage = async (newLanguage) => {
     try {
       setLanguage(newLanguage);
-      setTranslations(getLanguageTranslations(newLanguage));
       await AsyncStorage.setItem('app_language', newLanguage);
     } catch (error) {
       console.log('Error saving language:', error);
     }
   };
 
-  const t = (key) => {
-    if (!key) return '';
+  /**
+   * Translation function with nested key support
+   * @param {string} key - e.g. 'home.title'
+   * @param {string} [defaultValue] - Optional fallback
+   */
+  const t = (key, defaultValue) => {
+    if (!key) return defaultValue || '';
 
-    // Optimize: direct lookup
+    // Direct lookup for performance
     if (translations[key]) return translations[key];
 
-    // Resolve nested keys (dot notation)
+    // Handle nested keys (e.g. 'auth.login.title')
     if (key.includes('.')) {
       const keys = key.split('.');
       let value = translations;
@@ -62,19 +68,30 @@ export const LanguageProvider = ({ children }) => {
         value = value?.[k];
         if (!value) break;
       }
-      if (value && typeof value === 'string') return value;
+      if (typeof value === 'string') return value;
     }
 
-    // Log missing translation keys
-    if (!translations[key] && !key.includes('.')) {
-      console.warn(`[LanguageContext] Missing key: ${key}`);
+    // If key has no translation, return defaultValue if provided, else return the key itself
+    if (defaultValue !== undefined) return defaultValue;
+
+    // Log missing keys only in development
+    if (__DEV__) {
+      // Avoid excessive logging
+      // console.warn(`[LanguageContext] Missing translation for: "${key}" in language: "${language}"`);
     }
 
     return key;
   };
 
+  const contextValue = useMemo(() => ({
+    language,
+    changeLanguage,
+    t,
+    translations
+  }), [language, translations]);
+
   return (
-    <LanguageContext.Provider value={{ language, changeLanguage, t, translations }}>
+    <LanguageContext.Provider value={contextValue}>
       {children}
     </LanguageContext.Provider>
   );

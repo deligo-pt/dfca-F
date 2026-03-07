@@ -463,7 +463,6 @@ export default function CartDetail({ vendorId, navigation }) {
                   {addons > 0 && <SummaryRow label={t('addons') || 'Add-ons'} value={formatCurrency(currency, addons)} colors={colors} />}
                   {taxItems > 0 && <SummaryRow label={t('taxItems') || 'Tax'} value={formatCurrency(currency, taxItems)} colors={colors} />}
                   {taxAddons > 0 && <SummaryRow label={t('taxAddons') || 'Tax (Add-ons)'} value={formatCurrency(currency, taxAddons)} colors={colors} />}
-                  <SummaryRow label={t('delivery') || 'Delivery'} value={deliveryCharge > 0 ? formatCurrency(currency, deliveryCharge) : (t('free') || 'Free')} colors={colors} valueColor={deliveryCharge > 0 ? null : '#4CAF50'} icon="bicycle" />
                   {deliveryVat > 0 && <SummaryRow label={`${t('taxDelivery') || 'Delivery VAT'} ${deliveryVatRate ? `(${deliveryVatRate}%)` : ''}`} value={formatCurrency(currency, deliveryVat)} colors={colors} />}
 
                   <View style={[styles.summaryDivider, { backgroundColor: isDarkMode ? '#333' : '#E8E8E8' }]} />

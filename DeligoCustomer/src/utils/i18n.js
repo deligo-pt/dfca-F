@@ -14,6 +14,8 @@ export const translations = {
     confirm: "Confirm",
     save: "Save",
     delete: "Delete",
+    yes: "Yes",
+    no: "No",
     edit: "Edit",
     search: "Search",
     filter: "Filter",
@@ -745,6 +747,8 @@ export const translations = {
     orderTotal: "Order Total",
     voucherApplied: "Voucher Applied",
     finalPayable: "Final Payable",
+    cancelPaymentTitle: "Cancel Payment",
+    cancelPaymentMessage: "Are you sure you want to cancel the payment process?",
   },
   pt: {
     // Common
@@ -755,6 +759,8 @@ export const translations = {
     confirm: "Confirmar",
     save: "Guardar",
     delete: "Eliminar",
+    yes: "Sim",
+    no: "Não",
     edit: "Editar",
     search: "Pesquisar",
     filter: "Filtrar",
@@ -1453,6 +1459,8 @@ export const translations = {
     paymentFailed: "Pagamento Falhou",
     paymentFailedDescription: "Algo correu mal com a sua transação. Por favor, tente novamente.",
     tryAgain: "Tentar Novamente",
+    cancelPaymentTitle: "Cancelar Pagamento",
+    cancelPaymentMessage: "Tem a certeza que deseja cancelar o processo de pagamento?",
   },
 };
 

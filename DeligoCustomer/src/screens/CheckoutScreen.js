@@ -34,6 +34,7 @@ import { customerApi } from '../utils/api';
 import AddressApi from '../utils/addressApi';
 import { API_ENDPOINTS, API_CONFIG } from '../constants/config';
 import { getUserId, getUserData } from '../utils/auth';
+import AlertModal from '../components/AlertModal';
 
 /**
  * ConsumerLocationDisplay
@@ -171,6 +172,8 @@ const CheckoutScreen = ({ route, navigation }) => {
   const [nifSkipped, setNifSkipped] = useState(false);
   const [isUpdatingNif, setIsUpdatingNif] = useState(false);
   const { updateProfile } = useProfile();
+
+  const [showCancelModal, setShowCancelModal] = useState(false);
 
   // ... (existing state) ...
 
@@ -1108,6 +1111,10 @@ const CheckoutScreen = ({ route, navigation }) => {
     }
   };
 
+  const handleCancelPayment = () => {
+    setShowCancelModal(true);
+  };
+
   const renderSuccessModal = () => (
     <Modal visible={showSuccessModal} transparent animationType="slide">
       <View style={styles(colors).modalOverlay}>
@@ -1807,11 +1814,33 @@ const CheckoutScreen = ({ route, navigation }) => {
       {renderSuccessModal()}
       {renderFailureModal()}
 
+      <AlertModal
+        visible={showCancelModal}
+        onClose={() => setShowCancelModal(false)}
+        title={t('cancelPaymentTitle') || 'Cancel Payment'}
+        message={t('cancelPaymentMessage') || 'Are you sure you want to cancel the payment process?'}
+        icon="alert-circle"
+        buttons={[
+          {
+            text: t('no') || 'No',
+            style: 'cancel',
+            onPress: () => setShowCancelModal(false)
+          },
+          {
+            text: t('yes') || 'Yes',
+            onPress: () => {
+              setPaymentUrl(null);
+              setShowCancelModal(false);
+            }
+          }
+        ]}
+      />
+
       {/* Payment WebView Modal */}
-      <Modal visible={!!paymentUrl} animationType="slide" presentationStyle="pageSheet" onRequestClose={() => setPaymentUrl(null)}>
+      <Modal visible={!!paymentUrl} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleCancelPayment}>
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
           <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
-            <TouchableOpacity onPress={() => setPaymentUrl(null)}>
+            <TouchableOpacity onPress={handleCancelPayment}>
               <Ionicons name="close" size={28} color={colors.text.primary} />
             </TouchableOpacity>
             <Text style={{ fontSize: 18, fontFamily: 'Poppins-SemiBold', marginLeft: 16, color: colors.text.primary }}>
