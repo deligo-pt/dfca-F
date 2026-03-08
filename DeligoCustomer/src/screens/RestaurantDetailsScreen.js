@@ -48,6 +48,7 @@ import * as Location from "expo-location";
 import AlertModal from "../components/AlertModal";
 import MaxQuantityModal from "../components/MaxQuantityModal";
 import { fetchAddonGroups } from "../utils/addonApi";
+import { GOOGLE_MAPS_CONFIG } from "../constants/config";
 
 const RestaurantDetailsScreen = ({ route, navigation }) => {
   const { colors, isDarkMode } = useTheme();
@@ -415,27 +416,59 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const [estimatedTime, setEstimatedTime] = useState(null);
 
   useEffect(() => {
-    if (currentLocation && vendorCoords) {
-      const lat1 = currentLocation.latitude;
-      const lon1 = currentLocation.longitude;
-      const lat2 = vendorCoords.latitude;
-      const lon2 = vendorCoords.longitude;
+    let active = true;
+    const GOOGLE_MAPS_API_KEY = GOOGLE_MAPS_CONFIG.apiKey;
 
-      // Haversine formula
-      const R = 6371; // Radius of the earth in km
+    const fetchGoogleEta = async (origin, destination) => {
+      try {
+        const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origin.latitude},${origin.longitude}&destinations=${destination.latitude},${destination.longitude}&key=${GOOGLE_MAPS_API_KEY}`;
+        const response = await fetch(url);
+        const data = await response.json();
+
+        if (active && data.status === 'OK' && data.rows[0].elements[0].status === 'OK') {
+          const duration = data.rows[0].elements[0].duration;
+          // duration.value is in seconds
+          const travelMinutes = Math.ceil(duration.value / 60);
+          const prepTime = 15; // Standard prep time buffer
+          const totalMinutes = travelMinutes + prepTime;
+
+          setEstimatedTime(`${totalMinutes} - ${totalMinutes + 5} min`);
+          return true;
+        }
+        return false;
+      } catch (error) {
+        console.error('[RestaurantDetails] Google API fetch failed:', error);
+        return false;
+      }
+    };
+
+    const calculateFallbackEta = (lat1, lon1, lat2, lon2) => {
+      const R = 6371; // km
       const dLat = (lat2 - lat1) * (Math.PI / 180);
       const dLon = (lon2 - lon1) * (Math.PI / 180);
-      const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
+      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
         Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
         Math.sin(dLon / 2) * Math.sin(dLon / 2);
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       const distKm = R * c;
-
-      // Base formula: 10 mins prep time + 3 mins per km (20km/h average city speed)
-      const baseTime = Math.max(10, Math.round(distKm * 3) + 10);
+      const baseTime = Math.max(10, Math.round(distKm * 3.5) + 12);
       setEstimatedTime(`${baseTime} - ${baseTime + 5} min`);
+    };
+
+    if (currentLocation && vendorCoords) {
+      fetchGoogleEta(currentLocation, vendorCoords).then(success => {
+        if (!success && active) {
+          calculateFallbackEta(
+            currentLocation.latitude,
+            currentLocation.longitude,
+            vendorCoords.latitude,
+            vendorCoords.longitude
+          );
+        }
+      });
     }
+
+    return () => { active = false; };
   }, [currentLocation, vendorCoords]);
 
   const deliveryTimeProp = normVendor.deliveryTime || restaurant._raw?.deliveryTime || null;
@@ -1177,17 +1210,15 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                 // Keep variation logic as is since user can choose different add-ons/variations
                 let hasVariationOverride = false;
                 if (selectedVariations) {
-                  Object.keys(selectedVariations).filter(k => k.endsWith('_obj')).forEach(key => {
-                    const opt = selectedVariations[key];
-                    if (opt && opt.price) {
-                      basePrice = Number(opt.price);
+                  Object.values(selectedVariations).forEach(val => {
+                    if (val && typeof val === "object" && val.price) {
+                      basePrice = Math.max(basePrice, Number(val.price));
                       hasVariationOverride = true;
                     }
                   });
                 }
                 const discountPercent = Number(pricing.discount ?? raw.discount ?? 0);
 
-                // Keep variation logic as is since user can choose different add-ons/variations
                 let discountedBase = basePrice;
                 if (!hasVariationOverride && pricing.discountedBasePrice !== undefined && pricing.discountedBasePrice !== null) {
                   discountedBase = Number(pricing.discountedBasePrice);
@@ -1197,11 +1228,12 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
                 const discountAmount = basePrice - discountedBase;
                 const taxRate = Number(pricing.taxRate ?? raw.taxRate ?? 0);
-                const taxAmount = Number(pricing.taxAmount ?? 0);
+                let taxAmount = Number(pricing.taxAmount ?? 0);
                 let finalPrice = Number(pricing.finalPrice ?? raw.finalPrice ?? discountedBase);
 
-                // If it's a variation with different price, calculate naive finalPrice
+                // If variations change the price, recalculate tax and finalPrice proportionally
                 if (hasVariationOverride) {
+                  taxAmount = (discountedBase * taxRate) / 100;
                   finalPrice = discountedBase + taxAmount;
                 }
 
@@ -1459,6 +1491,28 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                         const addonGroupIds = raw.addonGroups || [];
                         const hasAddons = addonGroupIds.length > 0;
                         const payload = { variantName, variationSku, options: selectedVariations, addons: [] };
+
+                        // IF HAS ADDONS: Navigate to configuration screen instead of adding to cart so we can submit in 1 unified API request (like Postman)
+                        if (hasAddons) {
+                          closeProductModal();
+                          setTimeout(() => {
+                            const mid = raw._id || activeProduct._raw?._id || activeProduct.id;
+                            navigation.navigate('Addons', {
+                              product: raw || activeProduct,
+                              productId: mid,
+                              variantName,
+                              variationSku,
+                              addonGroupIds,
+                              currency: raw.pricing?.currency || 'EUR',
+                              quantity: quantity,
+                              options: selectedVariations,
+                              isNewItem: true
+                            });
+                          }, 300);
+                          return; // STOP execution
+                        }
+
+                        // IF NO ADDONS: Just add to cart directly here
                         const result = await addItem(activeProduct, quantity, payload);
                         if (result && !result.success) {
                           if (result.error === 'DIFFERENT_VENDOR') {
@@ -1475,7 +1529,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                                       setTimeout(async () => {
                                         const retry = await addItem(activeProduct, quantity, payload);
                                         if (retry && !retry.success) { setAlertConfig({ title: safeT('error', 'Error'), message: retry.message || 'Failed' }); setAlertVisible(true); }
-                                        else { closeProductModal(); if (hasAddons) { setTimeout(() => { const mid = raw._id || activeProduct._raw?._id || activeProduct.id; navigation.navigate('Addons', { product: { name: raw.name || activeProduct.name, id: mid }, productId: mid, variantName, variationSku, addonGroupIds, currency: raw.pricing?.currency || 'EUR' }); }, 300); } }
+                                        else { closeProductModal(); }
                                       }, 100);
                                     } catch (e) { console.error(e); }
                                   }
@@ -1488,7 +1542,6 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                           throw new Error(result.message || 'Failed to add to cart');
                         }
                         closeProductModal();
-                        if (hasAddons) { setTimeout(() => { const mid = raw._id || activeProduct._raw?._id || activeProduct.id; navigation.navigate('Addons', { product: { name: raw.name || activeProduct.name, id: mid }, productId: mid, variantName, variationSku, addonGroupIds, currency: raw.pricing?.currency || 'EUR' }); }, 300); }
                       } catch (error) {
                         console.error('[RestaurantDetails] Add to cart error:', error);
                         setAlertConfig({ title: t('error') || 'Error', message: error.message || t('addToCartFailed') || 'Failed to add item to cart' });

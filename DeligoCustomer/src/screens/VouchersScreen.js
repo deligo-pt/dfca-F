@@ -15,7 +15,8 @@ import {
   StatusBar,
   TextInput,
   ActivityIndicator,
-  Alert
+  Alert,
+  Modal
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Ionicons } from '@expo/vector-icons';
@@ -33,6 +34,7 @@ const VouchersScreen = ({ navigation, route }) => {
   const [loading, setLoading] = useState(true);
   const [manualCode, setManualCode] = useState('');
   const [verifying, setVerifying] = useState(false);
+  const [selectedVoucher, setSelectedVoucher] = useState(null);
 
   useEffect(() => {
     fetchCoupons();
@@ -58,7 +60,7 @@ const VouchersScreen = ({ navigation, route }) => {
       return;
     }
     // Handle coupon selection or display details
-    Alert.alert(t('couponCode'), `${t('code')}: ${coupon.code}`);
+    setSelectedVoucher(coupon);
   };
 
   const handleVerifyManualCode = async () => {
@@ -121,7 +123,7 @@ const VouchersScreen = ({ navigation, route }) => {
           <View style={styles.voucherCodeContainer}>
             <View style={[styles.voucherCodeBadge, isExpired && styles.voucherCodeBadgeExpired]}>
               <Text style={[styles.voucherCode, isExpired && styles.textExpired]}>
-                {voucher.code}
+                {voucher.code || voucher.offerCode || voucher.promoCode || 'N/A'}
               </Text>
             </View>
             <Text style={[styles.voucherExpiry, isExpired && styles.textExpired]}>
@@ -240,6 +242,50 @@ const VouchersScreen = ({ navigation, route }) => {
           </>
         )}
       </ScrollView>
+
+      {/* Custom Voucher Code Modal */}
+      <Modal
+        visible={!!selectedVoucher}
+        transparent={true}
+        animationType="fade"
+        onRequestClose={() => setSelectedVoucher(null)}
+      >
+        <View style={styles.modalOverlay}>
+          <View style={styles.modalContent}>
+            <View style={styles.modalHeader}>
+              <View style={styles.modalIconContainer}>
+                <Ionicons name="gift-outline" size={32} color={colors.primary} />
+              </View>
+              <TouchableOpacity onPress={() => setSelectedVoucher(null)} style={styles.modalCloseButton}>
+                <Ionicons name="close" size={24} color={colors.text.secondary} />
+              </TouchableOpacity>
+            </View>
+
+            <Text style={styles.modalTitle}>
+              {selectedVoucher?.name || selectedVoucher?.title || t('voucherDetail') || 'Voucher Code'}
+            </Text>
+            <Text style={styles.modalSubtitle}>
+              {selectedVoucher?.description || selectedVoucher?.subtitle || 'Use this code to get a discount on your order!'}
+            </Text>
+
+            <View style={styles.modalCodeSection}>
+              <Text style={styles.modalCodeLabel}>{t('code') || 'Coupon Code'}</Text>
+              <View style={styles.modalCodeBox}>
+                <Text style={styles.modalCodeText} selectable={true}>
+                  {selectedVoucher?.code || selectedVoucher?.offerCode || selectedVoucher?.promoCode || t('noCodeAvailable') || 'N/A'}
+                </Text>
+              </View>
+            </View>
+
+            <TouchableOpacity
+              style={styles.modalPrimaryButton}
+              onPress={() => setSelectedVoucher(null)}
+            >
+              <Text style={styles.modalPrimaryButtonText}>{t('gotIt') || 'Got It'}</Text>
+            </TouchableOpacity>
+          </View>
+        </View>
+      </Modal>
     </SafeAreaView>
   );
 };
@@ -441,6 +487,110 @@ const styles = StyleSheet.create({
   },
   textExpired: {
     color: colors.text.light,
+  },
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.5)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: 24,
+  },
+  modalContent: {
+    backgroundColor: colors.surface,
+    borderRadius: 28,
+    width: '100%',
+    maxWidth: 400,
+    padding: 24,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 10 },
+    shadowOpacity: 0.1,
+    shadowRadius: 20,
+    elevation: 10,
+  },
+  modalHeader: {
+    width: '100%',
+    flexDirection: 'row',
+    justifyContent: 'center',
+    marginBottom: 20,
+    position: 'relative',
+  },
+  modalIconContainer: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: colors.background === '#FFFFFF' ? '#FFF0F5' : 'rgba(220, 49, 115, 0.15)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 8,
+  },
+  modalCloseButton: {
+    position: 'absolute',
+    right: -8,
+    top: -8,
+    padding: 12,
+  },
+  modalTitle: {
+    fontSize: 22,
+    fontFamily: 'Poppins-Bold',
+    color: colors.text.primary,
+    textAlign: 'center',
+    marginBottom: 8,
+  },
+  modalSubtitle: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: colors.text.secondary,
+    textAlign: 'center',
+    marginBottom: 28,
+    lineHeight: 20,
+  },
+  modalCodeSection: {
+    width: '100%',
+    alignItems: 'center',
+    marginBottom: 32,
+  },
+  modalCodeLabel: {
+    fontSize: 13,
+    fontFamily: 'Poppins-Medium',
+    color: colors.text.secondary,
+    marginBottom: 10,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+  },
+  modalCodeBox: {
+    backgroundColor: colors.background === '#FFFFFF' ? '#F8F9FA' : '#2A2A2A',
+    borderWidth: 2,
+    borderColor: colors.border,
+    borderStyle: 'dashed',
+    borderRadius: 16,
+    paddingVertical: 18,
+    paddingHorizontal: 24,
+    width: '100%',
+    alignItems: 'center',
+  },
+  modalCodeText: {
+    fontSize: 22,
+    fontFamily: 'Poppins-Bold',
+    color: colors.primary,
+    letterSpacing: 2,
+  },
+  modalPrimaryButton: {
+    backgroundColor: colors.primary,
+    paddingVertical: 16,
+    width: '100%',
+    borderRadius: 16,
+    alignItems: 'center',
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 6 },
+    shadowOpacity: 0.25,
+    shadowRadius: 10,
+    elevation: 6,
+  },
+  modalPrimaryButtonText: {
+    color: '#FFF',
+    fontFamily: 'Poppins-Bold',
+    fontSize: 16,
   },
 });
 

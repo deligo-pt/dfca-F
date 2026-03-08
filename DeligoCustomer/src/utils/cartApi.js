@@ -86,7 +86,16 @@ class CartAPI {
             payload.options = it.options;
           }
           if (it.addons) {
-            payload.addons = it.addons;
+            // Ensure addons match backend expectation (Postman example uses addOnId)
+            payload.addons = Array.isArray(it.addons) 
+              ? it.addons.map(addon => {
+                  const addOnId = addon.addOnId || addon.addonId || addon.optionId || addon.id;
+                  return {
+                    addOnId: addOnId,
+                    quantity: addon.quantity || 1
+                  };
+                })
+              : it.addons;
           }
 
           console.debug('[CartAPI] Item payload:', payload);
@@ -202,7 +211,7 @@ class CartAPI {
             if (item.addons) {
               // Normalize addon structure
               obj.addons = item.addons.map(a => ({
-                addOnId: a.addOnId || a.addonId || a.id,
+                addOnId: a.addOnId || a.addonId || a.id || a.optionId,
                 quantity: a.quantity || 1
               }));
             }
@@ -288,19 +297,26 @@ class CartAPI {
    * @param {string} optionId - The add-on option ID
    * @param {string} action - 'increment' or 'decrement'
    */
-  static async updateAddonQuantity(productId, variantName, optionId, action = 'increment', variationSku = null) {
-    console.log('[CartAPI] updateAddonQuantity called with:', { productId, variantName, optionId, action, variationSku });
+  static async updateAddonQuantity(productId, variantName, optionId, action = 'increment', variationSku = null, addonSku = null) {
+    console.log('[CartAPI] updateAddonQuantity called with:', { productId, variantName, optionId, action, variationSku, addonSku });
     try {
+      // CRITICAL: Backend validation requires EXACTLY productId, variationSku, optionId, action
+      // Ensure productId is a valid hex string if it's a mongo ID
+      const cleanProductId = typeof productId === 'string' ? productId.split('|')[0] : productId;
+      
       const url = `${BASE_API_URL}${API_ENDPOINTS.CART.UPDATE_ADDON_QUANTITY}`;
       const headers = await this.getHeaders();
 
       const payload = {
-        productId,
-        variantName,
+        productId: cleanProductId,
         optionId,
         action,
-        ...(variationSku ? { variationSku } : {})
       };
+
+      // Only include variationSku if it's actually provided and not empty
+      if (variationSku) {
+        payload.variationSku = variationSku;
+      }
 
       console.debug('[CartAPI] PATCH (Addon)', url, payload);
 
@@ -313,7 +329,17 @@ class CartAPI {
       const responseData = await response.json();
 
       if (!response.ok) {
-        const errorMessage = responseData?.message || responseData?.error || 'Failed to update addon quantity';
+        let errorMessage = responseData?.message || responseData?.error || 'Failed to update addon quantity';
+
+        // Extract deep validation errors if they exist (e.g. array of objects)
+        if (responseData?.errors && Array.isArray(responseData.errors) && responseData.errors.length > 0) {
+          errorMessage = responseData.errors.map(e => typeof e === 'object' ? (e.msg || e.message || JSON.stringify(e)) : e).join('\\n');
+        } else if (responseData?.errors && typeof responseData.errors === 'string') {
+          errorMessage = responseData.errors;
+        }
+
+        console.error('\\n[CartAPI] RAW ADDON VALIDATION RESPONSE:', JSON.stringify(responseData, null, 2));
+
         if (response.status < 500) {
           console.warn('Cart API - Update addon warning:', {
             status: response.status,
@@ -325,7 +351,7 @@ class CartAPI {
             data: responseData
           });
         }
-        return { success: false, error: errorMessage, status: response.status };
+        return { success: false, error: errorMessage, status: response.status, rawResponse: responseData };
       }
       return { success: true, data: responseData };
     } catch (error) {
@@ -354,10 +380,14 @@ class CartAPI {
 
       if (!response.ok) {
         const errorMessage = responseData?.message || responseData?.error || 'Failed to fetch cart';
-        console.error('Cart API - Get cart error:', {
-          status: response.status,
-          data: responseData
-        });
+        if (response.status === 404) {
+          console.debug('Cart API - Get cart empty (404):', errorMessage);
+        } else {
+          console.error('Cart API - Get cart error:', {
+            status: response.status,
+            data: responseData
+          });
+        }
         return { success: false, error: errorMessage, status: response.status };
       }
 

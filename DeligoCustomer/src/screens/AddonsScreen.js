@@ -1,5 +1,5 @@
-import React, { useState, useEffect, useRef } from 'react';
-import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView, ActivityIndicator, Platform, Animated, Dimensions } from 'react-native';
+import React, { useState, useEffect, useRef, useMemo } from 'react';
+import { View, Text, StyleSheet, StatusBar, TouchableOpacity, ScrollView, ActivityIndicator, Platform, Animated, Dimensions, Alert } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -29,7 +29,7 @@ import Toast from 'react-native-toast-message';
 const AddonsScreen = ({ route, navigation }) => {
   const { colors, isDarkMode } = useTheme();
   const { t } = useLanguage();
-  const { fetchCart } = useCart();
+  const { fetchCart, addItem } = useCart();
   const insets = useSafeAreaInsets();
 
   // Params from navigation
@@ -247,24 +247,61 @@ const AddonsScreen = ({ route, navigation }) => {
       Object.values(groupSelections).forEach(opt => {
         if (opt._id && opt.quantity > 0) {
           addonUpdates.push({
-            optionId: opt._id,
+            addonId: opt._id,
+            optionId: opt._id, // Backward compat
             quantity: opt.quantity, // We'll loop this many times for the API call 
             name: opt.name,
-            price: opt.price
+            price: opt.price,
+            sku: opt.sku || opt._id || opt.id || 'N/A'
           });
         }
       });
     });
 
-    if (addonUpdates.length === 0) {
+    if (addonUpdates.length === 0 && !route.params?.isNewItem) {
       navigation.goBack();
       return;
     }
 
     setSaving(true);
     try {
+
+      // IF THIS IS A BRAND NEW ITEM, SUBMIT EVERYTHING VIA `addItem` (Like Postman)
+      if (route.params?.isNewItem) {
+        const payload = {
+          variantName: variantName === null ? undefined : (variantName || 'Standard'),
+          variationSku: route.params?.variationSku || undefined,
+          options: route.params?.options || {},
+          addons: addonUpdates
+        };
+
+        const result = await addItem(
+          product,
+          route.params?.quantity || 1,
+          payload
+        );
+
+        if (result && !result.success) {
+          setSaving(false);
+          let displayTitle = t('actionFailed');
+          if (displayTitle === 'actionFailed') displayTitle = 'Action Failed';
+
+          let displayMessage = result.message || result.error || 'Failed to add item to cart';
+          if (typeof displayMessage === 'object') displayMessage = JSON.stringify(displayMessage);
+
+          Alert.alert(displayTitle, displayMessage, [{ text: 'OK' }]);
+          return;
+        }
+
+        Toast.show({ type: 'success', text1: t('addedToCart') || 'Added to cart' });
+        navigation.goBack();
+        return;
+      }
+
+
       let hasError = false;
       let errorMessage = '';
+      let rawResponseError = null;
 
       // Call update-addon-quantity API for each addon unit
       for (const addon of addonUpdates) {
@@ -274,12 +311,14 @@ const AddonsScreen = ({ route, navigation }) => {
             variantName === null ? undefined : (variantName || 'Standard'),
             addon.optionId,
             'increment',
-            resolvedVariationSku === null ? undefined : resolvedVariationSku
+            resolvedVariationSku === null ? undefined : resolvedVariationSku,
+            addon.sku
           );
 
           if (res && !res.success) {
             hasError = true;
             errorMessage = res.error?.message || res.error || 'Failed to update addon';
+            rawResponseError = res.rawResponse || res.error;
             break;
           }
         }
@@ -289,15 +328,46 @@ const AddonsScreen = ({ route, navigation }) => {
       if (hasError) {
         setSaving(false);
 
+        if (rawResponseError) {
+          Alert.alert(
+            'Backend Validation Error',
+            JSON.stringify(rawResponseError, null, 2),
+            [{ text: 'OK' }]
+          );
+        }
+
         let displayTitle = t('actionFailed');
         if (displayTitle === 'actionFailed') displayTitle = t('error') !== 'error' ? t('error') : 'Action Failed';
 
+        // Deep extraction of error message to handle arrays, objects, and nested messages
         let displayMessage = errorMessage;
+        if (typeof displayMessage === 'object' && displayMessage !== null) {
+          if (Array.isArray(displayMessage)) {
+            displayMessage = displayMessage.map(err => typeof err === 'object' ? (err.msg || err.message || JSON.stringify(err)) : err).join(', ');
+          } else {
+            displayMessage = displayMessage.message || displayMessage.error || displayMessage.msg || JSON.stringify(displayMessage);
+          }
+        }
+        if (typeof displayMessage !== 'string') {
+          displayMessage = String(displayMessage);
+        }
+
+        // Sometimes backend returns "Validation Error" as main message but details are inside the object. Check if there was a deeper error
+        if (displayMessage === 'Validation Error' || displayMessage === 'Bad Request') {
+          displayMessage = 'Please ensure your selection meets all requirements (stock/limits).';
+        }
+
         if (displayMessage.includes('Maximum selection limit')) {
           displayMessage = t('limitReached') !== 'limitReached'
             ? t('limitReached')
             : 'Maximum selection limit reached for this item.';
         }
+
+        console.error('\\n==== ADDON VALIDATION ERROR ====');
+        console.error('Title:', displayTitle);
+        console.error('Parsed Message:', displayMessage);
+        console.error('Original Error Object:', JSON.stringify(errorMessage, null, 2));
+        console.error('================================\\n');
 
         Toast.show({
           type: 'error',
@@ -327,8 +397,49 @@ const AddonsScreen = ({ route, navigation }) => {
     navigation.goBack();
   };
 
+  // Calculate Base Product Price (handling variations)
+  const productPriceInfo = useMemo(() => {
+    if (!product) return { base: 0, discounted: 0, tax: 0, total: 0 };
+
+    const pricing = product.pricing || {};
+    let base = Number(pricing.price ?? product.price ?? 0);
+
+    // Check if a variation override exists from route params
+    if (variationSku) {
+      // Find variation price in product options
+      const variations = product.variations || product.options || [];
+      for (const grp of variations) {
+        const opt = (grp.items || grp.options || []).find(o => o.sku === variationSku || o.name === variantName);
+        if (opt && opt.price) {
+          base = Math.max(base, Number(opt.price));
+          break;
+        }
+      }
+    }
+
+    const discountPercent = Number(pricing.discount ?? product.discount ?? 0);
+    let discounted = base;
+    if (discountPercent > 0) {
+      discounted = base - (base * discountPercent / 100);
+    }
+
+    const taxRate = Number(pricing.taxRate ?? product.taxRate ?? 0);
+    const tax = (discounted * taxRate) / 100;
+
+    return {
+      base,
+      discounted,
+      tax,
+      total: discounted + tax
+    };
+  }, [product, variationSku, variantName]);
+
   const addonTotal = calculateAddonTotal();
-  const taxTotal = calculateTaxTotal();
+  const addonTaxTotal = calculateTaxTotal();
+
+  const finalQuantity = Number(route.params?.quantity || 1);
+  const itemTotal = productPriceInfo.total * finalQuantity;
+  const grandTotal = itemTotal + addonTotal;
 
   // Validation Check for "Continue" button
   const isValid = addonGroups.every(group => {
@@ -379,6 +490,25 @@ const AddonsScreen = ({ route, navigation }) => {
       </View>
 
       <ScrollView contentContainerStyle={[styles.scrollContent, { paddingBottom: 100 + insets.bottom }]} showsVerticalScrollIndicator={false}>
+        {/* PRICE SUMMARY CARD */}
+        <View style={[styles.summaryCard, { backgroundColor: isDarkMode ? '#22111A' : '#FFF9FB', borderColor: colors.primary + '20' }]}>
+          <View style={styles.summaryRow}>
+            <Text style={[styles.summaryLabel, { color: colors.text.secondary }]}>{t('itemSubtotal') || 'Item Subtotal'} ({finalQuantity}x)</Text>
+            <Text style={[styles.summaryValue, { color: colors.text.primary }]}>{formatCurrency(currency, itemTotal)}</Text>
+          </View>
+          {addonTotal > 0 && (
+            <View style={styles.summaryRow}>
+              <Text style={[styles.summaryLabel, { color: colors.text.secondary }]}>{t('addons') || 'Add-ons'}</Text>
+              <Text style={[styles.summaryValue, { color: colors.text.primary }]}>+{formatCurrency(currency, addonTotal)}</Text>
+            </View>
+          )}
+          <View style={[styles.summaryDivider, { backgroundColor: colors.primary + '15' }]} />
+          <View style={styles.summaryRow}>
+            <Text style={[styles.summaryTotalLabel, { color: colors.text.primary }]}>{t('total') || 'Total'}</Text>
+            <Text style={[styles.summaryTotalValue, { color: colors.primary }]}>{formatCurrency(currency, grandTotal)}</Text>
+          </View>
+        </View>
+
         {addonGroups.length === 0 ? (
           <View style={styles.emptyContainer}>
             <MaterialCommunityIcons name="food-variant-off" size={48} color={colors.text.disabled} />
@@ -576,8 +706,8 @@ const AddonsScreen = ({ route, navigation }) => {
             ) : null}
 
             <Text style={[styles.actionButtonText, { marginRight: 8, marginBottom: Platform.OS === 'ios' ? 0 : 2 }]}>
-              {addonTotal > 0
-                ? `${t('addToOrder') || 'Add to Order'} • ${formatCurrency(currency, addonTotal)}`
+              {grandTotal > 0
+                ? `${t('addToOrder') || 'Add to Order'} • ${formatCurrency(currency, grandTotal)}`
                 : (t('saveContinu') || 'Save & Continue')}
             </Text>
 
@@ -655,10 +785,44 @@ const styles = StyleSheet.create({
     paddingTop: 60,
   },
   emptyText: {
-    marginTop: 16,
-    fontSize: 15,
-    fontFamily: 'Poppins-Regular',
+    fontSize: 16,
+    fontFamily: 'Poppins-Medium',
+    marginTop: 12,
     textAlign: 'center',
+  },
+  // Summary Card Styles
+  summaryCard: {
+    margin: 16,
+    padding: 16,
+    borderRadius: 16,
+    borderWidth: 1,
+    elevation: 0,
+  },
+  summaryRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    paddingVertical: 4,
+  },
+  summaryLabel: {
+    fontSize: 13,
+    fontFamily: 'Poppins-Regular',
+  },
+  summaryValue: {
+    fontSize: 13,
+    fontFamily: 'Poppins-Medium',
+  },
+  summaryDivider: {
+    height: 1,
+    marginVertical: 10,
+  },
+  summaryTotalLabel: {
+    fontSize: 15,
+    fontFamily: 'Poppins-SemiBold',
+  },
+  summaryTotalValue: {
+    fontSize: 18,
+    fontFamily: 'Poppins-Bold',
   },
   groupCard: {
     borderRadius: 16,

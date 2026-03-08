@@ -749,6 +749,9 @@ export const translations = {
     finalPayable: "Final Payable",
     cancelPaymentTitle: "Cancel Payment",
     cancelPaymentMessage: "Are you sure you want to cancel the payment process?",
+    completeProfile: "Complete Profile",
+    incompleteProfileError: "Please complete your profile before checking out",
+    pleaseTryPayingAgain: "Please try paying again.",
   },
   pt: {
     // Common
@@ -1461,6 +1464,9 @@ export const translations = {
     tryAgain: "Tentar Novamente",
     cancelPaymentTitle: "Cancelar Pagamento",
     cancelPaymentMessage: "Tem a certeza que deseja cancelar o processo de pagamento?",
+    completeProfile: "Completar Perfil",
+    incompleteProfileError: "Por favor, complete as informações do seu perfil antes de finalizar a compra",
+    pleaseTryPayingAgain: "Por favor, tente pagar novamente.",
   },
 };
 

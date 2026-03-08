@@ -293,7 +293,7 @@ const CheckoutScreen = ({ route, navigation }) => {
         if (!hasFirstName || !hasFirstName.trim()) {
           console.warn('[CheckoutScreen] Profile incomplete (missing first name)');
           setProfileIncomplete(true);
-          setStripeError('Please complete your profile before checking out');
+          setStripeError(t('incompleteProfileError') || 'Please complete your profile before checking out');
           setInitializingCheckout(false);
           return;
         }
@@ -302,7 +302,7 @@ const CheckoutScreen = ({ route, navigation }) => {
         if (!hasLastName || !hasLastName.trim()) {
           console.warn('[CheckoutScreen] Profile incomplete (missing last name)');
           setProfileIncomplete(true);
-          setStripeError('Please complete your profile before checking out');
+          setStripeError(t('incompleteProfileError') || 'Please complete your profile before checking out');
           setInitializingCheckout(false);
           return;
         }
@@ -311,7 +311,7 @@ const CheckoutScreen = ({ route, navigation }) => {
         if (!hasContactNumber || !hasContactNumber.trim()) {
           console.warn('[CheckoutScreen] Profile incomplete (missing contact number)');
           setProfileIncomplete(true);
-          setStripeError('Please complete your profile before checking out');
+          setStripeError(t('incompleteProfileError') || 'Please complete your profile before checking out');
           setInitializingCheckout(false);
           return;
         }
@@ -320,7 +320,7 @@ const CheckoutScreen = ({ route, navigation }) => {
         if (!state || !state.trim()) {
           console.warn('[CheckoutScreen] Profile incomplete (missing address state)');
           setProfileIncomplete(true);
-          setStripeError('Please complete your profile before checking out');
+          setStripeError(t('incompleteProfileError') || 'Please complete your profile before checking out');
           setInitializingCheckout(false);
           return;
         }
@@ -329,7 +329,7 @@ const CheckoutScreen = ({ route, navigation }) => {
         if (!city || !city.trim()) {
           console.warn('[CheckoutScreen] Profile incomplete (missing address city)');
           setProfileIncomplete(true);
-          setStripeError('Please complete your profile before checking out');
+          setStripeError(t('incompleteProfileError') || 'Please complete your profile before checking out');
           setInitializingCheckout(false);
           return;
         }
@@ -338,7 +338,7 @@ const CheckoutScreen = ({ route, navigation }) => {
         if (!country || !country.trim()) {
           console.warn('[CheckoutScreen] Profile incomplete (missing address country)');
           setProfileIncomplete(true);
-          setStripeError('Please complete your profile before checking out');
+          setStripeError(t('incompleteProfileError') || 'Please complete your profile before checking out');
           setInitializingCheckout(false);
           return;
         }
@@ -347,7 +347,7 @@ const CheckoutScreen = ({ route, navigation }) => {
         if (!postalCode || !postalCode.trim()) {
           console.warn('[CheckoutScreen] Profile incomplete (missing address postalCode)');
           setProfileIncomplete(true);
-          setStripeError('Please complete your profile before checking out');
+          setStripeError(t('incompleteProfileError') || 'Please complete your profile before checking out');
           setInitializingCheckout(false);
           return;
         }
@@ -484,7 +484,7 @@ const CheckoutScreen = ({ route, navigation }) => {
         customerPhone: currentUser?.contactNumber || currentUser?.phone || currentUser?.mobile || '',
         vendorId: vendorId,
         // Optional fields from original req
-        estimatedDeliveryTime: formatMinutesToUX("25-35 min"),
+        estimatedDeliveryTime: cartData?.estimatedDeliveryTime || formatMinutesToUX("25-35 min"),
         discount: 0, // Placeholder
         nif: nifValue || currentUser?.NIF || '',
         NIF: nifValue || currentUser?.NIF || ''
@@ -1251,9 +1251,14 @@ const CheckoutScreen = ({ route, navigation }) => {
             <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
           </TouchableOpacity>
           <View style={styles(colors).headerCenter}>
-            <Text style={styles(colors).headerTitle}>{cart?.vendorName || cartData?.vendorName || t('checkout')}</Text>
-            <Text style={styles(colors).headerSubtitle}>
-              {cartItems.length} {cartItems.length === 1 ? t('item') : t('items')} • {t('estimated')} {formatMinutesToUX("25-35 min")}
+            <Text style={styles(colors).headerTitle} numberOfLines={1}>{cart?.vendorName || cartData?.vendorName || t('checkout')}</Text>
+            <Text
+              style={styles(colors).headerSubtitle}
+              numberOfLines={1}
+              adjustsFontSizeToFit
+              minimumFontScale={0.8}
+            >
+              {cartItems.length} {cartItems.length === 1 ? t('item') : t('items')} • {t('estimated')} {cartData?.estimatedDeliveryTime || formatMinutesToUX("25-35 min")}
             </Text>
           </View>
           <View style={styles(colors).headerRight} />
@@ -1272,7 +1277,14 @@ const CheckoutScreen = ({ route, navigation }) => {
           </View>
           <View style={styles(colors).deliveryTimeContent}>
             <Text style={styles(colors).deliveryTimeLabel}>{t('deliveryTime')}</Text>
-            <Text style={styles(colors).deliveryTimeValue}>{formatMinutesToUX("25-35 min")}</Text>
+            <Text
+              style={styles(colors).deliveryTimeValue}
+              numberOfLines={2}
+              adjustsFontSizeToFit
+              minimumFontScale={0.7}
+            >
+              {cartData?.estimatedDeliveryTime || formatMinutesToUX("25-35 min")}
+            </Text>
           </View>
           <View style={styles(colors).deliveryTimeBadge}>
             <Ionicons name="flash" size={14} color="#FFA000" />
@@ -1695,7 +1707,7 @@ const CheckoutScreen = ({ route, navigation }) => {
 
                   {/* User requested specific text: "please abar payment korar try korun" -> "Please try paying again" */}
                   <Text style={{ fontSize: 13, fontFamily: 'Poppins-Medium', color: '#991B1B', marginBottom: 12 }}>
-                    Please try paying again.
+                    {t('pleaseTryPayingAgain') || 'Please try paying again.'}
                   </Text>
 
                   <View style={{ flexDirection: 'row', gap: 12 }}>
@@ -2130,18 +2142,21 @@ const styles = (colors) => StyleSheet.create({
     marginBottom: 2,
   },
   deliveryTimeValue: {
-    fontSize: 18,
+    fontSize: 16,
     fontFamily: 'Poppins-Bold',
     color: colors.text.primary,
+    lineHeight: 22,
   },
   deliveryTimeBadge: {
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: colors.background === '#FFFFFF' ? '#FFF8E1' : 'rgba(255, 193, 7, 0.15)',
-    paddingHorizontal: 12,
+    paddingHorizontal: 10,
     paddingVertical: 6,
     borderRadius: 20,
     gap: 4,
+    marginLeft: 10,
+    flexShrink: 0,
   },
   deliveryTimeBadgeText: {
     fontSize: 12,

@@ -216,6 +216,7 @@ export default function CartDetail({ vendorId, navigation }) {
         vendorId, vendorName: cart.vendorName,
         items: items.map(it => ({ id: it.id, name: it.product?.name, quantity: it.qty, price: it.basePrice, discountPercent: it.discountPercent, taxPercent: it.taxPercent, finalPrice: it.finalUnit, currency: it.currency })),
         subtotal: subtotalAfterDiscount, tax: taxTotal, total, useCart: true,
+        estimatedDeliveryTime: finalDeliveryTime,
       };
       navigation.navigate('Checkout', { cartData });
     } catch (e) { console.error('[CartDetail] Navigation error', e); }

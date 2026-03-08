@@ -35,11 +35,6 @@ const FAQsScreen = ({ navigation }) => {
                     id: 'q1',
                     question: 'How do I place an order?',
                     answer: 'To place an order, browse the restaurants, select your items, add them to your cart, and proceed to checkout. You can pay using your preferred payment method.'
-                },
-                {
-                    id: 'q2',
-                    question: 'Can I cancel my order?',
-                    answer: 'You can cancel your order within the first 5 minutes of placing it. Go to "Orders", select your active order, and tap "Cancel Order". If the restaurant has already started preparing your food, cancellation might not be possible.'
                 }
             ]
         },
