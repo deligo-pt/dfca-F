@@ -430,8 +430,9 @@ export const CartProvider = ({ children }) => {
       // --- END WORKAROUND ---
 
       // Success: Refresh cart to get accurate server-side calculations (taxes, subtotal)
+      // NOTE: await here so that AddonsScreen Step 2 (addon updates) fires on a fresh cart.
       console.log('[Cart] Sync success, refreshing for accurate totals');
-      fetchCart({ force: true, silent: true });
+      await fetchCart({ force: true, silent: true }).catch(() => { });
 
       return { success: true, data: res.data };
     } catch (error) {

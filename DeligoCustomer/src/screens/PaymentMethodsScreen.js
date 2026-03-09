@@ -1,42 +1,57 @@
-/**
- * PaymentMethodsScreen
- * 
- * Manages the user's saved payment options (Cards, UPI) and provides interfaces
- * for adding new payment methods.
- */
-
 import React, { useState } from 'react';
 import { View, Text, StyleSheet, ScrollView, TouchableOpacity, StatusBar } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
-import { Ionicons } from '@expo/vector-icons';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 import { useTheme } from '../utils/ThemeContext';
 import { useLanguage } from '../utils/LanguageContext';
 
-const PaymentMethodsScreen = ({ navigation }) => {
+const PaymentMethodsScreen = ({ navigation, route }) => {
   const { t } = useLanguage();
   const { colors, isDarkMode } = useTheme();
-  const [paymentMethods, setPaymentMethods] = useState([
+
+  // Accept the initially selected ID if navigating from Checkout
+  const initialSelected = route?.params?.selectedId || 'CARD';
+  const [selectedMethod, setSelectedMethod] = useState(initialSelected);
+
+  const methods = [
     {
-      id: 1,
-      type: 'card',
-      name: 'Visa',
-      lastFour: '4532',
-      expiry: '12/25',
-      isDefault: true,
+      id: 'CARD',
+      name: t('creditDebitCard') || 'Credit/Debit Card',
+      icon: 'credit-card-outline',
+      badge: t('recommended') || 'Recommended',
     },
     {
-      id: 2,
-      type: 'upi',
-      name: 'Google Pay',
-      upiId: 'user@oksbi',
-      isDefault: false,
+      id: 'MB_WAY',
+      name: 'MB WAY',
+      icon: 'cellphone-nfc'
     },
-  ]);
+    {
+      id: 'APPLE_PAY',
+      name: 'Apple Pay',
+      icon: 'apple'
+    },
+    {
+      id: 'OTHER',
+      name: t('otherMethods') || 'Other Methods',
+      icon: 'dots-horizontal-circle-outline'
+    },
+  ];
+
+  const handleSelect = (method) => {
+    setSelectedMethod(method.id);
+    if (route?.params?.onSelect) {
+      // Small timeout so the user sees the radio button visually update before the screen slides out
+      setTimeout(() => {
+        route.params.onSelect(method);
+        navigation.goBack();
+      }, 250);
+    }
+  };
 
   const styles = StyleSheet.create({
     container: {
       flex: 1,
-      backgroundColor: colors.background,
+      backgroundColor: isDarkMode ? colors.background : '#F8F9FA', // elegant faint gray background for contrast
     },
     header: {
       flexDirection: 'row',
@@ -55,7 +70,6 @@ const PaymentMethodsScreen = ({ navigation }) => {
     },
     headerText: {
       fontSize: 18,
-      fontWeight: '600',
       color: colors.text.primary,
       fontFamily: 'Poppins-SemiBold',
       flex: 1,
@@ -66,163 +80,114 @@ const PaymentMethodsScreen = ({ navigation }) => {
     },
     content: {
       padding: 16,
-      paddingBottom: 24,
+      paddingTop: 24,
     },
-    section: {
+    mainCard: {
+      backgroundColor: colors.surface,
+      borderRadius: 24,
+      padding: 20,
+      // Premium shadow matches the provided inspiration image
+      shadowColor: '#000',
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.08,
+      shadowRadius: 16,
+      elevation: 4,
+    },
+    cardHeader: {
+      flexDirection: 'row',
+      alignItems: 'center',
       marginBottom: 24,
     },
-    sectionTitle: {
-      fontSize: 14,
-      fontWeight: '600',
-      color: colors.text.secondary,
-      fontFamily: 'Poppins-SemiBold',
-      textTransform: 'uppercase',
-      letterSpacing: 0.5,
-      marginBottom: 12,
+    cardHeaderTitle: {
+      fontSize: 17,
+      fontFamily: 'Poppins-Bold',
+      color: colors.text.primary,
+      marginLeft: 10,
     },
-    paymentCard: {
+    methodRowSelected: {
       flexDirection: 'row',
       alignItems: 'center',
-      backgroundColor: colors.surface,
+      borderColor: colors.primary,
+      borderWidth: 1.5,
+      backgroundColor: isDarkMode ? 'rgba(217, 27, 92, 0.15)' : 'rgba(217, 27, 92, 0.04)',
       borderRadius: 16,
       padding: 16,
-      marginBottom: 12,
-      borderWidth: 1,
-      borderColor: colors.border,
-      shadowColor: colors.shadow,
-      shadowOffset: { width: 0, height: 2 },
-      shadowOpacity: 0.05,
-      shadowRadius: 8,
-      elevation: 2,
+      marginBottom: 16,
     },
-    paymentIconContainer: {
-      width: 48,
-      height: 48,
-      borderRadius: 24,
-      backgroundColor: isDarkMode ? '#2A1A2E' : '#FFF0F6',
+    methodRowUnselected: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      borderColor: 'transparent',
+      borderWidth: 1.5,
+      backgroundColor: 'transparent',
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 16,
+    },
+    iconCircleSelected: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: colors.primary,
       alignItems: 'center',
       justifyContent: 'center',
       marginRight: 16,
+      backgroundColor: 'transparent',
     },
-    paymentInfo: {
+    iconCircleUnselected: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginRight: 16,
+      backgroundColor: 'transparent',
+    },
+    methodName: {
+      fontSize: 15,
+      fontFamily: 'Poppins-SemiBold',
+      color: colors.text.primary,
       flex: 1,
     },
-    paymentHeader: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      marginBottom: 4,
-    },
-    paymentName: {
-      fontSize: 16,
-      fontWeight: '600',
-      color: colors.text.primary,
-      fontFamily: 'Poppins-SemiBold',
-      marginRight: 8,
-    },
-    defaultBadge: {
-      backgroundColor: isDarkMode ? '#1B2E1B' : '#E8F5E9',
+    badge: {
+      backgroundColor: colors.primary,
       paddingHorizontal: 8,
-      paddingVertical: 2,
-      borderRadius: 12,
+      paddingVertical: 5,
+      borderRadius: 8,
+      marginRight: 14,
+      // Adding negative z-index slightly to match image overlap aesthetics loosely, or just tight margins
     },
-    defaultText: {
+    badgeText: {
+      color: '#FFF',
       fontSize: 10,
-      fontWeight: '600',
-      color: colors.success,
-      fontFamily: 'Poppins-SemiBold',
+      fontFamily: 'Poppins-Bold',
+      textTransform: 'none',
+      letterSpacing: 0.5,
     },
-    paymentDetails: {
-      fontSize: 14,
-      color: colors.text.secondary,
-      fontFamily: 'Poppins-Regular',
-      marginBottom: 2,
-    },
-    expiryText: {
-      fontSize: 12,
-      color: colors.text.light,
-      fontFamily: 'Poppins-Regular',
-    },
-    moreButton: {
-      padding: 4,
-    },
-    addMethodButton: {
-      flexDirection: 'row',
+    radioContainer: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: 2,
+      justifyContent: 'center',
       alignItems: 'center',
-      backgroundColor: colors.surface,
-      borderRadius: 16,
-      padding: 16,
-      marginBottom: 12,
-      borderWidth: 1,
+    },
+    radioSelected: {
+      borderColor: colors.primary,
+    },
+    radioUnselected: {
       borderColor: colors.border,
     },
-    addMethodIconContainer: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: isDarkMode ? '#2A2A2A' : '#F8F8F8',
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginRight: 16,
-    },
-    addMethodText: {
-      flex: 1,
-      fontSize: 16,
-      fontWeight: '500',
-      color: colors.text.primary,
-      fontFamily: 'Poppins-Medium',
-    },
-    infoCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      backgroundColor: isDarkMode ? '#1B2E1B' : '#E8F5E9',
-      borderRadius: 12,
-      padding: 16,
-      marginTop: 8,
-    },
-    infoText: {
-      flex: 1,
-      fontSize: 14,
-      color: colors.success,
-      fontFamily: 'Poppins-Regular',
-      marginLeft: 12,
-      lineHeight: 20,
-    },
+    radioInner: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: colors.primary,
+    }
   });
-
-  const PaymentCard = ({ method }) => {
-    const isCard = method.type === 'card';
-    const icon = isCard ? 'card' : 'logo-google';
-
-    return (
-      <View style={styles.paymentCard}>
-        <View style={styles.paymentIconContainer}>
-          <Ionicons name={icon} size={24} color={colors.primary} />
-        </View>
-
-        <View style={styles.paymentInfo}>
-          <View style={styles.paymentHeader}>
-            <Text style={styles.paymentName}>{method.name}</Text>
-            {method.isDefault && (
-              <View style={styles.defaultBadge}>
-                <Text style={styles.defaultText}>{t('default')}</Text>
-              </View>
-            )}
-          </View>
-
-          <Text style={styles.paymentDetails}>
-            {isCard ? `•••• •••• •••• ${method.lastFour}` : method.upiId}
-          </Text>
-          {isCard && (
-            <Text style={styles.expiryText}>{t('expires')} {method.expiry}</Text>
-          )}
-        </View>
-
-        <TouchableOpacity style={styles.moreButton}>
-          <Ionicons name="ellipsis-vertical" size={20} color={colors.text.secondary} />
-        </TouchableOpacity>
-      </View>
-    );
-  };
 
   return (
     <SafeAreaView style={styles.container} edges={["top"]}>
@@ -232,55 +197,60 @@ const PaymentMethodsScreen = ({ navigation }) => {
         translucent={true}
         animated={true}
       />
-      {/* Header */}
+
+      {/* App Header */}
       <View style={styles.header}>
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-          <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
+          <MaterialCommunityIcons name="arrow-left" size={24} color={colors.text.primary} />
         </TouchableOpacity>
-        <Text style={styles.headerText}>{t('paymentMethods')}</Text>
+        <Text style={styles.headerText}>{t('paymentMethods') || 'Payment Methods'}</Text>
         <View style={styles.placeholder} />
       </View>
 
-      <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('savedMethods')}</Text>
-          {paymentMethods.map(method => (
-            <PaymentCard key={method.id} method={method} />
-          ))}
-        </View>
+      <ScrollView contentContainerStyle={styles.content}>
+        <View style={styles.mainCard}>
+          {/* Card Header matching image */}
+          <View style={styles.cardHeader}>
+            <MaterialCommunityIcons name="credit-card-outline" size={22} color={colors.primary} />
+            <Text style={styles.cardHeaderTitle}>{t('paymentMethod') || 'Payment method'}</Text>
+          </View>
 
-        <View style={styles.section}>
-          <Text style={styles.sectionTitle}>{t('addPaymentMethod')}</Text>
+          {/* Methods List */}
+          {methods.map((method) => {
+            const isSelected = selectedMethod === method.id;
+            return (
+              <TouchableOpacity
+                key={method.id}
+                style={isSelected ? styles.methodRowSelected : styles.methodRowUnselected}
+                onPress={() => handleSelect(method)}
+                activeOpacity={0.8}
+              >
+                {/* Left Icon Layout exactly like image */}
+                <View style={isSelected ? styles.iconCircleSelected : styles.iconCircleUnselected}>
+                  <MaterialCommunityIcons
+                    name={method.icon}
+                    size={22}
+                    color={isSelected ? colors.primary : colors.text.secondary}
+                  />
+                </View>
 
-          <TouchableOpacity style={styles.addMethodButton}>
-            <View style={styles.addMethodIconContainer}>
-              <Ionicons name="card-outline" size={22} color={colors.primary} />
-            </View>
-            <Text style={styles.addMethodText}>{t('addDebitCreditCard')}</Text>
-            <Ionicons name="chevron-forward" size={20} color={colors.text.light} />
-          </TouchableOpacity>
+                {/* Name */}
+                <Text style={styles.methodName}>{method.name}</Text>
 
-          <TouchableOpacity style={styles.addMethodButton}>
-            <View style={styles.addMethodIconContainer}>
-              <Ionicons name="logo-google" size={22} color={colors.primary} />
-            </View>
-            <Text style={styles.addMethodText}>{t('addUPI')}</Text>
-            <Ionicons name="chevron-forward" size={20} color={colors.text.light} />
-          </TouchableOpacity>
+                {/* Recommended Badge */}
+                {method.badge && (
+                  <View style={styles.badge}>
+                    <Text style={styles.badgeText}>{method.badge}</Text>
+                  </View>
+                )}
 
-          <TouchableOpacity style={styles.addMethodButton}>
-            <View style={styles.addMethodIconContainer}>
-              <Ionicons name="wallet-outline" size={22} color={colors.primary} />
-            </View>
-            <Text style={styles.addMethodText}>{t('linkWallet')}</Text>
-            <Ionicons name="chevron-forward" size={20} color={colors.text.light} />
-          </TouchableOpacity>
-        </View>
-
-        {/* Security Assurance Info */}
-        <View style={styles.infoCard}>
-          <Ionicons name="shield-checkmark" size={24} color={colors.success} />
-          <Text style={styles.infoText}>{t('paymentInfoSecure')}</Text>
+                {/* Radio Button */}
+                <View style={[styles.radioContainer, isSelected ? styles.radioSelected : styles.radioUnselected]}>
+                  {isSelected && <View style={styles.radioInner} />}
+                </View>
+              </TouchableOpacity>
+            );
+          })}
         </View>
       </ScrollView>
     </SafeAreaView>

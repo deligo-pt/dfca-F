@@ -266,19 +266,23 @@ const AddonsScreen = ({ route, navigation }) => {
     setSaving(true);
     try {
 
-      // IF THIS IS A BRAND NEW ITEM, SUBMIT EVERYTHING VIA `addItem` (Like Postman)
+      // IF THIS IS A BRAND NEW ITEM: 2-step flow
+      // Step 1 → Add product to cart (no addons)
+      // Step 2 → Call update-addon-quantity for each selected addon
       if (route.params?.isNewItem) {
-        const payload = {
-          variantName: variantName === null ? undefined : (variantName || 'Standard'),
+        const addPayload = {
+          variantName: variantName === null ? undefined : (variantName || undefined),
           variationSku: route.params?.variationSku || undefined,
           options: route.params?.options || {},
-          addons: addonUpdates
+          // NOTE: Do NOT pass addons here — backend ignores them in addToCart.
+          // Addons are added separately via update-addon-quantity below.
         };
 
+        // ── STEP 1: Add product to cart ──
         const result = await addItem(
           product,
           route.params?.quantity || 1,
-          payload
+          addPayload
         );
 
         if (result && !result.success) {
@@ -293,7 +297,77 @@ const AddonsScreen = ({ route, navigation }) => {
           return;
         }
 
-        Toast.show({ type: 'success', text1: t('addedToCart') || 'Added to cart' });
+        // ── STEP 2: Add each addon via update-addon-quantity ──
+        // Resolve the clean MongoDB _id to send to backend.
+        // route.params.productId is the most reliable — it's the explicit Mongo _id
+        // passed by the ProductDetailScreen when navigating here.
+        const cleanProductId =
+          (typeof productId === 'string' && /^[0-9a-fA-F]{24}$/.test(productId) ? productId : null) ||
+          product?._raw?._id ||
+          product?._id ||
+          product?.id;
+
+        console.log('[AddonsScreen] Step 2 — using productId for addon update:', cleanProductId);
+
+        const resolvedSkuForAddon = route.params?.variationSku || undefined;
+
+        if (addonUpdates.length > 0) {
+          let addonHasError = false;
+          let addonErrorMessage = '';
+          let addonRawError = null;
+
+          for (const addon of addonUpdates) {
+            // Backend adds 1 per call, so loop quantity times
+            for (let i = 0; i < addon.quantity; i++) {
+              const res = await CartAPI.updateAddonQuantity(
+                cleanProductId,
+                undefined,           // variantName not needed by backend
+                addon.optionId,      // option _id
+                'increment',
+                resolvedSkuForAddon, // variationSku (undefined if no variation)
+                addon.sku
+              );
+
+              if (res && !res.success) {
+                addonHasError = true;
+                addonErrorMessage = res.error?.message || res.error || 'Failed to add addon';
+                addonRawError = res.rawResponse || res.error;
+                break;
+              }
+            }
+            if (addonHasError) break;
+          }
+
+          if (addonHasError) {
+            setSaving(false);
+            // Product was added but addon failed — still fetch updated cart
+            await fetchCart({ force: true }).catch(() => { });
+
+            let displayMessage = addonErrorMessage;
+            if (typeof displayMessage === 'object' && displayMessage !== null) {
+              displayMessage = displayMessage.message || displayMessage.error || JSON.stringify(displayMessage);
+            }
+            if (typeof displayMessage !== 'string') displayMessage = String(displayMessage);
+
+            console.warn('[AddonsScreen] Addon step failed after product add:', displayMessage);
+
+            Toast.show({
+              type: 'error',
+              position: 'top',
+              topOffset: Platform.OS === 'ios' ? 60 : (StatusBar.currentHeight || 0) + 20,
+              visibilityTime: 4000,
+              text1: t('error') !== 'error' ? t('error') : 'Addon Error',
+              text2: displayMessage,
+            });
+            // Don't navigate back — let user retry or skip
+            return;
+          }
+        }
+
+        // Both steps succeeded
+        console.log('[AddonsScreen] Product + addons saved successfully');
+        await fetchCart({ force: true }).catch(() => { });
+        Toast.show({ type: 'success', text1: t('addedToCart') || 'Added to cart!' });
         navigation.goBack();
         return;
       }
@@ -393,7 +467,38 @@ const AddonsScreen = ({ route, navigation }) => {
     }
   };
 
-  const handleSkip = () => {
+  const handleSkip = async () => {
+    // If this is a new item (not yet in cart), we must add the product
+    // even when skipping addons — otherwise nothing gets added to cart!
+    if (route.params?.isNewItem) {
+      setSaving(true);
+      try {
+        const addPayload = {
+          variantName: variantName === null ? undefined : (variantName || undefined),
+          variationSku: route.params?.variationSku || undefined,
+          options: route.params?.options || {},
+        };
+
+        const result = await addItem(
+          product,
+          route.params?.quantity || 1,
+          addPayload
+        );
+
+        if (result && !result.success) {
+          let displayMessage = result.message || result.error || 'Failed to add item to cart';
+          if (typeof displayMessage === 'object') displayMessage = JSON.stringify(displayMessage);
+          Alert.alert('Error', displayMessage, [{ text: 'OK' }]);
+          return; // Stay on screen if add failed
+        }
+
+        Toast.show({ type: 'success', text1: t('addedToCart') || 'Added to cart!' });
+      } catch (e) {
+        console.error('[AddonsScreen] Skip-add failed:', e);
+      } finally {
+        setSaving(false);
+      }
+    }
     navigation.goBack();
   };
 
@@ -483,8 +588,8 @@ const AddonsScreen = ({ route, navigation }) => {
               {product?.name}
             </Text>
           </View>
-          <TouchableOpacity style={styles.skipBtn} onPress={handleSkip}>
-            <Text style={[styles.skipButtonText, { color: colors.primary }]}>{t('skip') || 'Skip'}</Text>
+          <TouchableOpacity style={styles.skipBtn} onPress={handleSkip} disabled={saving}>
+            <Text style={[styles.skipButtonText, { color: saving ? colors.text.light : colors.primary }]}>{t('skip') || 'Skip'}</Text>
           </TouchableOpacity>
         </LinearGradient>
       </View>

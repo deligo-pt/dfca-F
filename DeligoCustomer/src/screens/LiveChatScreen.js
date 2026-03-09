@@ -53,7 +53,7 @@ const LiveChatScreen = () => {
     const { orderId, transactionId, issueType } = route.params || {};
 
     const [messages, setMessages] = useState([]);
-    const [inputText, setInputText] = useState(issueType ? `${t('issueRegarding') || 'Issue regarding'}: ${issueType}` : '');
+    const [inputText, setInputText] = useState(issueType || '');
     const [isTyping, setIsTyping] = useState(false);
     const [isConnected, setIsConnected] = useState(false);
     const [isInternetReachable, setIsInternetReachable] = useState(true);
@@ -546,77 +546,77 @@ const LiveChatScreen = () => {
                 <Text style={styles.offlineText}>{t('noInternet') || 'No internet connection'}</Text>
             </Animated.View>
 
-            {/* Content Area */}
-            <View style={[styles.contentContainer, { backgroundColor: colors.background }]}>
-                {isLoading ? (
-                    <View style={styles.centerContainer}>
-                        <ActivityIndicator size="large" color={colors.primary} />
-                    </View>
-                ) : hasError && !isLoading ? (
-                    <View style={styles.centerContainer}>
-                        <View style={[styles.errorIconCircle, { backgroundColor: '#FFEBEE' }]}>
-                            <Ionicons name="cloud-offline" size={32} color={colors.error || '#F44336'} />
-                        </View>
-                        <Text style={[styles.errorTitle, { color: colors.text }]}>
-                            {t('connectionFailed') || 'Connection Failed'}
-                        </Text>
-                        <Text style={[styles.errorText, { color: colors.textSecondary }]}>
-                            {t('connFailedDesc') || "We couldn't connect to the support chat."}
-                        </Text>
-                        <TouchableOpacity
-                            style={[styles.retryButton, { backgroundColor: colors.primary }]}
-                            onPress={setupChat}
-                        >
-                            <Text style={styles.retryButtonText}>{t('tryAgain') || 'Retry'}</Text>
-                        </TouchableOpacity>
-                    </View>
-                ) : (
-                    <FlatList
-                        ref={flatListRef}
-                        data={messages}
-                        renderItem={renderMessage}
-                        keyExtractor={(item) => item._id || item.id || Math.random().toString()}
-                        contentContainerStyle={styles.listContent}
-                        showsVerticalScrollIndicator={false}
-                        onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
-                        ListEmptyComponent={
-                            <View style={styles.centerContainer}>
-                                <Image
-                                    // Placeholder for a nice empty state illustration if available, else icon
-                                    source={require('../assets/icon.png')} // Fallback to logo or just icon
-                                    style={{ width: 60, height: 60, opacity: 0.2, marginBottom: 20 }}
-                                    resizeMode="contain"
-                                />
-                                <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
-                                    {t('howCanWeHelp') || "Hi! How can we help you today?"}
-                                </Text>
-                            </View>
-                        }
-                        ListFooterComponent={
-                            isTyping ? (
-                                <View style={styles.typingRow}>
-                                    <View style={styles.avatarContainer}>
-                                        <View style={[styles.avatarGradient, { backgroundColor: '#EEE' }]}>
-                                            <Text style={{ fontSize: 10 }}>...</Text>
-                                        </View>
-                                    </View>
-                                    <View style={[styles.typingBubble, { backgroundColor: colors.surface }]}>
-                                        <View style={styles.typingDot} />
-                                        <View style={[styles.typingDot, { animationDelay: '0.2s' }]} />
-                                        <View style={[styles.typingDot, { animationDelay: '0.4s' }]} />
-                                    </View>
-                                </View>
-                            ) : <View style={{ height: 10 }} />
-                        }
-                    />
-                )}
-            </View>
-
-            {/* Input Area - Clean & Modern */}
             <KeyboardAvoidingView
-                behavior={Platform.OS === 'ios' ? 'padding' : undefined}
+                style={{ flex: 1 }}
+                behavior={Platform.OS === 'ios' ? 'padding' : 'height'}
                 keyboardVerticalOffset={Platform.OS === 'ios' ? 0 : 0}
             >
+                {/* Content Area */}
+                <View style={[styles.contentContainer, { backgroundColor: colors.background }]}>
+                    {isLoading ? (
+                        <View style={styles.centerContainer}>
+                            <ActivityIndicator size="large" color={colors.primary} />
+                        </View>
+                    ) : hasError && !isLoading ? (
+                        <View style={styles.centerContainer}>
+                            <View style={[styles.errorIconCircle, { backgroundColor: '#FFEBEE' }]}>
+                                <Ionicons name="cloud-offline" size={32} color={colors.error || '#F44336'} />
+                            </View>
+                            <Text style={[styles.errorTitle, { color: colors.text }]}>
+                                {t('connectionFailed') || 'Connection Failed'}
+                            </Text>
+                            <Text style={[styles.errorText, { color: colors.textSecondary }]}>
+                                {t('connFailedDesc') || "We couldn't connect to the support chat."}
+                            </Text>
+                            <TouchableOpacity
+                                style={[styles.retryButton, { backgroundColor: colors.primary }]}
+                                onPress={setupChat}
+                            >
+                                <Text style={styles.retryButtonText}>{t('tryAgain') || 'Retry'}</Text>
+                            </TouchableOpacity>
+                        </View>
+                    ) : (
+                        <FlatList
+                            ref={flatListRef}
+                            data={messages}
+                            renderItem={renderMessage}
+                            keyExtractor={(item) => item._id || item.id || Math.random().toString()}
+                            contentContainerStyle={styles.listContent}
+                            showsVerticalScrollIndicator={false}
+                            onContentSizeChange={() => flatListRef.current?.scrollToEnd({ animated: true })}
+                            ListEmptyComponent={
+                                <View style={styles.centerContainer}>
+                                    <Image
+                                        source={require('../assets/icon.png')}
+                                        style={{ width: 60, height: 60, opacity: 0.2, marginBottom: 20 }}
+                                        resizeMode="contain"
+                                    />
+                                    <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                                        {t('howCanWeHelp') || "Hi! How can we help you today?"}
+                                    </Text>
+                                </View>
+                            }
+                            ListFooterComponent={
+                                isTyping ? (
+                                    <View style={styles.typingRow}>
+                                        <View style={styles.avatarContainer}>
+                                            <View style={[styles.avatarGradient, { backgroundColor: '#EEE' }]}>
+                                                <Text style={{ fontSize: 10 }}>...</Text>
+                                            </View>
+                                        </View>
+                                        <View style={[styles.typingBubble, { backgroundColor: colors.surface }]}>
+                                            <View style={styles.typingDot} />
+                                            <View style={[styles.typingDot, { animationDelay: '0.2s' }]} />
+                                            <View style={[styles.typingDot, { animationDelay: '0.4s' }]} />
+                                        </View>
+                                    </View>
+                                ) : <View style={{ height: 10 }} />
+                            }
+                        />
+                    )}
+                </View>
+
+                {/* Input Area - Clean & Modern */}
                 {chatStatus === 'CLOSED' ? (
                     <View style={[styles.closedBanner, { backgroundColor: colors.surface }]}>
                         <Ionicons name="lock-closed-outline" size={18} color={colors.textSecondary} />

@@ -1412,63 +1412,67 @@ const CheckoutScreen = ({ route, navigation }) => {
         <View style={styles(colors).section}>
           <TouchableOpacity
             style={styles(colors).voucherButton}
-            onPress={() => navigation.navigate('Vouchers', {
-              selectionMode: true,
-              vendorId: vendorId,
-              currentTotal: displayTotal,
-              onSelect: async (coupon, manualResult) => {
-                // Handle both list selection (coupon) and manual verification result (manualResult)
-                const selectedOffer = coupon || manualResult;
+            onPress={() => {
+              const checkoutSummaryId = extractCheckoutSummaryId(checkoutResponse);
+              navigation.navigate('Vouchers', {
+                selectionMode: true,
+                vendorId: vendorId,
+                checkoutId: checkoutSummaryId,
+                currentTotal: displayTotal,
+                onSelect: async (coupon, manualResult) => {
+                  // Handle both list selection (coupon) and manual verification result (manualResult)
+                  const selectedOffer = coupon || manualResult;
 
-                if (selectedOffer && selectedOffer.code) {
-                  console.debug('[CheckoutScreen] Voucher selected:', selectedOffer.code, 'AutoApply:', selectedOffer.autoApply);
+                  if (selectedOffer && selectedOffer.code) {
+                    console.debug('[CheckoutScreen] Voucher selected:', selectedOffer.code, 'AutoApply:', selectedOffer.autoApply);
 
-                  // Extract Checkout ID
-                  const checkoutSummaryId = extractCheckoutSummaryId(checkoutResponse);
-                  if (!checkoutSummaryId) {
-                    setStripeError(t('checkoutNotReady') === 'checkoutNotReady' ? 'Checkout session not ready. Please wait.' : t('checkoutNotReady'));
-                    return;
-                  }
-
-                  // User Request Fix: Always valid to send ID if we have it?
-                  // Previous rule was confusing. Now prioritizing ID if available, else Code.
-                  // For "test20" (AutoApply=false), user explicitly wanted ID.
-                  let offerIdentifier = selectedOffer.id || selectedOffer._id || selectedOffer.code;
-
-                  // Validate via API
-                  try {
-                    setIsProcessing(true);
-                    const res = await CheckoutAPI.validateApplyOffer({
-                      checkoutId: checkoutSummaryId,
-                      offerIdentifier: offerIdentifier
-                    });
-
-                    if (res.success) {
-                      console.debug('[CheckoutScreen] Offer validation FULL response:', JSON.stringify(res, null, 2));
-                      setAppliedPromo(selectedOffer);
-                      // Refresh checkout data if returned
-                      if (res.data && res.data.data) {
-                        setCheckoutResponse(res.data.data);
-                      }
-                      setStripeError(null);
-                    } else {
-                      console.warn('[CheckoutScreen] Offer validation failed:', res.error);
-                      setStripeError(res.error || 'Failed to apply voucher');
-                      setAppliedPromo(null);
+                    // Extract Checkout ID
+                    const checkoutSummaryId = extractCheckoutSummaryId(checkoutResponse);
+                    if (!checkoutSummaryId) {
+                      setStripeError(t('checkoutNotReady') === 'checkoutNotReady' ? 'Checkout session not ready. Please wait.' : t('checkoutNotReady'));
+                      return;
                     }
-                  } catch (err) {
-                    console.error('[CheckoutScreen] Offer validation error:', err);
-                    setStripeError(t('failedToValidateVoucher') || 'Failed to validate voucher');
-                    setAppliedPromo(null);
-                  } finally {
-                    setIsProcessing(false);
+
+                    // User Request Fix: Always valid to send ID if we have it?
+                    // Previous rule was confusing. Now prioritizing ID if available, else Code.
+                    // For "test20" (AutoApply=false), user explicitly wanted ID.
+                    let offerIdentifier = selectedOffer.id || selectedOffer._id || selectedOffer.code;
+
+                    // Validate via API
+                    try {
+                      setIsProcessing(true);
+                      const res = await CheckoutAPI.validateApplyOffer({
+                        checkoutId: checkoutSummaryId,
+                        offerIdentifier: offerIdentifier
+                      });
+
+                      if (res.success) {
+                        console.debug('[CheckoutScreen] Offer validation FULL response:', JSON.stringify(res, null, 2));
+                        setAppliedPromo(selectedOffer);
+                        // Refresh checkout data if returned
+                        if (res.data && res.data.data) {
+                          setCheckoutResponse(res.data.data);
+                        }
+                        setStripeError(null);
+                      } else {
+                        console.warn('[CheckoutScreen] Offer validation failed:', res.error);
+                        setStripeError(res.error || 'Failed to apply voucher');
+                        setAppliedPromo(null);
+                      }
+                    } catch (err) {
+                      console.error('[CheckoutScreen] Offer validation error:', err);
+                      setStripeError(t('failedToValidateVoucher') || 'Failed to validate voucher');
+                      setAppliedPromo(null);
+                    } finally {
+                      setIsProcessing(false);
+                    }
+                  } else {
+                    console.warn('[CheckoutScreen] Invalid voucher selection:', selectedOffer);
+                    setStripeError('Invalid voucher selected');
                   }
-                } else {
-                  console.warn('[CheckoutScreen] Invalid voucher selection:', selectedOffer);
-                  setStripeError('Invalid voucher selected');
                 }
-              }
-            })}
+              })
+            }}
           >
             <View style={styles(colors).voucherLeft}>
               <View style={styles(colors).voucherIconBadge}>
@@ -1495,57 +1499,41 @@ const CheckoutScreen = ({ route, navigation }) => {
             </View>
           </View>
           <View style={styles(colors).paymentMethodsList}>
-            {paymentMethods.map((method) => (
-              <TouchableOpacity
-                key={method.id}
-                style={[
-                  styles(colors).paymentMethodCard,
-                  selectedPayment === method.id && styles(colors).paymentMethodCardSelected,
-                ]}
-                onPress={() => setSelectedPayment(method.id)}
-                activeOpacity={0.7}
-              >
-                <View style={styles(colors).paymentMethodLeft}>
-                  <View
-                    style={[
-                      styles(colors).paymentMethodIcon,
-                      selectedPayment === method.id && styles(colors).paymentMethodIconSelected,
-                    ]}
-                  >
+            {paymentMethods.map((method) => {
+              const isSelected = selectedPayment === method.id;
+              return (
+                <TouchableOpacity
+                  key={method.id}
+                  style={isSelected ? styles(colors).methodRowSelected : styles(colors).methodRowUnselected}
+                  onPress={() => setSelectedPayment(method.id)}
+                  activeOpacity={0.8}
+                >
+                  {/* Left Icon Layout exactly like image */}
+                  <View style={isSelected ? styles(colors).iconCircleSelected : styles(colors).iconCircleUnselected}>
                     <MaterialCommunityIcons
                       name={method.icon}
-                      size={24}
-                      color={
-                        selectedPayment === method.id
-                          ? colors.primary
-                          : colors.text.secondary
-                      }
+                      size={22}
+                      color={isSelected ? colors.primary : colors.text.secondary}
                     />
                   </View>
-                  <View style={styles(colors).paymentMethodInfo}>
-                    <View style={styles(colors).paymentMethodNameRow}>
-                      <Text style={styles(colors).paymentMethodName}>{method.name}</Text>
-                      {method.badge && selectedPayment === method.id && (
-                        <View style={styles(colors).recommendedBadge}>
-                          <Text style={styles(colors).recommendedBadgeText}>{method.badge}</Text>
-                        </View>
-                      )}
+
+                  {/* Name */}
+                  <Text style={styles(colors).methodName}>{method.name}</Text>
+
+                  {/* Recommended Badge */}
+                  {method.badge && (
+                    <View style={styles(colors).badge}>
+                      <Text style={styles(colors).badgeText}>{method.badge}</Text>
                     </View>
-                    <Text style={styles(colors).paymentMethodDetails}>{method.details}</Text>
-                  </View>
-                </View>
-                <View
-                  style={[
-                    styles(colors).paymentRadio,
-                    selectedPayment === method.id && styles(colors).paymentRadioSelected,
-                  ]}
-                >
-                  {selectedPayment === method.id && (
-                    <View style={styles(colors).paymentRadioInner} />
                   )}
-                </View>
-              </TouchableOpacity>
-            ))}
+
+                  {/* Radio Button */}
+                  <View style={[styles(colors).radioContainer, isSelected ? styles(colors).radioSelected : styles(colors).radioUnselected]}>
+                    {isSelected && <View style={styles(colors).radioInner} />}
+                  </View>
+                </TouchableOpacity>
+              );
+            })}
           </View>
         </View>
 
@@ -2413,88 +2401,83 @@ const styles = (colors) => StyleSheet.create({
   paymentMethodsList: {
     gap: 12,
   },
-  paymentMethodCard: {
+  methodRowSelected: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'space-between',
-    padding: spacing.md,
-    backgroundColor: colors.background,
-    borderRadius: 14,
-    borderWidth: 2,
-    borderColor: 'transparent',
-  },
-  paymentMethodCardSelected: {
-    backgroundColor: colors.background === '#FFFFFF' ? '#FFF5F8' : 'rgba(220, 49, 115, 0.1)',
     borderColor: colors.primary,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.15,
-    shadowRadius: 6,
-    elevation: 2,
+    borderWidth: 1.5,
+    backgroundColor: colors.background === '#FFFFFF' ? 'rgba(217, 27, 92, 0.04)' : 'rgba(217, 27, 92, 0.15)',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 0,
   },
-  paymentMethodLeft: {
+  methodRowUnselected: {
     flexDirection: 'row',
     alignItems: 'center',
-    flex: 1,
+    borderColor: 'transparent',
+    borderWidth: 1.5,
+    backgroundColor: 'transparent',
+    borderRadius: 16,
+    padding: 16,
+    marginBottom: 0,
   },
-  paymentMethodIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.surface,
+  iconCircleSelected: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    borderWidth: 1,
+    borderColor: colors.primary,
     alignItems: 'center',
     justifyContent: 'center',
-    marginRight: spacing.md,
+    marginRight: 16,
+    backgroundColor: 'transparent',
+  },
+  iconCircleUnselected: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
     borderWidth: 1,
     borderColor: colors.border,
-  },
-  paymentMethodIconSelected: {
-    backgroundColor: colors.background === '#FFFFFF' ? '#FFE8F0' : 'rgba(220, 49, 115, 0.2)',
-    borderColor: colors.primary,
-  },
-  paymentMethodInfo: {
-    flex: 1,
-  },
-  paymentMethodNameRow: {
-    flexDirection: 'row',
     alignItems: 'center',
-    gap: 8,
-    marginBottom: 3,
+    justifyContent: 'center',
+    marginRight: 16,
+    backgroundColor: 'transparent',
   },
-  paymentMethodName: {
+  methodName: {
     fontSize: 15,
     fontFamily: 'Poppins-SemiBold',
     color: colors.text.primary,
+    flex: 1,
   },
-  recommendedBadge: {
+  badge: {
     backgroundColor: colors.primary,
     paddingHorizontal: 8,
-    paddingVertical: 2,
-    borderRadius: 6,
+    paddingVertical: 5,
+    borderRadius: 8,
+    marginRight: 14,
   },
-  recommendedBadgeText: {
+  badgeText: {
+    color: '#FFF',
     fontSize: 10,
     fontFamily: 'Poppins-Bold',
-    color: '#FFFFFF',
+    textTransform: 'none',
+    letterSpacing: 0.5,
   },
-  paymentMethodDetails: {
-    fontSize: 13,
-    fontFamily: 'Poppins-Regular',
-    color: colors.text.secondary,
-  },
-  paymentRadio: {
+  radioContainer: {
     width: 24,
     height: 24,
     borderRadius: 12,
     borderWidth: 2,
-    borderColor: colors.text.light,
-    alignItems: 'center',
     justifyContent: 'center',
+    alignItems: 'center',
   },
-  paymentRadioSelected: {
+  radioSelected: {
     borderColor: colors.primary,
   },
-  paymentRadioInner: {
+  radioUnselected: {
+    borderColor: colors.text.light,
+  },
+  radioInner: {
     width: 12,
     height: 12,
     borderRadius: 6,

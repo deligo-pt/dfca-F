@@ -194,9 +194,15 @@ const NotificationsScreen = ({ navigation }) => {
   };
 
   const handleViewOrder = () => {
-    setModalVisible(false);
     if (selectedNotification?.data?.orderId) {
-      navigation.navigate('TrackOrder', { orderId: selectedNotification.data.orderId });
+      setModalVisible(false);
+      // Small delay to allow modal to close before navigation on some devices
+      setTimeout(() => {
+        navigation.navigate('TrackOrder', {
+          orderId: selectedNotification.data.orderId,
+          notificationData: selectedNotification // Pass extra data to help initial load
+        });
+      }, 100);
     }
   };
 

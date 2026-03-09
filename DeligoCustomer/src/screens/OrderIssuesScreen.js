@@ -63,7 +63,8 @@ const OrderIssuesScreen = ({ navigation }) => {
         // But since we want to keep it simple as per plan:
         // But since we want to keep it simple as per plan:
         navigation.navigate('LiveChat', {
-            issueType: `Issue with order #${order.orderId || order._id?.slice(-6)}`
+            orderId: order.orderId || order._id?.slice(-6),
+            issueType: `I have an issue with my order (#${order.orderId || order._id?.slice(-6)}).`
         });
     };
 
@@ -183,7 +184,7 @@ const OrderIssuesScreen = ({ navigation }) => {
                                         <Text style={{ fontSize: 12, color: colors.text.light }}> (#{order.orderId || order._id?.slice(-6)})</Text>
                                     </Text>
                                     <Text style={styles.orderDate}>{formatDate(order.createdAt)} • {order.items?.length || 0} items</Text>
-                                    <Text style={styles.orderPrice}>€{order.totalAmount?.toFixed(2) || order.subTotal?.toFixed(2)}</Text>
+                                    <Text style={styles.orderPrice}>€{Number(order.payoutSummary?.grandTotal ?? order.totalAmount ?? order.total ?? order.grandTotal ?? 0).toFixed(2)}</Text>
                                 </View>
                                 <Ionicons name="chevron-forward" size={20} color={colors.text.light} style={styles.chevron} />
                             </TouchableOpacity>

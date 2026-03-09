@@ -13,6 +13,7 @@ import {
 } from "react-native";
 import { useSafeAreaInsets } from "react-native-safe-area-context";
 import { useFocusEffect } from "@react-navigation/native";
+import { useNetInfo } from "@react-native-community/netinfo";
 import { spacing } from "../theme";
 
 import { useTheme } from "../utils/ThemeContext";
@@ -62,6 +63,10 @@ const CategoriesScreen = ({ navigation }) => {
     loading: locationLoading,
     getCurrentLocation,
   } = useLocation();
+
+  const netInfo = useNetInfo();
+  // Safe extraction of network state
+  const isOnline = netInfo.isConnected !== false;
 
   // Business category (API) selection
   // selectedVendorType remains the selected business category slug (e.g. "restaurant") for backwards UI compatibility
@@ -1081,38 +1086,18 @@ const CategoriesScreen = ({ navigation }) => {
         translucent={true}
       />
 
-      {/* Sticky Search Header - appears on scroll */}
-      <StickySearchHeader
-        scrollY={scrollY}
-        onCartPress={handleCartPress}
-        onLocationPress={handleLocationPress}
-        area={address}
-        cartItemCount={cartItemCount}
-        cartVendorsCount={cartVendorsCount}
-        onSearchPress={handleSearchPress} // REPLACED: trigger nav only
-        paddingTop={insets.top}
-        pointerEvents={isStickyVisible ? "auto" : "none"}
-      />
-
-      {(productsLoading || categoriesLoading) && !refreshing ? (
-        <SkeletonCategory />
-      ) : productsError && (!products || products.length === 0) ? (
+      {!isOnline ? (
         <View style={styles(colors).errorContainer}>
           <View style={styles(colors).errorContent}>
             <View style={styles(colors).errorIconBadge}>
-              <Text style={styles(colors).errorIcon}>📡</Text>
+              <Text style={styles(colors).errorIcon}>🚫</Text>
             </View>
             <Text style={styles(colors).errorTitle}>
-              {t("network_error_title")}
+              {t("no_internet", { defaultValue: "No Internet Connection" })}
             </Text>
             <Text style={styles(colors).errorSubtext}>
-              {t("network_error_msg")}
+              {t("no_internet_msg", { defaultValue: "Please check your network settings and try again." })}
             </Text>
-            {productsError && (
-              <Text style={styles(colors).errorDebug}>
-                {String(productsError)}
-              </Text>
-            )}
 
             <TouchableOpacity
               style={styles(colors).retryButton}
@@ -1123,266 +1108,317 @@ const CategoriesScreen = ({ navigation }) => {
                 {t("retry_again")}
               </Text>
             </TouchableOpacity>
-
-            <TouchableOpacity
-              style={styles(colors).secondaryRetryButton}
-              onPress={() => getCurrentLocation && getCurrentLocation()}
-            >
-              <Text style={styles(colors).secondaryRetryText}>
-                {t("pull_to_refresh")}
-              </Text>
-            </TouchableOpacity>
           </View>
         </View>
       ) : (
-        <Animated.ScrollView
-          style={styles(colors).scrollView}
-          showsVerticalScrollIndicator={false}
-          bounces={true}
-          scrollEventThrottle={16}
-          refreshControl={
-            <RefreshControl
-              refreshing={refreshing}
-              onRefresh={handleRefresh}
-              colors={[colors.primary]}
-              tintColor={colors.primary}
-              progressViewOffset={insets.top + 20}
-            />
-          }
-          onScroll={Animated.event(
-            [{ nativeEvent: { contentOffset: { y: scrollY } } }],
-            { useNativeDriver: true },
-          )}
-        >
-          {/* Location Header with Search - scrolls away */}
-          <LocationHeader
-            location={currentLocation}
-            area={address}
-            loading={locationLoading}
+        <>
+          {/* Sticky Search Header - appears on scroll */}
+          <StickySearchHeader
+            scrollY={scrollY}
+            onCartPress={handleCartPress}
             onLocationPress={handleLocationPress}
-            onSearchPress={handleSearchPress}
-            userName={userName}
-            onProfilePress={() => navigation.navigate("Profile")}
-            onNotificationPress={() => navigation.navigate("Notifications")}
+            area={address}
+            cartItemCount={cartItemCount}
+            cartVendorsCount={cartVendorsCount}
+            onSearchPress={handleSearchPress} // REPLACED: trigger nav only
             paddingTop={insets.top}
+            pointerEvents={isStickyVisible ? "auto" : "none"}
           />
 
-          {/* Promotional Banner Carousel */}
-          <PromoCarousel
-            onPress={(promo) => console.log("Promo pressed:", promo.title)}
-            refreshTrigger={promoRefreshTrigger}
-          />
-
-          {/* High-End App Hub Bubbles */}
-          <PremiumCategories
-            categories={displayCategories}
-            onPress={handleVendorTypePress}
-            selectedId={selectedVendorType}
-          />
-
-          {/* Categories Section - filtered by selected Business Category */}
-          <SectionHeader
-            title={
-              t("what_on_your_mind", {
-                defaultValue: "What's on your mind?",
-              }) || "What's on your mind?"
-            }
-            showSeeAll={false}
-          />
-
-          {selectedBusinessCategoryId &&
-            productCategoriesForBusiness.length === 0 ? (
-            <View style={styles(colors).noResultsContainer}>
-              <Text style={styles(colors).noResultsText}>
-                {t("noProductCategoriesAdded") ||
-                  "No product categories has added"}
-              </Text>
-            </View>
-          ) : (
-            <Category
-              cuisines={
-                selectedBusinessCategoryId
-                  ? productCategoriesForBusiness
-                  : apiProductCategories.length > 0
-                    ? apiProductCategories
-                    : dynamicCategories
-              }
-              selectedCuisine={selectedCuisine}
-              onPress={handleCuisinePress}
-            />
-          )}
-
-          {/* Results Section */}
-          <SectionHeader
-            title={
-              searchQuery
-                ? `${t("searchResults")} (${(products || []).length})`
-                : t("nearYou")
-            }
-            onSeeAll={
-              !searchQuery
-                ? () =>
-                  navigation.navigate("SeeAll", {
-                    allItems: sourceProducts,
-                    vendorTypes: displayCategories,
-                    availableCuisines: cuisinesFromProducts,
-                    title: t("nearYou"),
-                  })
-                : undefined
-            }
-          />
-
-          {/* Active Filter Chips - Uber Eats Style */}
-          {(selectedVendorType || selectedCuisine) && (
-            <ScrollView
-              horizontal
-              showsHorizontalScrollIndicator={false}
-              style={styles(colors).filterChipsContainer}
-              contentContainerStyle={styles(colors).filterChipsContent}
-            >
-              {selectedVendorType && (
-                <TouchableOpacity
-                  onPress={() => {
-                    setSelectedVendorType(null);
-                    setSelectedBusinessCategoryId(null);
-                    persistSelection("selectedVendorType", null);
-                    persistSelection("selectedBusinessCategoryId", null);
-                  }}
-                  style={styles(colors).filterChip}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles(colors).filterChipText}>
-                    {selectedVendorType?.toUpperCase()}
-                  </Text>
-                  <View style={styles(colors).filterChipClose}>
-                    <Text style={styles(colors).filterChipCloseIcon}>×</Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-              {selectedCuisine && (
-                <TouchableOpacity
-                  onPress={() => {
-                    setSelectedCuisine(null);
-                    setSelectedCuisineId(null);
-                    persistSelection("selectedCuisine", null);
-                    persistSelection("selectedCuisineId", null);
-                  }}
-                  style={styles(colors).filterChip}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles(colors).filterChipText}>
-                    {selectedCuisine?.toUpperCase()}
-                  </Text>
-                  <View style={styles(colors).filterChipClose}>
-                    <Text style={styles(colors).filterChipCloseIcon}>×</Text>
-                  </View>
-                </TouchableOpacity>
-              )}
-              {selectedVendorType && selectedCuisine && (
-                <TouchableOpacity
-                  onPress={() => {
-                    setSelectedVendorType(null);
-                    setSelectedBusinessCategoryId(null);
-                    setSelectedCuisine(null);
-                    setSelectedCuisineId(null);
-                    persistSelection("selectedVendorType", null);
-                    persistSelection("selectedBusinessCategoryId", null);
-                    persistSelection("selectedCuisine", null);
-                    persistSelection("selectedCuisineId", null);
-                  }}
-                  style={styles(colors).clearAllChip}
-                  activeOpacity={0.7}
-                >
-                  <Text style={styles(colors).clearAllChipText}>
-                    {t("clearFilters")}
-                  </Text>
-                </TouchableOpacity>
-              )}
-            </ScrollView>
-          )}
-
-          {productsLoading &&
-            (!displayedProducts || displayedProducts.length === 0) ? (
+          {/* Location Header removed from Sticky area, keeping below block wrapped with <></> logic */}
+          {(productsLoading || categoriesLoading) && !refreshing ? (
             <SkeletonCategory />
-          ) : (selectedVendorType || selectedCuisine) &&
-            filteredVendors.length === 0 ? (
-            <View style={styles(colors).noResultsContainer}>
-              <Text style={styles(colors).noResultsText}>
-                {t("noVendorsFound") || "No vendors found for this category"}
-              </Text>
-            </View>
-          ) : (selectedVendorType || selectedCuisine) &&
-            filteredVendors.length > 0 ? (
-            <RestaurantsList
-              restaurants={filteredVendors}
-              onPress={handleRestaurantPress}
-              searchQuery={searchQuery}
-              disableScroll={true}
-            />
-          ) : displayedByVendor.length > 0 ? (
-            // Default: always show vendors (deduped) when no strict filter has produced a vendor list
-            <RestaurantsList
-              restaurants={displayedByVendor}
-              onPress={handleRestaurantPress}
-              searchQuery={searchQuery}
-              disableScroll={true}
-            />
-          ) : prevNonEmptyRef.current.length > 0 &&
-            (selectedVendorType || selectedCuisine) ? (
-            <RestaurantsList
-              restaurants={prevNonEmptyRef.current}
-              onPress={handleRestaurantPress}
-              searchQuery={searchQuery}
-              disableScroll={true}
-            />
-          ) : (
-            <View style={styles(colors).noResultsContainer}>
-              <Text style={styles(colors).noResultsText}>
-                {selectedVendorType || selectedCuisine
-                  ? t("noResultsFor") +
-                  " " +
-                  (selectedVendorType || selectedCuisine) ||
-                  t("noMatchSelection")
-                  : t("noResultsFor") +
-                  " " +
-                  (selectedVendorType || selectedCuisine) ||
-                  t("noResultsFound")}
-              </Text>
-              <Text style={styles(colors).noResultsSubtext}>
-                {selectedVendorType || selectedCuisine
-                  ? t("tryDifferentFilter")
-                  : t("tryAdjustingFilters")}
-              </Text>
-              {(selectedVendorType || selectedCuisine) && (
+          ) : productsError && (!products || products.length === 0) ? (
+            <View style={styles(colors).errorContainer}>
+              <View style={styles(colors).errorContent}>
+                <View style={styles(colors).errorIconBadge}>
+                  <Text style={styles(colors).errorIcon}>📡</Text>
+                </View>
+                <Text style={styles(colors).errorTitle}>
+                  {t("network_error_title")}
+                </Text>
+                <Text style={styles(colors).errorSubtext}>
+                  {t("network_error_msg")}
+                </Text>
+                {productsError && (
+                  <Text style={styles(colors).errorDebug}>
+                    {String(productsError)}
+                  </Text>
+                )}
+
                 <TouchableOpacity
-                  onPress={() => {
-                    setSelectedVendorType(null);
-                    setSelectedBusinessCategoryId(null);
-                    setSelectedCuisine(null);
-                    persistSelection("selectedVendorType", null);
-                    persistSelection("selectedBusinessCategoryId", null);
-                    persistSelection("selectedCuisine", null);
-                  }}
-                  style={styles(colors).clearFiltersButton}
+                  style={styles(colors).retryButton}
+                  onPress={handleRefresh}
+                  activeOpacity={0.8}
                 >
-                  <Text style={styles(colors).clearFiltersText}>
-                    {t("clearFilters")}
+                  <Text style={styles(colors).retryButtonText}>
+                    {t("retry_again")}
                   </Text>
                 </TouchableOpacity>
-              )}
+
+                <TouchableOpacity
+                  style={styles(colors).secondaryRetryButton}
+                  onPress={() => getCurrentLocation && getCurrentLocation()}
+                >
+                  <Text style={styles(colors).secondaryRetryText}>
+                    {t("pull_to_refresh")}
+                  </Text>
+                </TouchableOpacity>
+              </View>
             </View>
+          ) : (
+            <Animated.ScrollView
+              style={styles(colors).scrollView}
+              showsVerticalScrollIndicator={false}
+              bounces={true}
+              scrollEventThrottle={16}
+              refreshControl={
+                <RefreshControl
+                  refreshing={refreshing}
+                  onRefresh={handleRefresh}
+                  colors={[colors.primary]}
+                  tintColor={colors.primary}
+                  progressViewOffset={insets.top + 20}
+                />
+              }
+              onScroll={Animated.event(
+                [{ nativeEvent: { contentOffset: { y: scrollY } } }],
+                { useNativeDriver: true },
+              )}
+            >
+              {/* Location Header with Search - scrolls away */}
+              <LocationHeader
+                location={currentLocation}
+                area={address}
+                loading={locationLoading}
+                onLocationPress={handleLocationPress}
+                onSearchPress={handleSearchPress}
+                userName={userName}
+                onProfilePress={() => navigation.navigate("Profile")}
+                onNotificationPress={() => navigation.navigate("Notifications")}
+                paddingTop={insets.top}
+              />
+
+              {/* Promotional Banner Carousel */}
+              <PromoCarousel
+                onPress={(promo) => console.log("Promo pressed:", promo.title)}
+                refreshTrigger={promoRefreshTrigger}
+              />
+
+              {/* High-End App Hub Bubbles */}
+              <PremiumCategories
+                categories={displayCategories}
+                onPress={handleVendorTypePress}
+                selectedId={selectedVendorType}
+              />
+
+              {/* Categories Section - filtered by selected Business Category */}
+              <SectionHeader
+                title={
+                  t("what_on_your_mind", {
+                    defaultValue: "What's on your mind?",
+                  }) || "What's on your mind?"
+                }
+                showSeeAll={false}
+              />
+
+              {selectedBusinessCategoryId &&
+                productCategoriesForBusiness.length === 0 ? (
+                <View style={styles(colors).noResultsContainer}>
+                  <Text style={styles(colors).noResultsText}>
+                    {t("noProductCategoriesAdded") ||
+                      "No product categories has added"}
+                  </Text>
+                </View>
+              ) : (
+                <Category
+                  cuisines={
+                    selectedBusinessCategoryId
+                      ? productCategoriesForBusiness
+                      : apiProductCategories.length > 0
+                        ? apiProductCategories
+                        : dynamicCategories
+                  }
+                  selectedCuisine={selectedCuisine}
+                  onPress={handleCuisinePress}
+                />
+              )}
+
+              {/* Results Section */}
+              <SectionHeader
+                title={
+                  searchQuery
+                    ? `${t("searchResults")} (${(products || []).length})`
+                    : t("nearYou")
+                }
+                onSeeAll={
+                  !searchQuery
+                    ? () =>
+                      navigation.navigate("SeeAll", {
+                        allItems: sourceProducts,
+                        vendorTypes: displayCategories,
+                        availableCuisines: cuisinesFromProducts,
+                        title: t("nearYou"),
+                      })
+                    : undefined
+                }
+              />
+
+              {/* Active Filter Chips - Uber Eats Style */}
+              {(selectedVendorType || selectedCuisine) && (
+                <ScrollView
+                  horizontal
+                  showsHorizontalScrollIndicator={false}
+                  style={styles(colors).filterChipsContainer}
+                  contentContainerStyle={styles(colors).filterChipsContent}
+                >
+                  {selectedVendorType && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setSelectedVendorType(null);
+                        setSelectedBusinessCategoryId(null);
+                        persistSelection("selectedVendorType", null);
+                        persistSelection("selectedBusinessCategoryId", null);
+                      }}
+                      style={styles(colors).filterChip}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles(colors).filterChipText}>
+                        {selectedVendorType?.toUpperCase()}
+                      </Text>
+                      <View style={styles(colors).filterChipClose}>
+                        <Text style={styles(colors).filterChipCloseIcon}>×</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                  {selectedCuisine && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setSelectedCuisine(null);
+                        setSelectedCuisineId(null);
+                        persistSelection("selectedCuisine", null);
+                        persistSelection("selectedCuisineId", null);
+                      }}
+                      style={styles(colors).filterChip}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles(colors).filterChipText}>
+                        {selectedCuisine?.toUpperCase()}
+                      </Text>
+                      <View style={styles(colors).filterChipClose}>
+                        <Text style={styles(colors).filterChipCloseIcon}>×</Text>
+                      </View>
+                    </TouchableOpacity>
+                  )}
+                  {selectedVendorType && selectedCuisine && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setSelectedVendorType(null);
+                        setSelectedBusinessCategoryId(null);
+                        setSelectedCuisine(null);
+                        setSelectedCuisineId(null);
+                        persistSelection("selectedVendorType", null);
+                        persistSelection("selectedBusinessCategoryId", null);
+                        persistSelection("selectedCuisine", null);
+                        persistSelection("selectedCuisineId", null);
+                      }}
+                      style={styles(colors).clearAllChip}
+                      activeOpacity={0.7}
+                    >
+                      <Text style={styles(colors).clearAllChipText}>
+                        {t("clearFilters")}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </ScrollView>
+              )}
+
+              {productsLoading &&
+                (!displayedProducts || displayedProducts.length === 0) ? (
+                <SkeletonCategory />
+              ) : (selectedVendorType || selectedCuisine) &&
+                filteredVendors.length === 0 ? (
+                <View style={styles(colors).noResultsContainer}>
+                  <Text style={styles(colors).noResultsText}>
+                    {t("noVendorsFound") || "No vendors found for this category"}
+                  </Text>
+                </View>
+              ) : (selectedVendorType || selectedCuisine) &&
+                filteredVendors.length > 0 ? (
+                <RestaurantsList
+                  restaurants={filteredVendors}
+                  onPress={handleRestaurantPress}
+                  searchQuery={searchQuery}
+                  disableScroll={true}
+                />
+              ) : displayedByVendor.length > 0 ? (
+                // Default: always show vendors (deduped) when no strict filter has produced a vendor list
+                <RestaurantsList
+                  restaurants={displayedByVendor}
+                  onPress={handleRestaurantPress}
+                  searchQuery={searchQuery}
+                  disableScroll={true}
+                />
+              ) : prevNonEmptyRef.current.length > 0 &&
+                (selectedVendorType || selectedCuisine) ? (
+                <RestaurantsList
+                  restaurants={prevNonEmptyRef.current}
+                  onPress={handleRestaurantPress}
+                  searchQuery={searchQuery}
+                  disableScroll={true}
+                />
+              ) : (
+                <View style={styles(colors).noResultsContainer}>
+                  <Text style={styles(colors).noResultsText}>
+                    {selectedVendorType || selectedCuisine
+                      ? t("noResultsFor") +
+                      " " +
+                      (selectedVendorType || selectedCuisine) ||
+                      t("noMatchSelection")
+                      : t("noResultsFor") +
+                      " " +
+                      (selectedVendorType || selectedCuisine) ||
+                      t("noResultsFound")}
+                  </Text>
+                  <Text style={styles(colors).noResultsSubtext}>
+                    {selectedVendorType || selectedCuisine
+                      ? t("tryDifferentFilter")
+                      : t("tryAdjustingFilters")}
+                  </Text>
+                  {(selectedVendorType || selectedCuisine) && (
+                    <TouchableOpacity
+                      onPress={() => {
+                        setSelectedVendorType(null);
+                        setSelectedBusinessCategoryId(null);
+                        setSelectedCuisine(null);
+                        persistSelection("selectedVendorType", null);
+                        persistSelection("selectedBusinessCategoryId", null);
+                        persistSelection("selectedCuisine", null);
+                      }}
+                      style={styles(colors).clearFiltersButton}
+                    >
+                      <Text style={styles(colors).clearFiltersText}>
+                        {t("clearFilters")}
+                      </Text>
+                    </TouchableOpacity>
+                  )}
+                </View>
+              )}
+
+              <View style={{ height: 100 }} />
+            </Animated.ScrollView>
           )}
 
-          <View style={{ height: 100 }} />
-        </Animated.ScrollView>
+          {isOnline && (
+            <OfferModal
+              visible={offerModalVisible}
+              onClose={() => setOfferModalVisible(false)}
+              offer={selectedOffer}
+              onApply={(o) => console.log("Apply offer:", o)}
+            />
+          )}
+        </>
       )}
-
-      <OfferModal
-        visible={offerModalVisible}
-        onClose={() => setOfferModalVisible(false)}
-        offer={selectedOffer}
-        onApply={(o) => console.log("Apply offer:", o)}
-      />
     </View>
   );
 };

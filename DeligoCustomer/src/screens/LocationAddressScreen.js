@@ -103,6 +103,29 @@ const LocationAddressScreen = ({ navigation, route }) => {
     })();
   }, []);
 
+  // Sync with edit mode
+  useEffect(() => {
+    if (route.params?.mode === 'edit_delivery_address' && route.params?.addressToEdit) {
+      const editAddr = route.params.addressToEdit;
+      setStreetAddress(editAddr.street || editAddr.address || '');
+      setDetailedAddress(editAddr.detailedAddress || '');
+      setCity(editAddr.city || '');
+      setPostalCode(editAddr.postalCode || '');
+      setState(editAddr.state || 'Dhaka Division');
+      setCountry(editAddr.country || 'Bangladesh');
+      setLabel(editAddr.addressType === 'OFFICE' ? 'Work' : editAddr.addressType === 'OTHER' ? 'Other' : 'Home');
+      if (editAddr.latitude && editAddr.longitude) {
+        const coords = { latitude: editAddr.latitude, longitude: editAddr.longitude };
+        setMarkerCoordinate(coords);
+        setMapRegion(prev => ({
+          ...prev,
+          latitude: coords.latitude,
+          longitude: coords.longitude
+        }));
+      }
+    }
+  }, [route.params?.mode, route.params?.addressToEdit]);
+
   // Sync with context if it changes (optional, but good for init)
   useEffect(() => {
     if (contextLocation) {
@@ -257,9 +280,11 @@ const LocationAddressScreen = ({ navigation, route }) => {
         coordinates: markerCoordinate
       };
 
-      // Custom mode for adding delivery addresses directly to the list via API
-      if (route.params?.mode === 'add_delivery_address') {
+      // Custom mode for adding/editing delivery addresses directly to the list via API
+      if (route.params?.mode === 'add_delivery_address' || route.params?.mode === 'edit_delivery_address') {
         try {
+          const isEditTemplate = route.params?.mode === 'edit_delivery_address';
+
           const payload = {
             deliveryAddress: {
               street: streetAddress,
@@ -272,12 +297,19 @@ const LocationAddressScreen = ({ navigation, route }) => {
               longitude: markerCoordinate?.longitude,
               // Map friendly labels to backend enums if possible
               addressType: label === 'Work' ? 'OFFICE' : label === 'Other' ? 'OTHER' : 'HOME',
-              isActive: true
+              // retain active state if editing, force active if adding
+              isActive: isEditTemplate ? route.params.addressToEdit?.isActive : true
             }
           };
 
-          console.debug('[LocationAddressScreen] Adding delivery address:', payload);
-          const res = await AddressApi.addDeliveryAddress(payload);
+          let res;
+          if (isEditTemplate && route.params?.addressToEdit?._id) {
+            console.debug('[LocationAddressScreen] Editing delivery address:', payload);
+            res = await AddressApi.updateDeliveryAddress(route.params.addressToEdit._id, payload);
+          } else {
+            console.debug('[LocationAddressScreen] Adding delivery address:', payload);
+            res = await AddressApi.addDeliveryAddress(payload);
+          }
 
           if (res.data && res.data.success === false) {
             throw new Error(res.data.message || 'Failed');
@@ -449,7 +481,9 @@ const LocationAddressScreen = ({ navigation, route }) => {
         <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
           <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
         </TouchableOpacity>
-        <Text style={[styles.headerTitle, { color: colors.text.primary }]}>{t('addNewAddress')}</Text>
+        <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
+          {route.params?.mode === 'edit_delivery_address' ? t('editAddress') || 'Edit Address' : t('addNewAddress')}
+        </Text>
         <View style={{ width: 40 }} />
       </View>
 

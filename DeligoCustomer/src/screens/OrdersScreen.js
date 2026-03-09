@@ -196,7 +196,7 @@ const OrdersScreen = ({ navigation }) => {
                 {order.vendorName || t('groceriesAndFood') || 'Deligo Order'}
               </Text>
 
-              {/* Single row: date + order number */}
+              {/* Single row: date */}
               <View style={[styles.infoPillsRow, { marginTop: 8 }]}>
                 {/* Date */}
                 <View style={[styles.infoPill, { backgroundColor: isDarkMode ? 'rgba(255,255,255,0.06)' : '#F5F5F5' }]}>
@@ -205,25 +205,24 @@ const OrdersScreen = ({ navigation }) => {
                     {formatDate(order.createdAt)} • {formatTime(order.createdAt)}
                   </Text>
                 </View>
-
-                {/* Order number chip */}
-                {orderNum ? (
-                  <View style={[styles.infoPill, {
-                    marginLeft: 10,
-                    backgroundColor: isDarkMode ? 'rgba(220,49,115,0.18)' : 'rgba(220,49,115,0.09)',
-                  }]}>
-                    <Text style={[styles.infoPillText, { color: colors.primary, fontFamily: 'Poppins-Bold', letterSpacing: 0.3 }]}>
-                      #{orderNum}
-                    </Text>
-                  </View>
-                ) : null}
               </View>
             </View>
           </View>
 
-          {/* Price — top aligned */}
-          <View style={{ alignItems: 'flex-end', justifyContent: 'flex-start' }}>
+          {/* Price & Order Number — top/right aligned */}
+          <View style={{ alignItems: 'flex-end', justifyContent: 'flex-start', marginLeft: 8 }}>
             <Text style={[styles.orderPrice, { color: colors.primary }]}>€{finalPrice}</Text>
+            {/* Order number chip */}
+            {orderNum ? (
+              <View style={[styles.infoPill, {
+                marginTop: 6,
+                backgroundColor: isDarkMode ? 'rgba(220,49,115,0.18)' : 'rgba(220,49,115,0.09)',
+              }]}>
+                <Text style={[styles.infoPillText, { color: colors.primary, fontFamily: 'Poppins-Bold', letterSpacing: 0.3, marginLeft: 0 }]}>
+                  #{orderNum}
+                </Text>
+              </View>
+            ) : null}
           </View>
         </View>
 

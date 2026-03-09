@@ -214,12 +214,13 @@ export const NotificationProvider = ({ children }) => {
 
   /**
    * Fetches the latest notifications from the backend API.
+   * @param {boolean} force - Whether to bypass the throttle.
    * @returns {Promise<Array>} The list of notifications.
    */
-  const fetchNotifications = useCallback(async () => {
+  const fetchNotifications = useCallback(async (force = false) => {
     const now = Date.now();
     // Throttle fetches to max once every 5 seconds to prevent 429 errors
-    if (now - lastFetchRef.current < 5000) {
+    if (!force && now - lastFetchRef.current < 5000) {
       console.log('[NotificationContext] Skipping fetch, throttled');
       return [];
     }
@@ -287,7 +288,7 @@ export const NotificationProvider = ({ children }) => {
   }, []);
 
   const refreshNotifications = useCallback(async () => {
-    return await fetchNotifications();
+    return await fetchNotifications(true);
   }, [fetchNotifications]);
 
   const value = {

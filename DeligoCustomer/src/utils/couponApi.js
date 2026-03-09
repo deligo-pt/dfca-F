@@ -77,6 +77,36 @@ class CouponAPI {
     }
 
     /**
+     * Get available offers for a specific checkout
+     * @param {string} checkoutId - The checkout ID
+     */
+    static async getAvailableCheckoutOffers(checkoutId) {
+        try {
+            const url = `${BASE_API_URL}/offers/available-offers/${checkoutId}`;
+            const headers = await this.getHeaders();
+            console.debug('[CouponAPI] GET', url);
+
+            const response = await fetch(url, {
+                method: 'GET',
+                headers,
+            });
+
+            const data = await response.json();
+
+            if (!response.ok) {
+                return { success: false, error: data?.message || 'Failed to fetch checkout offers', status: response.status };
+            }
+
+            const items = data.data?.data || data.data || [];
+
+            return { success: true, data: items };
+        } catch (error) {
+            console.error('[CouponAPI] getAvailableCheckoutOffers error:', error);
+            return { success: false, error: error?.message || 'Network error' };
+        }
+    }
+
+    /**
      * Apply a coupon to the cart
      * @param {string} identifier - The ID or Code of the coupon/offer
      * @param {string} type - Application type (default: 'CART')

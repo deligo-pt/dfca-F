@@ -159,11 +159,18 @@ const OrderRatingModal = ({ visible, onClose, orderId, restaurantName, driverNam
             await customerApi.post(API_ENDPOINTS.RATINGS.CREATE, payload);
             return 'SUCCESS';
         } catch (error) {
-            const isDuplicate = error.response?.status === 400 &&
-                (
-                    (error.response?.data?.message && error.response.data.message.includes('already submitted')) ||
-                    (error.response?.data?.error?.message && error.response.data.error.message.includes('already submitted'))
-                );
+            console.log('RATING SUBMISSION ERROR:', error?.response?.data || error.message);
+
+            const errStatus = error.response?.status;
+            let isDuplicate = false;
+
+            if (errStatus === 400 || errStatus === 409) {
+                const errStr = JSON.stringify(error.response?.data || '').toLowerCase();
+                isDuplicate = errStr.includes('already') ||
+                    errStr.includes('exist') ||
+                    errStr.includes('rated');
+            }
+
             if (isDuplicate) return 'ALREADY_RATED';
             throw error;
         }

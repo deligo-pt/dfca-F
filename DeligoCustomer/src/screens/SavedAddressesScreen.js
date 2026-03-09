@@ -179,7 +179,7 @@ const SavedAddressesScreen = ({ navigation, route }) => {
         ]}
         onPress={() => onSelect ? handleSelect(address) : handleToggleStatus(address._id, address.isActive)}
         activeOpacity={0.9}
-        // disabled={isActive} // Removed to allow interaction even if active (UX clarity)
+      // disabled={isActive} // Removed to allow interaction even if active (UX clarity)
       >
         <View style={themeStyles.cardContent}>
           {/* Left Icon Section */}
@@ -212,8 +212,31 @@ const SavedAddressesScreen = ({ navigation, route }) => {
           </View>
 
           {/* Right Action Section */}
-          <View style={themeStyles.actionSection}>
-            {/* If not active and not in select mode, allow delete */}
+          <View style={[themeStyles.actionSection, { flexDirection: 'row', alignItems: 'center', gap: 6 }]}>
+            {/* Edit Button - Always show */}
+            <TouchableOpacity
+              style={themeStyles.editButton}
+              onPress={(e) => {
+                e.stopPropagation();
+                navigation.navigate('LocationAddress', {
+                  mode: 'edit_delivery_address',
+                  addressToEdit: address,
+                  onSave: () => fetchUserProfile()
+                });
+              }}
+              hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
+            >
+              <Ionicons name="pencil-outline" size={20} color={colors.primary} />
+            </TouchableOpacity>
+
+            {/* Selection Radio Circle (if in selection mode) */}
+            {onSelect && (
+              <View style={[themeStyles.radioCircle, isSelected && themeStyles.radioCircleSelected]}>
+                {isSelected && <View style={themeStyles.radioInner} />}
+              </View>
+            )}
+
+            {/* If not active and NOT in select mode allow delete */}
             {!isActive && !onSelect && (
               <TouchableOpacity
                 style={themeStyles.deleteButton}
@@ -222,13 +245,6 @@ const SavedAddressesScreen = ({ navigation, route }) => {
               >
                 <Ionicons name="trash-outline" size={20} color={colors.error} />
               </TouchableOpacity>
-            )}
-
-            {/* Selection Radio Circle (if in selection mode) */}
-            {onSelect && (
-              <View style={[themeStyles.radioCircle, isSelected && themeStyles.radioCircleSelected]}>
-                {isSelected && <View style={themeStyles.radioInner} />}
-              </View>
             )}
           </View>
         </View>
@@ -466,6 +482,9 @@ const styles = (colors) => StyleSheet.create({
   actionSection: {
     marginLeft: 12,
     justifyContent: 'center',
+  },
+  editButton: {
+    padding: 8,
   },
   deleteButton: {
     padding: 8,

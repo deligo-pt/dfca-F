@@ -40,6 +40,7 @@ const { height } = Dimensions.get('window');
 
 import { customerApi } from '../utils/api';
 import OrderRatingModal from '../components/OrderRatingModal';
+import StorageService from '../utils/storage';
 
 // Google Maps API Key for ETA calculations
 const GOOGLE_MAPS_API_KEY = 'AIzaSyCZ1jixNYbSRM21Uq82a6KXNO_FSpLUwaQ';
@@ -68,11 +69,24 @@ const TrackOrderScreen = ({ route, navigation }) => {
   const { colors, isDarkMode } = useTheme();
   const insets = useSafeAreaInsets();
 
-  const { order: paramOrder, orderId: paramOrderId } = route.params || {};
+  const { order: paramOrder, orderId: paramOrderId, notificationData } = route.params || {};
   const [fetchedOrder, setFetchedOrder] = useState(null);
   const [loading, setLoading] = useState(!paramOrder && !!paramOrderId);
 
-  const order = fetchedOrder || paramOrder;
+  // Initialize order with notification data if available to show SOMETHING immediately
+  const [initialOrder, setInitialOrder] = useState(() => {
+    if (paramOrder) return paramOrder;
+    if (notificationData?.data) {
+      return {
+        _id: paramOrderId || notificationData.data.orderId,
+        orderStatus: notificationData.data.status || notificationData.data.orderStatus,
+        ...notificationData.data
+      };
+    }
+    return null;
+  });
+
+  const order = fetchedOrder || initialOrder;
   const orderId = order?._id || paramOrderId;
 
   // Map API status to internal stage
@@ -103,6 +117,13 @@ const TrackOrderScreen = ({ route, navigation }) => {
 
   const initialStatus = order?.orderStatus ? mapOrderStatusToStage(order.orderStatus) : 'pending';
   const [currentStatus, setCurrentStatus] = useState(initialStatus);
+
+  // Sync currentStatus if order changes (e.g., after fetch or from notificationData)
+  useEffect(() => {
+    if (order?.orderStatus) {
+      setCurrentStatus(mapOrderStatusToStage(order.orderStatus));
+    }
+  }, [order?.orderStatus]);
   const [progressAnim] = useState(new Animated.Value(0));
   const inlineMapRef = useRef(null);
   const fullscreenMapRef = useRef(null);
@@ -118,6 +139,8 @@ const TrackOrderScreen = ({ route, navigation }) => {
   const [fullscreenMapLayout, setFullscreenMapLayout] = useState(false);
   const [isMapFullscreen, setIsMapFullscreen] = useState(false);
   const [showRatingModal, setShowRatingModal] = useState(false);
+  const [hasShownRatingModal, setHasShownRatingModal] = useState(false);
+  const [localRatedStatus, setLocalRatedStatus] = useState(false);
   const [driverEta, setDriverEta] = useState(null);
   const [callModalVisible, setCallModalVisible] = useState(false);
   const [messageModalVisible, setMessageModalVisible] = useState(false);
@@ -238,14 +261,28 @@ const TrackOrderScreen = ({ route, navigation }) => {
 
   // Trigger rating automatically when order is delivered
   useEffect(() => {
-    if (currentStatus === 'delivered') {
+    if (currentStatus === 'delivered' && !hasShownRatingModal && !order?.isRated && !localRatedStatus) {
       // Small delay to ensure user sees the "Delivered" status update first
       const timer = setTimeout(() => {
         setShowRatingModal(true);
+        setHasShownRatingModal(true);
       }, 2000);
       return () => clearTimeout(timer);
     }
-  }, [currentStatus]);
+  }, [currentStatus, order?.isRated, hasShownRatingModal, localRatedStatus]);
+
+  // Check local rating status to prevent repeated popups
+  useEffect(() => {
+    const checkLocalStatus = async () => {
+      if (orderId) {
+        const isRatedLocally = await StorageService.getItem(`rating_completed_${orderId}`);
+        if (isRatedLocally) {
+          setLocalRatedStatus(true);
+        }
+      }
+    };
+    checkLocalStatus();
+  }, [orderId]);
 
   // Skeleton Animation
   const skeletonOpacity = useRef(new Animated.Value(0.3)).current;
@@ -326,8 +363,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
     fetchOrderDetails();
 
     return () => { isActive = false; };
-    return () => { isActive = false; };
-  }, [order?._id, order?.vendorId, order?.items]);
+  }, [paramOrderId, paramOrder]);
 
   // Smart Polling Mechanism (Hybrid Approach)
   useEffect(() => {
@@ -564,6 +600,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
       orderStatus: data.orderStatus || '',
       promoCode: data.couponId?.code || '',
       isOtpVerified: data.isOtpVerified || false,
+      isRated: data.isRated || false,
     };
   };
 
@@ -1807,7 +1844,7 @@ const TrackOrderScreen = ({ route, navigation }) => {
                   <View style={{ backgroundColor: isDarkMode ? 'rgba(220,49,115,0.15)' : 'rgba(220,49,115,0.08)', width: 24, height: 24, borderRadius: 6, alignItems: 'center', justifyContent: 'center', marginRight: 8 }}>
                     <Text style={{ fontSize: 12, fontFamily: 'Poppins-Bold', color: colors.primary }}>{item.quantity || 1}x</Text>
                   </View>
-                  <Text style={{ fontSize: 14, fontFamily: 'Poppins-Medium', color: colors.text.primary }} numberOfLines={2}>{item.name || item}</Text>
+                  <Text style={{ flex: 1, fontSize: 14, fontFamily: 'Poppins-Medium', color: colors.text.primary }} numberOfLines={2}>{item.name || item}</Text>
                 </View>
                 <Text style={{ fontSize: 14, fontFamily: 'Poppins-SemiBold', color: colors.text.primary }}>€{item.subtotal ? item.subtotal.toFixed(2) : '0.00'}</Text>
               </View>
@@ -3106,8 +3143,8 @@ const TrackOrderScreen = ({ route, navigation }) => {
           </TouchableOpacity>
         </View>
 
-        {/* Rate Order Button (Visible only when Delivered) */}
-        {currentStatus === 'delivered' && (
+        {/* Rate Order Button (Visible only when Delivered and NOT rated) */}
+        {currentStatus === 'delivered' && !orderData.isRated && !localRatedStatus && (
           <View style={{ paddingHorizontal: spacing.md, marginTop: spacing.sm }}>
             <TouchableOpacity
               style={[styles.supportButton, { backgroundColor: colors.secondary, marginTop: 0 }]} // Using secondary color or gold for rating
@@ -3179,8 +3216,10 @@ const TrackOrderScreen = ({ route, navigation }) => {
             : (currentStatus === 'delivered' ? (t('deliveryRider') || 'Delivery Partner') : null)
         }
         onRatingSuccess={() => {
-          // Optionally navigate away or refresh
-          // navigation.goBack();
+          // Store rating status locally so it doesn't pop up again
+          StorageService.setItem(`rating_completed_${orderData.id}`, true);
+          setLocalRatedStatus(true);
+          setHasShownRatingModal(true);
         }}
       />
     </SafeAreaView>

@@ -15,7 +15,6 @@ import {
   StatusBar,
   TextInput,
   ActivityIndicator,
-  Alert,
   Modal
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
@@ -24,10 +23,11 @@ import { spacing, colors } from '../theme';
 import { useLanguage } from '../utils/LanguageContext';
 import formatCurrency from '../utils/currency';
 import CouponAPI from '../utils/couponApi';
+import AlertModal from '../components/AlertModal';
 
 const VouchersScreen = ({ navigation, route }) => {
   const { t } = useLanguage();
-  const { selectionMode, vendorId, onSelect, currentTotal } = route.params || {};
+  const { selectionMode, vendorId, checkoutId, onSelect, currentTotal } = route.params || {};
 
   const [activeTab, setActiveTab] = useState('available');
   const [coupons, setCoupons] = useState([]);
@@ -35,6 +35,11 @@ const VouchersScreen = ({ navigation, route }) => {
   const [manualCode, setManualCode] = useState('');
   const [verifying, setVerifying] = useState(false);
   const [selectedVoucher, setSelectedVoucher] = useState(null);
+  const [alertConfig, setAlertConfig] = useState({ visible: false, title: '', message: '', type: 'success' });
+
+  const showAlert = (title, message, type = 'success') => {
+    setAlertConfig({ visible: true, title, message, type });
+  };
 
   useEffect(() => {
     fetchCoupons();
@@ -43,7 +48,13 @@ const VouchersScreen = ({ navigation, route }) => {
   const fetchCoupons = async () => {
     setLoading(true);
     // Retrieve coupons from backend
-    const res = await CouponAPI.getCoupons(vendorId);
+    let res;
+    if (checkoutId) {
+      res = await CouponAPI.getAvailableCheckoutOffers(checkoutId);
+    } else {
+      res = await CouponAPI.getCoupons(vendorId);
+    }
+
     if (res.success && Array.isArray(res.data)) {
       setCoupons(res.data);
     } else {
@@ -55,6 +66,10 @@ const VouchersScreen = ({ navigation, route }) => {
 
   const handleApply = async (coupon) => {
     if (selectionMode && onSelect) {
+      if (checkoutId && coupon.isEligible === false) {
+        showAlert(t('offerNotApplicable') || 'Not Applicable', coupon.message || t('offerRequirementsNotMet') || 'Requirements for this offer are not met.', 'error');
+        return;
+      }
       onSelect(coupon);
       navigation.goBack();
       return;
@@ -79,7 +94,7 @@ const VouchersScreen = ({ navigation, route }) => {
         navigation.goBack();
       } else {
         // Notify availability
-        Alert.alert(t('success'), t('couponAvailable'));
+        showAlert(t('success'), t('couponAvailable'), 'success');
       }
       return;
     }
@@ -94,10 +109,10 @@ const VouchersScreen = ({ navigation, route }) => {
         onSelect(null, res.data);
         navigation.goBack();
       } else {
-        Alert.alert(t('success'), t('couponApplied'));
+        showAlert(t('success'), t('couponApplied'), 'success');
       }
     } else {
-      Alert.alert(t('error'), res.error || t('invalidPromoCode'));
+      showAlert(t('error'), res.error || t('invalidPromoCode'), 'error');
     }
   };
 
@@ -131,14 +146,29 @@ const VouchersScreen = ({ navigation, route }) => {
               {voucher.expiryDate ? new Date(voucher.expiryDate).toLocaleDateString() : ''}
             </Text>
           </View>
+
+          {checkoutId && voucher.message ? (
+            <Text style={{ fontSize: 11, color: voucher.isEligible ? '#2E7D32' : colors.primary, fontFamily: 'Poppins-Medium', marginTop: 8 }}>
+              {voucher.message.replace(/(\d+(?:\.\d+)?)\s*(?:TK|€)/i, (match, amount) => {
+                return formatCurrency('EUR', amount);
+              })}
+            </Text>
+          ) : null}
         </View>
 
         {!isExpired && (
           <TouchableOpacity
-            style={styles.applyButton}
+            style={[
+              styles.applyButton,
+              checkoutId && voucher.isEligible === false && { opacity: 0.5, backgroundColor: '#f0f0f0' }
+            ]}
             onPress={() => handleApply(voucher)}
+            disabled={checkoutId && voucher.isEligible === false}
           >
-            <Text style={styles.applyButtonText}>
+            <Text style={[
+              styles.applyButtonText,
+              checkoutId && voucher.isEligible === false && { color: colors.text.light }
+            ]}>
               {selectionMode ? t('apply') : t('view')}
             </Text>
           </TouchableOpacity>
@@ -286,6 +316,15 @@ const VouchersScreen = ({ navigation, route }) => {
           </View>
         </View>
       </Modal>
+
+      <AlertModal
+        visible={alertConfig.visible}
+        title={alertConfig.title}
+        message={alertConfig.message}
+        icon={alertConfig.type === 'success' ? 'checkmark-circle' : 'alert-circle'}
+        iconColor={alertConfig.type === 'success' ? '#2E7D32' : colors.primary}
+        onClose={() => setAlertConfig({ ...alertConfig, visible: false })}
+      />
     </SafeAreaView>
   );
 };
