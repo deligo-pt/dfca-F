@@ -74,8 +74,6 @@ const LocationDetails = ({
       paddingVertical: 20,
       paddingHorizontal: 20,
       backgroundColor: colors.surface,
-      borderBottomWidth: 1,
-      borderBottomColor: colors.border,
     },
     professionalTitle: {
       fontSize: 24,
@@ -819,8 +817,8 @@ const LocationDetails = ({
               },
               textInputContainer: {
                 backgroundColor: colors.surface,
-                borderWidth: 1,
-                borderColor: colors.border,
+                borderWidth: 0,
+                borderColor: 'transparent',
                 borderRadius: 12,
                 paddingHorizontal: 8,
               },
@@ -829,6 +827,8 @@ const LocationDetails = ({
                 color: colors.text.primary,
                 fontSize: 16,
                 backgroundColor: 'transparent',
+                underlineColorAndroid: 'transparent',
+                borderWidth: 0,
               },
               predefinedPlacesDescription: {
                 color: '#1faadb',

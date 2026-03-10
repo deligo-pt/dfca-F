@@ -84,51 +84,8 @@ const CategoriesScreen = ({ navigation }) => {
   const [staticCuisines, setStaticCuisines] = useState([]);
   const [sessionLoaded, setSessionLoaded] = useState(false);
 
-  // Glovo-style static subcategories for each vendor type
-  const RESTAURANT_CATEGORIES = [
-    { id: "pizza", name: t("pizza"), icon: "🍕" },
-    { id: "burger", name: t("burger"), icon: "🍔" },
-    { id: "chinese", name: t("chinese"), icon: "🥡" },
-    { id: "indian", name: t("indian"), icon: "🍛" },
-    { id: "healthy", name: t("healthy"), icon: "🥗" },
-    { id: "desserts", name: t("dessert"), icon: "🍰" },
-    { id: "coffee", name: t("coffee"), icon: "☕" },
-  ];
-
-  const STORE_CATEGORIES = [
-    { id: "dairy", name: t("dairy"), icon: "🥛" },
-    { id: "fruits", name: t("fruits"), icon: "🍎" },
-    { id: "snacks", name: t("snacks"), icon: "🍪" },
-    { id: "beverages", name: t("beverages"), icon: "🥤" },
-    { id: "frozen", name: t("frozen"), icon: "🧊" },
-    { id: "household", name: t("household"), icon: "🧹" },
-    { id: "pharmacy", name: t("pharmacy"), icon: "💊" },
-  ];
-
-  // Dynamic categories based on selected vendor type
-  const dynamicCategories = React.useMemo(() => {
-    const vendorName = (selectedVendorType || "").toLowerCase();
-    // Check includes with lowercased selected type (e.g. 'restaurant')
-    if (
-      vendorName.includes("resturent") ||
-      vendorName.includes("restaurant") ||
-      vendorName.includes("food")
-    ) {
-      return RESTAURANT_CATEGORIES;
-    }
-    if (
-      vendorName.includes("store") ||
-      vendorName.includes("grocery") ||
-      vendorName.includes("shop")
-    ) {
-      return STORE_CATEGORIES;
-    }
-    // If no vendor selected, show combined or empty
-    return [
-      ...RESTAURANT_CATEGORIES.slice(0, 3),
-      ...STORE_CATEGORIES.slice(0, 3),
-    ];
-  }, [selectedVendorType]);
+  // Dynamic categories based on selected vendor type - Removed hardcoded fallbacks as per user request
+  const dynamicCategories = [];
 
   // Modal state for offer details
   const [offerModalVisible, setOfferModalVisible] = useState(false);
@@ -1093,10 +1050,10 @@ const CategoriesScreen = ({ navigation }) => {
               <Text style={styles(colors).errorIcon}>🚫</Text>
             </View>
             <Text style={styles(colors).errorTitle}>
-              {t("no_internet", { defaultValue: "No Internet Connection" })}
+              {t("no_internet", "No Internet Connection")}
             </Text>
             <Text style={styles(colors).errorSubtext}>
-              {t("no_internet_msg", { defaultValue: "Please check your network settings and try again." })}
+              {t("no_internet_msg", "Please check your network settings and try again.")}
             </Text>
 
             <TouchableOpacity
@@ -1105,7 +1062,7 @@ const CategoriesScreen = ({ navigation }) => {
               activeOpacity={0.8}
             >
               <Text style={styles(colors).retryButtonText}>
-                {t("retry_again")}
+                {t("retry_again", "Retry Again")}
               </Text>
             </TouchableOpacity>
           </View>
@@ -1135,10 +1092,10 @@ const CategoriesScreen = ({ navigation }) => {
                   <Text style={styles(colors).errorIcon}>📡</Text>
                 </View>
                 <Text style={styles(colors).errorTitle}>
-                  {t("network_error_title")}
+                  {t("network_error_title", "Connection Error")}
                 </Text>
                 <Text style={styles(colors).errorSubtext}>
-                  {t("network_error_msg")}
+                  {t("network_error_msg", "Check your internet connection and try again.")}
                 </Text>
                 {productsError && (
                   <Text style={styles(colors).errorDebug}>
@@ -1152,7 +1109,7 @@ const CategoriesScreen = ({ navigation }) => {
                   activeOpacity={0.8}
                 >
                   <Text style={styles(colors).retryButtonText}>
-                    {t("retry_again")}
+                    {t("retry_again", "Retry Again")}
                   </Text>
                 </TouchableOpacity>
 
@@ -1215,9 +1172,7 @@ const CategoriesScreen = ({ navigation }) => {
               {/* Categories Section - filtered by selected Business Category */}
               <SectionHeader
                 title={
-                  t("what_on_your_mind", {
-                    defaultValue: "What's on your mind?",
-                  }) || "What's on your mind?"
+                  t("what_on_your_mind", "What's on your mind?")
                 }
                 showSeeAll={false}
               />
@@ -1231,18 +1186,19 @@ const CategoriesScreen = ({ navigation }) => {
                   </Text>
                 </View>
               ) : (
-                <Category
-                  cuisines={
-                    selectedBusinessCategoryId
-                      ? productCategoriesForBusiness
-                      : apiProductCategories.length > 0
-                        ? apiProductCategories
-                        : dynamicCategories
-                  }
-                  selectedCuisine={selectedCuisine}
-                  onPress={handleCuisinePress}
-                />
+              <Category
+                cuisines={
+                  selectedBusinessCategoryId
+                    ? productCategoriesForBusiness
+                    : apiProductCategories.length > 0
+                      ? apiProductCategories
+                      : dynamicCategories
+                }
+                selectedCuisine={selectedCuisine}
+                onPress={handleCuisinePress}
+              />
               )}
+
 
               {/* Results Section */}
               <SectionHeader
@@ -1371,14 +1327,8 @@ const CategoriesScreen = ({ navigation }) => {
                 <View style={styles(colors).noResultsContainer}>
                   <Text style={styles(colors).noResultsText}>
                     {selectedVendorType || selectedCuisine
-                      ? t("noResultsFor") +
-                      " " +
-                      (selectedVendorType || selectedCuisine) ||
-                      t("noMatchSelection")
-                      : t("noResultsFor") +
-                      " " +
-                      (selectedVendorType || selectedCuisine) ||
-                      t("noResultsFound")}
+                      ? `${t("noResultsFor") || "No results for"} ${selectedVendorType || selectedCuisine}`
+                      : t("noProductsAvailable") || "No stores or restaurants available right now"}
                   </Text>
                   <Text style={styles(colors).noResultsSubtext}>
                     {selectedVendorType || selectedCuisine

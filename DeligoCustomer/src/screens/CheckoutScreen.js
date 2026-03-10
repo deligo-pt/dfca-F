@@ -930,6 +930,39 @@ const CheckoutScreen = ({ route, navigation }) => {
     // We just wait for the user to click "Place Order".
   }, [checkoutResponse, total]);
 
+  const handleRemoveVoucher = async () => {
+    const checkoutSummaryId = extractCheckoutSummaryId(checkoutResponse);
+    if (!checkoutSummaryId) {
+      console.warn('[CheckoutScreen] Cannot remove voucher: no checkout ID');
+      return;
+    }
+
+    try {
+      setIsProcessing(true);
+      const res = await CheckoutAPI.unapplyOffer(checkoutSummaryId);
+
+      if (res.success) {
+        console.debug('[CheckoutScreen] Offer removed successfully');
+        setAppliedPromo(null);
+        // Refresh checkout data if returned
+        if (res.data && res.data.data) {
+          setCheckoutResponse(res.data.data);
+        } else if (res.data) {
+          setCheckoutResponse(res.data);
+        }
+        setStripeError(null);
+      } else {
+        console.warn('[CheckoutScreen] Offer removal failed:', res.error);
+        setStripeError(res.error || 'Failed to remove voucher');
+      }
+    } catch (err) {
+      console.error('[CheckoutScreen] Offer removal error:', err);
+      setStripeError(t('failedToRemoveVoucher') || 'Failed to remove voucher');
+    } finally {
+      setIsProcessing(false);
+    }
+  };
+
   const handlePlaceOrder = async () => {
     const checkoutSummaryId = extractCheckoutSummaryId(checkoutResponse);
 
@@ -1258,7 +1291,7 @@ const CheckoutScreen = ({ route, navigation }) => {
               adjustsFontSizeToFit
               minimumFontScale={0.8}
             >
-              {cartItems.length} {cartItems.length === 1 ? t('item') : t('items')} • {t('estimated')} {cartData?.estimatedDeliveryTime || formatMinutesToUX("25-35 min")}
+              {cartItems.length} {cartItems.length === 1 ? t('item') : t('items')} • {t('estimated')} {formatMinutesToUX(cartData?.estimatedDeliveryTime) || formatMinutesToUX("25-35 min")}
             </Text>
           </View>
           <View style={styles(colors).headerRight} />
@@ -1410,80 +1443,116 @@ const CheckoutScreen = ({ route, navigation }) => {
 
         {/* Voucher / Promo Code */}
         <View style={styles(colors).section}>
-          <TouchableOpacity
-            style={styles(colors).voucherButton}
-            onPress={() => {
-              const checkoutSummaryId = extractCheckoutSummaryId(checkoutResponse);
-              navigation.navigate('Vouchers', {
-                selectionMode: true,
-                vendorId: vendorId,
-                checkoutId: checkoutSummaryId,
-                currentTotal: displayTotal,
-                onSelect: async (coupon, manualResult) => {
-                  // Handle both list selection (coupon) and manual verification result (manualResult)
-                  const selectedOffer = coupon || manualResult;
+          <View style={styles(colors).voucherButton}>
+            <TouchableOpacity
+              activeOpacity={0.7}
+              style={styles(colors).voucherLeft}
+              onPress={() => {
+                const checkoutSummaryId = extractCheckoutSummaryId(checkoutResponse);
+                navigation.navigate('Vouchers', {
+                  selectionMode: true,
+                  vendorId: vendorId,
+                  checkoutId: checkoutSummaryId,
+                  currentTotal: displayTotal,
+                  onSelect: async (coupon, manualResult) => {
+                    // Handle both list selection (coupon) and manual verification result (manualResult)
+                    const selectedOffer = coupon || manualResult;
 
-                  if (selectedOffer && selectedOffer.code) {
-                    console.debug('[CheckoutScreen] Voucher selected:', selectedOffer.code, 'AutoApply:', selectedOffer.autoApply);
+                    if (selectedOffer && selectedOffer.code) {
+                      console.debug('[CheckoutScreen] Voucher selected:', selectedOffer.code, 'AutoApply:', selectedOffer.autoApply);
 
-                    // Extract Checkout ID
-                    const checkoutSummaryId = extractCheckoutSummaryId(checkoutResponse);
-                    if (!checkoutSummaryId) {
-                      setStripeError(t('checkoutNotReady') === 'checkoutNotReady' ? 'Checkout session not ready. Please wait.' : t('checkoutNotReady'));
-                      return;
-                    }
-
-                    // User Request Fix: Always valid to send ID if we have it?
-                    // Previous rule was confusing. Now prioritizing ID if available, else Code.
-                    // For "test20" (AutoApply=false), user explicitly wanted ID.
-                    let offerIdentifier = selectedOffer.id || selectedOffer._id || selectedOffer.code;
-
-                    // Validate via API
-                    try {
-                      setIsProcessing(true);
-                      const res = await CheckoutAPI.validateApplyOffer({
-                        checkoutId: checkoutSummaryId,
-                        offerIdentifier: offerIdentifier
-                      });
-
-                      if (res.success) {
-                        console.debug('[CheckoutScreen] Offer validation FULL response:', JSON.stringify(res, null, 2));
-                        setAppliedPromo(selectedOffer);
-                        // Refresh checkout data if returned
-                        if (res.data && res.data.data) {
-                          setCheckoutResponse(res.data.data);
-                        }
-                        setStripeError(null);
-                      } else {
-                        console.warn('[CheckoutScreen] Offer validation failed:', res.error);
-                        setStripeError(res.error || 'Failed to apply voucher');
-                        setAppliedPromo(null);
+                      // Extract Checkout ID
+                      const checkoutSummaryId = extractCheckoutSummaryId(checkoutResponse);
+                      if (!checkoutSummaryId) {
+                        setStripeError(t('checkoutNotReady') === 'checkoutNotReady' ? 'Checkout session not ready. Please wait.' : t('checkoutNotReady'));
+                        return;
                       }
-                    } catch (err) {
-                      console.error('[CheckoutScreen] Offer validation error:', err);
-                      setStripeError(t('failedToValidateVoucher') || 'Failed to validate voucher');
-                      setAppliedPromo(null);
-                    } finally {
-                      setIsProcessing(false);
+
+                      // User Request Fix: Prefer sending the CODE string if available.
+                      // Some vouchers (like "SUMMER2") require the actual code string to be validated,
+                      // even if they can be found by ID.
+                      let offerIdentifier = selectedOffer.code || selectedOffer.id || selectedOffer._id;
+
+                      // Validate via API
+                      try {
+                        setIsProcessing(true);
+                        const res = await CheckoutAPI.validateApplyOffer({
+                          checkoutId: checkoutSummaryId,
+                          offerIdentifier: offerIdentifier
+                        });
+
+                        if (res.success) {
+                          console.debug('[CheckoutScreen] Offer validation FULL response:', JSON.stringify(res, null, 2));
+                          setAppliedPromo(selectedOffer);
+                          // Refresh checkout data if returned
+                          if (res.data && res.data.data) {
+                            setCheckoutResponse(res.data.data);
+                          }
+                          setStripeError(null);
+                        } else {
+                          console.warn('[CheckoutScreen] Offer validation failed:', res.error);
+                          setStripeError(res.error || 'Failed to apply voucher');
+                          setAppliedPromo(null);
+                        }
+                      } catch (err) {
+                        console.error('[CheckoutScreen] Offer validation error:', err);
+                        setStripeError(t('failedToValidateVoucher') || 'Failed to validate voucher');
+                        setAppliedPromo(null);
+                      } finally {
+                        setIsProcessing(false);
+                      }
+                    } else {
+                      console.warn('[CheckoutScreen] Invalid voucher selection:', selectedOffer);
+                      setStripeError('Invalid voucher selected');
                     }
-                  } else {
-                    console.warn('[CheckoutScreen] Invalid voucher selection:', selectedOffer);
-                    setStripeError('Invalid voucher selected');
                   }
-                }
-              })
-            }}
-          >
-            <View style={styles(colors).voucherLeft}>
+                })
+              }}
+            >
               <View style={styles(colors).voucherIconBadge}>
                 <Ionicons name="pricetag" size={20} color={colors.primary} />
               </View>
               <Text style={styles(colors).voucherButtonText}>
-                {checkoutResponse?.data?.discount > 0 ? t('voucherApplied') : t('applyVoucher')}
+                {checkoutResponse?.orderCalculation?.totalOfferDiscount > 0 || checkoutResponse?.offerDiscount > 0
+                  ? t('voucherApplied')
+                  : t('applyVoucher')}
               </Text>
+            </TouchableOpacity>
+
+            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+              {(checkoutResponse?.orderCalculation?.totalOfferDiscount > 0 || checkoutResponse?.offerDiscount > 0) && (
+                <TouchableOpacity
+                  activeOpacity={0.6}
+                  onPress={handleRemoveVoucher}
+                  style={{
+                    backgroundColor: colors.background === '#FFFFFF' ? '#FEE2E2' : 'rgba(239, 68, 68, 0.15)',
+                    paddingHorizontal: 12,
+                    paddingVertical: 6,
+                    borderRadius: 8,
+                    marginRight: 10
+                  }}
+                >
+                  <Text style={{ fontSize: 12, color: '#EF4444', fontFamily: 'Poppins-Bold' }}>
+                    {t('remove') || 'Remove'}
+                  </Text>
+                </TouchableOpacity>
+              )}
+              <TouchableOpacity
+                onPress={() => {
+                  const checkoutSummaryId = extractCheckoutSummaryId(checkoutResponse);
+                  navigation.navigate('Vouchers', {
+                    selectionMode: true,
+                    vendorId: vendorId,
+                    checkoutId: checkoutSummaryId,
+                    currentTotal: displayTotal,
+                    onSelect: async (coupon) => { /* reuse logic above if needed or just go back */ }
+                  });
+                }}
+              >
+                <Ionicons name="chevron-forward" size={20} color={colors.text.secondary} />
+              </TouchableOpacity>
             </View>
-            <Ionicons name="chevron-forward" size={20} color={colors.text.secondary} />
-          </TouchableOpacity>
+          </View>
         </View>
 
         {/* Payment Methods */}
@@ -1644,7 +1713,23 @@ const CheckoutScreen = ({ route, navigation }) => {
             {/* 8. Voucher Applied (If any) */}
             {(checkoutResponse?.orderCalculation?.totalOfferDiscount > 0 || checkoutResponse?.offerDiscount > 0) && (
               <View style={[styles(colors).summaryRow, { marginTop: 8 }]}>
-                <Text style={[styles(colors).summaryLabel, { color: '#059669' }]}>{t('voucherApplied') || 'Voucher Applied'}</Text>
+                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
+                  <Text style={[styles(colors).summaryLabel, { color: '#059669' }]}>{t('voucherApplied') || 'Voucher Applied'}</Text>
+                  <TouchableOpacity
+                    onPress={handleRemoveVoucher}
+                    style={{
+                      marginLeft: 8,
+                      backgroundColor: 'rgba(5, 150, 105, 0.1)',
+                      paddingHorizontal: 8,
+                      paddingVertical: 2,
+                      borderRadius: 6
+                    }}
+                  >
+                    <Text style={{ fontSize: 11, color: '#059669', fontFamily: 'Poppins-Bold' }}>
+                      {t('remove') || 'Remove'}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
                 <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 13, color: '#059669' }}>
                   -{formatCurrency(currency, checkoutResponse?.orderCalculation?.totalOfferDiscount || checkoutResponse?.offerDiscount || 0)}
                 </Text>
@@ -1664,61 +1749,89 @@ const CheckoutScreen = ({ route, navigation }) => {
         {
           !!stripeError && (
             <View style={{
-              backgroundColor: '#FEF2F2',
-              borderRadius: 16,
+              backgroundColor: isDarkMode ? 'rgba(254, 242, 242, 0.05)' : '#FEF2F2',
+              borderRadius: 24,
               marginHorizontal: spacing.lg,
-              marginBottom: 20,
+              marginBottom: 24,
               borderWidth: 1,
-              borderColor: '#FECACA',
-              overflow: 'hidden'
+              borderColor: isDarkMode ? 'rgba(252, 202, 202, 0.2)' : '#FECACA',
+              overflow: 'hidden',
+              elevation: 4,
+              shadowColor: '#EF4444',
+              shadowOffset: { width: 0, height: 4 },
+              shadowOpacity: 0.1,
+              shadowRadius: 10,
             }}>
-              <View style={{ flexDirection: 'row', padding: 16 }}>
+              <View style={{ flexDirection: 'row', padding: 20 }}>
                 <View style={{
-                  width: 40,
-                  height: 40,
-                  borderRadius: 20,
+                  width: 48,
+                  height: 48,
+                  borderRadius: 24,
                   backgroundColor: '#FEE2E2',
                   alignItems: 'center',
                   justifyContent: 'center',
-                  marginRight: 12
+                  marginRight: 16
                 }}>
-                  <MaterialCommunityIcons name="alert-circle-outline" size={24} color="#EF4444" />
+                  <MaterialCommunityIcons 
+                    name={(String(stripeError).toLowerCase().includes('offer') || String(stripeError).toLowerCase().includes('promo') || String(stripeError).toLowerCase().includes('voucher')) ? 'ticket-percent-outline' : 'alert-circle-outline'} 
+                    size={28} 
+                    color="#EF4444" 
+                  />
                 </View>
 
                 <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 16, fontFamily: 'Poppins-Bold', color: '#B91C1C', marginBottom: 4 }}>
-                    {t('paymentFailed') === 'paymentFailed' ? 'Payment Failed' : t('paymentFailed')}
+                  <Text style={{ fontSize: 17, fontFamily: 'Poppins-Bold', color: '#B91C1C', marginBottom: 4 }}>
+                    {(String(stripeError).toLowerCase().includes('offer') || String(stripeError).toLowerCase().includes('promo') || String(stripeError).toLowerCase().includes('voucher')) 
+                      ? (t('voucherError') || 'Promotion Error')
+                      : (t('paymentFailed') === 'paymentFailed' ? 'Payment Failed' : t('paymentFailed'))
+                    }
                   </Text>
-                  <Text style={{ fontSize: 14, fontFamily: 'Poppins-Regular', color: '#7F1D1D', marginBottom: 8, lineHeight: 20 }}>
+                  <Text style={{ fontSize: 14, fontFamily: 'Poppins-Medium', color: isDarkMode ? '#FCA5A5' : '#7F1D1D', marginBottom: 16, lineHeight: 22 }}>
                     {typeof stripeError === 'string' ? stripeError : t('error')}
-                  </Text>
-
-                  {/* User requested specific text: "please abar payment korar try korun" -> "Please try paying again" */}
-                  <Text style={{ fontSize: 13, fontFamily: 'Poppins-Medium', color: '#991B1B', marginBottom: 12 }}>
-                    {t('pleaseTryPayingAgain') || 'Please try paying again.'}
                   </Text>
 
                   <View style={{ flexDirection: 'row', gap: 12 }}>
                     {profileIncomplete ? (
                       <TouchableOpacity
                         onPress={() => navigation.navigate('EditProfile')}
-                        style={{ backgroundColor: '#DC2626', paddingVertical: 10, paddingHorizontal: 20, borderRadius: 10, alignItems: 'center' }}
+                        style={{ backgroundColor: '#DC2626', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 14, alignItems: 'center', elevation: 2 }}
                       >
-                        <Text style={{ color: '#fff', fontFamily: 'Poppins-Bold', fontSize: 13 }}>{t('completeProfile') || 'Complete Profile'}</Text>
+                        <Text style={{ color: '#fff', fontFamily: 'Poppins-Bold', fontSize: 14 }}>{t('completeProfile') || 'Complete Profile'}</Text>
                       </TouchableOpacity>
                     ) : (
                       <>
                         <TouchableOpacity
+                          activeOpacity={0.7}
+                          onPress={() => {
+                            setStripeError(null);
+                            if (!String(stripeError).toLowerCase().includes('offer')) {
+                                // Only go back for critical errors, or stay for voucher issues
+                                // navigation.goBack();
+                            }
+                          }}
+                          style={{
+                            paddingVertical: 10,
+                            paddingHorizontal: 20,
+                            borderRadius: 12,
+                            borderWidth: 1.5,
+                            borderColor: '#DC2626',
+                            backgroundColor: 'rgba(220, 38, 38, 0.05)'
+                          }}
+                        >
+                          <Text style={{ color: '#DC2626', fontFamily: 'Poppins-Bold', fontSize: 13 }}>{t('dismiss') || 'Dismiss'}</Text>
+                        </TouchableOpacity>
+                        
+                        <TouchableOpacity
+                          activeOpacity={0.7}
                           onPress={() => navigation.goBack()}
                           style={{
                             paddingVertical: 10,
-                            paddingHorizontal: 16,
-                            borderRadius: 10,
-                            borderWidth: 1,
-                            borderColor: '#DC2626'
+                            paddingHorizontal: 20,
+                            borderRadius: 12,
+                            backgroundColor: '#DC2626',
                           }}
                         >
-                          <Text style={{ color: '#DC2626', fontFamily: 'Poppins-SemiBold', fontSize: 13 }}>{t('goBack')}</Text>
+                          <Text style={{ color: '#FFFFFF', fontFamily: 'Poppins-Bold', fontSize: 13 }}>{t('goBack')}</Text>
                         </TouchableOpacity>
                       </>
                     )}

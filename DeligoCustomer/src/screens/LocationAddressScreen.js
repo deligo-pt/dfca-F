@@ -527,6 +527,7 @@ const LocationAddressScreen = ({ navigation, route }) => {
       {!isMapFullScreen && (
         <View style={[styles.footer, {
           backgroundColor: colors.surface,
+          borderTopWidth: 1,
           borderTopColor: colors.border,
           paddingBottom: Math.max(16, insets.bottom + 16)
         }]}>
@@ -583,8 +584,6 @@ const styles = StyleSheet.create({
     paddingHorizontal: 16,
     paddingVertical: 12,
     backgroundColor: '#fff',
-    borderBottomWidth: 1,
-    borderBottomColor: '#E5E7EB',
   },
   backButton: {
     padding: 8,

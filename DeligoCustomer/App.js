@@ -8,6 +8,7 @@ import * as Font from 'expo-font';
 import * as SplashScreen from 'expo-splash-screen';
 import { LanguageProvider } from './src/utils/LanguageContext';
 import { ThemeProvider } from './src/utils/ThemeContext';
+import { CustomSplashScreen } from './src/components/CustomSplashScreen';
 import { ProductsProvider } from './src/contexts/ProductsContext';
 import { CartProvider } from './src/contexts/CartContext';
 import { OrdersProvider } from './src/contexts/OrdersContext';
@@ -84,8 +85,8 @@ const requestNotificationPermission = async () => {
   }
 };
 
-// Keep the splash screen visible while we fetch resources
-SplashScreen.preventAutoHideAsync();
+// Hide the native splash immediately — CustomSplashScreen covers it from the start
+SplashScreen.hideAsync().catch(() => {});
 
 // Set default font for all Text and TextInput components
 RNText.defaultProps = RNText.defaultProps || {};
@@ -95,6 +96,8 @@ RNTextInput.defaultProps.style = [{ fontFamily: 'Poppins-Regular' }];
 
 export default function App() {
   const [isLoading, setIsLoading] = useState(true);
+  // Controls the cinematic splash overlay visibility
+  const [showCustomSplash, setShowCustomSplash] = useState(true);
 
   // Load Poppins fonts
   const loadFonts = async () => {
@@ -123,40 +126,21 @@ export default function App() {
   useEffect(() => {
     const prepare = async () => {
       try {
-        // Start timing
         // Set system UI colors for notch areas (top and bottom)
         await SystemUI.setBackgroundColorAsync(colors.primary);
 
-        const startTime = Date.now();
-
         await loadFonts();
 
-        // Request notification permission early (critical for production APK)
-        // await requestNotificationPermission(); // Removed to enforce PermissionsScreen flow
-
         // initializeApp is no longer needed here as ProfileContext handles it via Provider
-
-        // Ensure splash screen shows for at least 2 seconds
-        const elapsedTime = Date.now() - startTime;
-        const minimumTime = 2000; // 2 seconds
-        if (elapsedTime < minimumTime) {
-          await new Promise(resolve => setTimeout(resolve, minimumTime - elapsedTime));
-        }
       } catch (e) {
         console.warn(e);
       } finally {
         setIsLoading(false);
-        // Hide the splash screen
-        await SplashScreen.hideAsync();
       }
     };
     prepare();
   }, []);
 
-  // Don't render anything while loading fonts (splash screen is visible)
-  if (isLoading) {
-    return null;
-  }
 
   return (
     <StripeProvider
@@ -185,6 +169,10 @@ export default function App() {
         </ThemeProvider>
       </SafeAreaProvider>
       <Toast config={toastConfig} />
+      {/* Cinematic splash overlay — renders over everything, unmounts after animation */}
+      {showCustomSplash && (
+        <CustomSplashScreen onFinish={() => setShowCustomSplash(false)} />
+      )}
     </StripeProvider>
   );
 }

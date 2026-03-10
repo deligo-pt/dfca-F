@@ -24,6 +24,8 @@ export const translations = {
     order: "Order",
     call: "Call",
     unknown: "Unknown",
+    remove: "Remove",
+    failedToRemoveVoucher: "Failed to remove voucher",
     searchResults: "Search Results",
     noMatchSelection: "No restaurants match your selection",
     off: "OFF",
@@ -33,6 +35,12 @@ export const translations = {
     searchPlaceholderHeader: "Search restaurants, cuisines, dishes...",
     awaitingPartner: "Looking for Driver",
     awaitingDriver: "Awaiting Driver",
+    no_internet: "No Internet Connection",
+    no_internet_msg: "Please check your network settings and try again.",
+    network_error_title: "Connection Error",
+    network_error_msg: "Check your internet connection and try again.",
+    retry_again: "Retry Again",
+
 
     // Navigation
     home: "Home",
@@ -68,8 +76,10 @@ export const translations = {
     noRestaurantsFound: "No vendors found",
     popularRestaurants: "Popular Restaurants",
     nearYou: "Near You",
-    nearbyRestaurants: "Nearby Restaurants",
     viewAll: "View All",
+    noProductsAvailable: "No stores or restaurants available right now",
+    noResultsFound: "No results found",
+
 
     noProductCategoriesAdded: "No product categories added",
     pizza: "Pizza",
@@ -235,6 +245,9 @@ export const translations = {
     paymentFailed: "Payment Failed",
     paymentFailedDescription: "Something went wrong with your transaction. Please try again.",
     tryAgain: "Try Again",
+    voucherError: "Promotion Error",
+    failedToValidateVoucher: "Failed to validate voucher",
+    failedToRemoveVoucher: "Failed to remove voucher",
 
     // Orders Screen
     ongoingOrders: "Ongoing Orders",
@@ -404,6 +417,7 @@ export const translations = {
     stateRequired: "State is required",
     countryRequired: "Country is required",
     addNewAddress: "Add New Address",
+    editAddress: "Edit Address",
     fullMap: "Full Map",
     updateLocation: "Update Location",
     confirmAndGetAddress: "Confirm & Get Address",
@@ -747,6 +761,7 @@ export const translations = {
     orderTotal: "Order Total",
     voucherApplied: "Voucher Applied",
     finalPayable: "Final Payable",
+    voucherError: "Promotion Error",
     cancelPaymentTitle: "Cancel Payment",
     cancelPaymentMessage: "Are you sure you want to cancel the payment process?",
     completeProfile: "Complete Profile",
@@ -772,6 +787,8 @@ export const translations = {
     order: "Pedido",
     call: "Ligar",
     unknown: "Desconhecido",
+    remove: "Remover",
+    failedToRemoveVoucher: "Erro ao remover o vale",
     searchResults: "Resultados da Pesquisa",
     noMatchSelection: "Nenhum restaurante corresponde à sua seleção",
     off: "DESC.",
@@ -780,6 +797,12 @@ export const translations = {
     hAgo: "h atrás",
     searchPlaceholderHeader: "Pesquisar restaurantes, cozinhas, pratos...",
     awaitingDriver: "Aguardando Entregador",
+    no_internet: "Sem Conexão à Internet",
+    no_internet_msg: "Por favor, verifique as suas definições de rede e tente novamente.",
+    network_error_title: "Erro de Ligação",
+    network_error_msg: "Verifique a sua ligação à internet e tente novamente.",
+    retry_again: "Tentar Novamente",
+
 
     // Navigation
     home: "Início",
@@ -811,6 +834,10 @@ export const translations = {
     nearYou: "Perto de Você",
     nearbyRestaurants: "Restaurantes Próximos",
     viewAll: "Ver Todos",
+    noProductsAvailable: "Nenhuma loja ou restaurante disponível no momento",
+    noResultsFound: "Nenhum resultado encontrado",
+    noResultsFor: "Sem resultados para",
+
 
     noProductCategoriesAdded: "Nenhum categoria de produto adicionada",
 
@@ -988,6 +1015,7 @@ export const translations = {
     cityRequired: "Cidade é obrigatória",
     postalCodeRequired: "Código postal é obrigatório",
     addNewAddress: "Adicionar Novo Endereço",
+    editAddress: "Editar Endereço",
     fullMap: "Mapa Completo",
     updateLocation: "Atualizar Localização",
     confirmAndGetAddress: "Confirmar e Obter Endereço",

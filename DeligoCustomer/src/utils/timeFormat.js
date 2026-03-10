@@ -10,11 +10,22 @@ export const formatMinutesToUX = (timeInput) => {
   if (!timeInput) return '';
 
   const formatSingle = (mins) => {
+    // Safety check: if mins is suspiciously large (e.g., > 8 hours), 
+    // it's likely a bug or seconds being passed as minutes.
+    if (mins >= 480) {
+        // Detected a bug (e.g. the 624h bug or seconds passed as mins). Fallback to standard range.
+        return '25-35 min';
+    }
+
     const hours = Math.floor(mins / 60);
     const minutes = mins % 60;
     
     if (hours === 0) {
       return `${minutes} min`;
+    } else if (hours > 24) {
+      // Still too large? Maybe it was seconds.
+      const realMins = Math.floor(mins / 60);
+      return realMins > 0 ? `${realMins} min` : '25-35 min';
     } else if (minutes === 0) {
       return `${hours} hour`;
     } else {

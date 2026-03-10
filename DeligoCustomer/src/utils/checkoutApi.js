@@ -127,6 +127,18 @@ class CheckoutAPI {
   }
 
   /**
+   * Remove/Unapply offer from a checkout session
+   * @param {string} checkoutId 
+   * @returns {Promise}
+   */
+  static async unapplyOffer(checkoutId) {
+    return this.validateApplyOffer({
+      checkoutId,
+      offerIdentifier: '' // Sending empty string triggers removal logic in backend
+    });
+  }
+
+  /**
    * Create Reduniq payment intent
    * @param {string} checkoutSummaryId
    * @param {string} paymentMethod

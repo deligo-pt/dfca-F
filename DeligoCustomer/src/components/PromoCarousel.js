@@ -36,20 +36,7 @@ const BACK_CONFIGS = [
     { rotate: '-2.5deg', tx: -10, ty: 10, scale: 0.90 }, // furthest back
 ];
 
-const FALLBACK_PROMOS = [
-    {
-        id: 1, title: 'Food In 15 Mins!', subtitle: 'Crispy, hot & fresh.', brand: 'DeliGo', cta: 'ORDER NOW',
-        image: 'https://images.unsplash.com/photo-1504674900247-0877df9cc836?w=800&q=80', bgColor: '#6B1A3D'
-    },
-    {
-        id: 2, title: 'Free Delivery', subtitle: 'On your first 3 orders.', brand: 'DeliGo Pro', cta: 'JOIN NOW',
-        image: 'https://images.unsplash.com/photo-1565299624946-b28f40a0ae38?w=800&q=80', bgColor: '#1A3D6B'
-    },
-    {
-        id: 3, title: 'Weekend Feast', subtitle: 'Up to 40% off Sundays.', brand: 'Offers', cta: 'GRAB DEAL',
-        image: 'https://images.unsplash.com/photo-1555939594-58d7cb561ad1?w=800&q=80', bgColor: '#1A6B3D'
-    },
-];
+
 
 function shadeColor(hex, pct) {
     try {
@@ -106,16 +93,14 @@ const PromoCarousel = ({ promos: propPromos = [], onPress, refreshTrigger = 0 })
         })();
     }, [colors.primary, refreshTrigger]);
 
-    const finalPromos = useMemo(() =>
-        apiPromos.length > 0 ? apiPromos : FALLBACK_PROMOS,
-        [apiPromos]);
+    const finalPromos = useMemo(() => apiPromos, [apiPromos]);
 
     /* ── Auto-cycle ── */
     useEffect(() => {
         if (finalPromos.length <= 1) return;
         const t = setInterval(triggerTransition, 4500);
         return () => clearInterval(t);
-    }, [finalPromos.length, displayIndex]);
+    }, [finalPromos.length]);
 
     /* ── Transition: all cards move together ── */
     const triggerTransition = () => {
@@ -192,7 +177,7 @@ const PromoCarousel = ({ promos: propPromos = [], onPress, refreshTrigger = 0 })
         },
     })).current;
 
-    if (!loading && finalPromos.length === 0) return null;
+    if (loading || finalPromos.length === 0) return null;
 
     // ── Interpolated back-card transforms (progress 0→1) ──
     // back-0: resting-pos → front-pos
