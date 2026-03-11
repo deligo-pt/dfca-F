@@ -283,33 +283,36 @@ const LocationAddressScreen = ({ navigation, route }) => {
       // Custom mode for adding/editing delivery addresses directly to the list via API
       if (route.params?.mode === 'add_delivery_address' || route.params?.mode === 'edit_delivery_address') {
         try {
-          const isEditTemplate = route.params?.mode === 'edit_delivery_address';
+          const isEditMode = route.params?.mode === 'edit_delivery_address';
+          const existingAddr = route.params?.addressToEdit || {};
 
-          const payload = {
-            deliveryAddress: {
-              street: streetAddress,
-              detailedAddress: detailedAddress,
-              city: city,
-              state: state,
-              country: country,
-              postalCode: postalCode,
-              latitude: markerCoordinate?.latitude,
-              longitude: markerCoordinate?.longitude,
-              // Map friendly labels to backend enums if possible
-              addressType: label === 'Work' ? 'OFFICE' : label === 'Other' ? 'OTHER' : 'HOME',
-              // retain active state if editing, force active if adding
-              isActive: isEditTemplate ? route.params.addressToEdit?.isActive : true
-            }
+          // Build payload matching exact backend structure
+          const deliveryAddressPayload = {
+            street: streetAddress,
+            detailedAddress: detailedAddress || '',
+            city: city,
+            state: state || 'Dhaka Division',
+            country: country || 'Bangladesh',
+            postalCode: postalCode,
+            latitude: markerCoordinate?.latitude ?? existingAddr.latitude,
+            longitude: markerCoordinate?.longitude ?? existingAddr.longitude,
+            geoAccuracy: existingAddr.geoAccuracy ?? 10,
+            zoneId: existingAddr.zoneId ?? undefined,
+            notes: existingAddr.notes ?? '',
+            addressType: label === 'Work' ? 'OFFICE' : label === 'Other' ? 'OTHER' : 'HOME',
           };
 
+          const payload = { deliveryAddress: deliveryAddressPayload };
+
           let res;
-          if (isEditTemplate && route.params?.addressToEdit?._id) {
-            console.debug('[LocationAddressScreen] Editing delivery address:', payload);
-            res = await AddressApi.updateDeliveryAddress(route.params.addressToEdit._id, payload);
+          if (isEditMode && existingAddr._id) {
+            console.debug('[LocationAddressScreen] Updating delivery address:', existingAddr._id, payload);
+            res = await AddressApi.updateDeliveryAddress(existingAddr._id, payload);
           } else {
             console.debug('[LocationAddressScreen] Adding delivery address:', payload);
             res = await AddressApi.addDeliveryAddress(payload);
           }
+
 
           if (res.data && res.data.success === false) {
             throw new Error(res.data.message || 'Failed');

@@ -13,7 +13,6 @@ export const formatMinutesToUX = (timeInput) => {
     // Safety check: if mins is suspiciously large (e.g., > 8 hours), 
     // it's likely a bug or seconds being passed as minutes.
     if (mins >= 480) {
-        // Detected a bug (e.g. the 624h bug or seconds passed as mins). Fallback to standard range.
         return '25-35 min';
     }
 
@@ -23,7 +22,6 @@ export const formatMinutesToUX = (timeInput) => {
     if (hours === 0) {
       return `${minutes} min`;
     } else if (hours > 24) {
-      // Still too large? Maybe it was seconds.
       const realMins = Math.floor(mins / 60);
       return realMins > 0 ? `${realMins} min` : '25-35 min';
     } else if (minutes === 0) {
@@ -38,6 +36,15 @@ export const formatMinutesToUX = (timeInput) => {
   }
 
   if (typeof timeInput === 'string') {
+    // ── Guard: already human-readable like "25-35 min" or "25 min - 35 min"
+    // Patterns that are ALREADY formatted — return as-is to prevent doubling
+    const alreadyFormatted = /^\d+(\s*hour)?\s*(\d+\s*min)?\s*-\s*\d+(\s*hour)?\s*(\d+\s*min)?$/.test(timeInput.trim())
+      || /^\d+\s*min$/.test(timeInput.trim())
+      || /^\d+\s*hour$/.test(timeInput.trim())
+      || /^\d+\s*hour\s+\d+\s*min$/.test(timeInput.trim());
+
+    if (alreadyFormatted) return timeInput.trim();
+
     // Check for ranges like "25-35 min" or "25 - 35"
     const rangeMatch = timeInput.match(/(\d+)\s*-\s*(\d+)/);
     if (rangeMatch) {

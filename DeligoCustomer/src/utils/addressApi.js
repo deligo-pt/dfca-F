@@ -21,6 +21,22 @@ const AddressApi = {
   },
 
   /**
+   * Update an existing delivery address by ID
+   * Endpoint: PATCH customers/update-delivery-address/:addressId
+   * @param {string} addressId - The ID of the address to update
+   * @param {Object} payload - Must follow: { deliveryAddress: { street, city, state, country, postalCode, longitude, latitude, geoAccuracy, detailedAddress, zoneId, notes, addressType } }
+   * @returns {Promise<Object>} Response data
+   */
+  updateDeliveryAddress: async (addressId, payload) => {
+    try {
+      const response = await customerApi.patch(`/customers/update-delivery-address/${addressId}`, payload);
+      return response;
+    } catch (error) {
+      throw error;
+    }
+  },
+
+  /**
    * Delete a delivery address by ID
    * @param {string} addressId - The ID of the address to delete
    * @returns {Promise<Object>} Response data

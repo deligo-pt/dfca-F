@@ -160,18 +160,47 @@ export default function CartDetail({ vendorId, navigation }) {
 
   const vendorLat = pcVendor?.latitude || firstItem?.product?._raw?.vendor?.latitude;
   const vendorLon = pcVendor?.longitude || firstItem?.product?._raw?.vendor?.longitude;
-  let calculatedDeliveryTime = null;
-  if (currentLocation?.latitude && currentLocation?.longitude && vendorLat && vendorLon) {
-    const lat2 = parseFloat(vendorLat); const lon2 = parseFloat(vendorLon);
-    if (!isNaN(lat2) && !isNaN(lon2)) {
-      const R = 6371; const dLat = (lat2 - currentLocation.latitude) * (Math.PI / 180); const dLon = (lon2 - currentLocation.longitude) * (Math.PI / 180);
-      const a = Math.sin(dLat / 2) ** 2 + Math.cos(currentLocation.latitude * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon / 2) ** 2;
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); const distKm = R * c;
-      const baseTime = Math.max(10, Math.round(distKm * 3) + 10);
-      calculatedDeliveryTime = `${baseTime} - ${baseTime + 5} min`;
-    }
-  }
-  const finalDeliveryTime = formatMinutesToUX(calculatedDeliveryTime || cart.vendorDeliveryTime || pcVendor?.deliveryTime || firstItem?.product?._raw?.vendor?.deliveryTime || pcProduct?.deliveryTime || '15 - 25 min');
+  const [cartDeliveryTime, setCartDeliveryTime] = useState(null);
+
+  useEffect(() => {
+    let active = true;
+    const lat1 = currentLocation?.latitude;
+    const lon1 = currentLocation?.longitude;
+    const lat2 = vendorLat ? parseFloat(vendorLat) : null;
+    const lon2 = vendorLon ? parseFloat(vendorLon) : null;
+
+    if (!lat1 || !lon1 || !lat2 || !lon2 || isNaN(lat2) || isNaN(lon2)) return;
+
+    const GOOGLE_KEY = 'AIzaSyCZ1jixNYbSRM21Uq82a6KXNO_FSpLUwaQ';
+    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${lat1},${lon1}&destinations=${lat2},${lon2}&mode=driving&key=${GOOGLE_KEY}`;
+
+    fetch(url)
+      .then(r => r.json())
+      .then(data => {
+        if (!active) return;
+        const el = data?.rows?.[0]?.elements?.[0];
+        if (data.status === 'OK' && el?.status === 'OK') {
+          const driveMin = Math.ceil(el.duration.value / 60);
+          setCartDeliveryTime(driveMin + 10); // drive + 10 min prep
+        } else {
+          // Haversine fallback
+          const R = 6371;
+          const dLat = (lat2 - lat1) * (Math.PI / 180);
+          const dLon = (lon2 - lon1) * (Math.PI / 180);
+          const a = Math.sin(dLat/2)**2 + Math.cos(lat1*(Math.PI/180))*Math.cos(lat2*(Math.PI/180))*Math.sin(dLon/2)**2;
+          const distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          setCartDeliveryTime(Math.max(10, Math.round(distKm * 3) + 10));
+        }
+      })
+      .catch(() => {});
+
+    return () => { active = false; };
+  }, [currentLocation?.latitude, currentLocation?.longitude, vendorLat, vendorLon]);
+
+  // Format: 'X hour Y min - X hour Y+5 min'
+  const finalDeliveryTime = cartDeliveryTime
+    ? `${formatMinutesToUX(cartDeliveryTime)} - ${formatMinutesToUX(cartDeliveryTime + 5)}`
+    : formatMinutesToUX(cart.vendorDeliveryTime || pcVendor?.deliveryTime || firstItem?.product?._raw?.vendor?.deliveryTime || '20 - 30 min');
 
   // ── Handlers ──
   const handleUpdateQuantity = async (itemId, delta) => {

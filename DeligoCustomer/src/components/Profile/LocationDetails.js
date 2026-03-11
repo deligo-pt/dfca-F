@@ -106,15 +106,15 @@ const LocationDetails = ({
       alignItems: 'center',
       paddingHorizontal: 14,
       paddingVertical: 12,
-      borderRadius: 12,
+      borderRadius: 30,
       backgroundColor: colors.surface,
-      borderWidth: 1,
-      borderColor: colors.border,
-      shadowColor: colors.shadow,
-      shadowOffset: { width: 0, height: 1 },
-      shadowOpacity: 0.05,
-      shadowRadius: 3,
-      elevation: 2,
+      borderWidth: 1.5,
+      borderColor: colors.primary,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.12,
+      shadowRadius: 6,
+      elevation: 3,
     },
     internationalSearchInput: {
       flex: 1,
@@ -761,7 +761,7 @@ const LocationDetails = ({
       {!isMapFullScreen && (
         <View style={styles.internationalSearchContainer}>
           <GooglePlacesAutocomplete
-            placeholder={t('searchBusinessAddress')}
+                    placeholder={t('searchAddress') || 'Search for your address...'}
             fetchDetails={true}
             onPress={(data, details = null) => {
               if (details) {
@@ -817,25 +817,31 @@ const LocationDetails = ({
               },
               textInputContainer: {
                 backgroundColor: colors.surface,
-                borderWidth: 0,
-                borderColor: 'transparent',
-                borderRadius: 12,
+                borderWidth: 1.5,
+                borderColor: colors.primary,
+                borderRadius: 30,
                 paddingHorizontal: 8,
+                shadowColor: colors.primary,
+                shadowOffset: { width: 0, height: 2 },
+                shadowOpacity: 0.12,
+                shadowRadius: 6,
+                elevation: 3,
               },
               textInput: {
                 height: 48,
                 color: colors.text.primary,
-                fontSize: 16,
+                fontSize: 15,
                 backgroundColor: 'transparent',
                 underlineColorAndroid: 'transparent',
                 borderWidth: 0,
+                fontFamily: 'Poppins-Regular',
               },
               predefinedPlacesDescription: {
                 color: '#1faadb',
               },
               listView: {
                 backgroundColor: colors.surface,
-                borderRadius: 12,
+                borderRadius: 16,
                 marginTop: 8,
                 elevation: 5,
                 shadowColor: '#000',

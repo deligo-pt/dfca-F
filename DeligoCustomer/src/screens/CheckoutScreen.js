@@ -35,6 +35,8 @@ import AddressApi from '../utils/addressApi';
 import { API_ENDPOINTS, API_CONFIG } from '../constants/config';
 import { getUserId, getUserData } from '../utils/auth';
 import AlertModal from '../components/AlertModal';
+import { getRealTimeDeliveryEstimate } from '../utils/deliveryEstimate';
+import { GOOGLE_MAPS_CONFIG } from '../constants/config';
 
 /**
  * ConsumerLocationDisplay
@@ -151,6 +153,9 @@ const CheckoutScreen = ({ route, navigation }) => {
   const [showFailureModal, setShowFailureModal] = useState(false);
   const [isSuccess, setIsSuccess] = useState(false);
   const [paymentUrl, setPaymentUrl] = useState(null);
+  // Incrementing this forces the createCheckoutOnEnter useEffect to re-run
+  // Used after payment cancel to get a fresh checkout session
+  const [checkoutRetryKey, setCheckoutRetryKey] = useState(0);
 
   // CTA shimmer animation
   const shimmerAnim = useRef(new Animated.Value(0)).current;
@@ -174,6 +179,14 @@ const CheckoutScreen = ({ route, navigation }) => {
   const { updateProfile } = useProfile();
 
   const [showCancelModal, setShowCancelModal] = useState(false);
+
+  // Real-time delivery estimate via Google Distance Matrix
+  const [realTimeDeliveryEstimate, setRealTimeDeliveryEstimate] = useState(null);
+
+  // Helper: get display delivery time (real-time > vendor default > fallback)
+  const deliveryTimeDisplay = realTimeDeliveryEstimate
+    || (cartData?.estimatedDeliveryTime ? formatMinutesToUX(cartData.estimatedDeliveryTime) : null)
+    || '25-35 min';
 
   // ... (existing state) ...
 
@@ -216,6 +229,31 @@ const CheckoutScreen = ({ route, navigation }) => {
 
 
 
+
+  // Real-time delivery estimate - calculate on mount using Google Distance Matrix
+  useEffect(() => {
+    const vendorLat = cartData?.vendorLatitude || cartData?.vendor?.latitude || cartData?.location?.latitude;
+    const vendorLng = cartData?.vendorLongitude || cartData?.vendor?.longitude || cartData?.location?.longitude;
+    const custLat = currentLocation?.latitude;
+    const custLng = currentLocation?.longitude;
+
+    if (!vendorLat || !vendorLng || !custLat || !custLng) {
+      console.warn('[CheckoutScreen] Coordinates missing for real-time estimate:', { vendorLat, vendorLng, custLat, custLng });
+      return;
+    }
+
+    const origin = { latitude: custLat, longitude: custLng };
+    const destination = { latitude: vendorLat, longitude: vendorLng };
+    const prepTime = cartData?.estimatedPrepTime || cartData?.prepTime || 10;
+
+    console.log('[CheckoutScreen] Calculating real-time delivery estimate...');
+    getRealTimeDeliveryEstimate(origin, destination, prepTime).then(estimate => {
+      if (estimate) {
+        console.log('[CheckoutScreen] Real-time estimate:', estimate);
+        setRealTimeDeliveryEstimate(estimate);
+      }
+    });
+  }, [currentLocation?.latitude, currentLocation?.longitude, cartData?.vendorLatitude, cartData?.vendorLongitude]);
 
   // Build full address string from all components
   const fullAddressParts = [
@@ -484,7 +522,7 @@ const CheckoutScreen = ({ route, navigation }) => {
         customerPhone: currentUser?.contactNumber || currentUser?.phone || currentUser?.mobile || '',
         vendorId: vendorId,
         // Optional fields from original req
-        estimatedDeliveryTime: cartData?.estimatedDeliveryTime || formatMinutesToUX("25-35 min"),
+        estimatedDeliveryTime: deliveryTimeDisplay,
         discount: 0, // Placeholder
         nif: nifValue || currentUser?.NIF || '',
         NIF: nifValue || currentUser?.NIF || ''
@@ -670,7 +708,7 @@ const CheckoutScreen = ({ route, navigation }) => {
     return () => {
       canceled = true;
     };
-  }, [address, detailedAddress, city, postalCode, appliedOffer, nifSkipped]);
+  }, [address, detailedAddress, city, postalCode, appliedOffer, nifSkipped, checkoutRetryKey]);
 
   // Calculate real cart values with ProductsContext enrichment
   const cartItems = cart?.items ? Object.keys(cart.items).map(id => {
@@ -1170,13 +1208,17 @@ const CheckoutScreen = ({ route, navigation }) => {
             {t('paymentConfirmedInfo') === 'paymentConfirmedInfo' ? 'Your payment was successful. We are now preparing your order.' : t('paymentConfirmedInfo')}
           </Text>
           <View style={[styles(colors).successDetails, { backgroundColor: colors.background, padding: 16, borderRadius: 16, width: '100%', marginBottom: 24 }]}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 8 }}>
-              <Text style={{ fontFamily: 'Poppins-Regular', color: colors.text.secondary }}>{t('amountPaid') || 'Amount Paid'}</Text>
-              <Text style={{ fontFamily: 'Poppins-Bold', color: colors.text.primary }}>{formatCurrency(currency, displayTotal)}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+              <Text style={{ fontFamily: 'Poppins-Regular', color: colors.text.secondary, flexShrink: 1, marginRight: 8 }}>{t('amountPaid') || 'Amount Paid'}</Text>
+              <Text style={{ fontFamily: 'Poppins-Bold', color: colors.text.primary, flexShrink: 0 }}>{formatCurrency(currency, displayTotal)}</Text>
             </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between' }}>
-              <Text style={{ fontFamily: 'Poppins-Regular', color: colors.text.secondary }}>{t('estimatedDelivery') || 'Delivery Time'}</Text>
-              <Text style={{ fontFamily: 'Poppins-Bold', color: colors.primary }}>25-35 {t('min')}</Text>
+            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
+              <Text style={{ fontFamily: 'Poppins-Regular', color: colors.text.secondary, flexShrink: 1, marginRight: 8 }}>{t('estimatedDelivery') || 'Estimated Delivery'}</Text>
+              <Text style={{ fontFamily: 'Poppins-Bold', color: colors.primary, flexShrink: 0 }}>
+                {cartData?.estimatedDeliveryTime
+                  ? formatMinutesToUX(cartData.estimatedDeliveryTime)
+                  : `25-35 ${t('min') || 'min'}`}
+              </Text>
             </View>
           </View>
 
@@ -1291,7 +1333,7 @@ const CheckoutScreen = ({ route, navigation }) => {
               adjustsFontSizeToFit
               minimumFontScale={0.8}
             >
-              {cartItems.length} {cartItems.length === 1 ? t('item') : t('items')} • {t('estimated')} {formatMinutesToUX(cartData?.estimatedDeliveryTime) || formatMinutesToUX("25-35 min")}
+              {cartItems.length} {cartItems.length === 1 ? t('item') : t('items')} • {t('estimated')} {deliveryTimeDisplay}
             </Text>
           </View>
           <View style={styles(colors).headerRight} />
@@ -1316,7 +1358,7 @@ const CheckoutScreen = ({ route, navigation }) => {
               adjustsFontSizeToFit
               minimumFontScale={0.7}
             >
-              {cartData?.estimatedDeliveryTime || formatMinutesToUX("25-35 min")}
+              {deliveryTimeDisplay}
             </Text>
           </View>
           <View style={styles(colors).deliveryTimeBadge}>
@@ -1944,6 +1986,14 @@ const CheckoutScreen = ({ route, navigation }) => {
             onPress: () => {
               setPaymentUrl(null);
               setShowCancelModal(false);
+              // Reset checkout session so a FRESH one is created on next attempt.
+              // Without this, the backend keeps the old session in 'PROCESSING'
+              // state and returns "Payment already in process" if user retries.
+              setCheckoutResponse(null);
+              setStripeError(null);
+              setIsProcessing(false);
+              // Increment key to force the createCheckoutOnEnter useEffect to re-run
+              setCheckoutRetryKey(k => k + 1);
             }
           }
         ]}

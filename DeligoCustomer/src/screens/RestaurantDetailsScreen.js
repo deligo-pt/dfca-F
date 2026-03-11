@@ -172,7 +172,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   const [updatingProductId, setUpdatingProductId] = useState(null);
   const [addingToCart, setAddingToCart] = useState(false);
   const [modalQuantity, setModalQuantity] = useState(1);
-  const [modalReady, setModalReady] = useState(false); // For fixing footer position on first render
+  const [modalFooterHeight, setModalFooterHeight] = useState(140); // Measured on-device via onLayout
 
   const [selectedVariations, setSelectedVariations] = useState({});
 
@@ -253,11 +253,8 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
 
     // Reset add-ons
     setActiveAddons([]);
-    setModalReady(false); // Reset modal ready state
+    setModalFooterHeight(140); // Reset before onLayout remeasures
     setProductModalVisible(true);
-
-    // Delay to let modal animation complete before showing footer
-    setTimeout(() => setModalReady(true), 50);
 
     // FETCH FRESH DETAILS (Single Product Get)
     // This ensures we have the latest price, tax, and stock info which might be missing from list
@@ -429,10 +426,11 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
           const duration = data.rows[0].elements[0].duration;
           // duration.value is in seconds
           const travelMinutes = Math.ceil(duration.value / 60);
-          const prepTime = 15; // Standard prep time buffer
+          const prepTime = 10; // Standardized — matches RestaurantCard and CartDetail
           const totalMinutes = travelMinutes + prepTime;
 
-          setEstimatedTime(`${totalMinutes} - ${totalMinutes + 5} min`);
+          // Store totalMinutes as number — formatMinutesToUX will produce "X hour Y min - X hour Y+5 min"
+          setEstimatedTime(totalMinutes);
           return true;
         }
         return false;
@@ -452,7 +450,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
       const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
       const distKm = R * c;
       const baseTime = Math.max(10, Math.round(distKm * 3.5) + 12);
-      setEstimatedTime(`${baseTime} - ${baseTime + 5} min`);
+      setEstimatedTime(baseTime);
     };
 
     if (currentLocation && vendorCoords) {
@@ -472,7 +470,10 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   }, [currentLocation, vendorCoords]);
 
   const deliveryTimeProp = normVendor.deliveryTime || restaurant._raw?.deliveryTime || null;
-  const finalDeliveryTime = formatMinutesToUX(estimatedTime || deliveryTimeProp || "15 - 20 min");
+  // estimatedTime is a number (minutes from Google/Haversine), format it to "X hour Y min - X hour Y+5 min"
+  const finalDeliveryTime = estimatedTime
+    ? `${formatMinutesToUX(estimatedTime)} - ${formatMinutesToUX(estimatedTime + 5)}`
+    : formatMinutesToUX(deliveryTimeProp || '20 - 30 min');
 
   useEffect(() => {
     let mounted = true;
@@ -1107,7 +1108,13 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
           />
 
           {/* Bottom Sheet */}
-          <View style={[styles.modalCard, { backgroundColor: colors.surface }]}>
+          <View style={[
+            styles.modalCard,
+            {
+              backgroundColor: colors.surface,
+              height: Math.round(Dimensions.get('window').height * 0.92),
+            }
+          ]}>
 
             {/* Handle bar + Close button */}
             <View style={styles.modalHandleRow}>
@@ -1135,9 +1142,11 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
             {/* ScrollView — everything scrolls */}
             <ScrollView
               style={{ flex: 1 }}
-              contentContainerStyle={{ paddingBottom: 100 }}
+              contentContainerStyle={{ paddingBottom: modalFooterHeight + 24 }}
               showsVerticalScrollIndicator={false}
               bounces={true}
+              overScrollMode="never"
+              keyboardShouldPersistTaps="handled"
             >
               {/* ── Rounded hero image — Design 3 centered ── */}
               <View style={styles.modalImageCenter}>
@@ -1442,13 +1451,14 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
             </ScrollView>
 
             {/* ── STICKY FOOTER: Full-width ADD TO CART ── */}
-            {modalReady && (
-              <View style={[styles.modalFooter, {
+            <View
+              onLayout={(e) => setModalFooterHeight(e.nativeEvent.layout.height)}
+              style={[styles.modalFooter, {
                 backgroundColor: colors.surface,
                 borderTopColor: isDarkMode ? '#2A2A2A' : '#F0F0F0',
                 paddingBottom: Platform.OS === 'android' ? Math.max(34, insets.bottom + 20) : Math.max(24, insets.bottom),
                 paddingTop: 16,
-                zIndex: 999, // Ensure it stays on top of content
+                zIndex: 999,
                 elevation: 10,
               }]}>
                 {/* Animated heartbeat wrapper */}
@@ -1597,7 +1607,6 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                   </TouchableOpacity>
                 </Animated.View>
               </View>
-            )}
           </View>
         </View>
       </Modal>
@@ -3039,7 +3048,7 @@ const styles = StyleSheet.create({
     backgroundColor: 'rgba(0,0,0,0.45)',
   },
   modalCard: {
-    height: '92%',
+    // height set inline via Dimensions for cross-device accuracy
     width: '100%',
     borderTopLeftRadius: 28,
     borderTopRightRadius: 28,
@@ -3247,6 +3256,7 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     height: 56,
     paddingHorizontal: 20,
+    borderRadius: 16,
   },
   modalAddToCartText: {
     fontSize: 16,

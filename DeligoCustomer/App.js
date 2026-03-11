@@ -85,8 +85,9 @@ const requestNotificationPermission = async () => {
   }
 };
 
-// Hide the native splash immediately — CustomSplashScreen covers it from the start
-SplashScreen.hideAsync().catch(() => {});
+// Keep native splash visible until CustomSplashScreen is mounted and ready to take over
+// preventAutoHideAsync must be called before React renders
+SplashScreen.preventAutoHideAsync().catch(() => {});
 
 // Set default font for all Text and TextInput components
 RNText.defaultProps = RNText.defaultProps || {};
@@ -95,9 +96,11 @@ RNTextInput.defaultProps = RNTextInput.defaultProps || {};
 RNTextInput.defaultProps.style = [{ fontFamily: 'Poppins-Regular' }];
 
 export default function App() {
-  const [isLoading, setIsLoading] = useState(true);
-  // Controls the cinematic splash overlay visibility
-  const [showCustomSplash, setShowCustomSplash] = useState(true);
+  const [fontsReady, setFontsReady] = useState(false);
+  const [splashAnimDone, setSplashAnimDone] = useState(false);
+
+  // Splash stays visible until BOTH fonts are loaded AND animation is done
+  const showCustomSplash = !fontsReady || !splashAnimDone;
 
   // Load Poppins fonts
   const loadFonts = async () => {
@@ -126,16 +129,12 @@ export default function App() {
   useEffect(() => {
     const prepare = async () => {
       try {
-        // Set system UI colors for notch areas (top and bottom)
         await SystemUI.setBackgroundColorAsync(colors.primary);
-
         await loadFonts();
-
-        // initializeApp is no longer needed here as ProfileContext handles it via Provider
       } catch (e) {
         console.warn(e);
       } finally {
-        setIsLoading(false);
+        setFontsReady(true);
       }
     };
     prepare();
@@ -171,7 +170,7 @@ export default function App() {
       <Toast config={toastConfig} />
       {/* Cinematic splash overlay — renders over everything, unmounts after animation */}
       {showCustomSplash && (
-        <CustomSplashScreen onFinish={() => setShowCustomSplash(false)} />
+        <CustomSplashScreen onFinish={() => setSplashAnimDone(true)} />
       )}
     </StripeProvider>
   );

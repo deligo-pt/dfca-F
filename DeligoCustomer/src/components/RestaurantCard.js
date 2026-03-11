@@ -86,31 +86,49 @@ const RestaurantCard = ({ restaurant, onPress }) => {
   // ---------------------------------------------------------------------------
 
   React.useEffect(() => {
+    let active = true;
     const lat1 = currentLocation?.latitude;
     const lon1 = currentLocation?.longitude;
     const lat2 = mergedVendor.latitude || p.latitude;
     const lon2 = mergedVendor.longitude || p.longitude;
 
-    if (lat1 && lon1 && lat2 && lon2) {
-      // Haversine formula
-      const R = 6371; // Radius of the earth in km
-      const dLat = (lat2 - lat1) * (Math.PI / 180);
-      const dLon = (lon2 - lon1) * (Math.PI / 180);
-      const a =
-        Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      const distKm = R * c;
+    if (!lat1 || !lon1 || !lat2 || !lon2) return;
 
-      // Base formula: 10 mins prep time + 3 mins per km (20km/h average city speed)
-      const baseTime = Math.max(10, Math.round(distKm * 3) + 10);
-      setEstimatedTime(`${baseTime} - ${baseTime + 5} min`);
-    }
-  }, [currentLocation, mergedVendor.latitude, mergedVendor.longitude, p.latitude, p.longitude]);
+    const GOOGLE_KEY = 'AIzaSyCZ1jixNYbSRM21Uq82a6KXNO_FSpLUwaQ';
+    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${lat1},${lon1}&destinations=${lat2},${lon2}&mode=driving&key=${GOOGLE_KEY}`;
 
-  // Priority: API dynamic calculation -> API static deliveryTime -> Fallback
-  const finalDeliveryTime = formatMinutesToUX(estimatedTime || deliveryTime || '15 - 20 min');
+    fetch(url)
+      .then(r => r.json())
+      .then(data => {
+        if (!active) return;
+        const el = data?.rows?.[0]?.elements?.[0];
+        if (data.status === 'OK' && el?.status === 'OK') {
+          const driveMin = Math.ceil(el.duration.value / 60);
+          const prepTime = 10;
+          const total = driveMin + prepTime;
+          setEstimatedTime(total); // store as NUMBER
+        } else {
+          // Haversine fallback
+          const R = 6371;
+          const dLat = (lat2 - lat1) * (Math.PI / 180);
+          const dLon = (lon2 - lon1) * (Math.PI / 180);
+          const a = Math.sin(dLat/2)**2 + Math.cos(lat1*(Math.PI/180))*Math.cos(lat2*(Math.PI/180))*Math.sin(dLon/2)**2;
+          const distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+          const baseTime = Math.max(10, Math.round(distKm * 3) + 10);
+          setEstimatedTime(baseTime); // store as NUMBER
+        }
+      })
+      .catch(() => {
+        // silent fail — will show vendor deliveryTime fallback
+      });
+
+    return () => { active = false; };
+  }, [currentLocation?.latitude, currentLocation?.longitude, mergedVendor.latitude, mergedVendor.longitude, p.latitude, p.longitude]);
+
+  // estimatedTime is a NUMBER (minutes). Format as 'X hour Y min - X hour Y+5 min'
+  const finalDeliveryTime = estimatedTime
+    ? `${formatMinutesToUX(estimatedTime)} - ${formatMinutesToUX(estimatedTime + 5)}`
+    : formatMinutesToUX(deliveryTime || '20 - 30 min');
 
   // ---------------------------------------------------------------------------
   // Location Logic

@@ -38,8 +38,11 @@ export const CustomSplashScreen = ({ onFinish }) => {
   const charAnims = useRef(brandChars.map(() => new Animated.Value(0))).current;
 
   useEffect(() => {
-    // Hide native splash immediately — the custom animated splash already covers the screen
-    SplashScreen.hideAsync().catch(() => {});
+    // Hide native splash on the very first painted frame of the custom splash
+    // This ensures seamless handoff: native splash → custom animated splash (no gap, no double)
+    const frame = requestAnimationFrame(() => {
+      SplashScreen.hideAsync().catch(() => {});
+    });
 
     // 1. Background Circles Floating
     Animated.loop(
@@ -120,6 +123,8 @@ export const CustomSplashScreen = ({ onFinish }) => {
     ]).start(() => {
       if (onFinish) onFinish();
     });
+
+    return () => cancelAnimationFrame(frame);
   }, []);
 
   const LOGO_SIZE = width * 0.38;

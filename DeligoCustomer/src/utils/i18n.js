@@ -384,7 +384,7 @@ export const translations = {
     addNewAddress: "Add New Address",
     selectLabelAndSave:
       "Select a label and save your location for future orders",
-    searchBusinessAddress: "Search for your business address...",
+    searchAddress: "Search for your address...",
     work: "Work",
     other: "Other",
     primary: "Primary",
@@ -984,7 +984,7 @@ export const translations = {
     confirmLocation: "Confirmar Localização",
     addNewAddress: "Adicionar Nova Morada",
     selectLabelAndSave: "Selecione uma etiqueta e guarde a sua localização",
-    searchBusinessAddress: "Pesquisar morada...",
+    searchAddress: "Pesquisar morada...",
     work: "Trabalho",
     other: "Outro",
     failedInitializeCheckout: "Falha ao inicializar o checkout",

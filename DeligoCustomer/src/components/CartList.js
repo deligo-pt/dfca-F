@@ -26,6 +26,65 @@ export default function CartList({ navigation }) {
   const [deletingVendorId, setDeletingVendorId] = useState(null);
   const [switchingVendorId, setSwitchingVendorId] = useState(null);
   const [vendorDetailsCache, setVendorDetailsCache] = useState({});
+  // Keyed by vendorId → drive time in minutes (number)
+  const [deliveryTimesCache, setDeliveryTimesCache] = useState({});
+
+  // ── Fetch Google ETA for each vendor once ──────────────────────────────────
+  // MUST be before any early return (React Rules of Hooks)
+  React.useEffect(() => {
+    let active = true;
+    const GOOGLE_KEY = 'AIzaSyCZ1jixNYbSRM21Uq82a6KXNO_FSpLUwaQ';
+    const lat1 = currentLocation?.latitude;
+    const lon1 = currentLocation?.longitude;
+    if (!lat1 || !lon1 || !cartsArray?.length) return;
+
+    cartsArray.forEach(cart => {
+      const vid = cart.vendorId;
+      if (deliveryTimesCache[vid] !== undefined) return;
+
+      let vendorLat = null, vendorLon = null;
+      if (products && products.length > 0) {
+        const match = products.find(p => {
+          const v = p.vendor || {}; const r = p._raw || {}; const rv = r.vendor || {};
+          const vs = String(vid);
+          return String(v.vendorId) === vs || String(v._id) === vs || String(rv.vendorId) === vs || String(rv._id) === vs;
+        });
+        const v = match?.vendor || match?._raw?.vendor;
+        vendorLat = v?.latitude;
+        vendorLon = v?.longitude;
+      }
+      if (!vendorLat || !vendorLon) return;
+
+      const lat2 = parseFloat(vendorLat);
+      const lon2 = parseFloat(vendorLon);
+      if (isNaN(lat2) || isNaN(lon2)) return;
+
+      const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${lat1},${lon1}&destinations=${lat2},${lon2}&mode=driving&key=${GOOGLE_KEY}`;
+
+      fetch(url)
+        .then(r => r.json())
+        .then(data => {
+          if (!active) return;
+          const el = data?.rows?.[0]?.elements?.[0];
+          let driveMin;
+          if (data.status === 'OK' && el?.status === 'OK') {
+            driveMin = Math.ceil(el.duration.value / 60) + 10;
+          } else {
+            const R = 6371;
+            const dLat = (lat2 - lat1) * (Math.PI / 180);
+            const dLon = (lon2 - lon1) * (Math.PI / 180);
+            const a = Math.sin(dLat/2)**2 + Math.cos(lat1*(Math.PI/180))*Math.cos(lat2*(Math.PI/180))*Math.sin(dLon/2)**2;
+            const distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
+            driveMin = Math.max(10, Math.round(distKm * 3) + 10);
+          }
+          setDeliveryTimesCache(prev => ({ ...prev, [vid]: driveMin }));
+        })
+        .catch(() => {});
+    });
+
+    return () => { active = false; };
+  }, [currentLocation?.latitude, currentLocation?.longitude, cartsArray?.length]);
+  // ──────────────────────────────────────────────────────────────────────────
 
   if (!cartsArray || cartsArray.length === 0) return null;
 
@@ -85,19 +144,11 @@ export default function CartList({ navigation }) {
           const num = Number(val); return !isNaN(num) ? num : null;
         };
 
-        const vendorLatSource = pcVendor?.latitude || firstItem?._raw?.vendor?.latitude;
-        const vendorLonSource = pcVendor?.longitude || firstItem?._raw?.vendor?.longitude;
-        let calculatedDeliveryTime = null;
-        if (currentLocation?.latitude && currentLocation?.longitude && vendorLatSource && vendorLonSource) {
-          const lat2 = parseFloat(vendorLatSource); const lon2 = parseFloat(vendorLonSource);
-          if (!isNaN(lat2) && !isNaN(lon2)) {
-            const R = 6371; const dLat = (lat2 - currentLocation.latitude) * (Math.PI / 180); const dLon = (lon2 - currentLocation.longitude) * (Math.PI / 180);
-            const a = Math.sin(dLat / 2) ** 2 + Math.cos(currentLocation.latitude * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) * Math.sin(dLon / 2) ** 2;
-            const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a)); const distKm = R * c;
-            const baseTime = Math.max(10, Math.round(distKm * 3) + 10); calculatedDeliveryTime = `${baseTime} - ${baseTime + 5} min`;
-          }
-        }
-        const finalDeliveryTime = formatMinutesToUX(calculatedDeliveryTime || cached?.deliveryTime || cart.vendorDeliveryTime || pcVendor?.deliveryTime || firstItem?._raw?.vendor?.deliveryTime || '15 - 25 min');
+        // Use cached Google estimate (number) or fallback string
+        const cachedMin = deliveryTimesCache[cart.vendorId];
+        const finalDeliveryTime = cachedMin
+          ? `${formatMinutesToUX(cachedMin)} - ${formatMinutesToUX(cachedMin + 5)}`
+          : formatMinutesToUX(cached?.deliveryTime || cart.vendorDeliveryTime || pcVendor?.deliveryTime || firstItem?._raw?.vendor?.deliveryTime || '20 - 30 min');
 
         const ratingSources = [productContextMatch?.rating, productContextMatch?._raw?.rating, firstItem?.product?.productRating, firstItem?.product?.vendorRating, firstItem?._raw?.rating, cached?.rating, cart.vendorRating, firstItem?._raw?.vendorId?.rating, pcVendor?.rating, pcVendor?.businessDetails?.rating, firstItem?._raw?.vendor?.rating, firstItem?._raw?.businessDetails?.rating];
         let finalVendorRating = null;
