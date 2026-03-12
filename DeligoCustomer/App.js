@@ -23,6 +23,7 @@ import { useTheme } from './src/utils/ThemeContext';
 import Toast from 'react-native-toast-message';
 import { toastConfig } from './src/components/ToastConfig';
 import { navigationRef } from './src/navigation/navigationRef';
+import { DeliveryProvider } from './src/contexts/DeliveryContext';
 import messaging from '@react-native-firebase/messaging';
 import { PermissionsAndroid } from 'react-native';
 
@@ -153,13 +154,15 @@ export default function App() {
               <NotificationProvider>
                 <SocketProvider>
                   <LocationProvider>
-                    <ProductsProvider>
-                      <CartProvider>
-                        <OrdersProvider>
-                          <AppContent />
-                        </OrdersProvider>
-                      </CartProvider>
-                    </ProductsProvider>
+                    <DeliveryProvider>
+                      <ProductsProvider>
+                        <CartProvider>
+                          <OrdersProvider>
+                            <AppContent />
+                          </OrdersProvider>
+                        </CartProvider>
+                      </ProductsProvider>
+                    </DeliveryProvider>
                   </LocationProvider>
                 </SocketProvider>
               </NotificationProvider>

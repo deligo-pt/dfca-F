@@ -125,12 +125,7 @@ const HelpCenterScreen = ({ navigation }) => {
             colors={colors}
             styles={styles}
           />
-          <FAQItem
-            question={t('cancelOrder')}
-            answer={t('cancelOrderAnswer')}
-            colors={colors}
-            styles={styles}
-          />
+
           <FAQItem
             question={t('deliveryCharges')}
             answer={t('deliveryChargesAnswer')}

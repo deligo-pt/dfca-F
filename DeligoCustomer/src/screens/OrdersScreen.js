@@ -119,7 +119,7 @@ const OrdersScreen = ({ navigation }) => {
       case 'DELIVERED': return { name: 'check-decagram', color: '#4CAF50', label: t('delivered') || 'Delivered' };
       case 'CANCELED':
       case 'REJECTED': return { name: 'close-circle-outline', color: '#D32F2F', label: t('canceled') || 'Canceled' };
-      default: return { name: 'clock-outline', color: colors.text?.secondary || '#999', label: t('processing') || 'Processing' };
+      default: return { name: 'clock-outline', color: colors.text.primary?.secondary || '#999', label: t('processing') || 'Processing' };
     }
   };
 

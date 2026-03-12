@@ -421,7 +421,7 @@ const LiveChatScreen = () => {
                             {url.endsWith('.pdf') ? (
                                 <View style={[styles.pdfAttachment, { borderColor: isUser ? 'rgba(255,255,255,0.3)' : colors.border }]}>
                                     <Ionicons name="document-text" size={24} color={isUser ? '#FFF' : colors.primary} />
-                                    <Text style={[styles.pdfText, { color: isUser ? '#FFF' : colors.text }]} numberOfLines={1}>
+                                    <Text style={[styles.pdfText, { color: isUser ? '#FFF' : colors.text.primary }]} numberOfLines={1}>
                                         Document
                                     </Text>
                                 </View>
@@ -436,7 +436,7 @@ const LiveChatScreen = () => {
             {(item.text || item.content || item.message) ? (
                 <Text style={[
                     styles.messageText,
-                    isUser ? styles.userMessageText : { color: colors.text }
+                    isUser ? styles.userMessageText : { color: colors.text.primary }
                 ]}>
                     {item.text || item.content || item.message}
                 </Text>
@@ -445,7 +445,7 @@ const LiveChatScreen = () => {
             <View style={styles.metaContainer}>
                 <Text style={[
                     styles.timeStamp,
-                    isUser ? styles.userTimeStamp : { color: colors.textSecondary || '#999' }
+                    isUser ? styles.userTimeStamp : { color: colors.text.secondary || '#999' }
                 ]}>
                     {formatTime(item.timestamp || item.createdAt)}
                     {isUser && (
@@ -485,7 +485,7 @@ const LiveChatScreen = () => {
                     style={styles.backButton}
                     hitSlop={{ top: 10, bottom: 10, left: 10, right: 10 }}
                 >
-                    <Ionicons name="arrow-back" size={24} color={colors.text} />
+                    <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
                 </TouchableOpacity>
 
                 <View style={styles.headerContent}>
@@ -502,17 +502,17 @@ const LiveChatScreen = () => {
                     </View>
 
                     <View>
-                        <Text style={[styles.headerTitle, { color: colors.text }]}>
+                        <Text style={[styles.headerTitle, { color: colors.text.primary }]}>
                             {agentName || t('supportTeam') || 'Support Team'}
                         </Text>
-                        <Text style={[styles.statusText, { color: isConnected ? colors.success : colors.textSecondary }]}>
+                        <Text style={[styles.statusText, { color: isConnected ? colors.success : colors.text.secondary }]}>
                             {getStatusText()}
                         </Text>
                     </View>
                 </View>
 
                 <TouchableOpacity style={styles.menuButton}>
-                    <Ionicons name="ellipsis-vertical" size={24} color={colors.text} />
+                    <Ionicons name="ellipsis-vertical" size={24} color={colors.text.primary} />
                 </TouchableOpacity>
             </View>
 
@@ -525,7 +525,7 @@ const LiveChatScreen = () => {
                                 <View style={[styles.iconBox, { backgroundColor: colors.primary + '15' }]}>
                                     <Ionicons name={orderId ? "receipt" : "card"} size={14} color={colors.primary} />
                                 </View>
-                                <Text style={[styles.contextText, { color: colors.text }]}>
+                                <Text style={[styles.contextText, { color: colors.text.primary }]}>
                                     {orderId
                                         ? <>{t('order') || 'Order'} <Text style={{ fontFamily: 'Poppins-SemiBold' }}>#{String(orderId).slice(-6)}</Text></>
                                         : <>{t('transaction') || 'Tx'} <Text style={{ fontFamily: 'Poppins-SemiBold' }}>#{String(transactionId)}</Text></>
@@ -562,10 +562,10 @@ const LiveChatScreen = () => {
                             <View style={[styles.errorIconCircle, { backgroundColor: '#FFEBEE' }]}>
                                 <Ionicons name="cloud-offline" size={32} color={colors.error || '#F44336'} />
                             </View>
-                            <Text style={[styles.errorTitle, { color: colors.text }]}>
+                            <Text style={[styles.errorTitle, { color: colors.text.primary }]}>
                                 {t('connectionFailed') || 'Connection Failed'}
                             </Text>
-                            <Text style={[styles.errorText, { color: colors.textSecondary }]}>
+                            <Text style={[styles.errorText, { color: colors.text.secondary }]}>
                                 {t('connFailedDesc') || "We couldn't connect to the support chat."}
                             </Text>
                             <TouchableOpacity
@@ -591,7 +591,7 @@ const LiveChatScreen = () => {
                                         style={{ width: 60, height: 60, opacity: 0.2, marginBottom: 20 }}
                                         resizeMode="contain"
                                     />
-                                    <Text style={[styles.emptyText, { color: colors.textSecondary }]}>
+                                    <Text style={[styles.emptyText, { color: colors.text.secondary }]}>
                                         {t('howCanWeHelp') || "Hi! How can we help you today?"}
                                     </Text>
                                 </View>
@@ -619,8 +619,8 @@ const LiveChatScreen = () => {
                 {/* Input Area - Clean & Modern */}
                 {chatStatus === 'CLOSED' ? (
                     <View style={[styles.closedBanner, { backgroundColor: colors.surface }]}>
-                        <Ionicons name="lock-closed-outline" size={18} color={colors.textSecondary} />
-                        <Text style={{ color: colors.textSecondary, marginLeft: 8, fontFamily: 'Poppins-Medium' }}>
+                        <Ionicons name="lock-closed-outline" size={18} color={colors.text.secondary} />
+                        <Text style={{ color: colors.text.secondary, marginLeft: 8, fontFamily: 'Poppins-Medium' }}>
                             {t('chatClosed') || "This conversation has ended."}
                         </Text>
                     </View>
@@ -631,14 +631,14 @@ const LiveChatScreen = () => {
                             onPress={handleAttachment}
                             disabled={!isInternetReachable}
                         >
-                            <Ionicons name="add-circle-outline" size={28} color={isInternetReachable ? colors.primary : colors.textSecondary} />
+                            <Ionicons name="add-circle-outline" size={28} color={isInternetReachable ? colors.primary : colors.text.secondary} />
                         </TouchableOpacity>
 
                         <View style={[styles.inputFieldContainer, { backgroundColor: colors.background }]}>
                             <TextInput
-                                style={[styles.input, { color: colors.text }]}
+                                style={[styles.input, { color: colors.text.primary }]}
                                 placeholder={isInternetReachable ? (t('typeMessage') || "Type a message...") : (t('waitingNetwork') || "Waiting for network...")}
-                                placeholderTextColor={colors.textSecondary}
+                                placeholderTextColor={colors.text.secondary}
                                 value={inputText}
                                 onChangeText={handleInputChange}
                                 multiline

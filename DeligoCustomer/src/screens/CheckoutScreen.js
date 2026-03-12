@@ -24,6 +24,7 @@ import { useLanguage } from '../utils/LanguageContext';
 import { useCart } from '../contexts/CartContext';
 import { useProducts } from '../contexts/ProductsContext';
 import { useLocation } from '../contexts/LocationContext';
+import { useDelivery } from '../contexts/DeliveryContext';
 import { useProfile } from '../contexts/ProfileContext';
 import formatCurrency from '../utils/currency';
 import { formatMinutesToUX } from '../utils/timeFormat';
@@ -180,15 +181,21 @@ const CheckoutScreen = ({ route, navigation }) => {
 
   const [showCancelModal, setShowCancelModal] = useState(false);
 
-  // Real-time delivery estimate via Google Distance Matrix
-  const [realTimeDeliveryEstimate, setRealTimeDeliveryEstimate] = useState(null);
+  const { fetchEstimate, getFormattedRange } = useDelivery();
+  const vLat = cartData?.vendorLatitude || cartData?.vendor?.latitude || cartData?.location?.latitude;
+  const vLng = cartData?.vendorLongitude || cartData?.vendor?.longitude || cartData?.location?.longitude;
+  const vId = cartData?.vendorId || cartData?.vendor?._id;
 
-  // Helper: get display delivery time (real-time > vendor default > fallback)
-  const deliveryTimeDisplay = realTimeDeliveryEstimate
-    || (cartData?.estimatedDeliveryTime ? formatMinutesToUX(cartData.estimatedDeliveryTime) : null)
-    || '25-35 min';
+  useEffect(() => {
+    if (vId && vLat && vLng) {
+      fetchEstimate(vId, vLat, vLng);
+    }
+  }, [vId, vLat, vLng, currentLocation?.latitude, currentLocation?.longitude]);
 
-  // ... (existing state) ...
+  const deliveryTimeDisplay = getFormattedRange(
+    vId, 
+    cartData?.estimatedDeliveryTime ? String(cartData.estimatedDeliveryTime) : '25-35 min'
+  );
 
   const handleUpdateNif = async () => {
     if (!nifValue.trim()) {
@@ -229,31 +236,6 @@ const CheckoutScreen = ({ route, navigation }) => {
 
 
 
-
-  // Real-time delivery estimate - calculate on mount using Google Distance Matrix
-  useEffect(() => {
-    const vendorLat = cartData?.vendorLatitude || cartData?.vendor?.latitude || cartData?.location?.latitude;
-    const vendorLng = cartData?.vendorLongitude || cartData?.vendor?.longitude || cartData?.location?.longitude;
-    const custLat = currentLocation?.latitude;
-    const custLng = currentLocation?.longitude;
-
-    if (!vendorLat || !vendorLng || !custLat || !custLng) {
-      console.warn('[CheckoutScreen] Coordinates missing for real-time estimate:', { vendorLat, vendorLng, custLat, custLng });
-      return;
-    }
-
-    const origin = { latitude: custLat, longitude: custLng };
-    const destination = { latitude: vendorLat, longitude: vendorLng };
-    const prepTime = cartData?.estimatedPrepTime || cartData?.prepTime || 10;
-
-    console.log('[CheckoutScreen] Calculating real-time delivery estimate...');
-    getRealTimeDeliveryEstimate(origin, destination, prepTime).then(estimate => {
-      if (estimate) {
-        console.log('[CheckoutScreen] Real-time estimate:', estimate);
-        setRealTimeDeliveryEstimate(estimate);
-      }
-    });
-  }, [currentLocation?.latitude, currentLocation?.longitude, cartData?.vendorLatitude, cartData?.vendorLongitude]);
 
   // Build full address string from all components
   const fullAddressParts = [
@@ -1186,56 +1168,67 @@ const CheckoutScreen = ({ route, navigation }) => {
     setShowCancelModal(true);
   };
 
+  const getSafeSuccessEta = () => {
+    const fallback = `25-35 ${t('min') || 'min'}`;
+    const rawEta =
+      cartData?.estimatedDeliveryTime ??
+      checkoutResponse?.delivery?.estimatedTime ??
+      deliveryTimeDisplay;
+
+    if (rawEta === null || rawEta === undefined || rawEta === '') return fallback;
+
+    const formatted = formatMinutesToUX(String(rawEta));
+    const output = String(formatted || '').trim();
+    if (!output) return fallback;
+
+    const values = (output.match(/\d+/g) || []).map(Number).filter(n => Number.isFinite(n));
+    if (!values.length) return fallback;
+
+    const maxValue = Math.max(...values);
+    const hasHourUnit = /hour/i.test(output);
+
+    // Guard unrealistic delivery ETA values in the success sheet.
+    if ((hasHourUnit && maxValue > 5) || maxValue > 300) return fallback;
+
+    return output;
+  };
+
   const renderSuccessModal = () => (
     <Modal visible={showSuccessModal} transparent animationType="slide">
       <View style={styles(colors).modalOverlay}>
-        <View style={[styles(colors).successModal, { paddingBottom: 40 }]}>
-          <View style={styles(colors).successIconContainer}>
-            <View style={{
-              width: 100,
-              height: 100,
-              borderRadius: 50,
-              backgroundColor: '#E8F5E9',
-              alignItems: 'center',
-              justifyContent: 'center',
-              marginBottom: 10
-            }}>
-              <Ionicons name="checkmark-done-circle" size={80} color={colors.success} />
+        <View style={styles(colors).successModal}>
+          <View style={styles(colors).successIconShell}>
+            <View style={styles(colors).successIconCore}>
+              <Ionicons name="checkmark" size={34} color="#FFFFFF" />
             </View>
           </View>
-          <Text style={styles(colors).successTitle}>{t('orderPlacedSuccessfully') === 'orderPlacedSuccessfully' ? 'Order Placed!' : t('orderPlacedSuccessfully')}</Text>
+          <Text style={styles(colors).successTitle}>{t('orderPlacedSuccessfully') === 'orderPlacedSuccessfully' ? 'Order Placed Successfully!' : t('orderPlacedSuccessfully')}</Text>
           <Text style={styles(colors).successMessage}>
             {t('paymentConfirmedInfo') === 'paymentConfirmedInfo' ? 'Your payment was successful. We are now preparing your order.' : t('paymentConfirmedInfo')}
           </Text>
-          <View style={[styles(colors).successDetails, { backgroundColor: colors.background, padding: 16, borderRadius: 16, width: '100%', marginBottom: 24 }]}>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-              <Text style={{ fontFamily: 'Poppins-Regular', color: colors.text.secondary, flexShrink: 1, marginRight: 8 }}>{t('amountPaid') || 'Amount Paid'}</Text>
-              <Text style={{ fontFamily: 'Poppins-Bold', color: colors.text.primary, flexShrink: 0 }}>{formatCurrency(currency, displayTotal)}</Text>
+
+          <View style={styles(colors).successDetails}>
+            <View style={styles(colors).successRow}>
+              <View style={styles(colors).successRowLeft}>
+                <View style={styles(colors).successDot} />
+                <Text style={styles(colors).successLabel}>{t('amountPaid') || 'Amount Paid'}</Text>
+              </View>
+              <Text style={styles(colors).successValue}>{formatCurrency(currency, displayTotal)}</Text>
             </View>
-            <View style={{ flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' }}>
-              <Text style={{ fontFamily: 'Poppins-Regular', color: colors.text.secondary, flexShrink: 1, marginRight: 8 }}>{t('estimatedDelivery') || 'Estimated Delivery'}</Text>
-              <Text style={{ fontFamily: 'Poppins-Bold', color: colors.primary, flexShrink: 0 }}>
-                {cartData?.estimatedDeliveryTime
-                  ? formatMinutesToUX(cartData.estimatedDeliveryTime)
-                  : `25-35 ${t('min') || 'min'}`}
-              </Text>
+
+            <View style={styles(colors).successDivider} />
+
+            <View style={styles(colors).successRow}>
+              <View style={styles(colors).successRowLeft}>
+                <Ionicons name="time-outline" size={16} color={colors.primary} style={{ marginRight: 8 }} />
+                <Text style={styles(colors).successLabel}>{t('estimatedDelivery') || 'Estimated Delivery'}</Text>
+              </View>
+              <Text style={styles(colors).successEta}>{getSafeSuccessEta()}</Text>
             </View>
           </View>
 
           <TouchableOpacity
-            style={{
-              backgroundColor: colors.primary,
-              paddingVertical: 16,
-              paddingHorizontal: 40,
-              borderRadius: 30,
-              elevation: 4,
-              shadowColor: colors.primary,
-              shadowOffset: { width: 0, height: 4 },
-              shadowOpacity: 0.3,
-              shadowRadius: 8,
-              width: '100%',
-              alignItems: 'center'
-            }}
+            style={styles(colors).successCta}
             onPress={() => {
               setShowSuccessModal(false);
               navigation.reset({
@@ -1248,6 +1241,8 @@ const CheckoutScreen = ({ route, navigation }) => {
               {t('viewOrderDetails') || 'View Order'}
             </Text>
           </TouchableOpacity>
+
+          <Text style={styles(colors).successHint}>{t('orderWillAppearInOrders') || 'You can track this order anytime from Orders.'}</Text>
         </View>
       </View>
     </Modal>
@@ -2844,10 +2839,12 @@ const styles = (colors) => StyleSheet.create({
   },
   successModal: {
     backgroundColor: colors.surface,
-    padding: 32,
-    borderRadius: 24,
+    paddingHorizontal: 22,
+    paddingTop: 22,
+    paddingBottom: 20,
+    borderRadius: 22,
     alignItems: 'center',
-    maxWidth: 360,
+    maxWidth: 380,
     width: '100%',
     shadowColor: colors.shadow,
     shadowOffset: { width: 0, height: 10 },
@@ -2860,30 +2857,107 @@ const styles = (colors) => StyleSheet.create({
   successIconContainer: {
     marginBottom: 20,
   },
+  successIconShell: {
+    width: 88,
+    height: 88,
+    borderRadius: 44,
+    backgroundColor: 'rgba(76,175,80,0.14)',
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: 14,
+  },
+  successIconCore: {
+    width: 62,
+    height: 62,
+    borderRadius: 31,
+    backgroundColor: colors.success,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
   successTitle: {
-    fontSize: 24,
+    fontSize: 30,
     fontFamily: 'Poppins-Bold',
     color: colors.text.primary,
     textAlign: 'center',
-    marginBottom: 10,
+    marginBottom: 8,
+    lineHeight: 38,
   },
   successMessage: {
     fontSize: 15,
     fontFamily: 'Poppins-Regular',
     color: colors.text.secondary,
     textAlign: 'center',
-    marginBottom: 24,
-    lineHeight: 23,
+    marginBottom: 18,
+    lineHeight: 24,
   },
   successDetails: {
-    alignItems: 'center',
     backgroundColor: colors.background,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 16,
+    paddingVertical: 14,
+    paddingHorizontal: 14,
+    borderRadius: 18,
     width: '100%',
+    marginBottom: 18,
     borderWidth: 1,
     borderColor: colors.border,
+  },
+  successRow: {
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    minHeight: 34,
+  },
+  successRowLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    flex: 1,
+    marginRight: 10,
+  },
+  successDot: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+    backgroundColor: colors.success,
+    marginRight: 8,
+  },
+  successLabel: {
+    fontSize: 14,
+    fontFamily: 'Poppins-Regular',
+    color: colors.text.secondary,
+  },
+  successValue: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Bold',
+    color: colors.text.primary,
+  },
+  successEta: {
+    fontSize: 16,
+    fontFamily: 'Poppins-Bold',
+    color: colors.primary,
+  },
+  successDivider: {
+    height: 1,
+    backgroundColor: colors.border,
+    marginVertical: 8,
+  },
+  successCta: {
+    backgroundColor: colors.primary,
+    paddingVertical: 16,
+    paddingHorizontal: 24,
+    borderRadius: 30,
+    elevation: 4,
+    shadowColor: colors.primary,
+    shadowOffset: { width: 0, height: 4 },
+    shadowOpacity: 0.3,
+    shadowRadius: 8,
+    width: '100%',
+    alignItems: 'center',
+  },
+  successHint: {
+    marginTop: 10,
+    fontSize: 12,
+    fontFamily: 'Poppins-Regular',
+    color: colors.text.secondary,
+    textAlign: 'center',
   },
   successDetailText: {
     fontSize: 14,

@@ -58,15 +58,15 @@ const AccountSupportScreen = () => {
 
             <View style={[styles.header, { backgroundColor: colors.card, borderBottomColor: colors.border }]}>
                 <TouchableOpacity onPress={() => navigation.goBack()} style={styles.backButton}>
-                    <Ionicons name="arrow-back" size={24} color={colors.text} />
+                    <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
                 </TouchableOpacity>
-                <Text style={[styles.headerText, { color: colors.text }]}>{t('supportCenter') || 'Support Center'}</Text>
+                <Text style={[styles.headerText, { color: colors.text.primary }]}>{t('supportCenter') || 'Support Center'}</Text>
                 <View style={styles.placeholder} />
             </View>
 
             {/* Reassurance Banner */}
             <View style={[styles.reassuranceContainer, { backgroundColor: colors.card }]}>
-                <Text style={[styles.reassuranceText, { color: colors.textSecondary }]}>
+                <Text style={[styles.reassuranceText, { color: colors.text.secondary }]}>
                     {t('supportSubtitle') || 'We are here to help you with any issues you may have.'}
                 </Text>
             </View>
@@ -74,7 +74,7 @@ const AccountSupportScreen = () => {
             <ScrollView contentContainerStyle={styles.content} showsVerticalScrollIndicator={false}>
                 {/* Profile Card */}
                 <View style={styles.section}>
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('yourAccount') || 'Your Account'}</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('yourAccount') || 'Your Account'}</Text>
                     <View style={[styles.profileCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                         {isLoading ? (
                             <ActivityIndicator size="small" color={colors.primary} />
@@ -87,10 +87,10 @@ const AccountSupportScreen = () => {
                                         </Text>
                                     </View>
                                     <View style={styles.profileInfo}>
-                                        <Text style={[styles.profileName, { color: colors.text }]}>
+                                        <Text style={[styles.profileName, { color: colors.text.primary }]}>
                                             {getFullName()}
                                         </Text>
-                                        <Text style={[styles.profileEmail, { color: colors.textSecondary }]}>
+                                        <Text style={[styles.profileEmail, { color: colors.text.secondary }]}>
                                             {profile?.email}
                                         </Text>
                                     </View>
@@ -110,7 +110,7 @@ const AccountSupportScreen = () => {
 
                 {/* Issue Types */}
                 <View style={styles.section}>
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('whatCanWeHelpWith') || 'What can we help you with?'}</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('whatCanWeHelpWith') || 'What can we help you with?'}</Text>
                     {issueTypes.map((issue) => (
                         <TouchableOpacity
                             key={issue.id}
@@ -120,15 +120,15 @@ const AccountSupportScreen = () => {
                             <View style={[styles.issueIconContainer, { backgroundColor: (colors.primary) + '15' }]}>
                                 <Ionicons name={issue.icon} size={22} color={colors.primary} />
                             </View>
-                            <Text style={[styles.issueText, { color: colors.text }]}>{issue.label}</Text>
-                            <Ionicons name="chevron-forward" size={18} color={colors.textSecondary} />
+                            <Text style={[styles.issueText, { color: colors.text.primary }]}>{issue.label}</Text>
+                            <Ionicons name="chevron-forward" size={18} color={colors.text.secondary} />
                         </TouchableOpacity>
                     ))}
                 </View>
 
                 {/* FAQs */}
                 <View style={styles.section}>
-                    <Text style={[styles.sectionTitle, { color: colors.text }]}>{t('popularQuestions') || 'Popular Questions'}</Text>
+                    <Text style={[styles.sectionTitle, { color: colors.text.primary }]}>{t('popularQuestions') || 'Popular Questions'}</Text>
                     {faqs.map((faq) => (
                         <View key={faq.id} style={[styles.faqCard, { backgroundColor: colors.card, borderColor: colors.border }]}>
                             <TouchableOpacity
@@ -136,16 +136,16 @@ const AccountSupportScreen = () => {
                                 onPress={() => setExpandedFaqId(expandedFaqId === faq.id ? null : faq.id)}
                             >
                                 <Ionicons name="help-circle-outline" size={20} color={colors.primary} />
-                                <Text style={[styles.faqQuestion, { color: colors.text }]}>{faq.question}</Text>
+                                <Text style={[styles.faqQuestion, { color: colors.text.primary }]}>{faq.question}</Text>
                                 <Ionicons
                                     name={expandedFaqId === faq.id ? "chevron-up" : "chevron-down"}
                                     size={18}
-                                    color={colors.textSecondary}
+                                    color={colors.text.secondary}
                                 />
                             </TouchableOpacity>
                             {expandedFaqId === faq.id && (
                                 <View style={styles.faqBody}>
-                                    <Text style={[styles.faqAnswer, { color: colors.textSecondary }]}>{faq.answer}</Text>
+                                    <Text style={[styles.faqAnswer, { color: colors.text.secondary }]}>{faq.answer}</Text>
                                 </View>
                             )}
                         </View>

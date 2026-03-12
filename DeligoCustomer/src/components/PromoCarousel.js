@@ -105,6 +105,7 @@ const PromoCarousel = ({ promos: propPromos = [], onPress, refreshTrigger = 0 })
     /* ── Transition: all cards move together ── */
     const triggerTransition = () => {
         if (isTransitioning.current) return;
+        if (apiPromos.length <= 1) return; // Block transition if only 1 promo
         isTransitioning.current = true;
 
         // Reset interactive swipe immediately (before any render)
@@ -133,7 +134,7 @@ const PromoCarousel = ({ promos: propPromos = [], onPress, refreshTrigger = 0 })
             backCardsOp.setValue(0);
 
             // Step 2: Update React state (batched in same tick)
-            setDisplayIndex(prev => (prev + 1) % finalPromos.length);
+            setDisplayIndex(prev => (prev + 1) % apiPromos.length);
             setIsAnimating(false); // stable-front now renders at swipeX=0 (already reset above)
             isTransitioning.current = false;
 
@@ -156,13 +157,19 @@ const PromoCarousel = ({ promos: propPromos = [], onPress, refreshTrigger = 0 })
     };
 
     /* ── Pan ── */
+    // Use a ref to hold the latest triggerTransition to avoid stale closures in PanResponder
+    const latestTriggerTransition = useRef(triggerTransition);
+    useEffect(() => {
+        latestTriggerTransition.current = triggerTransition;
+    }, [triggerTransition]);
+
     const swipeRotate = swipeX.interpolate({
         inputRange: [-width, 0, width],
         outputRange: ['-10deg', '0deg', '10deg'],
         extrapolate: 'clamp',
     });
     const pan = useRef(PanResponder.create({
-        onStartShouldSetPanResponder: () => !isTransitioning.current,
+        onStartShouldSetPanResponder: () => false,
         onMoveShouldSetPanResponder: (_, g) => !isTransitioning.current && Math.abs(g.dx) > 5,
         onPanResponderMove: (_, g) => {
             swipeX.setValue(g.dx);
@@ -170,7 +177,7 @@ const PromoCarousel = ({ promos: propPromos = [], onPress, refreshTrigger = 0 })
         },
         onPanResponderRelease: (_, g) => {
             if (g.dx < -SWIPE_THRESHOLD) {
-                triggerTransition();
+                latestTriggerTransition.current();
             } else {
                 Animated.spring(swipeX, { toValue: 0, friction: 5, tension: 90, useNativeDriver: true }).start();
             }

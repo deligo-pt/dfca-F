@@ -6,6 +6,7 @@ import { useTheme } from '../utils/ThemeContext';
 import { spacing, fontSize, borderRadius } from '../theme';
 import { useLanguage } from '../utils/LanguageContext';
 import { useLocation } from '../contexts/LocationContext';
+import { useDelivery } from '../contexts/DeliveryContext';
 import formatCurrency from '../utils/currency';
 import { formatMinutesToUX } from '../utils/timeFormat';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
@@ -26,23 +27,15 @@ export default function CartList({ navigation }) {
   const [deletingVendorId, setDeletingVendorId] = useState(null);
   const [switchingVendorId, setSwitchingVendorId] = useState(null);
   const [vendorDetailsCache, setVendorDetailsCache] = useState({});
-  // Keyed by vendorId → drive time in minutes (number)
-  const [deliveryTimesCache, setDeliveryTimesCache] = useState({});
+  const { fetchEstimate, getFormattedRange } = useDelivery();
 
-  // ── Fetch Google ETA for each vendor once ──────────────────────────────────
-  // MUST be before any early return (React Rules of Hooks)
+  // ── Centralized Delivery ETA ─────────────────────────────────────────────
   React.useEffect(() => {
-    let active = true;
-    const GOOGLE_KEY = 'AIzaSyCZ1jixNYbSRM21Uq82a6KXNO_FSpLUwaQ';
-    const lat1 = currentLocation?.latitude;
-    const lon1 = currentLocation?.longitude;
-    if (!lat1 || !lon1 || !cartsArray?.length) return;
+    if (!cartsArray?.length) return;
 
     cartsArray.forEach(cart => {
       const vid = cart.vendorId;
-      if (deliveryTimesCache[vid] !== undefined) return;
-
-      let vendorLat = null, vendorLon = null;
+      // Try to resolve vendor coords from products
       if (products && products.length > 0) {
         const match = products.find(p => {
           const v = p.vendor || {}; const r = p._raw || {}; const rv = r.vendor || {};
@@ -50,40 +43,12 @@ export default function CartList({ navigation }) {
           return String(v.vendorId) === vs || String(v._id) === vs || String(rv.vendorId) === vs || String(rv._id) === vs;
         });
         const v = match?.vendor || match?._raw?.vendor;
-        vendorLat = v?.latitude;
-        vendorLon = v?.longitude;
+        if (v?.latitude && v?.longitude) {
+           fetchEstimate(vid, v.latitude, v.longitude);
+        }
       }
-      if (!vendorLat || !vendorLon) return;
-
-      const lat2 = parseFloat(vendorLat);
-      const lon2 = parseFloat(vendorLon);
-      if (isNaN(lat2) || isNaN(lon2)) return;
-
-      const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${lat1},${lon1}&destinations=${lat2},${lon2}&mode=driving&key=${GOOGLE_KEY}`;
-
-      fetch(url)
-        .then(r => r.json())
-        .then(data => {
-          if (!active) return;
-          const el = data?.rows?.[0]?.elements?.[0];
-          let driveMin;
-          if (data.status === 'OK' && el?.status === 'OK') {
-            driveMin = Math.ceil(el.duration.value / 60) + 10;
-          } else {
-            const R = 6371;
-            const dLat = (lat2 - lat1) * (Math.PI / 180);
-            const dLon = (lon2 - lon1) * (Math.PI / 180);
-            const a = Math.sin(dLat/2)**2 + Math.cos(lat1*(Math.PI/180))*Math.cos(lat2*(Math.PI/180))*Math.sin(dLon/2)**2;
-            const distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-            driveMin = Math.max(10, Math.round(distKm * 3) + 10);
-          }
-          setDeliveryTimesCache(prev => ({ ...prev, [vid]: driveMin }));
-        })
-        .catch(() => {});
     });
-
-    return () => { active = false; };
-  }, [currentLocation?.latitude, currentLocation?.longitude, cartsArray?.length]);
+  }, [cartsArray?.length, products]);
   // ──────────────────────────────────────────────────────────────────────────
 
   if (!cartsArray || cartsArray.length === 0) return null;
@@ -144,11 +109,11 @@ export default function CartList({ navigation }) {
           const num = Number(val); return !isNaN(num) ? num : null;
         };
 
-        // Use cached Google estimate (number) or fallback string
-        const cachedMin = deliveryTimesCache[cart.vendorId];
-        const finalDeliveryTime = cachedMin
-          ? `${formatMinutesToUX(cachedMin)} - ${formatMinutesToUX(cachedMin + 5)}`
-          : formatMinutesToUX(cached?.deliveryTime || cart.vendorDeliveryTime || pcVendor?.deliveryTime || firstItem?._raw?.vendor?.deliveryTime || '20 - 30 min');
+        // Use centralized delivery time
+        const finalDeliveryTime = getFormattedRange(
+          cart.vendorId, 
+          cached?.deliveryTime || cart.vendorDeliveryTime || pcVendor?.deliveryTime || firstItem?._raw?.vendor?.deliveryTime || '20 - 30 min'
+        );
 
         const ratingSources = [productContextMatch?.rating, productContextMatch?._raw?.rating, firstItem?.product?.productRating, firstItem?.product?.vendorRating, firstItem?._raw?.rating, cached?.rating, cart.vendorRating, firstItem?._raw?.vendorId?.rating, pcVendor?.rating, pcVendor?.businessDetails?.rating, firstItem?._raw?.vendor?.rating, firstItem?._raw?.businessDetails?.rating];
         let finalVendorRating = null;

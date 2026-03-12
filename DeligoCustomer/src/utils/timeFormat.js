@@ -10,23 +10,17 @@ export const formatMinutesToUX = (timeInput) => {
   if (!timeInput) return '';
 
   const formatSingle = (mins) => {
-    // Safety check: if mins is suspiciously large (e.g., > 8 hours), 
-    // it's likely a bug or seconds being passed as minutes.
-    if (mins >= 480) {
-        return '25-35 min';
-    }
+    if (!mins || mins <= 0) return '15 min';
 
     const hours = Math.floor(mins / 60);
     const minutes = mins % 60;
     
     if (hours === 0) {
       return `${minutes} min`;
-    } else if (hours > 24) {
-      const realMins = Math.floor(mins / 60);
-      return realMins > 0 ? `${realMins} min` : '25-35 min';
     } else if (minutes === 0) {
       return `${hours} hour`;
     } else {
+      // Always "X hour Y min" format as requested
       return `${hours} hour ${minutes} min`;
     }
   };
@@ -36,27 +30,25 @@ export const formatMinutesToUX = (timeInput) => {
   }
 
   if (typeof timeInput === 'string') {
-    // ── Guard: already human-readable like "25-35 min" or "25 min - 35 min"
-    // Patterns that are ALREADY formatted — return as-is to prevent doubling
-    const alreadyFormatted = /^\d+(\s*hour)?\s*(\d+\s*min)?\s*-\s*\d+(\s*hour)?\s*(\d+\s*min)?$/.test(timeInput.trim())
-      || /^\d+\s*min$/.test(timeInput.trim())
-      || /^\d+\s*hour$/.test(timeInput.trim())
-      || /^\d+\s*hour\s+\d+\s*min$/.test(timeInput.trim());
+    const trimmed = timeInput.trim();
+    
+    // ── Better Guard: Check if it already contains "min" or "hour"
+    // If it looks like "25-35 min", "1 hour 5 min", etc., just return it
+    if (trimmed.includes('min') || trimmed.includes('hour')) {
+      return trimmed;
+    }
 
-    if (alreadyFormatted) return timeInput.trim();
-
-    // Check for ranges like "25-35 min" or "25 - 35"
-    const rangeMatch = timeInput.match(/(\d+)\s*-\s*(\d+)/);
+    // Check for ranges like "25-35" or "25 - 35" (raw numbers)
+    const rangeMatch = trimmed.match(/^(\d+)\s*[-]\s*(\d+)$/);
     if (rangeMatch) {
       const start = parseInt(rangeMatch[1], 10);
       const end = parseInt(rangeMatch[2], 10);
       return `${formatSingle(start)} - ${formatSingle(end)}`;
     }
 
-    // Check for single number in string like "45 min" or "45"
-    const singleMatch = timeInput.match(/(\d+)/);
-    if (singleMatch) {
-      return formatSingle(parseInt(singleMatch[1], 10));
+    // Check for single raw number strings like "45"
+    if (/^\d+$/.test(trimmed)) {
+      return formatSingle(parseInt(trimmed, 10));
     }
   }
 

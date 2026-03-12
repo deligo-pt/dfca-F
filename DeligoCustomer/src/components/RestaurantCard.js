@@ -5,6 +5,7 @@ import { useTheme } from '../utils/ThemeContext';
 import { Ionicons } from '@expo/vector-icons';
 import * as Location from 'expo-location';
 import { useLocation } from '../contexts/LocationContext';
+import { useDelivery } from '../contexts/DeliveryContext';
 import { formatMinutesToUX } from '../utils/timeFormat';
 
 /**
@@ -38,8 +39,8 @@ const RestaurantCard = ({ restaurant, onPress }) => {
 
   const businessDetails = mergedVendor.businessDetails || {};
 
-  // Resolve visual assets
-  const imageUrl = mergedVendor.storePhoto || mergedVendor.logo || (Array.isArray(p.images) && p.images[0]) || null;
+  // Resolve visual assets. Stop falling back to product images for restaurant banners.
+  const imageUrl = mergedVendor.storePhoto || mergedVendor.logo || businessDetails?.storePhoto || null;
   const imageSource = imageUrl ? { uri: imageUrl } : require('../assets/images/logonew.png');
 
   // Resolve display name
@@ -79,56 +80,33 @@ const RestaurantCard = ({ restaurant, onPress }) => {
     return '';
   }).filter(t => t);
 
+  const { fetchEstimate, getFormattedRange } = useDelivery();
+
   const deliveryTime = mergedVendor.deliveryTime || p.deliveryTime || null;
 
   // ---------------------------------------------------------------------------
-  // Dynamic Delivery Time Calculation
+  // Centralized Delivery Time
   // ---------------------------------------------------------------------------
-
   React.useEffect(() => {
-    let active = true;
-    const lat1 = currentLocation?.latitude;
-    const lon1 = currentLocation?.longitude;
-    const lat2 = mergedVendor.latitude || p.latitude;
-    const lon2 = mergedVendor.longitude || p.longitude;
+    const rawVid = mergedVendor.vendorId || mergedVendor._id || p.vendorId || p._id;
+    // Handle cases where the ID might be a mongo object or inside another property
+    const vid = typeof rawVid === 'object' ? rawVid?._id : rawVid;
 
-    if (!lat1 || !lon1 || !lat2 || !lon2) return;
+    const lat = mergedVendor.latitude || p.latitude;
+    const lon = mergedVendor.longitude || p.longitude;
+    if (vid && lat && lon) {
+      fetchEstimate(vid, lat, lon);
+    }
+  }, [mergedVendor, p.vendorId, p._id, p.latitude, p.longitude]);
 
-    const GOOGLE_KEY = 'AIzaSyCZ1jixNYbSRM21Uq82a6KXNO_FSpLUwaQ';
-    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${lat1},${lon1}&destinations=${lat2},${lon2}&mode=driving&key=${GOOGLE_KEY}`;
+  // Use the global formatted range from context
+  const rawVid = mergedVendor.vendorId || mergedVendor._id || p.vendorId || p._id;
+  const vid = typeof rawVid === 'object' ? rawVid?._id : rawVid;
 
-    fetch(url)
-      .then(r => r.json())
-      .then(data => {
-        if (!active) return;
-        const el = data?.rows?.[0]?.elements?.[0];
-        if (data.status === 'OK' && el?.status === 'OK') {
-          const driveMin = Math.ceil(el.duration.value / 60);
-          const prepTime = 10;
-          const total = driveMin + prepTime;
-          setEstimatedTime(total); // store as NUMBER
-        } else {
-          // Haversine fallback
-          const R = 6371;
-          const dLat = (lat2 - lat1) * (Math.PI / 180);
-          const dLon = (lon2 - lon1) * (Math.PI / 180);
-          const a = Math.sin(dLat/2)**2 + Math.cos(lat1*(Math.PI/180))*Math.cos(lat2*(Math.PI/180))*Math.sin(dLon/2)**2;
-          const distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-          const baseTime = Math.max(10, Math.round(distKm * 3) + 10);
-          setEstimatedTime(baseTime); // store as NUMBER
-        }
-      })
-      .catch(() => {
-        // silent fail — will show vendor deliveryTime fallback
-      });
-
-    return () => { active = false; };
-  }, [currentLocation?.latitude, currentLocation?.longitude, mergedVendor.latitude, mergedVendor.longitude, p.latitude, p.longitude]);
-
-  // estimatedTime is a NUMBER (minutes). Format as 'X hour Y min - X hour Y+5 min'
-  const finalDeliveryTime = estimatedTime
-    ? `${formatMinutesToUX(estimatedTime)} - ${formatMinutesToUX(estimatedTime + 5)}`
-    : formatMinutesToUX(deliveryTime || '20 - 30 min');
+  const finalDeliveryTime = getFormattedRange(
+    vid, 
+    deliveryTime || '25 - 35 min'
+  );
 
   // ---------------------------------------------------------------------------
   // Location Logic

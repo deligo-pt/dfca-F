@@ -42,6 +42,7 @@ import { useProducts } from "../contexts/ProductsContext";
 import { useLanguage } from "../utils/LanguageContext";
 import { useCart } from "../contexts/CartContext";
 import { useLocation } from "../contexts/LocationContext";
+import { useDelivery } from "../contexts/DeliveryContext";
 import formatCurrency from "../utils/currency";
 import { formatMinutesToUX } from "../utils/timeFormat";
 import * as Location from "expo-location";
@@ -53,62 +54,8 @@ import { GOOGLE_MAPS_CONFIG } from "../constants/config";
 const RestaurantDetailsScreen = ({ route, navigation }) => {
   const { colors, isDarkMode } = useTheme();
   const { t } = useLanguage();
-  // SAFETY CHECK: Ensure route params exist
-  if (!route || !route.params || !route.params.restaurant) {
-    console.error(
-      "[RestaurantDetailsScreen] Missing restaurant data in route params",
-    );
-    // If navigation is available, go back after a tick, otherwise return error view
-    // useEffect to trigger navigation safely
-    useEffect(() => {
-      if (navigation && navigation.canGoBack()) navigation.goBack();
-    }, []);
-    return (
-      <SafeAreaView
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-          backgroundColor: colors.background,
-        }}
-      >
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={{ marginTop: 16, color: colors.text.secondary }}>
-          {t("loading") || "Loading..."}
-        </Text>
-      </SafeAreaView>
-    );
-  }
-
   const insets = useSafeAreaInsets();
-
-  // SAFETY CHECK: Ensure route params exist
-  if (!route || !route.params || !route.params.restaurant) {
-    console.error(
-      "[RestaurantDetailsScreen] Missing restaurant data in route params",
-    );
-    // useEffect to trigger navigation safely
-    useEffect(() => {
-      if (navigation && navigation.canGoBack()) navigation.goBack();
-    }, []);
-    return (
-      <SafeAreaView
-        style={{
-          flex: 1,
-          justifyContent: "center",
-          alignItems: "center",
-          backgroundColor: colors.background,
-        }}
-      >
-        <ActivityIndicator size="large" color={colors.primary} />
-        <Text style={{ marginTop: 16, color: colors.text.secondary }}>
-          {t("loading") || "Loading..."}
-        </Text>
-      </SafeAreaView>
-    );
-  }
-
-  const { restaurant } = route.params;
+  const { restaurant } = route?.params || {};
 
   // Normalize rating
   const _r = restaurant || {};
@@ -343,10 +290,23 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   // Access normalized vendor if available, else raw nested object, else raw flat props
   const normVendor = restaurant.vendor || {};
   const rawVendorObj = restaurant._raw?.vendorId || {};
+  const rawVendorFlat = restaurant._raw?.vendor || {};
 
   // Enhanced Vendor Details extraction for display
   const vendorBusinessDetails =
-    rawVendorObj?.businessDetails || normVendor?.businessDetails || {};
+    rawVendorObj?.businessDetails || normVendor?.businessDetails || rawVendorFlat?.businessDetails || {};
+  
+  // Resolve correct store photo
+  const vendorStorePhoto = 
+    normVendor?.storePhoto || 
+    normVendor?.logo ||
+    rawVendorObj?.documents?.storePhoto ||
+    rawVendorObj?.storePhoto ||
+    rawVendorObj?.logo ||
+    rawVendorFlat?.documents?.storePhoto ||
+    rawVendorFlat?.storePhoto ||
+    rawVendorFlat?.logo ||
+    null;
   const vendorOpeningHours = vendorBusinessDetails.openingHours;
   const vendorClosingHours = vendorBusinessDetails.closingHours;
   const formattedHours =
@@ -410,70 +370,16 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
   // Dynamic Delivery Time Calculation
   // ---------------------------------------------------------------------------
   const { currentLocation } = useLocation();
-  const [estimatedTime, setEstimatedTime] = useState(null);
+  const { fetchEstimate, getFormattedRange } = useDelivery();
 
   useEffect(() => {
-    let active = true;
-    const GOOGLE_MAPS_API_KEY = GOOGLE_MAPS_CONFIG.apiKey;
-
-    const fetchGoogleEta = async (origin, destination) => {
-      try {
-        const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${origin.latitude},${origin.longitude}&destinations=${destination.latitude},${destination.longitude}&key=${GOOGLE_MAPS_API_KEY}`;
-        const response = await fetch(url);
-        const data = await response.json();
-
-        if (active && data.status === 'OK' && data.rows[0].elements[0].status === 'OK') {
-          const duration = data.rows[0].elements[0].duration;
-          // duration.value is in seconds
-          const travelMinutes = Math.ceil(duration.value / 60);
-          const prepTime = 10; // Standardized — matches RestaurantCard and CartDetail
-          const totalMinutes = travelMinutes + prepTime;
-
-          // Store totalMinutes as number — formatMinutesToUX will produce "X hour Y min - X hour Y+5 min"
-          setEstimatedTime(totalMinutes);
-          return true;
-        }
-        return false;
-      } catch (error) {
-        console.error('[RestaurantDetails] Google API fetch failed:', error);
-        return false;
-      }
-    };
-
-    const calculateFallbackEta = (lat1, lon1, lat2, lon2) => {
-      const R = 6371; // km
-      const dLat = (lat2 - lat1) * (Math.PI / 180);
-      const dLon = (lon2 - lon1) * (Math.PI / 180);
-      const a = Math.sin(dLat / 2) * Math.sin(dLat / 2) +
-        Math.cos(lat1 * (Math.PI / 180)) * Math.cos(lat2 * (Math.PI / 180)) *
-        Math.sin(dLon / 2) * Math.sin(dLon / 2);
-      const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
-      const distKm = R * c;
-      const baseTime = Math.max(10, Math.round(distKm * 3.5) + 12);
-      setEstimatedTime(baseTime);
-    };
-
-    if (currentLocation && vendorCoords) {
-      fetchGoogleEta(currentLocation, vendorCoords).then(success => {
-        if (!success && active) {
-          calculateFallbackEta(
-            currentLocation.latitude,
-            currentLocation.longitude,
-            vendorCoords.latitude,
-            vendorCoords.longitude
-          );
-        }
-      });
+    if (vendorCoords && vendorId) {
+      fetchEstimate(vendorId, vendorCoords.latitude, vendorCoords.longitude);
     }
-
-    return () => { active = false; };
-  }, [currentLocation, vendorCoords]);
+  }, [vendorId, vendorCoords]);
 
   const deliveryTimeProp = normVendor.deliveryTime || restaurant._raw?.deliveryTime || null;
-  // estimatedTime is a number (minutes from Google/Haversine), format it to "X hour Y min - X hour Y+5 min"
-  const finalDeliveryTime = estimatedTime
-    ? `${formatMinutesToUX(estimatedTime)} - ${formatMinutesToUX(estimatedTime + 5)}`
-    : formatMinutesToUX(deliveryTimeProp || '20 - 30 min');
+  const finalDeliveryTime = getFormattedRange(vendorId, deliveryTimeProp || '20 - 30 min');
 
   useEffect(() => {
     let mounted = true;
@@ -1554,7 +1460,15 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                         closeProductModal();
                       } catch (error) {
                         console.error('[RestaurantDetails] Add to cart error:', error);
-                        setAlertConfig({ title: t('error') || 'Error', message: error.message || t('addToCartFailed') || 'Failed to add item to cart' });
+                        const rawMessage = String(error?.message || '');
+                        const isTimeoutLike = /aborted|timeout|timed out/i.test(rawMessage);
+                        const alertMessage = isTimeoutLike
+                          ? (t('networkSlowTryAgain') === 'networkSlowTryAgain'
+                            ? 'Network is slow. Please try adding the item again.'
+                            : t('networkSlowTryAgain'))
+                          : (error.message || t('addToCartFailed') || 'Failed to add item to cart');
+
+                        setAlertConfig({ title: t('error') || 'Error', message: alertMessage });
                         setAlertVisible(true);
                       } finally { setAddingToCart(false); }
                     }}
@@ -1612,6 +1526,22 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
       </Modal>
     );
   };
+
+  // Final safety guard for missing data - MUST be after all hooks to prevent crash
+  useEffect(() => {
+    if (!restaurant && navigation && navigation.canGoBack()) {
+      navigation.goBack();
+    }
+  }, [restaurant, navigation]);
+
+  if (!restaurant) {
+    return (
+      <SafeAreaView style={{ flex: 1, backgroundColor: colors.background, justifyContent: 'center', alignItems: 'center' }}>
+        <ActivityIndicator size="large" color={colors.primary} />
+        <Text style={{ marginTop: 16, color: colors.text.secondary }}>{t('loading') || 'Loading...'}</Text>
+      </SafeAreaView>
+    );
+  }
 
   return (
     <SafeAreaView
@@ -1737,9 +1667,9 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
             <View style={styles.vendorHero}>
               <Image
                 source={
-                  restaurant._raw?.vendor?.storePhoto
-                    ? { uri: restaurant._raw.vendor.storePhoto }
-                    : restaurant.image
+                  vendorStorePhoto
+                    ? { uri: vendorStorePhoto }
+                    : restaurant.image && !restaurant._raw?.productName // only use restaurant.image if it's actually a restaurant, not a product obj passed down
                       ? { uri: restaurant.image }
                       : require("../assets/images/logonew.png")
                 }
@@ -2067,7 +1997,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                 <Ionicons
                   name="share-social-outline"
                   size={22}
-                  color={colors.text.primary}
+                  color={colors.primary}
                 />
               </TouchableOpacity>
             </View>
@@ -2105,14 +2035,14 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                   <Ionicons
                     name="time"
                     size={20}
-                    color={colors.text.primary}
+                    color={colors.primary}
                     style={styles.vendorInfoIcon}
                   />
                   <View style={styles.vendorInfoContent}>
                     <Text
                       style={[
                         styles.vendorInfoLabel,
-                        { color: colors.text.primary },
+                        { color: colors.primary },
                       ]}
                     >
                       Open now
@@ -2135,14 +2065,14 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                       <Ionicons
                         name="call"
                         size={20}
-                        color={colors.text.primary}
+                        color={colors.primary}
                         style={styles.vendorInfoIcon}
                       />
                       <View style={styles.vendorInfoContent}>
                         <Text
                           style={[
                             styles.vendorInfoLabel,
-                            { color: colors.text.primary },
+                            { color: colors.primary },
                           ]}
                         >
                           Call us
@@ -2166,14 +2096,14 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                     <Ionicons
                       name="location"
                       size={20}
-                      color={colors.text.primary}
+                      color={colors.primary}
                       style={styles.vendorInfoIcon}
                     />
                     <View style={styles.vendorInfoContent}>
                       <Text
                         style={[
                           styles.vendorInfoLabel,
-                          { color: colors.text.primary },
+                          { color: colors.primary },
                         ]}
                       >
                         View map
@@ -2210,7 +2140,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                       <View pointerEvents="none">
                         <MapView
                           provider={PROVIDER_GOOGLE}
-                          style={{ width: "100%", height: 120, opacity: 0.9 }}
+                          style={{ width: "100%", height: 200, opacity: 0.9 }}
                           initialRegion={{
                             latitude: vendorCoords.latitude,
                             longitude: vendorCoords.longitude,
@@ -2230,7 +2160,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                     <View
                       style={{
                         width: "100%",
-                        height: 120,
+                        height: 200,
                         justifyContent: "center",
                         alignItems: "center",
                         opacity: 0.5,
@@ -2307,7 +2237,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                     <Text
                       style={[
                         styles.vendorRatingTitle,
-                        { color: colors.text.primary },
+                        { color: colors.primary },
                       ]}
                     >
                       Rating
@@ -2342,7 +2272,7 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                     <Text
                       style={[
                         styles.otherDetailsTitle,
-                        { color: colors.text.primary },
+                        { color: colors.primary },
                       ]}
                     >
                       Other details

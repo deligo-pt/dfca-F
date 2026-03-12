@@ -7,8 +7,8 @@ import { useTheme } from '../utils/ThemeContext';
 import { spacing, fontSize, borderRadius } from '../theme';
 import { useLanguage } from '../utils/LanguageContext';
 import { useLocation } from '../contexts/LocationContext';
+import { useDelivery } from '../contexts/DeliveryContext';
 import formatCurrency from '../utils/currency';
-import { formatMinutesToUX } from '../utils/timeFormat';
 import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
 import { LinearGradient } from 'expo-linear-gradient';
 import CheckoutAPI from '../utils/checkoutApi';
@@ -30,11 +30,18 @@ export default function CartDetail({ vendorId, navigation }) {
   const cart = getVendorCart(vendorId);
   const { colors, isDarkMode } = useTheme();
   const { currentLocation } = useLocation();
+  const { fetchEstimate, getFormattedRange } = useDelivery();
   const [updatingItem, setUpdatingItem] = useState(null);
   const [refreshing, setRefreshing] = useState(false);
   const [checkingOut, setCheckingOut] = useState(false);
   const [alertVisible, setAlertVisible] = useState(false);
   const [alertConfig, setAlertConfig] = useState({ title: '', message: '', buttons: [] });
+
+  const firstCartItem = cart ? Object.values(cart.items || {})[0] : null;
+  const deliveryVendor = firstCartItem?.product?._raw?.vendor || firstCartItem?.product?.vendor || null;
+  const deliveryVendorLat = deliveryVendor?.latitude;
+  const deliveryVendorLon = deliveryVendor?.longitude;
+  const fallbackDeliveryTime = cart?.vendorDeliveryTime || deliveryVendor?.deliveryTime || '20 - 30 min';
 
   // CTA shimmer animation
   const shimmerAnim = useRef(new Animated.Value(-1)).current;
@@ -49,6 +56,14 @@ export default function CartDetail({ vendorId, navigation }) {
     shimmer.start();
     return () => shimmer.stop();
   }, []);
+
+  useEffect(() => {
+    if (vendorId && deliveryVendorLat && deliveryVendorLon) {
+      fetchEstimate(vendorId, deliveryVendorLat, deliveryVendorLon);
+    }
+  }, [vendorId, deliveryVendorLat, deliveryVendorLon, fetchEstimate]);
+
+  const finalDeliveryTime = getFormattedRange(vendorId, fallbackDeliveryTime);
 
   // ── Empty State ──
   if (!cart) return (
@@ -158,49 +173,6 @@ export default function CartDetail({ vendorId, navigation }) {
   let finalVendorRating = null;
   for (const r of ratingSources) { const val = extractRating(r); if (val !== null && val > 0 && val <= 5) { finalVendorRating = Number(val).toFixed(1); break; } }
 
-  const vendorLat = pcVendor?.latitude || firstItem?.product?._raw?.vendor?.latitude;
-  const vendorLon = pcVendor?.longitude || firstItem?.product?._raw?.vendor?.longitude;
-  const [cartDeliveryTime, setCartDeliveryTime] = useState(null);
-
-  useEffect(() => {
-    let active = true;
-    const lat1 = currentLocation?.latitude;
-    const lon1 = currentLocation?.longitude;
-    const lat2 = vendorLat ? parseFloat(vendorLat) : null;
-    const lon2 = vendorLon ? parseFloat(vendorLon) : null;
-
-    if (!lat1 || !lon1 || !lat2 || !lon2 || isNaN(lat2) || isNaN(lon2)) return;
-
-    const GOOGLE_KEY = 'AIzaSyCZ1jixNYbSRM21Uq82a6KXNO_FSpLUwaQ';
-    const url = `https://maps.googleapis.com/maps/api/distancematrix/json?origins=${lat1},${lon1}&destinations=${lat2},${lon2}&mode=driving&key=${GOOGLE_KEY}`;
-
-    fetch(url)
-      .then(r => r.json())
-      .then(data => {
-        if (!active) return;
-        const el = data?.rows?.[0]?.elements?.[0];
-        if (data.status === 'OK' && el?.status === 'OK') {
-          const driveMin = Math.ceil(el.duration.value / 60);
-          setCartDeliveryTime(driveMin + 10); // drive + 10 min prep
-        } else {
-          // Haversine fallback
-          const R = 6371;
-          const dLat = (lat2 - lat1) * (Math.PI / 180);
-          const dLon = (lon2 - lon1) * (Math.PI / 180);
-          const a = Math.sin(dLat/2)**2 + Math.cos(lat1*(Math.PI/180))*Math.cos(lat2*(Math.PI/180))*Math.sin(dLon/2)**2;
-          const distKm = R * 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1-a));
-          setCartDeliveryTime(Math.max(10, Math.round(distKm * 3) + 10));
-        }
-      })
-      .catch(() => {});
-
-    return () => { active = false; };
-  }, [currentLocation?.latitude, currentLocation?.longitude, vendorLat, vendorLon]);
-
-  // Format: 'X hour Y min - X hour Y+5 min'
-  const finalDeliveryTime = cartDeliveryTime
-    ? `${formatMinutesToUX(cartDeliveryTime)} - ${formatMinutesToUX(cartDeliveryTime + 5)}`
-    : formatMinutesToUX(cart.vendorDeliveryTime || pcVendor?.deliveryTime || firstItem?.product?._raw?.vendor?.deliveryTime || '20 - 30 min');
 
   // ── Handlers ──
   const handleUpdateQuantity = async (itemId, delta) => {

@@ -55,6 +55,7 @@ class CartAPI {
    * @returns {Promise}
    */
   static async addToCart(items) {
+    let timeoutId = null;
     try {
       const url = `${BASE_API_URL}${API_ENDPOINTS.CART.ADD_TO_CART}`;
       const headers = await this.getHeaders();
@@ -108,7 +109,8 @@ class CartAPI {
 
       console.debug('[CartAPI] POST', url, 'items:', preparedItems);
       const controller = new AbortController();
-      const timeoutId = setTimeout(() => controller.abort(), 15000);
+      // Add-to-cart can include heavy backend calculations; keep timeout more tolerant.
+      timeoutId = setTimeout(() => controller.abort(), 30000);
 
       const response = await fetch(url, {
         method: 'POST',
@@ -116,7 +118,10 @@ class CartAPI {
         body: JSON.stringify({ items: preparedItems }),
         signal: controller.signal
       });
-      clearTimeout(timeoutId);
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
       const responseData = await response.json();
       console.debug('[CartAPI] addToCart response status:', response.status, 'data:', responseData);
       if (!response.ok) {
@@ -129,6 +134,20 @@ class CartAPI {
       }
       return { success: true, data: responseData };
     } catch (error) {
+      if (timeoutId) {
+        clearTimeout(timeoutId);
+        timeoutId = null;
+      }
+
+      if (error?.name === 'AbortError') {
+        console.warn('Cart API - Add to cart timeout:', error);
+        return {
+          success: false,
+          error: 'Request timed out while adding to cart. Please try again.',
+          status: 408,
+        };
+      }
+
       console.error('Cart API - Add to cart network error:', error);
       return { success: false, error: error?.message || 'Network error occurred', status: null };
     }
