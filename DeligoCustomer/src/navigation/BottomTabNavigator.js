@@ -147,13 +147,13 @@ const BottomTabNavigator = ({ onLogout }) => {
                         />
                         <Tab.Screen
                             name="Profile"
+                            component={ProfileScreen}
                             options={{
                                 tabBarLabel: t('account'),
                                 tabBarIcon: ({ focused, color }) => <ProfileIcon focused={focused} color={color} />,
                             }}
-                        >
-                            {(props) => <ProfileScreen {...props} onLogout={onLogout} />}
-                        </Tab.Screen>
+                            initialParams={{ onLogout }}
+                        />
                     </Tab.Navigator>
                 </KeyboardAvoidingView>
             </View>

@@ -205,18 +205,24 @@ const SeeAllScreen = ({ navigation, route }) => {
             </View>
 
             {/* Search Bar */}
-            <View style={[styles.searchContainer, { backgroundColor: colors.surface }]}>
-                <Ionicons name="search" size={20} color={colors.text.secondary} />
+            <View style={[styles.searchContainer, { 
+                backgroundColor: colors.surface,
+                borderColor: colors.primary,
+                shadowColor: colors.primary
+            }]}>
+                <Ionicons name="search" size={20} color={colors.primary} />
                 <TextInput
                     style={[styles.searchInput, { color: colors.text.primary }]}
                     placeholder={t('search') || 'Search...'}
-                    placeholderTextColor={colors.text.disabled}
+                    placeholderTextColor={colors.text.disabled || '#999'}
                     value={searchQuery}
                     onChangeText={setSearchQuery}
+                    returnKeyType="search"
+                    selectionColor={colors.primary}
                 />
                 {searchQuery.length > 0 && (
-                    <TouchableOpacity onPress={() => setSearchQuery('')}>
-                        <Ionicons name="close-circle" size={20} color={colors.text.secondary} />
+                    <TouchableOpacity onPress={() => setSearchQuery('')} style={styles.clearButtonIcon}>
+                        <Ionicons name="close-circle" size={20} color={colors.primary} />
                     </TouchableOpacity>
                 )}
             </View>
@@ -318,17 +324,27 @@ const styles = StyleSheet.create({
         alignItems: 'center',
         marginHorizontal: spacing.md,
         marginTop: spacing.sm,
-        marginBottom: spacing.xs,
+        marginBottom: spacing.sm,
         paddingHorizontal: spacing.md,
-        paddingVertical: spacing.sm,
-        borderRadius: borderRadius.lg,
+        height: 48,
+        borderRadius: 24,
+        borderWidth: 1,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 5,
+        elevation: 2,
     },
     searchInput: {
         flex: 1,
         marginLeft: spacing.sm,
         fontSize: fontSize.md,
         fontFamily: 'Poppins-Regular',
-        paddingVertical: 0, // Remove extra vertical padding
+        height: '100%',
+        paddingVertical: 0,
+    },
+    clearButtonIcon: {
+        padding: spacing.xs,
+        marginLeft: spacing.xs,
     },
     filterRow: {
         paddingHorizontal: spacing.md,

@@ -26,7 +26,8 @@ import ProfileSection from '../components/Profile/ProfileSection';
 import AppVersionText from '../components/Profile/AppVersionText';
 import { useFocusEffect } from '@react-navigation/native';
 
-const ProfileScreen = ({ onLogout, navigation }) => {
+const ProfileScreen = ({ navigation, route }) => {
+  const onLogout = route?.params?.onLogout;
   const { t } = useLanguage();
   const { colors, isDarkMode } = useTheme();
   const { logout } = useProfile();

@@ -407,23 +407,28 @@ const SearchScreen = ({ navigation }) => {
                     <Ionicons name="arrow-back" size={24} color={colors.primary} />
                 </TouchableOpacity>
 
-                <View style={styles(colors, isDarkMode).inputContainer}>
-                    <Ionicons name="search" size={20} color={colors.text.secondary} style={{ marginRight: 8 }} />
+                <View style={[styles(colors, isDarkMode).inputContainer, { 
+                    backgroundColor: colors.surface,
+                    borderColor: colors.primary,
+                    shadowColor: colors.primary
+                }]}>
+                    <Ionicons name="search" size={20} color={colors.primary} style={{ marginRight: 4 }} />
                     <TextInput
                         ref={inputRef}
-                        style={styles(colors, isDarkMode).input}
+                        style={[styles(colors, isDarkMode).input, { color: colors.text.primary }]}
                         placeholder={t('searchRestaurants') || 'Search for restaurants...'}
-                        placeholderTextColor={colors.text.secondary}
+                        placeholderTextColor={colors.text.disabled || '#999'}
                         value={searchQuery}
                         onChangeText={setSearchQuery}
                         returnKeyType="search"
                         autoCapitalize="none"
+                        selectionColor={colors.primary}
                     />
                     {isTyping ? (
-                        <ActivityIndicator size="small" color={colors.primary} />
+                        <ActivityIndicator size="small" color={colors.primary} style={{ marginLeft: 8 }} />
                     ) : searchQuery.length > 0 ? (
-                        <TouchableOpacity onPress={() => setSearchQuery('')}>
-                            <Ionicons name="close-circle" size={20} color={colors.text.secondary} />
+                        <TouchableOpacity onPress={() => setSearchQuery('')} style={{ padding: 4, marginLeft: 4 }}>
+                            <Ionicons name="close-circle" size={20} color={colors.primary} />
                         </TouchableOpacity>
                     ) : null}
                 </View>
@@ -530,16 +535,21 @@ const styles = (colors, isDarkMode) => StyleSheet.create({
         flex: 1,
         flexDirection: 'row',
         alignItems: 'center',
-        backgroundColor: isDarkMode ? '#333' : '#f5f5f5',
+        backgroundColor: isDarkMode ? '#333' : '#fff',
         borderRadius: 24, // Rounder pill shape
-        paddingHorizontal: 12,
-        height: 44,
+        borderWidth: 1,
+        paddingHorizontal: 16,
+        height: 48,
+        shadowOffset: { width: 0, height: 2 },
+        shadowOpacity: 0.05,
+        shadowRadius: 5,
+        elevation: 2,
     },
     input: {
         flex: 1,
         fontSize: fontSize.md,
         fontFamily: 'Poppins-Regular',
-        color: colors.text.primary,
+        height: '100%',
         marginLeft: 4,
         paddingVertical: 0, // Fix alignment on Android
     },
