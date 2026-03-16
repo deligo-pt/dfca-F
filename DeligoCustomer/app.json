@@ -137,7 +137,8 @@
       ],
       "./plugins/withResolvedFirebaseIconColor.js",
       "@react-native-firebase/messaging",
-      "expo-web-browser"
+      "expo-web-browser",
+      "expo-audio"
     ]
   }
 }

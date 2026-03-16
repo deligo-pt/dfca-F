@@ -1169,28 +1169,7 @@ const CheckoutScreen = ({ route, navigation }) => {
   };
 
   const getSafeSuccessEta = () => {
-    const fallback = `25-35 ${t('min') || 'min'}`;
-    const rawEta =
-      cartData?.estimatedDeliveryTime ??
-      checkoutResponse?.delivery?.estimatedTime ??
-      deliveryTimeDisplay;
-
-    if (rawEta === null || rawEta === undefined || rawEta === '') return fallback;
-
-    const formatted = formatMinutesToUX(String(rawEta));
-    const output = String(formatted || '').trim();
-    if (!output) return fallback;
-
-    const values = (output.match(/\d+/g) || []).map(Number).filter(n => Number.isFinite(n));
-    if (!values.length) return fallback;
-
-    const maxValue = Math.max(...values);
-    const hasHourUnit = /hour/i.test(output);
-
-    // Guard unrealistic delivery ETA values in the success sheet.
-    if ((hasHourUnit && maxValue > 5) || maxValue > 300) return fallback;
-
-    return output;
+    return deliveryTimeDisplay || `20-30 ${t('min') || 'min'}`;
   };
 
   const renderSuccessModal = () => (
@@ -1213,7 +1192,9 @@ const CheckoutScreen = ({ route, navigation }) => {
                 <View style={styles(colors).successDot} />
                 <Text style={styles(colors).successLabel}>{t('amountPaid') || 'Amount Paid'}</Text>
               </View>
-              <Text style={styles(colors).successValue}>{formatCurrency(currency, displayTotal)}</Text>
+              <View style={styles(colors).successRowRight}>
+                <Text style={styles(colors).successValue}>{formatCurrency(currency, displayTotal)}</Text>
+              </View>
             </View>
 
             <View style={styles(colors).successDivider} />
@@ -1223,7 +1204,14 @@ const CheckoutScreen = ({ route, navigation }) => {
                 <Ionicons name="time-outline" size={16} color={colors.primary} style={{ marginRight: 8 }} />
                 <Text style={styles(colors).successLabel}>{t('estimatedDelivery') || 'Estimated Delivery'}</Text>
               </View>
-              <Text style={styles(colors).successEta}>{getSafeSuccessEta()}</Text>
+              <View style={[styles(colors).successRowRight, { flex: 1.5, alignItems: 'flex-end' }]}>
+                <Text 
+                  style={[styles(colors).successEta, { textAlign: 'right' }]}
+                  numberOfLines={2}
+                >
+                  {getSafeSuccessEta()}
+                </Text>
+              </View>
             </View>
           </View>
 
@@ -1324,11 +1312,11 @@ const CheckoutScreen = ({ route, navigation }) => {
             <Text style={styles(colors).headerTitle} numberOfLines={1}>{cart?.vendorName || cartData?.vendorName || t('checkout')}</Text>
             <Text
               style={styles(colors).headerSubtitle}
-              numberOfLines={1}
+              numberOfLines={2}
               adjustsFontSizeToFit
-              minimumFontScale={0.8}
+              minimumFontScale={0.7}
             >
-              {cartItems.length} {cartItems.length === 1 ? t('item') : t('items')} • {t('estimated')} {deliveryTimeDisplay}
+              {cartItems.length} {cartItems.length === 1 ? (t('item') || 'item') : (t('items') || 'items')} • {t('estimated')} {deliveryTimeDisplay}
             </Text>
           </View>
           <View style={styles(colors).headerRight} />
@@ -1414,7 +1402,7 @@ const CheckoutScreen = ({ route, navigation }) => {
             <View style={styles(colors).sectionTitleRow}>
               <Text style={styles(colors).sectionTitle}>{t('yourOrder')}</Text>
             </View>
-            <Text style={styles(colors).itemCount}>{cartItems.length} {t('items')}</Text>
+            <Text style={styles(colors).itemCount}>{cartItems.length} {cartItems.length === 1 ? (t('item') || 'item') : (t('items') || 'items')}</Text>
           </View>
           <View style={styles(colors).orderItemsContainer}>
             {cartItems.map((item, index) => {
@@ -1437,41 +1425,61 @@ const CheckoutScreen = ({ route, navigation }) => {
               const unitPrice = item.quantity > 0 ? (itemTotal / item.quantity) : 0;
 
               return (
-                <View key={item.id || index} style={styles(colors).orderItemRow}>
-                  <View style={styles(colors).orderItemLeft}>
-                    <View style={{ backgroundColor: isDarkMode ? 'rgba(220,49,115,0.15)' : 'rgba(220,49,115,0.08)', width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginRight: 12, marginTop: 2 }}>
-                      <Text style={{ fontSize: 13, fontFamily: 'Poppins-Bold', color: colors.primary }}>{item.quantity}x</Text>
-                    </View>
-                    <View style={{ flex: 1 }}>
-                      <Text style={styles(colors).itemNameText} numberOfLines={2}>
+                <View key={item.id || index} style={[styles(colors).orderItemRow, { flexDirection: 'column', alignItems: 'flex-start' }]}>
+                  {/* Product Header Row */}
+                  <View style={{ flexDirection: 'row', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <View style={{ flexDirection: 'row', flex: 1, alignItems: 'center' }}>
+                      <View style={{ backgroundColor: isDarkMode ? 'rgba(220,49,115,0.15)' : 'rgba(220,49,115,0.08)', width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
+                        <Text style={{ fontSize: 13, fontFamily: 'Poppins-Bold', color: colors.primary }}>{item.quantity}x</Text>
+                      </View>
+                      <Text style={[styles(colors).itemNameText, { fontFamily: 'Poppins-SemiBold' }]} numberOfLines={2}>
                         {item.name}
                       </Text>
-                      {/* Unit price (Base + Addons) */}
-                      <Text style={{ fontSize: 12, fontFamily: 'Poppins-Regular', color: colors.text.secondary, marginTop: 4 }}>
-                        {formatCurrency(currency, unitPrice)} {t('each')}
-                      </Text>
-
-                      {/* Variations & Add-ons */}
-                      {(item.variantName && item.variantName !== 'Standard') && (
-                        <Text style={{ fontSize: 12, color: colors.text.secondary, marginTop: 2 }}>
-                          {item.variantName}
-                        </Text>
-                      )}
-                      {item.addons && item.addons.length > 0 && (
-                        <View style={{ marginTop: 4 }}>
-                          {item.addons.map((addon, aIdx) => (
-                            <Text key={aIdx} style={{ fontSize: 12, color: colors.text.secondary }}>
-                              + {addon.name}
-                            </Text>
-                          ))}
-                        </View>
-                      )}
                     </View>
+                    <Text style={styles(colors).itemPriceText}>
+                      {formatCurrency(currency, itemTotal)}
+                    </Text>
                   </View>
-                  {/* Line total */}
-                  <Text style={styles(colors).itemPriceText}>
-                    {formatCurrency(currency, itemTotal)}
-                  </Text>
+
+                  {/* Sub-Details (Base Price & Add-ons) */}
+                  <View style={{ paddingLeft: 40, width: '100%', marginTop: 2 }}>
+                    {/* Base Product Price Details */}
+                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                      <Text style={{ fontSize: 13, fontFamily: 'Poppins-Regular', color: colors.text.secondary }}>
+                        {t('basePrice') || 'Base price'} ({formatCurrency(currency, item.finalPrice || item.price || 0)})
+                      </Text>
+                    </View>
+
+                    {/* Variations */}
+                    {(item.variantName && item.variantName !== 'Standard') && (
+                      <Text style={{ fontSize: 12, color: colors.text.secondary, marginBottom: 4, fontFamily: 'Poppins-Medium' }}>
+                        • {item.variantName}
+                      </Text>
+                    )}
+
+                    {/* Add-ons List */}
+                    {item.addons && item.addons.length > 0 && (
+                      <View style={{ marginTop: 2 }}>
+                        <Text style={{ fontSize: 12, fontFamily: 'Poppins-SemiBold', color: colors.text.secondary, marginBottom: 4 }}>
+                          {t('addons') || 'Add-ons'}:
+                        </Text>
+                        {item.addons.map((addon, aIdx) => {
+                          const addonQty = Number(addon.quantity || 1);
+                          const addonBasePrice = Number(addon.lineTotal || (addon.originalPrice * addonQty) || (addon.price * addonQty) || 0);
+                          return (
+                            <View key={aIdx} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
+                              <Text style={{ fontSize: 12, color: colors.text.secondary, flex: 1, marginRight: 8 }}>
+                                + {addon.name} {addonQty > 1 ? `×${addonQty}` : ''}
+                              </Text>
+                              <Text style={{ fontSize: 12, color: colors.text.secondary, fontFamily: 'Poppins-Medium' }}>
+                                {formatCurrency(currency, addonBasePrice)}
+                              </Text>
+                            </View>
+                          );
+                        })}
+                      </View>
+                    )}
+                  </View>
                 </View>
               )
             })}
@@ -1680,6 +1688,22 @@ const CheckoutScreen = ({ route, navigation }) => {
               </Text>
             </View>
 
+            {/* 1.1 Add-ons (Price Breakdown) - Moved here for better flow */}
+            {(() => {
+              const addonsVal = checkoutResponse?.orderCalculation?.totalAddonsOriginalPrice || cart?.totals?.addonsTotal || 0;
+              if (addonsVal > 0) {
+                return (
+                  <View style={styles(colors).summaryRow}>
+                    <Text style={styles(colors).summaryLabel}>{t('addons') || 'Add-ons'}</Text>
+                    <Text style={styles(colors).summaryValue}>
+                      {formatCurrency(currency, addonsVal)}
+                    </Text>
+                  </View>
+                );
+              }
+              return null;
+            })()}
+
             {/* 2. Product Discount */}
             {(checkoutResponse?.orderCalculation?.totalProductDiscount > 0 || cart?.totals?.discount > 0) && (
               <View style={styles(colors).summaryRow}>
@@ -1690,6 +1714,7 @@ const CheckoutScreen = ({ route, navigation }) => {
               </View>
             )}
 
+
             {/* 3. Subtotal (Net/Excl Tax) */}
             <View style={styles(colors).summaryRow}>
               <Text style={styles(colors).summaryLabel}>{t('subtotalExclTax') || 'Subtotal (Excl. Tax)'}</Text>
@@ -1698,19 +1723,6 @@ const CheckoutScreen = ({ route, navigation }) => {
               </Text>
             </View>
 
-            {/* Spacing */}
-            <View style={{ height: 12 }} />
-
-            {/* 4. Tax (Items) */}
-            {(checkoutResponse?.orderCalculation?.totalTaxAmount > 0 || cart?.totals?.itemsTax > 0) && (
-              <View style={styles(colors).summaryRow}>
-                <Text style={styles(colors).summaryLabel}>{t('taxItems') || 'Tax (Items)'}</Text>
-                <Text style={styles(colors).summaryValue}>
-                  {formatCurrency(currency, checkoutResponse?.orderCalculation?.totalTaxAmount || cart?.totals?.itemsTax || 0)}
-                </Text>
-              </View>
-            )}
-
             {/* 5. Delivery Fee */}
             <View style={styles(colors).summaryRow}>
               <Text style={styles(colors).summaryLabel}>{t('deliveryFee')}</Text>
@@ -1718,6 +1730,45 @@ const CheckoutScreen = ({ route, navigation }) => {
                 {formatCurrency(currency, checkoutResponse?.delivery?.charge || checkoutResponse?.deliveryCharge || finalDeliveryFee || 0)}
               </Text>
             </View>
+
+            {/* Spacing before taxes */}
+            <View style={{ height: 12 }} />
+
+            {/* 4. Tax (Items) */}
+            {(() => {
+              const itemsTax = checkoutResponse?.orderCalculation?.totalTaxAmount || cart?.totals?.itemsTax || 0;
+              const addonsTax = checkoutResponse?.orderCalculation?.totalAddonsTaxAmount || cart?.totals?.addonsTax || 0;
+              
+              const displayItemsTax = addonsTax > 0 ? (itemsTax - addonsTax) : itemsTax;
+
+              if (itemsTax > 0) {
+                return (
+                  <View style={styles(colors).summaryRow}>
+                    <Text style={styles(colors).summaryLabel}>{addonsTax > 0 ? t('taxItems') : t('tax')}</Text>
+                    <Text style={styles(colors).summaryValue}>
+                      {formatCurrency(currency, addonsTax > 0 ? displayItemsTax : itemsTax)}
+                    </Text>
+                  </View>
+                );
+              }
+              return null;
+            })()}
+
+            {/* 4.1 Tax (Add-ons) (If any) */}
+            {(() => {
+              const addonsTaxVal = checkoutResponse?.orderCalculation?.totalAddonsTaxAmount || cart?.totals?.addonsTax || 0;
+              if (addonsTaxVal > 0) {
+                return (
+                  <View style={styles(colors).summaryRow}>
+                    <Text style={styles(colors).summaryLabel}>{t('taxAddons') || 'Tax (Add-ons)'}</Text>
+                    <Text style={styles(colors).summaryValue}>
+                      {formatCurrency(currency, addonsTaxVal)}
+                    </Text>
+                  </View>
+                );
+              }
+              return null;
+            })()}
 
             {/* 6. Delivery VAT */}
             {(checkoutResponse?.delivery?.vatAmount > 0 || checkoutResponse?.deliveryVatAmount > 0) && (
@@ -2912,6 +2963,10 @@ const styles = (colors) => StyleSheet.create({
     flex: 1,
     marginRight: 10,
   },
+  successRowRight: {
+    flexShrink: 0,
+    alignItems: 'flex-end',
+  },
   successDot: {
     width: 8,
     height: 8,
@@ -2923,16 +2978,19 @@ const styles = (colors) => StyleSheet.create({
     fontSize: 14,
     fontFamily: 'Poppins-Regular',
     color: colors.text.secondary,
+    flexShrink: 1,
   },
   successValue: {
     fontSize: 16,
     fontFamily: 'Poppins-Bold',
     color: colors.text.primary,
+    textAlign: 'right',
   },
   successEta: {
     fontSize: 16,
     fontFamily: 'Poppins-Bold',
     color: colors.primary,
+    textAlign: 'right',
   },
   successDivider: {
     height: 1,

@@ -216,7 +216,7 @@ export default function CartDetail({ vendorId, navigation }) {
       const cartData = {
         vendorId, vendorName: cart.vendorName,
         items: items.map(it => ({ id: it.id, name: it.product?.name, quantity: it.qty, price: it.basePrice, discountPercent: it.discountPercent, taxPercent: it.taxPercent, finalPrice: it.finalUnit, currency: it.currency })),
-        subtotal: subtotalAfterDiscount, tax: taxTotal, total, useCart: true,
+        subtotal: subtotalAfterDiscount, tax: taxTotal, total,
         estimatedDeliveryTime: finalDeliveryTime,
       };
       navigation.navigate('Checkout', { cartData });
@@ -286,7 +286,7 @@ export default function CartDetail({ vendorId, navigation }) {
                   </View>
                   <View style={[styles.infoPill, { backgroundColor: isDarkMode ? 'rgba(220,49,115,0.15)' : 'rgba(220,49,115,0.08)' }]}>
                     <Ionicons name="restaurant-outline" size={11} color={colors.primary} />
-                    <Text style={[styles.infoPillText, { color: colors.primary }]}>{totalItems} {t('items') || 'items'}</Text>
+                    <Text style={[styles.infoPillText, { color: colors.primary }]}>{totalItems} {totalItems === 1 ? (t('item') || 'item') : (t('items') || 'items')}</Text>
                   </View>
                 </View>
               </View>
@@ -343,11 +343,14 @@ export default function CartDetail({ vendorId, navigation }) {
                   )}
                   {it.addons && it.addons.length > 0 && (
                     <View style={{ marginTop: 3 }}>
-                      {it.addons.slice(0, 2).map((addon, ai) => (
-                        <Text key={ai} style={{ color: colors.text.secondary, fontSize: 11, fontFamily: 'Poppins-Regular' }}>
-                          + {addon.quantity > 1 ? `${addon.quantity}x ` : ''}{addon.name}
-                        </Text>
-                      ))}
+                      {it.addons.slice(0, 2).map((addon, ai) => {
+                        const addonPrice = Number(addon.lineTotal || (addon.originalPrice * (addon.quantity || 1)) || addon.price || 0);
+                        return (
+                          <Text key={ai} style={{ color: colors.text.secondary, fontSize: 11, fontFamily: 'Poppins-Regular' }}>
+                            + {addon.quantity > 1 ? `${addon.quantity}x ` : ''}{addon.name} ({formatCurrency(it.currency, addonPrice)})
+                          </Text>
+                        );
+                      })}
                       {it.addons.length > 2 && (
                         <Text style={{ color: colors.primary, fontSize: 11, fontFamily: 'Poppins-Medium' }}>+{it.addons.length - 2} more</Text>
                       )}
@@ -450,11 +453,24 @@ export default function CartDetail({ vendorId, navigation }) {
               const totals = cart.totals || {};
               const itemsOriginal = cart?.checkoutInfo?.orderCalculation?.totalOriginalPrice || totals.itemsOriginalTotal || 0;
               const discount = cart?.checkoutInfo?.orderCalculation?.totalProductDiscount || totals.discount || 0;
-              const addons = totals.addonsTotal || 0;
-              const taxItems = cart?.checkoutInfo?.orderCalculation?.totalTaxAmount || totals.taxAmount || totals.itemsTax || 0;
+              
+              // Fallback: If totals.addonsTotal is missing but we have items with addons, calculate it manually
+              let addons = totals.addonsTotal || 0;
+              if (addons <= 0 && items.length > 0) {
+                addons = items.reduce((sum, it) => {
+                  const itemAddonSum = (it.addons || []).reduce((aSum, a) => {
+                    const val = Number(a.lineTotal || (a.originalPrice * (a.quantity || 1)) || (a.unitPrice * (a.quantity || 1)) || a.price || a.priceUnit || 0);
+                    return aSum + val;
+                  }, 0);
+                  return sum + (itemAddonSum * Number(it.qty || 1));
+                }, 0);
+              }
+
+              // Use specific tax breakdown from context calculate during fetchCart
+              const taxItems = totals.itemsTax || 0;
               const taxAddons = totals.addonsTax || 0;
+              
               const grandTotal = cart?.checkoutInfo?.payoutSummary?.grandTotal || totals.grandTotal || 0;
-              const deliveryCharge = cart?.checkoutInfo?.delivery?.charge || 0;
               const deliveryVat = cart?.checkoutInfo?.delivery?.vatAmount || totals.deliveryTax || 0;
               const deliveryVatRate = cart?.checkoutInfo?.delivery?.vatRate || 0;
 
@@ -463,8 +479,11 @@ export default function CartDetail({ vendorId, navigation }) {
                   <SummaryRow label={t('subtotal') || 'Subtotal'} value={formatCurrency(currency, itemsOriginal)} colors={colors} />
                   {discount > 0 && <SummaryRow label={t('discount') || 'Discount'} value={`-${formatCurrency(currency, discount)}`} colors={colors} valueColor="#4CAF50" icon="pricetag" />}
                   {addons > 0 && <SummaryRow label={t('addons') || 'Add-ons'} value={formatCurrency(currency, addons)} colors={colors} />}
-                  {taxItems > 0 && <SummaryRow label={t('taxItems') || 'Tax'} value={formatCurrency(currency, taxItems)} colors={colors} />}
+                  
+                  {/* Granular Tax Breakdown */}
+                  {taxItems > 0 && <SummaryRow label={t('taxItems') || 'Tax (Items)'} value={formatCurrency(currency, taxItems)} colors={colors} />}
                   {taxAddons > 0 && <SummaryRow label={t('taxAddons') || 'Tax (Add-ons)'} value={formatCurrency(currency, taxAddons)} colors={colors} />}
+                  
                   {deliveryVat > 0 && <SummaryRow label={`${t('taxDelivery') || 'Delivery VAT'} ${deliveryVatRate ? `(${deliveryVatRate}%)` : ''}`} value={formatCurrency(currency, deliveryVat)} colors={colors} />}
 
                   <View style={[styles.summaryDivider, { backgroundColor: isDarkMode ? '#333' : '#E8E8E8' }]} />
@@ -491,7 +510,7 @@ export default function CartDetail({ vendorId, navigation }) {
         {/* Price + item count */}
         <View style={{ marginRight: 16 }}>
           <Text style={{ color: colors.text.secondary, fontSize: 12, fontFamily: 'Poppins-Regular' }}>
-            {totalItems} {t('items') || 'items'}
+            {totalItems} {totalItems === 1 ? (t('item') || 'item') : (t('items') || 'items')}
           </Text>
           <Text style={{ color: colors.primary, fontFamily: 'Poppins-Bold', fontSize: 22, marginTop: -2 }}>
             {formatCurrency(currency, cart?.checkoutInfo?.payoutSummary?.grandTotal || cart.totals?.grandTotal || total)}

@@ -147,10 +147,9 @@ const AddonsScreen = ({ route, navigation }) => {
       if (group.maxSelectable === 1) {
         // Radio behavior - select this, deselect others
         if (isSelected) {
-          // Typically radio buttons don't uncheck on tap, but we allow it if optional
-          if (group.minSelectable === 0) {
-            delete newGroupSelections[opt._id];
-          }
+          // Allow unselecting even if required (minSelectable > 0)
+          // Footer validation will handle the button state
+          delete newGroupSelections[opt._id];
         } else {
           // Clear other selections in this group for radio behavior
           return { ...prev, [group._id]: { [opt._id]: { ...opt, quantity: 1 } } };

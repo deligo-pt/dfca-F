@@ -1022,15 +1022,15 @@ export const CartProvider = ({ children }) => {
       const totalsCalc = items.reduce((acc, item) => {
         // Addons Value & Tax
         const itemAddons = item.addons || [];
-        const itemAddonsTotal = itemAddons.reduce((aSum, a) => aSum + (Number(a.price || 0) * Number(a.quantity || 1)), 0);
-        const itemAddonsTax = itemAddons.reduce((tSum, a) => tSum + (Number(a.taxAmount || 0)), 0);
+        const itemAddonsTotal = itemAddons.reduce((aSum, a) => 
+          aSum + Number(a.lineTotal || (a.originalPrice * (a.quantity || 1)) || a.price || a.priceUnit || 0), 0
+        );
+        const itemAddonsTax = itemAddons.reduce((tSum, a) => tSum + Number(a.taxAmount || 0), 0);
 
         // Items Tax & Price
-        const itemTax = Number(item.productTaxAmount || 0);
-        // Use originalPrice if available, otherwise fall back to price + discount (if any) or just price
-        // JSON shows 'originalPrice': 12.5
-        const itemOriginalPrice = Number(item.originalPrice || item.price || 0);
-        const itemQty = Number(item.quantity || 1);
+        const itemTax = Number(item.productPricing?.taxAmount || item.productTaxAmount || 0);
+        const itemOriginalPrice = Number(item.productPricing?.originalPrice || item.originalPrice || item.price || 0);
+        const itemQty = Number(item.itemSummary?.quantity ?? item.quantity ?? 1);
         const itemOriginalTotal = itemOriginalPrice * itemQty;
 
         return {

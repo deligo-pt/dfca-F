@@ -44,7 +44,7 @@ import { useCart } from "../contexts/CartContext";
 import { useLocation } from "../contexts/LocationContext";
 import { useDelivery } from "../contexts/DeliveryContext";
 import formatCurrency from "../utils/currency";
-import { formatMinutesToUX } from "../utils/timeFormat";
+import { formatMinutesToUX, to12Hour } from "../utils/timeFormat";
 import * as Location from "expo-location";
 import AlertModal from "../components/AlertModal";
 import MaxQuantityModal from "../components/MaxQuantityModal";
@@ -309,10 +309,11 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
     null;
   const vendorOpeningHours = vendorBusinessDetails.openingHours;
   const vendorClosingHours = vendorBusinessDetails.closingHours;
-  const formattedHours =
-    vendorOpeningHours && vendorClosingHours
+  const formattedHours = to12Hour(
+    (vendorOpeningHours && vendorClosingHours)
       ? `${vendorOpeningHours} – ${vendorClosingHours}`
-      : vendorOpeningHours || normVendor.openingHours || "11:00 – 23:59";
+      : (vendorOpeningHours || normVendor.openingHours || "11:00 – 23:59")
+  );
   // If vendorId is an object in _raw, use its _id
   const rawVendorId =
     typeof rawVendorObj === "object" ? rawVendorObj._id : rawVendorObj;
@@ -967,31 +968,34 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
         raw.pricing?.price ?? raw.price ?? activeProduct.price ?? 0,
       );
 
-      let hasVariationOverride = false;
-      // 1. Variations override
+      let hasSelection = false;
       if (selectedVariations) {
         Object.values(selectedVariations).forEach((val) => {
           if (val && typeof val === "object" && val.price) {
-            base = Math.max(base, Number(val.price));
-            hasVariationOverride = true;
+            base = Number(val.price);
+            hasSelection = true;
           }
         });
       }
 
-      // Direct from backend - no frontend math!
-      if (!hasVariationOverride && raw.pricing?.finalPrice !== undefined && raw.pricing?.finalPrice !== null) {
-        base = Number(raw.pricing.finalPrice);
-      } else if (hasVariationOverride) {
-        const discount = Number(raw.pricing?.discount ?? raw.discount ?? 0);
-        if (discount > 0) {
-          base = base - (base * discount) / 100;
+      // If no selection, show the "starting from" (minimum) variation price
+      if (!hasSelection) {
+        const variationItems = (raw.variations || raw.options || []).flatMap(v => v.items || v.options || []);
+        const prices = variationItems.map(i => Number(i.price || 0)).filter(p => p > 0);
+        if (prices.length > 0) {
+          base = Math.min(...prices);
         }
+      }
 
-        // Add tax
-        const taxRate = Number(raw.pricing?.taxRate ?? raw.taxRate ?? 0);
-        if (taxRate > 0) {
-          base += (base * taxRate) / 100;
-        }
+      const discount = Number(raw.pricing?.discount ?? raw.discount ?? 0);
+      if (discount > 0) {
+        base = base - (base * discount) / 100;
+      }
+
+      // Add tax
+      const taxRate = Number(raw.pricing?.taxRate ?? raw.taxRate ?? 0);
+      if (taxRate > 0) {
+        base += (base * taxRate) / 100;
       }
 
       return base * quantity;
@@ -1122,35 +1126,34 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                 const pricing = raw.pricing || {};
                 let basePrice = Number(pricing.price ?? raw.price ?? 0);
 
-                // Keep variation logic as is since user can choose different add-ons/variations
-                let hasVariationOverride = false;
+                let hasSelection = false;
                 if (selectedVariations) {
                   Object.values(selectedVariations).forEach(val => {
                     if (val && typeof val === "object" && val.price) {
-                      basePrice = Math.max(basePrice, Number(val.price));
-                      hasVariationOverride = true;
+                      basePrice = Number(val.price);
+                      hasSelection = true;
                     }
                   });
                 }
-                const discountPercent = Number(pricing.discount ?? raw.discount ?? 0);
 
-                let discountedBase = basePrice;
-                if (!hasVariationOverride && pricing.discountedBasePrice !== undefined && pricing.discountedBasePrice !== null) {
-                  discountedBase = Number(pricing.discountedBasePrice);
-                } else if (hasVariationOverride && discountPercent > 0) {
-                  discountedBase = basePrice - (basePrice * discountPercent) / 100;
+                // If no selection, use the minimum variation price as "starting from"
+                if (!hasSelection) {
+                  const variationItems = (raw.variations || raw.options || []).flatMap(v => v.items || v.options || []);
+                  const prices = variationItems.map(i => Number(i.price || 0)).filter(p => p > 0);
+                  if (prices.length > 0) {
+                    basePrice = Math.min(...prices);
+                  }
                 }
+
+                const discountPercent = Number(pricing.discount ?? raw.discount ?? 0);
+                const discountedBase = discountPercent > 0 
+                  ? basePrice - (basePrice * discountPercent) / 100
+                  : basePrice;
 
                 const discountAmount = basePrice - discountedBase;
                 const taxRate = Number(pricing.taxRate ?? raw.taxRate ?? 0);
-                let taxAmount = Number(pricing.taxAmount ?? 0);
-                let finalPrice = Number(pricing.finalPrice ?? raw.finalPrice ?? discountedBase);
-
-                // If variations change the price, recalculate tax and finalPrice proportionally
-                if (hasVariationOverride) {
-                  taxAmount = (discountedBase * taxRate) / 100;
-                  finalPrice = discountedBase + taxAmount;
-                }
+                const taxAmount = (discountedBase * taxRate) / 100;
+                const finalPrice = discountedBase + taxAmount;
 
                 return (
                   <>
@@ -1329,11 +1332,20 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                           <TouchableOpacity
                             key={oIndex}
                             style={[styles.variationOptionRow, { borderColor: isSelected ? colors.primary + '50' : (isDarkMode ? '#2A2A2A' : '#EFEFEF'), backgroundColor: isSelected ? (isDarkMode ? '#1E0A14' : '#FFF0F5') : 'transparent' }]}
-                            onPress={() => setSelectedVariations(prev => ({
-                              ...prev,
-                              [variation.name || variation.title || variation.id]: optId,
-                              [`${variation.name || variation.title || variation.id}_obj`]: opt,
-                            }))}
+                            onPress={() => setSelectedVariations(prev => {
+                              const key = variation.name || variation.title || variation.id;
+                              if (prev[key] === optId) {
+                                // Already selected, unselect it (clears everything)
+                                return {};
+                              }
+                              // Enforce single selection across ALL variation groups
+                              // This ensures that if "Small" and "Medium" are in different groups,
+                              // picking one will automatically deselect the other.
+                              return {
+                                [key]: optId,
+                                [`${key}_obj`]: opt,
+                              };
+                            })}
                             activeOpacity={0.7}
                           >
                             <View style={[styles.radioOuter, { borderColor: isSelected ? colors.primary : (isDarkMode ? '#555' : '#CCC') }]}>
@@ -1378,6 +1390,18 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                       if (stockQty <= 0 || addingToCart || quantity === 0) return;
                       const variations = raw.variations || raw.options || [];
                       if (variations.length > 0) {
+                        // Check if at least one variation is selected globally
+                        const selectionKeys = Object.keys(selectedVariations).filter(k => !k.endsWith('_obj'));
+                        if (selectionKeys.length === 0) {
+                          setAlertConfig({ 
+                            title: t('selectionRequired') || 'Required', 
+                            message: t('pleaseSelectVariation') || 'Please select an option to continue.' 
+                          });
+                          setAlertVisible(true);
+                          return;
+                        }
+
+                        // Also check for specific required groups (if any)
                         const unselectedRequired = variations.filter(v => v.required && !selectedVariations[v.name || v.title || v.id]);
                         if (unselectedRequired.length > 0) {
                           setAlertConfig({ title: t('selectionRequired') || 'Required', message: `${t('pleaseSelect') || 'Please select'}: ${unselectedRequired[0].name || unselectedRequired[0].title || 'a variation'}` });
@@ -2054,6 +2078,34 @@ const RestaurantDetailsScreen = ({ route, navigation }) => {
                       ]}
                     >
                       {formattedHours}
+                    </Text>
+                  </View>
+                </View>
+
+                {/* Estimated Delivery Section - Added Google Matrix Calculation */}
+                <View style={styles.vendorInfoItem}>
+                  <Ionicons
+                    name="bicycle"
+                    size={20}
+                    color={colors.primary}
+                    style={styles.vendorInfoIcon}
+                  />
+                  <View style={styles.vendorInfoContent}>
+                    <Text
+                      style={[
+                        styles.vendorInfoLabel,
+                        { color: colors.primary },
+                      ]}
+                    >
+                      Estimated Delivery
+                    </Text>
+                    <Text
+                      style={[
+                        styles.vendorInfoValue,
+                        { color: colors.text.secondary },
+                      ]}
+                    >
+                      {finalDeliveryTime}
                     </Text>
                   </View>
                 </View>

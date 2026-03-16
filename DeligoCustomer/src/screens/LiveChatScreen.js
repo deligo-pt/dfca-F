@@ -278,8 +278,23 @@ const LiveChatScreen = () => {
 
     const formatTime = (timestamp) => {
         if (!timestamp) return '';
+        const now = new Date();
         const date = new Date(timestamp);
-        return date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+        const timeStr = date.toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' });
+
+        const diffInMs = now - date;
+        const diffInMins = Math.floor(diffInMs / (1000 * 60));
+
+        if (diffInMins < 60) {
+            return diffInMins <= 1 ? (t('justNow') || 'Just now') : `${diffInMins}m • ${timeStr}`;
+        }
+
+        const diffInHours = Math.floor(diffInMs / (1000 * 60 * 60));
+        if (diffInHours < 24 && now.toDateString() === date.toDateString()) {
+            return `${diffInHours}h • ${timeStr}`;
+        }
+
+        return timeStr;
     };
 
     const handleInputChange = (text) => {
@@ -345,42 +360,104 @@ const LiveChatScreen = () => {
 
     const renderMessage = ({ item, index }) => {
         const myId = profile?.userId || profile?._id || profile?.id;
+        const isUserRole = item.role === 'customer' || item.sender === 'user';
 
         // Determine if this message is from ME
-        const isUser = item.sender === myId || item.senderId === myId || item.sender === 'user' || item.role === 'customer';
+        const getMsgSenderId = (msg) => {
+            if (!msg) return null;
+            const id = msg.senderId || (typeof msg.sender === 'object' ? msg.sender?._id || msg.sender?.id : msg.sender);
+            return id || msg.role || 'unknown';
+        };
 
-        const isFollowUp = index > 0 && (
-            messages[index - 1].sender === item.sender ||
-            messages[index - 1].senderId === item.senderId
-        );
+        const currentSenderId = getMsgSenderId(item);
+        const nextSenderId = index < messages.length - 1 ? getMsgSenderId(messages[index + 1]) : null;
+        const prevSenderId = index > 0 ? getMsgSenderId(messages[index - 1]) : null;
 
-        // Date separator logic can be added here if needed
+        const isFollowUp = index > 0 && currentSenderId === prevSenderId;
+        const isLastInChain = index === messages.length - 1 || currentSenderId !== nextSenderId;
+
+        const isUserMsg = isUserRole || currentSenderId === myId || currentSenderId === 'user' || item.role === 'customer';
+
+        // Date divider logic
+        let shouldShowDateDivider = false;
+        let dateDividerLabel = '';
+
+        const msgTimestamp = item.timestamp || item.createdAt;
+        const currentMsgDate = msgTimestamp ? new Date(msgTimestamp) : new Date();
+
+        if (index === 0) {
+            shouldShowDateDivider = true;
+        } else {
+            const prevMsgDate = new Date(messages[index - 1].timestamp || messages[index - 1].createdAt);
+            if (currentMsgDate.toDateString() !== prevMsgDate.toDateString()) {
+                shouldShowDateDivider = true;
+            }
+        }
+
+        if (shouldShowDateDivider) {
+            const now = new Date();
+            const dateStr = currentMsgDate.toDateString();
+            if (dateStr === now.toDateString()) {
+                dateDividerLabel = t('today') || 'Today';
+            } else {
+                const yesterday = new Date(now);
+                yesterday.setDate(now.getDate() - 1);
+                if (dateStr === yesterday.toDateString()) {
+                    dateDividerLabel = t('yesterday') || 'Yesterday';
+                } else {
+                    dateDividerLabel = currentMsgDate.toLocaleDateString([], { 
+                        weekday: 'short', 
+                        month: 'short', 
+                        day: 'numeric',
+                        year: currentMsgDate.getFullYear() !== now.getFullYear() ? 'numeric' : undefined
+                    });
+                }
+            }
+        }
 
         return (
-            <View style={[
-                styles.messageRow,
-                isUser ? styles.userMessageRow : styles.agentMessageRow,
-                isFollowUp ? { marginTop: 4 } : { marginTop: 16 }
-            ]}>
-                {!isUser && (
-                    <View style={[styles.avatarContainer, { opacity: isFollowUp ? 0 : 1 }]}>
-                        {/* Show avatar only for first message in chain, but keep space */}
-                        <LinearGradient
-                            colors={['#FF9A9E', colors.primary]}
-                            style={styles.avatarGradient}
-                        >
-                            <Text style={styles.avatarText}>
-                                {agentName ? agentName.charAt(0).toUpperCase() : 'S'}
+            <View key={item._id || item.id || index}>
+                {shouldShowDateDivider && (
+                    <View style={styles.dateSeparatorContainer}>
+                        <View style={[styles.dateLine, { backgroundColor: colors.border }]} />
+                        <View style={[styles.dateLabelWrapper, { backgroundColor: colors.surface, borderColor: colors.border }]}>
+                            <Text style={[styles.dateSeparatorText, { color: colors.text.secondary }]}>
+                                {dateDividerLabel}
                             </Text>
-                        </LinearGradient>
+                        </View>
+                        <View style={[styles.dateLine, { backgroundColor: colors.border }]} />
+                    </View>
+                )}
+                <View style={[
+                    styles.messageRow,
+                    isUserMsg ? styles.userMessageRow : styles.agentMessageRow,
+                    isFollowUp ? { marginTop: 4 } : { marginTop: 16 }
+                ]}>
+                {!isUserMsg && (
+                    <View style={[styles.avatarContainer, { opacity: isFollowUp ? 0 : 1 }]}>
+                        {item.sender?.profilePicture || item.senderId?.profilePicture || item.senderPhoto ? (
+                            <Image 
+                                source={{ uri: item.sender?.profilePicture || item.senderId?.profilePicture || item.senderPhoto }} 
+                                style={[styles.avatarGradient, { borderRadius: 14, opacity: isLastInChain ? 1 : 0 }]} 
+                            />
+                        ) : (
+                            <LinearGradient
+                                colors={['#FF9A9E', colors.primary]}
+                                style={[styles.avatarGradient, { opacity: isLastInChain ? 1 : 0 }]}
+                            >
+                                <Text style={styles.avatarText}>
+                                    {agentName ? agentName.charAt(0).toUpperCase() : 'S'}
+                                </Text>
+                            </LinearGradient>
+                        )}
                     </View>
                 )}
 
                 <View style={[
                     styles.bubbleContainer,
-                    isUser ? styles.userBubbleContainer : styles.agentBubbleContainer
+                    isUserMsg ? styles.userBubbleContainer : styles.agentBubbleContainer
                 ]}>
-                    {isUser ? (
+                    {isUserMsg ? (
                         <LinearGradient
                             colors={[colors.primary, '#FF6B9D']} // Modern gradient
                             start={{ x: 0.2, y: 0 }}
@@ -403,6 +480,32 @@ const LiveChatScreen = () => {
                             {renderBubbleContent(item, false)}
                         </View>
                     )}
+                </View>
+
+                {isUserMsg && (
+                    <View style={[styles.avatarContainer, { marginRight: 0, marginLeft: 8 }]}>
+                        {(profile?.profilePicture || profile?.profilePhoto) ? (
+                            <Image 
+                                source={{ uri: profile?.profilePicture || profile?.profilePhoto }} 
+                                style={[styles.avatarGradient, { borderRadius: 14, opacity: isLastInChain ? 1 : 0 }]} 
+                            />
+                        ) : (item.sender?.profilePicture || item.senderPhoto) ? (
+                             <Image 
+                                source={{ uri: item.sender?.profilePicture || item.senderPhoto }} 
+                                style={[styles.avatarGradient, { borderRadius: 14, opacity: isLastInChain ? 1 : 0 }]} 
+                            />
+                        ) : (
+                            <LinearGradient
+                                colors={[colors.primary, '#FF6B9D']}
+                                style={[styles.avatarGradient, { opacity: isLastInChain ? 1 : 0 }]}
+                            >
+                                <Text style={styles.avatarText}>
+                                    {profile?.name?.firstName?.charAt(0) || 'U'}
+                                </Text>
+                            </LinearGradient>
+                        )}
+                    </View>
+                )}
                 </View>
             </View>
         );
@@ -443,10 +546,13 @@ const LiveChatScreen = () => {
             ) : null}
 
             <View style={styles.metaContainer}>
-                <Text style={[
-                    styles.timeStamp,
-                    isUser ? styles.userTimeStamp : { color: colors.text.secondary || '#999' }
-                ]}>
+                <Text 
+                    style={[
+                        styles.timeStamp,
+                        isUser ? styles.userTimeStamp : { color: colors.text.secondary || '#999' }
+                    ]}
+                    numberOfLines={1}
+                >
                     {formatTime(item.timestamp || item.createdAt)}
                     {isUser && (
                         <Ionicons
@@ -1023,6 +1129,33 @@ const styles = StyleSheet.create({
         borderRadius: 3,
         backgroundColor: '#CCC',
         marginHorizontal: 2,
+    },
+
+    // Date Clustering
+    dateSeparatorContainer: {
+        flexDirection: 'row',
+        alignItems: 'center',
+        justifyContent: 'center',
+        marginVertical: 24,
+        paddingHorizontal: 20,
+    },
+    dateLine: {
+        flex: 1,
+        height: 1,
+        opacity: 0.5,
+    },
+    dateLabelWrapper: {
+        paddingHorizontal: 16,
+        paddingVertical: 6,
+        borderRadius: 20,
+        borderWidth: 1,
+        marginHorizontal: 12,
+    },
+    dateSeparatorText: {
+        fontSize: 12,
+        fontFamily: 'Poppins-Medium',
+        textTransform: 'uppercase',
+        letterSpacing: 0.5,
     },
 });
 

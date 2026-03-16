@@ -1,24 +1,24 @@
 /**
  * Sound Service
  * 
- * Manages audio playback for notifications using Expo AV.
- * Handles audio session configuration, resource management, and playback state.
+ * Manages audio playback for notifications using the new expo-audio package.
+ * Optimized for SDK 54+ with modern interruption mode handling.
  */
 
-import { Audio } from 'expo-av';
+import { AudioModule, createAudioPlayer } from 'expo-audio';
 import { InteractionManager } from 'react-native';
 
-let soundObject = null;
+let audioPlayer = null;
 let isPlaying = false;
 
 const SoundService = {
     /**
-     * Loads and plays the notification sound.
+     * Loads and plays the notification sound using the modern expo-audio API.
      * @param {boolean} loop - Whether to loop the sound
      */
     playNotificationSound: async (loop = false) => {
         try {
-            // Prevent concurrent playback
+            // Prevent concurrent playback hits
             if (isPlaying) {
                 console.log('⏭️ Sound already playing, skipping...');
                 return;
@@ -26,48 +26,40 @@ const SoundService = {
 
             isPlaying = true;
 
-            // Defer playback until interactions complete
+            // Ensure smooth transitions by waiting for interactions
             InteractionManager.runAfterInteractions(async () => {
                 try {
-                    // Release existing audio resources
-                    if (soundObject) {
+                    // Release existing player resources if any
+                    if (audioPlayer) {
                         try {
-                            await soundObject.unloadAsync();
-                        } catch (e) {
-                            console.warn('Cleanup warning:', e.message);
-                        }
-                        soundObject = null;
+                            audioPlayer.pause();
+                        } catch (e) { }
+                        audioPlayer = null;
                     }
 
-                    // Configure audio session for playback in silent mode
-                    await Audio.setAudioModeAsync({
-                        playsInSilentModeIOS: true,
-                        staysActiveInBackground: true,
-                        shouldDuckAndroid: true,
-                        interruptionModeAndroid: Audio.INTERRUPTION_MODE_ANDROID_DO_NOT_MIX,
+                    // Configure modern audio session
+                    await AudioModule.setAudioModeAsync({
+                        playsInSilentMode: true,
+                        shouldPlayInBackground: true,
+                        interruptionMode: 'doNotMix',
                     });
 
-                    const { sound } = await Audio.Sound.createAsync(
-                        require('../assets/sounds/notification_sound.wav'),
-                        { shouldPlay: true, isLooping: loop }
-                    );
+                    // Create new player instance
+                    const player = createAudioPlayer(require('../assets/sounds/notification_sound.wav'));
+                    
+                    // Set looping preference
+                    player.loop = loop;
+                    
+                    // Start playback
+                    player.play();
+                    audioPlayer = player;
 
-                    soundObject = sound;
-
-                    // Release resources on playback completion
-                    sound.setOnPlaybackStatusUpdate((status) => {
-                        if (status.didJustFinish && !status.isLooping) {
-                            isPlaying = false;
-                            sound.unloadAsync().catch(() => { });
-                        }
-                    });
-
-                    console.log('✅ Notification sound playing...');
+                    console.log('✅ Notification sound playing (expo-audio)...');
                 } catch (error) {
                     isPlaying = false;
-                    console.warn('❌ Failed to play notification sound:', error.message);
+                    console.warn('❌ Failed to play notification sound (AudioModule):', error.message);
                 } finally {
-                    // Debounce playback state
+                    // Reset playing state after a reasonable buffer
                     setTimeout(() => {
                         isPlaying = false;
                     }, 2000);
@@ -80,15 +72,14 @@ const SoundService = {
     },
 
     /**
-     * Stops the currently playing sound.
+     * Stops and releases the currently playing sound.
      */
     stopNotificationSound: async () => {
         try {
             isPlaying = false;
-            if (soundObject) {
-                await soundObject.stopAsync();
-                await soundObject.unloadAsync();
-                soundObject = null;
+            if (audioPlayer) {
+                audioPlayer.pause();
+                audioPlayer = null;
                 console.log('🔇 Notification sound stopped');
             }
         } catch (error) {
