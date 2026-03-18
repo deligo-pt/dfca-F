@@ -16,6 +16,7 @@
     "platforms": ["ios", "android", "web"],
     "extra": {
       "eas": {
+        "googleMapsApiKey": "AIzaSyCZ1jixNYbSRM21Uq82a6KXNO_FSpLUwaQ",
         "projectId": "0398adbd-442d-4696-8cbe-ff9fadd087a2"
       }
     },
@@ -31,6 +32,9 @@
         "NSCameraUsageDescription": "Allow Deligo to access your camera to take profile pictures.",
         "UIBackgroundModes": ["remote-notification"]
       },
+      // "config": {
+      //   "googleMapsApiKey": "AIzaSyCZ1jixNYbSRM21Uq82a6KXNO_FSpLUwaQ"
+      // },
       "config": {
         "googleMapsApiKey": "AIzaSyCZ1jixNYbSRM21Uq82a6KXNO_FSpLUwaQ"
       },
@@ -120,7 +124,8 @@
             "podfileProperties": {
               "use_modular_headers!": true
             },
-            "buildReactNativeFromSource": true
+            "buildReactNativeFromSource": true,
+            "newArchEnabled": false
           }
         }
       ],
@@ -132,14 +137,8 @@
           "sounds": ["./src/assets/sounds/notification_sound.wav"]
         }
       ],
-      [
-        "@react-native-firebase/app",
-        {
-          "android": {
-            "googleServicesFile": "./google-services.json"
-          }
-        }
-      ],
+
+      "@react-native-firebase/app",
       "./plugins/withResolvedFirebaseIconColor.js",
       "@react-native-firebase/messaging",
       "expo-web-browser",
