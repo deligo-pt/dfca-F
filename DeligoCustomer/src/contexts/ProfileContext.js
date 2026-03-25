@@ -7,6 +7,7 @@
  */
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import AuthService, { logoutUser as apiLogout } from '../utils/auth';
+import { DeviceEventEmitter } from 'react-native';
 
 export const ProfileContext = createContext(null);
 
@@ -65,6 +66,16 @@ export const ProfileProvider = ({ children }) => {
     useEffect(() => {
         checkAuthStatus();
     }, [checkAuthStatus]);
+
+    // Listen for force logout from api.js
+    useEffect(() => {
+        const subscription = DeviceEventEmitter.addListener('forceLogout', () => {
+            console.warn('[ProfileContext] forceLogout event received: Triggering UI auto-logout');
+            setUser(null);
+            setIsAuthenticated(false);
+        });
+        return () => subscription.remove();
+    }, []);
 
     /**
      * Logs the user in and updates local state.

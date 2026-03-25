@@ -11,6 +11,7 @@ import axios from 'axios';
 import { getAccessToken } from './token';
 import Config from '../constants/config';
 import StorageService from './storage';
+import { DeviceEventEmitter } from 'react-native';
 
 const { BASE_API_URL, API_CONFIG, HTTP_STATUS, API_ENDPOINTS } = Config;
 
@@ -87,6 +88,7 @@ customerApi.interceptors.response.use(
           return customerApi(originalRequest);
         } catch (e) {
           console.warn('[api] queued request failed after refresh', e);
+          DeviceEventEmitter.emit('forceLogout');
           import('./auth').then(m => m.default && m.default.logout());
           return Promise.reject(e);
         }
@@ -154,6 +156,7 @@ customerApi.interceptors.response.use(
         } catch (refreshError) {
           console.warn('[api] refresh failed', refreshError);
           processQueue(refreshError, null);
+          DeviceEventEmitter.emit('forceLogout');
           import('./auth').then(m => m.default && m.default.logout());
           return Promise.reject(refreshError);
         } finally {

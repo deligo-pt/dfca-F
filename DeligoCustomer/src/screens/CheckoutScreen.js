@@ -828,46 +828,22 @@ const CheckoutScreen = ({ route, navigation }) => {
     }
   }
 
-  // Build baseSubtotal/discountTotal/taxAmount/total to match CartDetail
-  const baseSubtotal = cartItems.reduce((sum, it) => {
-    const addonsTotal = (it.addons || []).reduce((s, ad) => s + Number(ad.price || 0), 0);
-    return sum + ((it.price || 0) + addonsTotal) * (it.quantity || 0);
-  }, 0);
-  const discountTotal = discount; // Use the calculated/server discount as total discount
-
-  /* 
-   * Previous logic was calculating line-item discounts from product.discountPercent.
-   * IF we want to show Coupon Discount separately, we should distinguish item-discounts from order-discounts.
-   * For now, we overwrite discountTotal with the Order Level discount if present.
-   */
-  const subtotalAfterDiscount = baseSubtotal - discountTotal;
-  const taxAmount = cartItems.reduce((sum, it) => {
-    const unitDiscount = (it.price || 0) * ((it.discountPercent || 0) / 100);
-    const unitTaxable = (it.price || 0) - unitDiscount;
-    const unitTax = unitTaxable * ((it.taxPercent || 0) / 100);
-    return sum + unitTax * (it.quantity || 0);
-  }, 0);
-  const total = subtotalAfterDiscount + taxAmount;
-
-  // Debug: Log checkoutResponse to verify it's being populated
-  console.debug('[CheckoutScreen] Render - checkoutResponse:', checkoutResponse, 'local total:', total);
-
   // Use server's total if available, else local
-  const displayTotal = serverTotal ?? total;
+  // Checkout page = NO CALCULATION ZONE. Only render server data.
+  const displayTotal = serverData.payoutSummary?.grandTotal || serverTotal || 0;
 
-  // Calculate delivery fee: Explicit -> Diff -> CartData -> 0
-  let finalDeliveryFee = 0;
+  // Calculate delivery fee: Trust Backend 100%
+  // Strategy: Explicit > Delivery Object > 0
+  let finalDeliveryFee = Number(
+    serverData.delivery?.charge || 
+    serverData.deliveryCharge || 
+    serverData.deliveryFee || 
+    cartData?.deliveryFee || 
+    0
+  );
 
-  if (serverDeliveryFee !== null && serverDeliveryFee !== undefined) {
-    finalDeliveryFee = Number(serverDeliveryFee);
-  } else if (serverTotal) {
-    // Determine fee from total diff (User confirmed distance-based)
-    const diff = Number(serverTotal) - displaySubtotal;
-    // Only clamp negative
-    finalDeliveryFee = diff > 0 ? diff : 0;
-  } else {
-    finalDeliveryFee = cartData?.deliveryFee || 0;
-  }
+  const deliveryVat = Number(serverData.delivery?.vatAmount || serverData.deliveryVatAmount || 0);
+  const deliveryTotal = Number(serverData.delivery?.totalDeliveryCharge || (finalDeliveryFee + deliveryVat));
 
   // Ensure non-negative
   if (finalDeliveryFee < 0) finalDeliveryFee = 0;
@@ -948,7 +924,7 @@ const CheckoutScreen = ({ route, navigation }) => {
   useEffect(() => {
     // Reduniq does not require initialization on the client side like Stripe.
     // We just wait for the user to click "Place Order".
-  }, [checkoutResponse, total]);
+  }, [checkoutResponse]);
 
   const handleRemoveVoucher = async () => {
     const checkoutSummaryId = extractCheckoutSummaryId(checkoutResponse);
@@ -1406,11 +1382,33 @@ const CheckoutScreen = ({ route, navigation }) => {
           </View>
           <View style={styles(colors).orderItemsContainer}>
             {cartItems.map((item, index) => {
-              // Priority: Backend GrandTotal > Backend Subtotal > Calculated Subtotal
-              const serverItem = (checkoutResponse?.items || []).find(
-                si => String(si.productId?._id || si.productId) === String(item.product?._id || item.product || item.id || item.productId)
-                  && (!item.variationSku || si.variationSku === item.variationSku)
-              );
+              // Aggressive ID resolution helper
+              const getSafeId = (p) => {
+                if (!p) return null;
+                if (typeof p === 'string') return p;
+                if (typeof p === 'object') return p._id || p.id || null;
+                return null;
+              };
+
+              // Find matching item from backend response
+              const serverItem = (checkoutResponse?.items || []).find(si => {
+                const sId = String(getSafeId(si.productId));
+                const cId = String(getSafeId(item.product) || getSafeId(item.productId) || getSafeId(item.id));
+                
+                // SKU matching (handle null/undefined/empty string as same)
+                const sSku = si.variationSku || null;
+                const cSku = item.variationSku || item.product?.variationSku || null;
+                const skuMatch = sSku === cSku;
+                
+                const isMatch = sId === cId && skuMatch;
+                
+                // Detailed debug for first few items if match fails
+                if (!isMatch && sId === cId) {
+                   console.debug(`[CheckoutScreen] Near-match for ${item.name}: IDs match (${sId}) but SKU mismatch. BackendSKU: "${sSku}", FrontendSKU: "${cSku}"`);
+                }
+                
+                return isMatch;
+              });
 
               const itemTotal = (serverItem?.itemSummary?.grandTotal !== undefined && serverItem?.itemSummary?.grandTotal !== null)
                 ? Number(serverItem.itemSummary.grandTotal)
@@ -1418,10 +1416,9 @@ const CheckoutScreen = ({ route, navigation }) => {
                   ? Number(item.subtotal)
                   : ((item.finalPrice || item.price || 0) + (item.addons || []).reduce((s, ad) => s + Number(ad.price || 0), 0)) * item.quantity;
 
-              console.debug(`[CheckoutScreen] Item Match for ${item.name}: serverItemFound=${!!serverItem}, serverItemTotal=${serverItem?.itemSummary?.grandTotal}, itemSubtotal=${item.subtotal}, finalItemTotal=${itemTotal}`);
+              console.debug(`[CheckoutScreen] Item Match for ${item.name}: result=${!!serverItem}, serverGrandTotal=${serverItem?.itemSummary?.grandTotal}, finalPriceSource=${!!serverItem ? 'BACKEND' : 'LOCAL'}`);
 
               // Back-calculate unit price for display consistency
-              // If backend gives total 25.3 for qty 3, unit is ~8.43
               const unitPrice = item.quantity > 0 ? (itemTotal / item.quantity) : 0;
 
               return (
@@ -1719,65 +1716,42 @@ const CheckoutScreen = ({ route, navigation }) => {
             <View style={styles(colors).summaryRow}>
               <Text style={styles(colors).summaryLabel}>{t('subtotalExclTax') || 'Subtotal (Excl. Tax)'}</Text>
               <Text style={styles(colors).summaryValue}>
-                {formatCurrency(currency, (checkoutResponse?.orderCalculation?.totalOriginalPrice - (checkoutResponse?.orderCalculation?.totalProductDiscount || 0)) || cart?.totals?.totalPrice || 0)}
+                {formatCurrency(currency, checkoutResponse?.orderCalculation?.totalOriginalPrice ? (checkoutResponse.orderCalculation.totalOriginalPrice - (checkoutResponse.orderCalculation.totalProductDiscount || 0)) : (cart?.totals?.totalPrice || total || 0))}
               </Text>
             </View>
+
+            {/* 4. Tax (Items & Add-ons Combined) */}
+            {(() => {
+              const itemsTax = checkoutResponse?.orderCalculation?.totalTaxAmount || cart?.totals?.itemsTax || 0;
+              if (itemsTax > 0) {
+                return (
+                  <View style={styles(colors).summaryRow}>
+                    <Text style={styles(colors).summaryLabel}>{t('tax')}</Text>
+                    <Text style={styles(colors).summaryValue}>
+                      {formatCurrency(currency, itemsTax)}
+                    </Text>
+                  </View>
+                );
+              }
+              return null;
+            })()}
 
             {/* 5. Delivery Fee */}
             <View style={styles(colors).summaryRow}>
               <Text style={styles(colors).summaryLabel}>{t('deliveryFee')}</Text>
               <Text style={styles(colors).summaryValue}>
-                {formatCurrency(currency, checkoutResponse?.delivery?.charge || checkoutResponse?.deliveryCharge || finalDeliveryFee || 0)}
+                {formatCurrency(currency, finalDeliveryFee)}
               </Text>
             </View>
 
-            {/* Spacing before taxes */}
-            <View style={{ height: 12 }} />
-
-            {/* 4. Tax (Items) */}
-            {(() => {
-              const itemsTax = checkoutResponse?.orderCalculation?.totalTaxAmount || cart?.totals?.itemsTax || 0;
-              const addonsTax = checkoutResponse?.orderCalculation?.totalAddonsTaxAmount || cart?.totals?.addonsTax || 0;
-              
-              const displayItemsTax = addonsTax > 0 ? (itemsTax - addonsTax) : itemsTax;
-
-              if (itemsTax > 0) {
-                return (
-                  <View style={styles(colors).summaryRow}>
-                    <Text style={styles(colors).summaryLabel}>{addonsTax > 0 ? t('taxItems') : t('tax')}</Text>
-                    <Text style={styles(colors).summaryValue}>
-                      {formatCurrency(currency, addonsTax > 0 ? displayItemsTax : itemsTax)}
-                    </Text>
-                  </View>
-                );
-              }
-              return null;
-            })()}
-
-            {/* 4.1 Tax (Add-ons) (If any) */}
-            {(() => {
-              const addonsTaxVal = checkoutResponse?.orderCalculation?.totalAddonsTaxAmount || cart?.totals?.addonsTax || 0;
-              if (addonsTaxVal > 0) {
-                return (
-                  <View style={styles(colors).summaryRow}>
-                    <Text style={styles(colors).summaryLabel}>{t('taxAddons') || 'Tax (Add-ons)'}</Text>
-                    <Text style={styles(colors).summaryValue}>
-                      {formatCurrency(currency, addonsTaxVal)}
-                    </Text>
-                  </View>
-                );
-              }
-              return null;
-            })()}
-
             {/* 6. Delivery VAT */}
-            {(checkoutResponse?.delivery?.vatAmount > 0 || checkoutResponse?.deliveryVatAmount > 0) && (
+            {deliveryVat > 0 && (
               <View style={styles(colors).summaryRow}>
                 <Text style={styles(colors).summaryLabel}>
                   {t('taxDelivery') || 'Delivery VAT'} {checkoutResponse?.delivery?.vatRate ? `(${checkoutResponse.delivery.vatRate}%)` : ''}
                 </Text>
                 <Text style={styles(colors).summaryValue}>
-                  {formatCurrency(currency, checkoutResponse?.delivery?.vatAmount || checkoutResponse?.deliveryVatAmount || 0)}
+                  {formatCurrency(currency, deliveryVat)}
                 </Text>
               </View>
             )}
