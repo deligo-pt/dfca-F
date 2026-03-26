@@ -328,10 +328,10 @@ const CategoriesScreen = ({ navigation }) => {
             // Map vendor types to icons for header
             const icon =
               key.toLowerCase().includes("resturent") ||
-                key.toLowerCase().includes("restaurant")
+              key.toLowerCase().includes("restaurant")
                 ? "🍕"
                 : key.toLowerCase().includes("store") ||
-                  key.toLowerCase().includes("grocery")
+                    key.toLowerCase().includes("grocery")
                   ? "🛒"
                   : key.toLowerCase().includes("pharmacy")
                     ? "💊"
@@ -422,9 +422,9 @@ const CategoriesScreen = ({ navigation }) => {
               typeof i === "string"
                 ? { id: i, name: i }
                 : {
-                  id: i.id || i.name || String(i),
-                  name: i.name || i.id || String(i),
-                },
+                    id: i.id || i.name || String(i),
+                    name: i.name || i.id || String(i),
+                  },
             );
           }
           if (input && typeof input === "object") {
@@ -584,8 +584,8 @@ const CategoriesScreen = ({ navigation }) => {
             const id =
               c._id || c.id
                 ? String(c._id || c.id)
-                  .toLowerCase()
-                  .trim()
+                    .toLowerCase()
+                    .trim()
                 : "";
 
             return (
@@ -716,9 +716,9 @@ const CategoriesScreen = ({ navigation }) => {
         const a =
           Math.sin(dLat / 2) * Math.sin(dLat / 2) +
           Math.cos(lat1 * (Math.PI / 180)) *
-          Math.cos(lat2 * (Math.PI / 180)) *
-          Math.sin(dLon / 2) *
-          Math.sin(dLon / 2);
+            Math.cos(lat2 * (Math.PI / 180)) *
+            Math.sin(dLon / 2) *
+            Math.sin(dLon / 2);
         const c = 2 * Math.atan2(Math.sqrt(a), Math.sqrt(1 - a));
         return R * c;
       };
@@ -732,7 +732,7 @@ const CategoriesScreen = ({ navigation }) => {
           userLat,
           userLng,
           item.vendor?.latitude,
-          item.vendor?.longitude
+          item.vendor?.longitude,
         );
       });
 
@@ -911,7 +911,7 @@ const CategoriesScreen = ({ navigation }) => {
         selectedCuisine &&
         val &&
         String(selectedCuisine).toLowerCase().trim() ===
-        String(val).toLowerCase().trim();
+          String(val).toLowerCase().trim();
       const newVal = isSame ? null : val;
       const newId = isSame ? null : cuisineId;
 
@@ -936,8 +936,8 @@ const CategoriesScreen = ({ navigation }) => {
   useEffect(() => {
     // Only auto-fetch location if user has not disabled Location Services
     (async () => {
-      const locationPref = await StorageService.getItem('location_enabled');
-      if (locationPref === 'false') return;
+      const locationPref = await StorageService.getItem("location_enabled");
+      if (locationPref === "false") return;
       if (!currentLocation && !locationLoading) {
         getCurrentLocation();
       }
@@ -1053,7 +1053,10 @@ const CategoriesScreen = ({ navigation }) => {
               {t("no_internet", "No Internet Connection")}
             </Text>
             <Text style={styles(colors).errorSubtext}>
-              {t("no_internet_msg", "Please check your network settings and try again.")}
+              {t(
+                "no_internet_msg",
+                "Please check your network settings and try again.",
+              )}
             </Text>
 
             <TouchableOpacity
@@ -1095,7 +1098,10 @@ const CategoriesScreen = ({ navigation }) => {
                   {t("network_error_title", "Connection Error")}
                 </Text>
                 <Text style={styles(colors).errorSubtext}>
-                  {t("network_error_msg", "Check your internet connection and try again.")}
+                  {t(
+                    "network_error_msg",
+                    "Check your internet connection and try again.",
+                  )}
                 </Text>
                 {productsError && (
                   <Text style={styles(colors).errorDebug}>
@@ -1171,14 +1177,12 @@ const CategoriesScreen = ({ navigation }) => {
 
               {/* Categories Section - filtered by selected Business Category */}
               <SectionHeader
-                title={
-                  t("what_on_your_mind", "What's on your mind?")
-                }
+                title={t("what_on_your_mind", "What's on your mind?")}
                 showSeeAll={false}
               />
 
               {selectedBusinessCategoryId &&
-                productCategoriesForBusiness.length === 0 ? (
+              productCategoriesForBusiness.length === 0 ? (
                 <View style={styles(colors).noResultsContainer}>
                   <Text style={styles(colors).noResultsText}>
                     {t("noProductCategoriesAdded") ||
@@ -1186,19 +1190,18 @@ const CategoriesScreen = ({ navigation }) => {
                   </Text>
                 </View>
               ) : (
-              <Category
-                cuisines={
-                  selectedBusinessCategoryId
-                    ? productCategoriesForBusiness
-                    : apiProductCategories.length > 0
-                      ? apiProductCategories
-                      : dynamicCategories
-                }
-                selectedCuisine={selectedCuisine}
-                onPress={handleCuisinePress}
-              />
+                <Category
+                  cuisines={
+                    selectedBusinessCategoryId
+                      ? productCategoriesForBusiness
+                      : apiProductCategories.length > 0
+                        ? apiProductCategories
+                        : dynamicCategories
+                  }
+                  selectedCuisine={selectedCuisine}
+                  onPress={handleCuisinePress}
+                />
               )}
-
 
               {/* Results Section */}
               <SectionHeader
@@ -1210,12 +1213,12 @@ const CategoriesScreen = ({ navigation }) => {
                 onSeeAll={
                   !searchQuery
                     ? () =>
-                      navigation.navigate("SeeAll", {
-                        allItems: sourceProducts,
-                        vendorTypes: displayCategories,
-                        availableCuisines: cuisinesFromProducts,
-                        title: t("nearYou"),
-                      })
+                        navigation.navigate("SeeAll", {
+                          allItems: sourceProducts,
+                          vendorTypes: displayCategories,
+                          availableCuisines: cuisinesFromProducts,
+                          title: t("nearYou"),
+                        })
                     : undefined
                 }
               />
@@ -1243,7 +1246,9 @@ const CategoriesScreen = ({ navigation }) => {
                         {selectedVendorType?.toUpperCase()}
                       </Text>
                       <View style={styles(colors).filterChipClose}>
-                        <Text style={styles(colors).filterChipCloseIcon}>×</Text>
+                        <Text style={styles(colors).filterChipCloseIcon}>
+                          ×
+                        </Text>
                       </View>
                     </TouchableOpacity>
                   )}
@@ -1262,7 +1267,9 @@ const CategoriesScreen = ({ navigation }) => {
                         {selectedCuisine?.toUpperCase()}
                       </Text>
                       <View style={styles(colors).filterChipClose}>
-                        <Text style={styles(colors).filterChipCloseIcon}>×</Text>
+                        <Text style={styles(colors).filterChipCloseIcon}>
+                          ×
+                        </Text>
                       </View>
                     </TouchableOpacity>
                   )}
@@ -1290,13 +1297,14 @@ const CategoriesScreen = ({ navigation }) => {
               )}
 
               {productsLoading &&
-                (!displayedProducts || displayedProducts.length === 0) ? (
+              (!displayedProducts || displayedProducts.length === 0) ? (
                 <SkeletonCategory />
               ) : (selectedVendorType || selectedCuisine) &&
                 filteredVendors.length === 0 ? (
                 <View style={styles(colors).noResultsContainer}>
                   <Text style={styles(colors).noResultsText}>
-                    {t("noVendorsFound") || "No vendors found for this category"}
+                    {t("noVendorsFound") ||
+                      "No vendors found for this category"}
                   </Text>
                 </View>
               ) : (selectedVendorType || selectedCuisine) &&
@@ -1328,7 +1336,8 @@ const CategoriesScreen = ({ navigation }) => {
                   <Text style={styles(colors).noResultsText}>
                     {selectedVendorType || selectedCuisine
                       ? `${t("noResultsFor") || "No results for"} ${selectedVendorType || selectedCuisine}`
-                      : t("noProductsAvailable") || "No stores or restaurants available right now"}
+                      : t("noProductsAvailable") ||
+                        "No stores or restaurants available right now"}
                   </Text>
                   <Text style={styles(colors).noResultsSubtext}>
                     {selectedVendorType || selectedCuisine
