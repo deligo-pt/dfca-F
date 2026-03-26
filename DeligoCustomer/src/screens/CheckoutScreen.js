@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useState, useEffect, useRef } from "react";
 import {
   View,
   Text,
@@ -13,72 +13,96 @@ import {
   Dimensions,
   Platform,
   KeyboardAvoidingView,
-} from 'react-native';
-import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
-import { WebView } from 'react-native-webview';
-import { LinearGradient } from 'expo-linear-gradient';
-import { spacing } from '../theme';
-import { useTheme } from '../utils/ThemeContext';
-import { Ionicons, MaterialCommunityIcons } from '@expo/vector-icons';
-import { useLanguage } from '../utils/LanguageContext';
-import { useCart } from '../contexts/CartContext';
-import { useProducts } from '../contexts/ProductsContext';
-import { useLocation } from '../contexts/LocationContext';
-import { useDelivery } from '../contexts/DeliveryContext';
-import { useProfile } from '../contexts/ProfileContext';
-import formatCurrency from '../utils/currency';
-import { formatMinutesToUX } from '../utils/timeFormat';
-import { setupPaymentSheet, openPaymentSheet } from '../utils/stripeService';
-import CheckoutAPI from '../utils/checkoutApi';
-import OrderAPI from '../utils/orderApi';
-import { customerApi } from '../utils/api';
-import AddressApi from '../utils/addressApi';
-import { API_ENDPOINTS, API_CONFIG } from '../constants/config';
-import { getUserId, getUserData } from '../utils/auth';
-import AlertModal from '../components/AlertModal';
-import { getRealTimeDeliveryEstimate } from '../utils/deliveryEstimate';
-import { GOOGLE_MAPS_CONFIG } from '../constants/config';
+} from "react-native";
+import {
+  SafeAreaView,
+  useSafeAreaInsets,
+} from "react-native-safe-area-context";
+import { WebView } from "react-native-webview";
+import { LinearGradient } from "expo-linear-gradient";
+import { spacing } from "../theme";
+import { useTheme } from "../utils/ThemeContext";
+import { Ionicons, MaterialCommunityIcons } from "@expo/vector-icons";
+import { useLanguage } from "../utils/LanguageContext";
+import { useCart } from "../contexts/CartContext";
+import { useProducts } from "../contexts/ProductsContext";
+import { useLocation } from "../contexts/LocationContext";
+import { useDelivery } from "../contexts/DeliveryContext";
+import { useProfile } from "../contexts/ProfileContext";
+import formatCurrency from "../utils/currency";
+import { formatMinutesToUX } from "../utils/timeFormat";
+import { setupPaymentSheet, openPaymentSheet } from "../utils/stripeService";
+import CheckoutAPI from "../utils/checkoutApi";
+import OrderAPI from "../utils/orderApi";
+import { customerApi } from "../utils/api";
+import AddressApi from "../utils/addressApi";
+import { API_ENDPOINTS, API_CONFIG } from "../constants/config";
+import { getUserId, getUserData } from "../utils/auth";
+import AlertModal from "../components/AlertModal";
+import { getRealTimeDeliveryEstimate } from "../utils/deliveryEstimate";
+import { GOOGLE_MAPS_CONFIG } from "../constants/config";
 
 /**
  * ConsumerLocationDisplay
- * 
+ *
  * Displays the current delivery address with appropriate iconography.
- * 
+ *
  * @param {Object} props
  * @param {Object} props.colors - Theme colors.
  * @param {Function} props.t - Localization helper.
  */
 const ConsumerLocationDisplay = ({ colors, t }) => {
   const { address, detailedAddress, city, postalCode, label } = useLocation();
-  const displayAddress = address || t('selectAddress');
+  const displayAddress = address || t("selectAddress");
 
   // Filter out redundant parts for the secondary line
-  const locationDetails = [
-    city,
-    postalCode
-  ].filter(part => part && part.trim()).join(', ');
+  const locationDetails = [city, postalCode]
+    .filter((part) => part && part.trim())
+    .join(", ");
 
   return (
     <View style={styles(colors).addressContainer}>
       <View style={styles(colors).addressIconWrapper}>
-        <MaterialCommunityIcons name={label === 'Work' ? 'briefcase' : label === 'Other' ? 'map-marker' : 'home-variant'} size={24} color={colors.primary} />
+        <MaterialCommunityIcons
+          name={
+            label === "Work"
+              ? "briefcase"
+              : label === "Other"
+                ? "map-marker"
+                : "home-variant"
+          }
+          size={24}
+          color={colors.primary}
+        />
       </View>
       <View style={styles(colors).addressDetails}>
-        <Text style={styles(colors).addressType}>{label || t('home')}</Text>
+        <Text style={styles(colors).addressType}>{label || t("home")}</Text>
 
         {/* Show Detailed Address (Apt/Floor) prominently if available */}
         {detailedAddress ? (
-          <Text style={[styles(colors).addressFull, { fontFamily: 'Poppins-SemiBold', color: colors.text.primary, marginBottom: 2 }]}>
+          <Text
+            style={[
+              styles(colors).addressFull,
+              {
+                fontFamily: "Poppins-SemiBold",
+                color: colors.text.primary,
+                marginBottom: 2,
+              },
+            ]}
+          >
             {detailedAddress}
           </Text>
         ) : null}
 
-        <Text style={styles(colors).addressFull}>
-          {displayAddress}
-        </Text>
+        <Text style={styles(colors).addressFull}>{displayAddress}</Text>
 
         {locationDetails ? (
-          <Text style={[styles(colors).addressFull, { fontSize: 13, color: colors.text.secondary, marginTop: 2 }]}>
+          <Text
+            style={[
+              styles(colors).addressFull,
+              { fontSize: 13, color: colors.text.secondary, marginTop: 2 },
+            ]}
+          >
             {locationDetails}
           </Text>
         ) : null}
@@ -89,7 +113,7 @@ const ConsumerLocationDisplay = ({ colors, t }) => {
 
 /**
  * CheckoutScreen
- * 
+ *
  * Orchestrates the final order placement process.
  * Features:
  * - Address validation and creation.
@@ -97,7 +121,7 @@ const ConsumerLocationDisplay = ({ colors, t }) => {
  * - Integration with Stripe PaymentSheet.
  * - Order creation via backend API.
  * - Handling of both cart-based and direct-buy flows.
- * 
+ *
  * @param {Object} props
  * @param {Object} props.route - Route params containing initial cart data.
  * @param {Object} props.navigation - Navigation prop.
@@ -136,18 +160,18 @@ const CheckoutScreen = ({ route, navigation }) => {
   const [initializingCheckout, setInitializingCheckout] = useState(false);
   const [stripeError, setStripeError] = useState(null);
   const [profileIncomplete, setProfileIncomplete] = useState(false);
-  const [notes, setNotes] = useState('');
+  const [notes, setNotes] = useState("");
   const [checkoutResponse, setCheckoutResponse] = useState(null);
 
   // Missing States Restoration
-  const [selectedPayment, setSelectedPayment] = useState('CARD');
+  const [selectedPayment, setSelectedPayment] = useState("CARD");
   const [stripeReady, setStripeReady] = useState(false);
   const [isProcessing, setIsProcessing] = useState(false);
   const [tip, setTip] = useState(0);
-  const [promoCode, setPromoCode] = useState('');
+  const [promoCode, setPromoCode] = useState("");
   const [isApplyingPromo, setIsApplyingPromo] = useState(false);
   const [appliedPromo, setAppliedPromo] = useState(null);
-  const [deliveryInstruction, setDeliveryInstruction] = useState('');
+  const [deliveryInstruction, setDeliveryInstruction] = useState("");
 
   // Success Modal State
   const [showSuccessModal, setShowSuccessModal] = useState(false);
@@ -166,7 +190,7 @@ const CheckoutScreen = ({ route, navigation }) => {
         toValue: 1,
         duration: 3500,
         useNativeDriver: true,
-      })
+      }),
     );
     shimmer.start();
     return () => shimmer.stop();
@@ -174,7 +198,7 @@ const CheckoutScreen = ({ route, navigation }) => {
 
   // NIF Modal State
   const [showNifModal, setShowNifModal] = useState(false);
-  const [nifValue, setNifValue] = useState('');
+  const [nifValue, setNifValue] = useState("");
   const [nifSkipped, setNifSkipped] = useState(false);
   const [isUpdatingNif, setIsUpdatingNif] = useState(false);
   const { updateProfile } = useProfile();
@@ -182,8 +206,14 @@ const CheckoutScreen = ({ route, navigation }) => {
   const [showCancelModal, setShowCancelModal] = useState(false);
 
   const { fetchEstimate, getFormattedRange } = useDelivery();
-  const vLat = cartData?.vendorLatitude || cartData?.vendor?.latitude || cartData?.location?.latitude;
-  const vLng = cartData?.vendorLongitude || cartData?.vendor?.longitude || cartData?.location?.longitude;
+  const vLat =
+    cartData?.vendorLatitude ||
+    cartData?.vendor?.latitude ||
+    cartData?.location?.latitude;
+  const vLng =
+    cartData?.vendorLongitude ||
+    cartData?.vendor?.longitude ||
+    cartData?.location?.longitude;
   const vId = cartData?.vendorId || cartData?.vendor?._id;
 
   useEffect(() => {
@@ -193,35 +223,43 @@ const CheckoutScreen = ({ route, navigation }) => {
   }, [vId, vLat, vLng, currentLocation?.latitude, currentLocation?.longitude]);
 
   const deliveryTimeDisplay = getFormattedRange(
-    vId, 
-    cartData?.estimatedDeliveryTime ? String(cartData.estimatedDeliveryTime) : '25-35 min'
+    vId,
+    cartData?.estimatedDeliveryTime
+      ? String(cartData.estimatedDeliveryTime)
+      : "25-35 min",
   );
 
   const handleUpdateNif = async () => {
     if (!nifValue.trim()) {
-      setStripeError(t('pleaseEnterNif') || 'Please enter valid NIF');
+      setStripeError(t("pleaseEnterNif") || "Please enter valid NIF");
       return;
     }
 
     setIsUpdatingNif(true);
-    console.log(`[${new Date().toISOString()}] [CheckoutScreen] handleUpdateNif starting with:`, nifValue);
+    console.log(
+      `[${new Date().toISOString()}] [CheckoutScreen] handleUpdateNif starting with:`,
+      nifValue,
+    );
     try {
       // Send both cases to ensure backend compat
       const success = await updateProfile({
         NIF: nifValue.trim(),
-        nif: nifValue.trim()
+        nif: nifValue.trim(),
       });
-      console.log(`[${new Date().toISOString()}] [CheckoutScreen] handleUpdateNif result:`, success);
+      console.log(
+        `[${new Date().toISOString()}] [CheckoutScreen] handleUpdateNif result:`,
+        success,
+      );
       if (success) {
-        console.log('[CheckoutScreen] NIF updated successfully');
+        console.log("[CheckoutScreen] NIF updated successfully");
         setShowNifModal(false);
         setNifSkipped(true);
       } else {
-        setStripeError('Failed to update NIF. Please try again or Skip.');
+        setStripeError("Failed to update NIF. Please try again or Skip.");
       }
     } catch (error) {
-      console.error('[CheckoutScreen] NIF update error:', error);
-      setStripeError('Failed to update NIF.');
+      console.error("[CheckoutScreen] NIF update error:", error);
+      setStripeError("Failed to update NIF.");
     } finally {
       setIsUpdatingNif(false);
     }
@@ -234,65 +272,70 @@ const CheckoutScreen = ({ route, navigation }) => {
 
   // ... (render) ...
 
-
-
-
   // Build full address string from all components
-  const fullAddressParts = [
-    address,
-    detailedAddress,
-    city,
-    postalCode
-  ].filter(part => part && part.trim()).join(', ');
+  const fullAddressParts = [address, detailedAddress, city, postalCode]
+    .filter((part) => part && part.trim())
+    .join(", ");
 
   const completeStreet = [detailedAddress, address]
-    .filter(part => part && part.trim())
-    .join(', ');
+    .filter((part) => part && part.trim())
+    .join(", ");
 
   const addressData = {
     // Primary address fields - combine address with details in street
-    address: completeStreet || address || '',
-    street: completeStreet || address || '', // Street should include apartment/building
-    detailedAddress: detailedAddress || '',
-    addressLine1: address || '',
-    addressLine2: detailedAddress || '', // Apartment/building as separate line
-    building: detailedAddress || '',
-    apartment: detailedAddress || '',
-    city: city || '',
-    postalCode: postalCode || '',
-    zipCode: postalCode || '',
+    address: completeStreet || address || "",
+    street: completeStreet || address || "", // Street should include apartment/building
+    detailedAddress: detailedAddress || "",
+    addressLine1: address || "",
+    addressLine2: detailedAddress || "", // Apartment/building as separate line
+    building: detailedAddress || "",
+    apartment: detailedAddress || "",
+    city: city || "",
+    postalCode: postalCode || "",
+    zipCode: postalCode || "",
     // Combined full address
     fullAddress: fullAddressParts,
     formattedAddress: fullAddressParts,
     // Coordinates
-    coordinates: currentLocation ? {
-      latitude: currentLocation.latitude,
-      longitude: currentLocation.longitude
-    } : null,
+    coordinates: currentLocation
+      ? {
+          latitude: currentLocation.latitude,
+          longitude: currentLocation.longitude,
+        }
+      : null,
     latitude: currentLocation?.latitude || null,
     longitude: currentLocation?.longitude || null,
     // Backend required fields
-    state: state || 'Dhaka Division', // Use map state or default
-    country: country || 'Bangladesh', // Use map country or default
+    state: state || "Dhaka Division", // Use map state or default
+    country: country || "Bangladesh", // Use map country or default
   };
 
   useEffect(() => {
     let canceled = false;
     const createCheckoutOnEnter = async () => {
-      if (appliedOffer || (checkoutResponse && checkoutResponse.offerDiscount > 0)) {
-        console.debug('[CheckoutScreen] Skipping auto-createCheckout because offer is active.');
+      if (
+        appliedOffer ||
+        (checkoutResponse && checkoutResponse.offerDiscount > 0)
+      ) {
+        console.debug(
+          "[CheckoutScreen] Skipping auto-createCheckout because offer is active.",
+        );
         return;
       }
 
       if (user && !user.NIF && !nifSkipped && !showNifModal) {
-        console.debug('[CheckoutScreen] User missing NIF, prompting modal...');
+        console.debug("[CheckoutScreen] User missing NIF, prompting modal...");
         setShowNifModal(true);
         return;
       }
 
       if (!address || !city) {
-        console.debug('[CheckoutScreen] No address available, skipping API call');
-        setStripeError(t('pleaseSelectAddress') || 'Please select a delivery address');
+        console.debug(
+          "[CheckoutScreen] No address available, skipping API call",
+        );
+        setStripeError(
+          t("pleaseSelectAddress") || "Please select a delivery address",
+        );
         setInitializingCheckout(false);
         return;
       }
@@ -304,75 +347,118 @@ const CheckoutScreen = ({ route, navigation }) => {
       // 0. Pre-check: Validate Profile Completeness
       try {
         const currentUser = await getUserData();
-        const hasFirstName = currentUser?.name?.firstName || currentUser?.firstName;
-        const hasLastName = currentUser?.name?.lastName || currentUser?.lastName;
-        const hasContactNumber = currentUser?.contactNumber || currentUser?.phone || currentUser?.mobile;
+        const hasFirstName =
+          currentUser?.name?.firstName || currentUser?.firstName;
+        const hasLastName =
+          currentUser?.name?.lastName || currentUser?.lastName;
+        const hasContactNumber =
+          currentUser?.contactNumber ||
+          currentUser?.phone ||
+          currentUser?.mobile;
         // Note: Email is not required - users can authenticate with mobile only
 
         // Validate customer.name.firstName
         if (!hasFirstName || !hasFirstName.trim()) {
-          console.warn('[CheckoutScreen] Profile incomplete (missing first name)');
+          console.warn(
+            "[CheckoutScreen] Profile incomplete (missing first name)",
+          );
           setProfileIncomplete(true);
-          setStripeError(t('incompleteProfileError') || 'Please complete your profile before checking out');
+          setStripeError(
+            t("incompleteProfileError") ||
+              "Please complete your profile before checking out",
+          );
           setInitializingCheckout(false);
           return;
         }
 
         // Validate customer.name.lastName
         if (!hasLastName || !hasLastName.trim()) {
-          console.warn('[CheckoutScreen] Profile incomplete (missing last name)');
+          console.warn(
+            "[CheckoutScreen] Profile incomplete (missing last name)",
+          );
           setProfileIncomplete(true);
-          setStripeError(t('incompleteProfileError') || 'Please complete your profile before checking out');
+          setStripeError(
+            t("incompleteProfileError") ||
+              "Please complete your profile before checking out",
+          );
           setInitializingCheckout(false);
           return;
         }
 
         // Validate customer.contactNumber
         if (!hasContactNumber || !hasContactNumber.trim()) {
-          console.warn('[CheckoutScreen] Profile incomplete (missing contact number)');
+          console.warn(
+            "[CheckoutScreen] Profile incomplete (missing contact number)",
+          );
           setProfileIncomplete(true);
-          setStripeError(t('incompleteProfileError') || 'Please complete your profile before checking out');
+          setStripeError(
+            t("incompleteProfileError") ||
+              "Please complete your profile before checking out",
+          );
           setInitializingCheckout(false);
           return;
         }
 
         // Validate customer.address.state
         if (!state || !state.trim()) {
-          console.warn('[CheckoutScreen] Profile incomplete (missing address state)');
+          console.warn(
+            "[CheckoutScreen] Profile incomplete (missing address state)",
+          );
           setProfileIncomplete(true);
-          setStripeError(t('incompleteProfileError') || 'Please complete your profile before checking out');
+          setStripeError(
+            t("incompleteProfileError") ||
+              "Please complete your profile before checking out",
+          );
           setInitializingCheckout(false);
           return;
         }
 
         // Validate customer.address.city
         if (!city || !city.trim()) {
-          console.warn('[CheckoutScreen] Profile incomplete (missing address city)');
+          console.warn(
+            "[CheckoutScreen] Profile incomplete (missing address city)",
+          );
           setProfileIncomplete(true);
-          setStripeError(t('incompleteProfileError') || 'Please complete your profile before checking out');
+          setStripeError(
+            t("incompleteProfileError") ||
+              "Please complete your profile before checking out",
+          );
           setInitializingCheckout(false);
           return;
         }
 
         // Validate customer.address.country
         if (!country || !country.trim()) {
-          console.warn('[CheckoutScreen] Profile incomplete (missing address country)');
+          console.warn(
+            "[CheckoutScreen] Profile incomplete (missing address country)",
+          );
           setProfileIncomplete(true);
-          setStripeError(t('incompleteProfileError') || 'Please complete your profile before checking out');
+          setStripeError(
+            t("incompleteProfileError") ||
+              "Please complete your profile before checking out",
+          );
           setInitializingCheckout(false);
           return;
         }
 
         // Validate customer.address.postalCode
         if (!postalCode || !postalCode.trim()) {
-          console.warn('[CheckoutScreen] Profile incomplete (missing address postalCode)');
+          console.warn(
+            "[CheckoutScreen] Profile incomplete (missing address postalCode)",
+          );
           setProfileIncomplete(true);
-          setStripeError(t('incompleteProfileError') || 'Please complete your profile before checking out');
+          setStripeError(
+            t("incompleteProfileError") ||
+              "Please complete your profile before checking out",
+          );
           setInitializingCheckout(false);
           return;
         }
       } catch (err) {
-        console.warn('[CheckoutScreen] Failed to validate profile completeness', err);
+        console.warn(
+          "[CheckoutScreen] Failed to validate profile completeness",
+          err,
+        );
       }
 
       let backendAddressId = null;
@@ -381,17 +467,21 @@ const CheckoutScreen = ({ route, navigation }) => {
       // Helper to find address in a list
       const findMatchingAddress = (list, target) => {
         if (!Array.isArray(list) || !list.length) return null;
-        return list.find(a =>
-          (a.latitude === target.latitude && a.longitude === target.longitude) ||
-          (a.street === target.street) ||
-          (a.address === target.address)
+        return list.find(
+          (a) =>
+            (a.latitude === target.latitude &&
+              a.longitude === target.longitude) ||
+            a.street === target.street ||
+            a.address === target.address,
         );
       };
 
       try {
         // Step 1: ALWAYS Fetch fresh profile from API to ensure we have the latest address IDs
         // Local storage (getUserData) might be stale specific for checkout flow
-        console.debug('[CheckoutScreen] Fetching fresh profile for address resolution...');
+        console.debug(
+          "[CheckoutScreen] Fetching fresh profile for address resolution...",
+        );
         let freshProfile = null;
         try {
           const profileRes = await customerApi.get(API_ENDPOINTS.PROFILE.GET);
@@ -401,27 +491,38 @@ const CheckoutScreen = ({ route, navigation }) => {
             freshProfile = profileRes.data;
           }
         } catch (fetchErr) {
-          console.warn('[CheckoutScreen] Failed to fetch fresh profile', fetchErr);
+          console.warn(
+            "[CheckoutScreen] Failed to fetch fresh profile",
+            fetchErr,
+          );
           // Fallback to local data if network fails
           freshProfile = await getUserData();
         }
 
         currentUser = freshProfile; // Update currentUser reference to use the fresh one
         const serverAddresses = freshProfile?.deliveryAddresses || [];
-        console.debug('[CheckoutScreen] Server addresses count:', serverAddresses.length);
+        console.debug(
+          "[CheckoutScreen] Server addresses count:",
+          serverAddresses.length,
+        );
 
         // Strategy 1: Check fresh server list for match
         if (serverAddresses.length > 0) {
           const match = findMatchingAddress(serverAddresses, addressData);
           if (match) {
-            console.debug('[CheckoutScreen] Found matching delivery address in SERVER data:', match._id);
+            console.debug(
+              "[CheckoutScreen] Found matching delivery address in SERVER data:",
+              match._id,
+            );
             backendAddressId = match._id;
           }
         }
 
         // Strategy 2: If not found, try to add it as a NEW delivery address
         if (!backendAddressId) {
-          console.debug('[CheckoutScreen] Address ID not found on server. Attempting to add...');
+          console.debug(
+            "[CheckoutScreen] Address ID not found on server. Attempting to add...",
+          );
 
           try {
             const payload = {
@@ -433,9 +534,14 @@ const CheckoutScreen = ({ route, navigation }) => {
                 postalCode: addressData.postalCode,
                 latitude: addressData.latitude,
                 longitude: addressData.longitude,
-                addressType: (addressData.label === 'Work' ? 'OFFICE' : addressData.label === 'Other' ? 'OTHER' : 'HOME').toUpperCase(),
-                isActive: true
-              }
+                addressType: (addressData.label === "Work"
+                  ? "OFFICE"
+                  : addressData.label === "Other"
+                    ? "OTHER"
+                    : "HOME"
+                ).toUpperCase(),
+                isActive: true,
+              },
             };
 
             const addRes = await AddressApi.addDeliveryAddress(payload);
@@ -445,39 +551,65 @@ const CheckoutScreen = ({ route, navigation }) => {
               const addedAddr = addRes.data.data || addRes.data.address;
               if (addedAddr && addedAddr._id) {
                 backendAddressId = addedAddr._id;
-              } else if (addRes.data.user && addRes.data.user.deliveryAddresses) {
-                const match = findMatchingAddress(addRes.data.user.deliveryAddresses, addressData);
+              } else if (
+                addRes.data.user &&
+                addRes.data.user.deliveryAddresses
+              ) {
+                const match = findMatchingAddress(
+                  addRes.data.user.deliveryAddresses,
+                  addressData,
+                );
                 if (match) backendAddressId = match._id;
               }
-              console.debug('[CheckoutScreen] Address added successfully, new ID:', backendAddressId);
+              console.debug(
+                "[CheckoutScreen] Address added successfully, new ID:",
+                backendAddressId,
+              );
             }
           } catch (addErr) {
             // Strategy 3: Handle 409 Conflict (Address already exists)
-            if (addErr.response && (addErr.response.status === 409)) {
-              console.warn('[CheckoutScreen] Address already exists (409) but was not matched initially.');
+            if (addErr.response && addErr.response.status === 409) {
+              console.warn(
+                "[CheckoutScreen] Address already exists (409) but was not matched initially.",
+              );
               // Try fuzzy match on street alone if strict match failed
-              const looseMatch = serverAddresses.find(a => a.street === addressData.street);
+              const looseMatch = serverAddresses.find(
+                (a) => a.street === addressData.street,
+              );
               if (looseMatch) {
                 backendAddressId = looseMatch._id;
-                console.debug('[CheckoutScreen] Resolved ID via loose street match after 409:', backendAddressId);
+                console.debug(
+                  "[CheckoutScreen] Resolved ID via loose street match after 409:",
+                  backendAddressId,
+                );
               } else {
-                console.warn('[CheckoutScreen] Could not resolve ID even after 409 conflict.');
+                console.warn(
+                  "[CheckoutScreen] Could not resolve ID even after 409 conflict.",
+                );
               }
             } else if (addErr.response && addErr.response.status === 400) {
-              const errorMsg = addErr.response.data?.message || '';
-              if (errorMsg.includes('maximum number of delivery addresses')) {
-                console.warn('[CheckoutScreen] Max addresses reached. Ideally prompt user to select existing.');
-                setStripeError(t('maxAddressesReached') || 'You have reached the maximum number of delivery addresses. Please select or delete an existing address.');
+              const errorMsg = addErr.response.data?.message || "";
+              if (errorMsg.includes("maximum number of delivery addresses")) {
+                console.warn(
+                  "[CheckoutScreen] Max addresses reached. Ideally prompt user to select existing.",
+                );
+                setStripeError(
+                  t("maxAddressesReached") ||
+                    "You have reached the maximum number of delivery addresses. Please select or delete an existing address.",
+                );
                 setInitializingCheckout(false);
                 return;
               }
             } else {
-              console.warn('[CheckoutScreen] Failed to add address', addErr.message);
+              console.warn(
+                "[CheckoutScreen] Failed to add address",
+                addErr.message,
+              );
             }
           }
         }
       } catch (e) {
-        console.warn('[CheckoutScreen] Address resolution logic failed', e);
+        console.warn("[CheckoutScreen] Address resolution logic failed", e);
       }
 
       // Prepare Final Payload
@@ -498,16 +630,21 @@ const CheckoutScreen = ({ route, navigation }) => {
 
       let checkoutPayload = {
         ...addressData,
-        label: addressData.label || 'Home',
-        customerName: `${currentUser?.name?.firstName || ''} ${currentUser?.name?.lastName || ''}`.trim(),
-        customerEmail: currentUser?.email || '',
-        customerPhone: currentUser?.contactNumber || currentUser?.phone || currentUser?.mobile || '',
+        label: addressData.label || "Home",
+        customerName:
+          `${currentUser?.name?.firstName || ""} ${currentUser?.name?.lastName || ""}`.trim(),
+        customerEmail: currentUser?.email || "",
+        customerPhone:
+          currentUser?.contactNumber ||
+          currentUser?.phone ||
+          currentUser?.mobile ||
+          "",
         vendorId: vendorId,
         // Optional fields from original req
         estimatedDeliveryTime: deliveryTimeDisplay,
         discount: 0, // Placeholder
-        nif: nifValue || currentUser?.NIF || '',
-        NIF: nifValue || currentUser?.NIF || ''
+        nif: nifValue || currentUser?.NIF || "",
+        NIF: nifValue || currentUser?.NIF || "",
       };
 
       if (isCartPurchase) {
@@ -559,14 +696,18 @@ const CheckoutScreen = ({ route, navigation }) => {
         checkoutPayload.cartTotal = calculatedSubtotal;
         checkoutPayload.amount = calculatedSubtotal;
         */
-
       } else {
         // DIRECT PURCHASE (Buy Now / Reorder / etc)
         // Extract items from cartData params
         let calculatedSubtotal = 0;
 
-        const directItems = (cartData?.items || []).map(it => {
-          const rawId = it.productId || it.product?.id || it.product?._id || it.id || it._id;
+        const directItems = (cartData?.items || []).map((it) => {
+          const rawId =
+            it.productId ||
+            it.product?.id ||
+            it.product?._id ||
+            it.id ||
+            it._id;
 
           const price = Number(it.price || it.product?.price || 0);
           const qty = Number(it.quantity || 1);
@@ -574,19 +715,20 @@ const CheckoutScreen = ({ route, navigation }) => {
           calculatedSubtotal += itemTotal;
 
           return {
-            productId: (rawId && rawId.includes('|')) ? rawId.split('|')[0] : rawId, // Ensure productId is set and clean
-            product: (rawId && rawId.includes('|')) ? rawId.split('|')[0] : rawId,   // Alias
-            id: (rawId && rawId.includes('|')) ? rawId.split('|')[0] : rawId,        // Alias
+            productId:
+              rawId && rawId.includes("|") ? rawId.split("|")[0] : rawId, // Ensure productId is set and clean
+            product: rawId && rawId.includes("|") ? rawId.split("|")[0] : rawId, // Alias
+            id: rawId && rawId.includes("|") ? rawId.split("|")[0] : rawId, // Alias
             quantity: qty,
             offerCode: appliedOffer?.code, // Inject offerCode
             price: price,
-            itemTotal: itemTotal
+            itemTotal: itemTotal,
           };
         });
         checkoutPayload.items = directItems;
         checkoutPayload.cartItems = directItems; // Alias
-        checkoutPayload.products = directItems;  // Alias
-        checkoutPayload.orderItems = directItems;// Alias
+        checkoutPayload.products = directItems; // Alias
+        checkoutPayload.orderItems = directItems; // Alias
 
         checkoutPayload.subtotal = calculatedSubtotal;
         checkoutPayload.subTotal = calculatedSubtotal;
@@ -595,7 +737,10 @@ const CheckoutScreen = ({ route, navigation }) => {
         // Don't send useCart
       }
 
-      console.log('[CheckoutScreen] Layout Dump:', JSON.stringify(checkoutPayload));
+      console.log(
+        "[CheckoutScreen] Layout Dump:",
+        JSON.stringify(checkoutPayload),
+      );
 
       // Fix: Ensure we send the robust deliveryAddress object if we don't have an ID
       // Fix: ALWAYS Construct proper nested object for backend validation
@@ -620,8 +765,13 @@ const CheckoutScreen = ({ route, navigation }) => {
         latitude: addressData.latitude,
         longitude: addressData.longitude,
         detailedAddress: addressData.detailedAddress,
-        addressType: (addressData.label === 'Work' ? 'OFFICE' : addressData.label === 'Other' ? 'OTHER' : 'HOME').toUpperCase(),
-        isActive: true
+        addressType: (addressData.label === "Work"
+          ? "OFFICE"
+          : addressData.label === "Other"
+            ? "OTHER"
+            : "HOME"
+        ).toUpperCase(),
+        isActive: true,
       };
 
       if (backendAddressId) {
@@ -638,43 +788,63 @@ const CheckoutScreen = ({ route, navigation }) => {
       while (attempts < maxAttempts && !success && !canceled) {
         attempts++;
         try {
-          console.debug(`[CheckoutScreen] Creating checkout (Attempt ${attempts}/${maxAttempts})...`);
+          console.debug(
+            `[CheckoutScreen] Creating checkout (Attempt ${attempts}/${maxAttempts})...`,
+          );
 
           if (!backendAddressId) {
-            console.warn('[CheckoutScreen] Sending NEW Address payload:', JSON.stringify(checkoutPayload.deliveryAddress));
+            console.warn(
+              "[CheckoutScreen] Sending NEW Address payload:",
+              JSON.stringify(checkoutPayload.deliveryAddress),
+            );
           }
 
           const res = await CheckoutAPI.createCheckout(checkoutPayload);
 
           if (res.success || (res.data && res.data.success)) {
             const checkoutData = res.data?.data || res.data || res;
-            console.debug('[CheckoutScreen] Checkout created successfully, ID:', extractCheckoutSummaryId(checkoutData));
+            console.debug(
+              "[CheckoutScreen] Checkout created successfully, ID:",
+              extractCheckoutSummaryId(checkoutData),
+            );
             setCheckoutResponse(checkoutData);
             success = true;
           } else {
             // Handle logical errors (non-throwing)
-            console.warn('[CheckoutScreen] Checkout creation failed:', res.error);
-            // If the API returns 429 in the body/error, we might need to handle it here too, 
+            console.warn(
+              "[CheckoutScreen] Checkout creation failed:",
+              res.error,
+            );
+            // If the API returns 429 in the body/error, we might need to handle it here too,
             // but usually axios throws for 4xx/5xx.
             // Assuming res.error is a string message.
-            setStripeError(res.error || 'Failed to initialize checkout');
+            setStripeError(res.error || "Failed to initialize checkout");
             break; // Don't retry logical errors (e.g. invalid data)
           }
         } catch (err) {
           // Check for 429 Rate Limit
-          if (err.response && (err.response.status === 429 || err.status === 429)) {
-            console.warn(`[CheckoutScreen] 429 Too Many Requests. Retrying in ${delay}ms...`);
+          if (
+            err.response &&
+            (err.response.status === 429 || err.status === 429)
+          ) {
+            console.warn(
+              `[CheckoutScreen] 429 Too Many Requests. Retrying in ${delay}ms...`,
+            );
             if (attempts < maxAttempts) {
-              await new Promise(resolve => setTimeout(resolve, delay));
+              await new Promise((resolve) => setTimeout(resolve, delay));
               delay *= 2; // Exponential backoff
               continue; // Retry
             } else {
-              setStripeError(t('serverBusy') || 'Server is busy. Please try again later.');
+              setStripeError(
+                t("serverBusy") || "Server is busy. Please try again later.",
+              );
             }
           } else {
             // Other errors
-            console.error('[CheckoutScreen] createCheckout error:', err);
-            setStripeError('An error occurred while initializing checkout. Please try again.');
+            console.error("[CheckoutScreen] createCheckout error:", err);
+            setStripeError(
+              "An error occurred while initializing checkout. Please try again.",
+            );
           }
           break; // Break loop for non-retriable errors
         }
@@ -690,89 +860,130 @@ const CheckoutScreen = ({ route, navigation }) => {
     return () => {
       canceled = true;
     };
-  }, [address, detailedAddress, city, postalCode, appliedOffer, nifSkipped, checkoutRetryKey]);
+  }, [
+    address,
+    detailedAddress,
+    city,
+    postalCode,
+    appliedOffer,
+    nifSkipped,
+    checkoutRetryKey,
+  ]);
 
   // Calculate real cart values with ProductsContext enrichment
-  const cartItems = cart?.items ? Object.keys(cart.items).map(id => {
-    let p = cart.items[id].product;
+  const cartItems = cart?.items
+    ? Object.keys(cart.items).map((id) => {
+        let p = cart.items[id].product;
 
-    // Enrich product data from ProductsContext (same logic as CartDetail)
-    let contextProduct = null;
-    if (products && products.length > 0) {
-      const rawId = p.id || p._id || p.productId || id;
-      if (rawId) {
-        contextProduct = products.find(prod =>
-          prod.id === rawId ||
-          prod._id === rawId ||
-          prod._raw?._id === rawId ||
-          prod._raw?.productId === rawId ||
-          prod._raw?.id === rawId ||
-          (prod._raw && (prod._raw.productId === rawId || prod._raw.id === rawId))
-        );
-      }
+        // Enrich product data from ProductsContext (same logic as CartDetail)
+        let contextProduct = null;
+        if (products && products.length > 0) {
+          const rawId = p.id || p._id || p.productId || id;
+          if (rawId) {
+            contextProduct = products.find(
+              (prod) =>
+                prod.id === rawId ||
+                prod._id === rawId ||
+                prod._raw?._id === rawId ||
+                prod._raw?.productId === rawId ||
+                prod._raw?.id === rawId ||
+                (prod._raw &&
+                  (prod._raw.productId === rawId || prod._raw.id === rawId)),
+            );
+          }
 
-      // Debug logging
-      if (!contextProduct && rawId) {
-        console.debug('[CheckoutScreen] Product lookup failed for ID:', rawId);
-      } else if (contextProduct) {
-        console.debug('[CheckoutScreen] Product matched:', contextProduct.name, 'for ID:', rawId);
-      }
-    }
-
-    // Merge: Prefer Context data for static fields (image, name) AND pricing if cart data is incomplete
-    if (contextProduct) {
-      p = {
-        ...p,
-        image: contextProduct.image || p.image,
-        name: contextProduct.name || p.name,
-        _raw: {
-          ...(contextProduct._raw || {}),
-          ...(p._raw || {}),
-          // Merge pricing: use context pricing if cart pricing is missing
-          pricing: {
-            ...(contextProduct._raw?.pricing || {}),
-            ...(p._raw?.pricing || {}),
-            ...(p.pricing || {})
+          // Debug logging
+          if (!contextProduct && rawId) {
+            console.debug(
+              "[CheckoutScreen] Product lookup failed for ID:",
+              rawId,
+            );
+          } else if (contextProduct) {
+            console.debug(
+              "[CheckoutScreen] Product matched:",
+              contextProduct.name,
+              "for ID:",
+              rawId,
+            );
           }
         }
-      };
-    }
 
-    const rawPricing = p?._raw?.pricing || p?.pricing || null;
-    const basePrice = Number((rawPricing && rawPricing.price) ?? p.price ?? 0) || 0;
-    const discountRaw = rawPricing?.discount;
-    const taxRaw = rawPricing?.tax;
-    const discountPercent = (discountRaw != null && !isNaN(Number(discountRaw))) ? (Number(discountRaw) <= 1 ? Number(discountRaw) * 100 : Number(discountRaw)) : 0;
-    const taxPercent = (taxRaw != null && !isNaN(Number(taxRaw))) ? (Number(taxRaw) <= 1 ? Number(taxRaw) * 100 : Number(taxRaw)) : (Number(cart?.vendorMeta?.taxRate ?? 0) * 100);
-    const finalUnitFromPricing = rawPricing && rawPricing.finalPrice != null ? Number(rawPricing.finalPrice) : null;
-    const computedFinalUnit = basePrice * (1 - (discountPercent / 100)) * (1 + (taxPercent / 100));
-    const finalUnitPrice = Number.isFinite(finalUnitFromPricing) ? finalUnitFromPricing : computedFinalUnit;
+        // Merge: Prefer Context data for static fields (image, name) AND pricing if cart data is incomplete
+        if (contextProduct) {
+          p = {
+            ...p,
+            image: contextProduct.image || p.image,
+            name: contextProduct.name || p.name,
+            _raw: {
+              ...(contextProduct._raw || {}),
+              ...(p._raw || {}),
+              // Merge pricing: use context pricing if cart pricing is missing
+              pricing: {
+                ...(contextProduct._raw?.pricing || {}),
+                ...(p._raw?.pricing || {}),
+                ...(p.pricing || {}),
+              },
+            },
+          };
+        }
 
-    return ({
-      id,
-      name: p?.name,
-      price: basePrice,
-      finalPrice: finalUnitPrice,
-      // Pass backend totals if available
-      subtotal: cart.items[id].subtotal,
-      totalPrice: cart.items[id].totalPrice,
-      discountPercent,
-      taxPercent,
-      quantity: cart.items[id].quantity,
-      image: p?.image,
-      image: p?.image,
-      currency: (rawPricing && rawPricing.currency) || p?.currency,
-      // Pass through customization data from cart item
-      addons: cart.items[id].addons || [],
-      variantName: cart.items[id].variantName || '',
-      options: cart.items[id].options || {},
-    });
-  }) : (cartData?.items || []);
+        const rawPricing = p?._raw?.pricing || p?.pricing || null;
+        const basePrice =
+          Number((rawPricing && rawPricing.price) ?? p.price ?? 0) || 0;
+        const discountRaw = rawPricing?.discount;
+        const taxRaw = rawPricing?.tax;
+        const discountPercent =
+          discountRaw != null && !isNaN(Number(discountRaw))
+            ? Number(discountRaw) <= 1
+              ? Number(discountRaw) * 100
+              : Number(discountRaw)
+            : 0;
+        const taxPercent =
+          taxRaw != null && !isNaN(Number(taxRaw))
+            ? Number(taxRaw) <= 1
+              ? Number(taxRaw) * 100
+              : Number(taxRaw)
+            : Number(cart?.vendorMeta?.taxRate ?? 0) * 100;
+        const finalUnitFromPricing =
+          rawPricing && rawPricing.finalPrice != null
+            ? Number(rawPricing.finalPrice)
+            : null;
+        const computedFinalUnit =
+          basePrice * (1 - discountPercent / 100) * (1 + taxPercent / 100);
+        const finalUnitPrice = Number.isFinite(finalUnitFromPricing)
+          ? finalUnitFromPricing
+          : computedFinalUnit;
 
-  const currency = cartItems.length > 0 ? (cartItems[0].currency || 'EUR') : 'EUR';
+        return {
+          id,
+          name: p?.name,
+          price: basePrice,
+          finalPrice: finalUnitPrice,
+          // Pass backend totals if available
+          subtotal: cart.items[id].subtotal,
+          totalPrice: cart.items[id].totalPrice,
+          discountPercent,
+          taxPercent,
+          quantity: cart.items[id].quantity,
+          image: p?.image,
+          image: p?.image,
+          currency: (rawPricing && rawPricing.currency) || p?.currency,
+          // Pass through customization data from cart item
+          addons: cart.items[id].addons || [],
+          variantName: cart.items[id].variantName || "",
+          options: cart.items[id].options || {},
+        };
+      })
+    : cartData?.items || [];
+
+  const currency =
+    cartItems.length > 0 ? cartItems[0].currency || "EUR" : "EUR";
   // Compute item-level subtotal (after item discounts, before tax) and tax
   const itemsSubtotal = cartItems.reduce((sum, it) => {
-    const addonsTotal = (it.addons || []).reduce((s, ad) => s + Number(ad.price || 0), 0);
+    const addonsTotal = (it.addons || []).reduce(
+      (s, ad) => s + Number(ad.price || 0),
+      0,
+    );
     // FIX: Discount applies only to base price
     const unitDiscount = (it.price || 0) * ((it.discountPercent || 0) / 100);
     const unitDiscountedBase = (it.price || 0) - unitDiscount;
@@ -790,52 +1001,91 @@ const CheckoutScreen = ({ route, navigation }) => {
   // MOVED UP to be available for logs
   const displaySubtotal = cartItems.reduce((sum, it) => {
     // Match CartDetail logic: Addons are flat cost per line item
-    const addonsCost = (it.addons || []).reduce((aSum, a) => aSum + (Number(a.price || 0) * Number(a.quantity || 1)), 0);
+    const addonsCost = (it.addons || []).reduce(
+      (aSum, a) => aSum + Number(a.price || 0) * Number(a.quantity || 1),
+      0,
+    );
     const itemTotal = (it.finalPrice || it.price || 0) * (it.quantity || 0);
     return sum + itemTotal + addonsCost;
   }, 0);
 
   // Extract values from server response FIRST so they are available for valid calculation
   const serverData = checkoutResponse?.data || checkoutResponse || {};
-  const serverTotal = serverData.payoutSummary?.grandTotal ?? serverData.subtotal ?? serverData.total ?? serverData.totalAmount ?? serverData.subTotal; // Fallback to grandTotal first
+  const serverTotal =
+    serverData.payoutSummary?.grandTotal ??
+    serverData.subtotal ??
+    serverData.total ??
+    serverData.totalAmount ??
+    serverData.subTotal; // Fallback to grandTotal first
 
   // Try to find explicit delivery fee
-  const serverDeliveryFee = serverData.deliveryCharge ?? serverData.deliveryFee ?? serverData.delivery_fee ?? null;
+  const serverDeliveryFee =
+    serverData.deliveryCharge ??
+    serverData.deliveryFee ??
+    serverData.delivery_fee ??
+    null;
 
   // Fees and promo discount
   // Extract discount from server main object or data object
-  let discount = serverData?.offerDiscount || serverData?.discount || serverData?.discountAmount || cart?.appliedPromo?.discount || cartData?.discount || 0;
+  let discount =
+    serverData?.offerDiscount ||
+    serverData?.discount ||
+    serverData?.discountAmount ||
+    cart?.appliedPromo?.discount ||
+    cartData?.discount ||
+    0;
 
-  console.debug('[CheckoutScreen] Discount Calculation:', {
+  console.debug("[CheckoutScreen] Discount Calculation:", {
     serverDiscount: discount,
     serverDataTotal: serverTotal,
     itemsSubtotal: displaySubtotal,
-    appliedOffer: appliedOffer ? { code: appliedOffer.code, type: appliedOffer.type, value: appliedOffer.value, discountAmount: appliedOffer.discountAmount } : 'null'
+    appliedOffer: appliedOffer
+      ? {
+          code: appliedOffer.code,
+          type: appliedOffer.type,
+          value: appliedOffer.value,
+          discountAmount: appliedOffer.discountAmount,
+        }
+      : "null",
   });
 
   // Fallback: Calculate local discount if server didn't return it but we have an applied offer
   if ((!discount || discount === 0) && appliedOffer) {
-    if (appliedOffer.discountType === 'PERCENTAGE' || appliedOffer.type === 'PERCENTAGE') {
-      const pct = Number(appliedOffer.discountAmount || appliedOffer.value || 0);
+    if (
+      appliedOffer.discountType === "PERCENTAGE" ||
+      appliedOffer.type === "PERCENTAGE"
+    ) {
+      const pct = Number(
+        appliedOffer.discountAmount || appliedOffer.value || 0,
+      );
       // Calculate against displaySubtotal (or baseSubtotal)
       discount = (displaySubtotal * pct) / 100;
       // Check max discount
-      if (appliedOffer.maxDiscountAmount && discount > appliedOffer.maxDiscountAmount) {
+      if (
+        appliedOffer.maxDiscountAmount &&
+        discount > appliedOffer.maxDiscountAmount
+      ) {
         discount = appliedOffer.maxDiscountAmount;
       }
-    } else if (appliedOffer.discountType === 'FIXED' || appliedOffer.type === 'FIXED') {
+    } else if (
+      appliedOffer.discountType === "FIXED" ||
+      appliedOffer.type === "FIXED"
+    ) {
       discount = Number(appliedOffer.discountAmount || appliedOffer.value || 0);
     }
   }
 
   // Build baseSubtotal/discountTotal/taxAmount/total to match CartDetail
   const baseSubtotal = cartItems.reduce((sum, it) => {
-    const addonsTotal = (it.addons || []).reduce((s, ad) => s + Number(ad.price || 0), 0);
+    const addonsTotal = (it.addons || []).reduce(
+      (s, ad) => s + Number(ad.price || 0),
+      0,
+    );
     return sum + ((it.price || 0) + addonsTotal) * (it.quantity || 0);
   }, 0);
   const discountTotal = discount; // Use the calculated/server discount as total discount
 
-  /* 
+  /*
    * Previous logic was calculating line-item discounts from product.discountPercent.
    * IF we want to show Coupon Discount separately, we should distinguish item-discounts from order-discounts.
    * For now, we overwrite discountTotal with the Order Level discount if present.
@@ -850,7 +1100,12 @@ const CheckoutScreen = ({ route, navigation }) => {
   const total = subtotalAfterDiscount + taxAmount;
 
   // Debug: Log checkoutResponse to verify it's being populated
-  console.debug('[CheckoutScreen] Render - checkoutResponse:', checkoutResponse, 'local total:', total);
+  console.debug(
+    "[CheckoutScreen] Render - checkoutResponse:",
+    checkoutResponse,
+    "local total:",
+    total,
+  );
 
   // Use server's total if available, else local
   const displayTotal = serverTotal ?? total;
@@ -881,45 +1136,45 @@ const CheckoutScreen = ({ route, navigation }) => {
 
   const paymentMethods = [
     {
-      id: 'CARD',
-      name: t('creditDebitCard'),
-      icon: 'credit-card-outline',
-      badge: t('recommended'),
+      id: "CARD",
+      name: t("creditDebitCard"),
+      icon: "credit-card-outline",
+      badge: t("recommended"),
     },
     {
-      id: 'MB_WAY',
-      name: 'MB WAY',
-      icon: 'cellphone-nfc'
+      id: "MB_WAY",
+      name: "MB WAY",
+      icon: "cellphone-nfc",
     },
     {
-      id: 'APPLE_PAY',
-      name: 'Apple Pay',
-      icon: 'apple'
+      id: "APPLE_PAY",
+      name: "Apple Pay",
+      icon: "apple",
     },
     {
-      id: 'OTHER',
-      name: t('otherMethods') || 'Other Methods',
-      icon: 'dots-horizontal-circle-outline',
+      id: "OTHER",
+      name: t("otherMethods") || "Other Methods",
+      icon: "dots-horizontal-circle-outline",
     },
   ];
 
   // Helper: robustly extract checkoutSummaryId from various backend response shapes
   const extractCheckoutSummaryId = (checkoutResponse) => {
-    if (!checkoutResponse || typeof checkoutResponse !== 'object') return null;
+    if (!checkoutResponse || typeof checkoutResponse !== "object") return null;
     const candidatePaths = [
       // Priority 1: Specific checkout summary ID keys
-      ['checkoutSummaryId'],
-      ['CheckoutSummaryId'],
-      ['data', 'checkoutSummaryId'],
-      ['data', 'CheckoutSummaryId'],
-      ['checkout_summary_id'],
-      ['data', 'checkout_summary_id'],
+      ["checkoutSummaryId"],
+      ["CheckoutSummaryId"],
+      ["data", "checkoutSummaryId"],
+      ["data", "CheckoutSummaryId"],
+      ["checkout_summary_id"],
+      ["data", "checkout_summary_id"],
       // Priority 2: Nested summary objects
-      ['data', 'checkoutSummary', '_id'],
-      ['checkoutSummary', '_id'],
+      ["data", "checkoutSummary", "_id"],
+      ["checkoutSummary", "_id"],
       // Priority 3: Fallback generic IDs (Low priority as they might be MongoDB IDs)
-      ['data', '_id'],
-      ['_id'],
+      ["data", "_id"],
+      ["_id"],
     ];
     for (const path of candidatePaths) {
       let cur = checkoutResponse;
@@ -927,16 +1182,20 @@ const CheckoutScreen = ({ route, navigation }) => {
       for (const segment of path) {
         if (cur && Object.prototype.hasOwnProperty.call(cur, segment)) {
           cur = cur[segment];
-        } else { ok = false; break; }
+        } else {
+          ok = false;
+          break;
+        }
       }
       // Allow strings and numbers
-      if (ok && (typeof cur === 'string' || typeof cur === 'number')) return String(cur);
+      if (ok && (typeof cur === "string" || typeof cur === "number"))
+        return String(cur);
     }
     // Try case-insensitive scan of top-level keys
     for (const k of Object.keys(checkoutResponse)) {
       if (/checkoutsummaryid/i.test(k)) return checkoutResponse[k];
       const v = checkoutResponse[k];
-      if (v && typeof v === 'object') {
+      if (v && typeof v === "object") {
         for (const vk of Object.keys(v)) {
           if (/checkoutsummaryid/i.test(vk)) return v[vk];
         }
@@ -953,7 +1212,7 @@ const CheckoutScreen = ({ route, navigation }) => {
   const handleRemoveVoucher = async () => {
     const checkoutSummaryId = extractCheckoutSummaryId(checkoutResponse);
     if (!checkoutSummaryId) {
-      console.warn('[CheckoutScreen] Cannot remove voucher: no checkout ID');
+      console.warn("[CheckoutScreen] Cannot remove voucher: no checkout ID");
       return;
     }
 
@@ -962,7 +1221,7 @@ const CheckoutScreen = ({ route, navigation }) => {
       const res = await CheckoutAPI.unapplyOffer(checkoutSummaryId);
 
       if (res.success) {
-        console.debug('[CheckoutScreen] Offer removed successfully');
+        console.debug("[CheckoutScreen] Offer removed successfully");
         setAppliedPromo(null);
         // Refresh checkout data if returned
         if (res.data && res.data.data) {
@@ -972,12 +1231,12 @@ const CheckoutScreen = ({ route, navigation }) => {
         }
         setStripeError(null);
       } else {
-        console.warn('[CheckoutScreen] Offer removal failed:', res.error);
-        setStripeError(res.error || 'Failed to remove voucher');
+        console.warn("[CheckoutScreen] Offer removal failed:", res.error);
+        setStripeError(res.error || "Failed to remove voucher");
       }
     } catch (err) {
-      console.error('[CheckoutScreen] Offer removal error:', err);
-      setStripeError(t('failedToRemoveVoucher') || 'Failed to remove voucher');
+      console.error("[CheckoutScreen] Offer removal error:", err);
+      setStripeError(t("failedToRemoveVoucher") || "Failed to remove voucher");
     } finally {
       setIsProcessing(false);
     }
@@ -987,7 +1246,7 @@ const CheckoutScreen = ({ route, navigation }) => {
     const checkoutSummaryId = extractCheckoutSummaryId(checkoutResponse);
 
     if (!checkoutSummaryId) {
-      setStripeError('Checkout session expired. Please try again.');
+      setStripeError("Checkout session expired. Please try again.");
       return;
     }
 
@@ -995,30 +1254,34 @@ const CheckoutScreen = ({ route, navigation }) => {
 
     // Step 1: Create Reduniq Payment Intent
     // using selected payment mapping or fallback to CARD
-    const validPaymentMethods = ['CARD', 'MB_WAY', 'APPLE_PAY', 'OTHER'];
-    let paymentMethod = validPaymentMethods.includes(selectedPayment) ? selectedPayment : 'CARD';
+    const validPaymentMethods = ["CARD", "MB_WAY", "APPLE_PAY", "OTHER"];
+    let paymentMethod = validPaymentMethods.includes(selectedPayment)
+      ? selectedPayment
+      : "CARD";
 
     const config = API_CONFIG;
     const returnUrlOk = `${config.frontend_urls.frontend_url_test_payment}/payment-success?token={token}&summaryId=${checkoutSummaryId}`;
     const returnUrlError = `${config.frontend_urls.frontend_url_test_payment}/payment-failed?summaryId=${checkoutSummaryId}`;
 
-    console.debug('[CheckoutScreen] Creating Reduniq payment intent with:', {
+    console.debug("[CheckoutScreen] Creating Reduniq payment intent with:", {
       checkoutSummaryId,
       paymentMethod,
       returnUrlOk,
-      returnUrlError
+      returnUrlError,
     });
 
     const payRes = await CheckoutAPI.createReduniqPaymentIntent(
       checkoutSummaryId,
       paymentMethod,
       returnUrlOk,
-      returnUrlError
+      returnUrlError,
     );
 
     if (!payRes.success) {
       setIsProcessing(false);
-      setStripeError(payRes.error || 'Payment initiation failed. Please try again.');
+      setStripeError(
+        payRes.error || "Payment initiation failed. Please try again.",
+      );
       return;
     }
 
@@ -1026,9 +1289,12 @@ const CheckoutScreen = ({ route, navigation }) => {
     const redirectUrl = responseData?.redirectUrl;
 
     if (!redirectUrl) {
-      console.error('[CheckoutScreen] Reduniq response missing redirectUrl:', responseData);
+      console.error(
+        "[CheckoutScreen] Reduniq response missing redirectUrl:",
+        responseData,
+      );
       setIsProcessing(false);
-      setStripeError('Payment gateway did not provide a redirect URL.');
+      setStripeError("Payment gateway did not provide a redirect URL.");
       return;
     }
 
@@ -1038,62 +1304,75 @@ const CheckoutScreen = ({ route, navigation }) => {
   };
 
   const handlePaymentSuccess = async (url) => {
-    console.log('[CheckoutScreen] Processing Success. URL:', url);
+    console.log("[CheckoutScreen] Processing Success. URL:", url);
 
     // Set loading state while converting checkout to order
     setIsProcessing(true);
     setPaymentUrl(null);
 
     let checkoutSummaryId = extractCheckoutSummaryId(checkoutResponse);
-    let paymentToken = 'REDUNIQ_SUCCESS';
+    let paymentToken = "REDUNIQ_SUCCESS";
 
     // Parse parameters from URL if available
-    if (url && url.includes('?')) {
+    if (url && url.includes("?")) {
       try {
-        const queryString = url.split('?')[1];
-        const pairs = queryString.split('&');
+        const queryString = url.split("?")[1];
+        const pairs = queryString.split("&");
         const params = {};
-        pairs.forEach(p => {
-          const [k, v] = p.split('=');
-          params[k] = decodeURIComponent(v || '');
+        pairs.forEach((p) => {
+          const [k, v] = p.split("=");
+          params[k] = decodeURIComponent(v || "");
         });
 
         if (params.summaryId) checkoutSummaryId = params.summaryId;
 
         // Robust token extraction
         // 1. Direct 'token' parameter
-        if (params.token && params.token !== '{token}') {
+        if (params.token && params.token !== "{token}") {
           paymentToken = params.token;
         }
         // 2. Fallback: Scan URL for anything that looks like a token if 'token' param is placeholder
         else {
           const tokenMatch = url.match(/token=([a-zA-Z0-9_-]+)/);
-          if (tokenMatch && tokenMatch[1] !== '{token}') {
+          if (tokenMatch && tokenMatch[1] !== "{token}") {
             paymentToken = tokenMatch[1];
           }
         }
       } catch (e) {
-        console.warn('[CheckoutScreen] Failed to parse success URL params:', e);
+        console.warn("[CheckoutScreen] Failed to parse success URL params:", e);
       }
     }
 
-    console.log('[CheckoutScreen] Delaying order confirmation to ensure gateway sync...');
-    await new Promise(resolve => setTimeout(resolve, 2000));
+    console.log(
+      "[CheckoutScreen] Delaying order confirmation to ensure gateway sync...",
+    );
+    await new Promise((resolve) => setTimeout(resolve, 2000));
 
-    console.log('[CheckoutScreen] Confirming order with backend:', { checkoutSummaryId, paymentToken });
+    console.log("[CheckoutScreen] Confirming order with backend:", {
+      checkoutSummaryId,
+      paymentToken,
+    });
 
     // Step 3: Convert Checkout to real Order
-    const orderRes = await OrderAPI.createOrder(checkoutSummaryId, paymentToken);
+    const orderRes = await OrderAPI.createOrder(
+      checkoutSummaryId,
+      paymentToken,
+    );
 
     setIsProcessing(false);
 
     if (orderRes.success) {
       setShowSuccessModal(true);
 
-      const targetVendorId = vendorId || (cartsArray && cartsArray.length > 0 ? cartsArray[0].vendorId : null);
+      const targetVendorId =
+        vendorId ||
+        (cartsArray && cartsArray.length > 0 ? cartsArray[0].vendorId : null);
       if (targetVendorId) {
-        clearVendorCartAndSync(targetVendorId).catch(err => {
-          console.warn('[CheckoutScreen] Failed to clear cart after order:', err);
+        clearVendorCartAndSync(targetVendorId).catch((err) => {
+          console.warn(
+            "[CheckoutScreen] Failed to clear cart after order:",
+            err,
+          );
         });
       }
 
@@ -1101,49 +1380,72 @@ const CheckoutScreen = ({ route, navigation }) => {
         setShowSuccessModal(false);
         navigation.reset({
           index: 0,
-          routes: [{ name: 'Main', params: { screen: 'Orders' } }]
+          routes: [{ name: "Main", params: { screen: "Orders" } }],
         });
       }, 4000);
     } else {
-      console.error('[CheckoutScreen] Failed to convert checkout to order:', orderRes.error);
-      setStripeError(orderRes.error || 'Payment was successful, but we failed to create your order. Please contact support.');
+      console.error(
+        "[CheckoutScreen] Failed to convert checkout to order:",
+        orderRes.error,
+      );
+      setStripeError(
+        orderRes.error ||
+          "Payment was successful, but we failed to create your order. Please contact support.",
+      );
       setShowFailureModal(true);
     }
   };
 
   const handlePaymentFailure = (urlOrMsg) => {
-    let displayError = t('paymentFailedDescription') || 'Something went wrong with your transaction. Please try again.';
-    let errorCode = 'UNKNOWN';
+    let displayError =
+      t("paymentFailedDescription") ||
+      "Something went wrong with your transaction. Please try again.";
+    let errorCode = "UNKNOWN";
 
-    console.log('[CheckoutScreen] Processing Failure. Input:', urlOrMsg);
+    console.log("[CheckoutScreen] Processing Failure. Input:", urlOrMsg);
 
-    if (typeof urlOrMsg === 'string' && urlOrMsg.includes('?')) {
+    if (typeof urlOrMsg === "string" && urlOrMsg.includes("?")) {
       try {
-        const queryString = urlOrMsg.split('?')[1];
-        const pairs = queryString.split('&');
+        const queryString = urlOrMsg.split("?")[1];
+        const pairs = queryString.split("&");
         const params = {};
-        pairs.forEach(p => {
-          const [k, v] = p.split('=');
-          params[k] = decodeURIComponent(v || '');
+        pairs.forEach((p) => {
+          const [k, v] = p.split("=");
+          params[k] = decodeURIComponent(v || "");
         });
 
         // Reduniq often sends 'message', 'errorMessage', 'reasonCode', or 'ResponseCode'
-        const reason = params.message || params.reason || params.error || params.errorMessage || params.status;
-        errorCode = params.errorCode || params.ResponseCode || params.status || 'FAIL';
+        const reason =
+          params.message ||
+          params.reason ||
+          params.error ||
+          params.errorMessage ||
+          params.status;
+        errorCode =
+          params.errorCode || params.ResponseCode || params.status || "FAIL";
 
         if (reason) {
           displayError = `${reason} (Code: ${errorCode})`;
-        } else if (errorCode !== 'UNKNOWN') {
+        } else if (errorCode !== "UNKNOWN") {
           displayError = `Payment refused by provider. Code: ${errorCode}`;
         }
       } catch (e) {
-        console.warn('[CheckoutScreen] Failed to parse failure URL details:', e);
+        console.warn(
+          "[CheckoutScreen] Failed to parse failure URL details:",
+          e,
+        );
       }
-    } else if (typeof urlOrMsg === 'string' && urlOrMsg.length > 0 && !urlOrMsg.startsWith('http')) {
+    } else if (
+      typeof urlOrMsg === "string" &&
+      urlOrMsg.length > 0 &&
+      !urlOrMsg.startsWith("http")
+    ) {
       displayError = urlOrMsg;
     }
 
-    console.error(`[CheckoutScreen] 🚨 PAYMENT FAILED 🚨\nURL/Msg: ${urlOrMsg}\nExtracted Error: ${displayError}`);
+    console.error(
+      `[CheckoutScreen] 🚨 PAYMENT FAILED 🚨\nURL/Msg: ${urlOrMsg}\nExtracted Error: ${displayError}`,
+    );
 
     setPaymentUrl(null);
     setIsProcessing(false);
@@ -1155,21 +1457,23 @@ const CheckoutScreen = ({ route, navigation }) => {
     if (!navState.url) return;
     const url = navState.url;
 
-    console.debug('[CheckoutScreen] WebView Navigation:', url);
+    console.debug("[CheckoutScreen] WebView Navigation:", url);
 
-    if (url.includes('payment-success')) {
+    if (url.includes("payment-success")) {
       handlePaymentSuccess(url);
-    } else if (url.includes('payment-failed')) {
+    } else if (url.includes("payment-failed")) {
       handlePaymentFailure(url);
     }
   };
 
   const handleCancelPayment = () => {
     setShowCancelModal(true);
+    // setPaymentUrl(null);
+    // navigation.goBack();
   };
 
   const getSafeSuccessEta = () => {
-    return deliveryTimeDisplay || `20-30 ${t('min') || 'min'}`;
+    return deliveryTimeDisplay || `20-30 ${t("min") || "min"}`;
   };
 
   const renderSuccessModal = () => (
@@ -1181,19 +1485,29 @@ const CheckoutScreen = ({ route, navigation }) => {
               <Ionicons name="checkmark" size={34} color="#FFFFFF" />
             </View>
           </View>
-          <Text style={styles(colors).successTitle}>{t('orderPlacedSuccessfully') === 'orderPlacedSuccessfully' ? 'Order Placed Successfully!' : t('orderPlacedSuccessfully')}</Text>
+          <Text style={styles(colors).successTitle}>
+            {t("orderPlacedSuccessfully") === "orderPlacedSuccessfully"
+              ? "Order Placed Successfully!"
+              : t("orderPlacedSuccessfully")}
+          </Text>
           <Text style={styles(colors).successMessage}>
-            {t('paymentConfirmedInfo') === 'paymentConfirmedInfo' ? 'Your payment was successful. We are now preparing your order.' : t('paymentConfirmedInfo')}
+            {t("paymentConfirmedInfo") === "paymentConfirmedInfo"
+              ? "Your payment was successful. We are now preparing your order."
+              : t("paymentConfirmedInfo")}
           </Text>
 
           <View style={styles(colors).successDetails}>
             <View style={styles(colors).successRow}>
               <View style={styles(colors).successRowLeft}>
                 <View style={styles(colors).successDot} />
-                <Text style={styles(colors).successLabel}>{t('amountPaid') || 'Amount Paid'}</Text>
+                <Text style={styles(colors).successLabel}>
+                  {t("amountPaid") || "Amount Paid"}
+                </Text>
               </View>
               <View style={styles(colors).successRowRight}>
-                <Text style={styles(colors).successValue}>{formatCurrency(currency, displayTotal)}</Text>
+                <Text style={styles(colors).successValue}>
+                  {formatCurrency(currency, displayTotal)}
+                </Text>
               </View>
             </View>
 
@@ -1201,12 +1515,24 @@ const CheckoutScreen = ({ route, navigation }) => {
 
             <View style={styles(colors).successRow}>
               <View style={styles(colors).successRowLeft}>
-                <Ionicons name="time-outline" size={16} color={colors.primary} style={{ marginRight: 8 }} />
-                <Text style={styles(colors).successLabel}>{t('estimatedDelivery') || 'Estimated Delivery'}</Text>
+                <Ionicons
+                  name="time-outline"
+                  size={16}
+                  color={colors.primary}
+                  style={{ marginRight: 8 }}
+                />
+                <Text style={styles(colors).successLabel}>
+                  {t("estimatedDelivery") || "Estimated Delivery"}
+                </Text>
               </View>
-              <View style={[styles(colors).successRowRight, { flex: 1.5, alignItems: 'flex-end' }]}>
-                <Text 
-                  style={[styles(colors).successEta, { textAlign: 'right' }]}
+              <View
+                style={[
+                  styles(colors).successRowRight,
+                  { flex: 1.5, alignItems: "flex-end" },
+                ]}
+              >
+                <Text
+                  style={[styles(colors).successEta, { textAlign: "right" }]}
                   numberOfLines={2}
                 >
                   {getSafeSuccessEta()}
@@ -1221,16 +1547,25 @@ const CheckoutScreen = ({ route, navigation }) => {
               setShowSuccessModal(false);
               navigation.reset({
                 index: 0,
-                routes: [{ name: 'Main', params: { screen: 'Orders' } }]
+                routes: [{ name: "Main", params: { screen: "Orders" } }],
               });
             }}
           >
-            <Text style={{ color: '#fff', fontFamily: 'Poppins-Bold', fontSize: 16 }}>
-              {t('viewOrderDetails') || 'View Order'}
+            <Text
+              style={{
+                color: "#fff",
+                fontFamily: "Poppins-Bold",
+                fontSize: 16,
+              }}
+            >
+              {t("viewOrderDetails") || "View Order"}
             </Text>
           </TouchableOpacity>
 
-          <Text style={styles(colors).successHint}>{t('orderWillAppearInOrders') || 'You can track this order anytime from Orders.'}</Text>
+          <Text style={styles(colors).successHint}>
+            {t("orderWillAppearInOrders") ||
+              "You can track this order anytime from Orders."}
+          </Text>
         </View>
       </View>
     </Modal>
@@ -1240,35 +1575,49 @@ const CheckoutScreen = ({ route, navigation }) => {
     <Modal visible={showFailureModal} transparent animationType="fade">
       <View style={styles(colors).modalOverlay}>
         <View style={styles(colors).successModal}>
-          <View style={{
-            width: 90,
-            height: 90,
-            borderRadius: 45,
-            backgroundColor: '#FFEBEE',
-            alignItems: 'center',
-            justifyContent: 'center',
-            marginBottom: 20
-          }}>
+          <View
+            style={{
+              width: 90,
+              height: 90,
+              borderRadius: 45,
+              backgroundColor: "#FFEBEE",
+              alignItems: "center",
+              justifyContent: "center",
+              marginBottom: 20,
+            }}
+          >
             <Ionicons name="close-circle" size={70} color="#F44336" />
           </View>
-          <Text style={[styles(colors).successTitle, { color: '#D32F2F' }]}>{t('paymentFailed') === 'paymentFailed' ? 'Payment Failed' : t('paymentFailed')}</Text>
+          <Text style={[styles(colors).successTitle, { color: "#D32F2F" }]}>
+            {t("paymentFailed") === "paymentFailed"
+              ? "Payment Failed"
+              : t("paymentFailed")}
+          </Text>
           <Text style={styles(colors).successMessage}>
-            {stripeError === 'paymentFailedDescription' ? 'Something went wrong with your transaction. Please try again.' : stripeError}
+            {stripeError === "paymentFailedDescription"
+              ? "Something went wrong with your transaction. Please try again."
+              : stripeError}
           </Text>
 
           <TouchableOpacity
             style={{
-              backgroundColor: '#D32F2F',
+              backgroundColor: "#D32F2F",
               paddingVertical: 14,
               paddingHorizontal: 32,
               borderRadius: 30,
               minWidth: 200,
-              alignItems: 'center'
+              alignItems: "center",
             }}
             onPress={() => setShowFailureModal(false)}
           >
-            <Text style={{ color: '#fff', fontFamily: 'Poppins-Bold', fontSize: 16 }}>
-              {t('tryAgain') || 'Try Again'}
+            <Text
+              style={{
+                color: "#fff",
+                fontFamily: "Poppins-Bold",
+                fontSize: 16,
+              }}
+            >
+              {t("tryAgain") || "Try Again"}
             </Text>
           </TouchableOpacity>
         </View>
@@ -1280,17 +1629,24 @@ const CheckoutScreen = ({ route, navigation }) => {
     <Modal visible={isProcessing} transparent animationType="fade">
       <View style={styles(colors).modalOverlay}>
         <View style={styles(colors).processingModal}>
-          <ActivityIndicator size="large" color={colors.primary} style={styles(colors).loadingSpinner} />
-          <Text style={styles(colors).processingText}>{t('processing')}</Text>
+          <ActivityIndicator
+            size="large"
+            color={colors.primary}
+            style={styles(colors).loadingSpinner}
+          />
+          <Text style={styles(colors).processingText}>{t("processing")}</Text>
         </View>
       </View>
     </Modal>
   );
 
   return (
-    <SafeAreaView style={styles(colors).container} edges={['bottom', 'left', 'right']}>
+    <SafeAreaView
+      style={styles(colors).container}
+      edges={["bottom", "left", "right"]}
+    >
       <StatusBar
-        barStyle={isDarkMode ? 'light-content' : 'dark-content'}
+        barStyle={isDarkMode ? "light-content" : "dark-content"}
         backgroundColor="transparent"
         translucent={true}
         animated={true}
@@ -1299,8 +1655,11 @@ const CheckoutScreen = ({ route, navigation }) => {
       {/* Header */}
       <View style={[styles(colors).headerContainer]}>
         <LinearGradient
-          colors={isDarkMode ? ['#1A0A15', '#1A0A15'] : ['#FFF5F8', '#FFE8F0']}
-          style={[styles(colors).headerGradient, { paddingTop: insets.top + 16 }]}
+          colors={isDarkMode ? ["#1A0A15", "#1A0A15"] : ["#FFF5F8", "#FFE8F0"]}
+          style={[
+            styles(colors).headerGradient,
+            { paddingTop: insets.top + 16 },
+          ]}
         >
           <TouchableOpacity
             style={styles(colors).backButton}
@@ -1309,14 +1668,20 @@ const CheckoutScreen = ({ route, navigation }) => {
             <Ionicons name="arrow-back" size={24} color={colors.text.primary} />
           </TouchableOpacity>
           <View style={styles(colors).headerCenter}>
-            <Text style={styles(colors).headerTitle} numberOfLines={1}>{cart?.vendorName || cartData?.vendorName || t('checkout')}</Text>
+            <Text style={styles(colors).headerTitle} numberOfLines={1}>
+              {cart?.vendorName || cartData?.vendorName || t("checkout")}
+            </Text>
             <Text
               style={styles(colors).headerSubtitle}
               numberOfLines={2}
               adjustsFontSizeToFit
               minimumFontScale={0.7}
             >
-              {cartItems.length} {cartItems.length === 1 ? (t('item') || 'item') : (t('items') || 'items')} • {t('estimated')} {deliveryTimeDisplay}
+              {cartItems.length}{" "}
+              {cartItems.length === 1
+                ? t("item") || "item"
+                : t("items") || "items"}{" "}
+              • {t("estimated")} {deliveryTimeDisplay}
             </Text>
           </View>
           <View style={styles(colors).headerRight} />
@@ -1331,10 +1696,16 @@ const CheckoutScreen = ({ route, navigation }) => {
         {/* Delivery Time Banner */}
         <View style={styles(colors).deliveryTimeBanner}>
           <View style={styles(colors).deliveryTimeIcon}>
-            <MaterialCommunityIcons name="timer-sand" size={28} color={colors.primary} />
+            <MaterialCommunityIcons
+              name="timer-sand"
+              size={28}
+              color={colors.primary}
+            />
           </View>
           <View style={styles(colors).deliveryTimeContent}>
-            <Text style={styles(colors).deliveryTimeLabel}>{t('deliveryTime')}</Text>
+            <Text style={styles(colors).deliveryTimeLabel}>
+              {t("deliveryTime")}
+            </Text>
             <Text
               style={styles(colors).deliveryTimeValue}
               numberOfLines={2}
@@ -1346,41 +1717,53 @@ const CheckoutScreen = ({ route, navigation }) => {
           </View>
           <View style={styles(colors).deliveryTimeBadge}>
             <Ionicons name="flash" size={14} color="#FFA000" />
-            <Text style={styles(colors).deliveryTimeBadgeText}>{t('fast')}</Text>
+            <Text style={styles(colors).deliveryTimeBadgeText}>
+              {t("fast")}
+            </Text>
           </View>
         </View>
 
         {/* Delivery Address */}
         <View style={styles(colors).section}>
           <View style={styles(colors).sectionHeader}>
-            <Text style={styles(colors).sectionTitle}>{t('deliveryTo')}</Text>
+            <Text style={styles(colors).sectionTitle}>{t("deliveryTo")}</Text>
             <TouchableOpacity
               activeOpacity={0.7}
-              onPress={() => navigation.navigate('SavedAddresses', {
-                onSelect: (selectedAddr) => {
-                  // Map API address to LocationContext format
-                  const locAddr = {
-                    address: selectedAddr.street || selectedAddr.address,
-                    detailedAddress: selectedAddr.detailedAddress || '',
-                    city: selectedAddr.city,
-                    postalCode: selectedAddr.postalCode,
-                    state: selectedAddr.state,
-                    country: selectedAddr.country,
-                    coordinates: {
-                      latitude: selectedAddr.latitude,
-                      longitude: selectedAddr.longitude
-                    },
-                    label: selectedAddr.addressType === 'OFFICE' ? 'Work' : selectedAddr.addressType === 'OTHER' ? 'Other' : 'Home'
-                  };
-                  selectAddress(locAddr);
-                },
-                selectedId: user?.deliveryAddresses?.find(a =>
-                  (a.latitude === currentLocation?.latitude && a.longitude === currentLocation?.longitude) ||
-                  (a.street === address || a.address === address)
-                )?._id
-              })}
+              onPress={() =>
+                navigation.navigate("SavedAddresses", {
+                  onSelect: (selectedAddr) => {
+                    // Map API address to LocationContext format
+                    const locAddr = {
+                      address: selectedAddr.street || selectedAddr.address,
+                      detailedAddress: selectedAddr.detailedAddress || "",
+                      city: selectedAddr.city,
+                      postalCode: selectedAddr.postalCode,
+                      state: selectedAddr.state,
+                      country: selectedAddr.country,
+                      coordinates: {
+                        latitude: selectedAddr.latitude,
+                        longitude: selectedAddr.longitude,
+                      },
+                      label:
+                        selectedAddr.addressType === "OFFICE"
+                          ? "Work"
+                          : selectedAddr.addressType === "OTHER"
+                            ? "Other"
+                            : "Home",
+                    };
+                    selectAddress(locAddr);
+                  },
+                  selectedId: user?.deliveryAddresses?.find(
+                    (a) =>
+                      (a.latitude === currentLocation?.latitude &&
+                        a.longitude === currentLocation?.longitude) ||
+                      a.street === address ||
+                      a.address === address,
+                  )?._id,
+                })
+              }
             >
-              <Text style={styles(colors).changeButton}>{t('change')}</Text>
+              <Text style={styles(colors).changeButton}>{t("change")}</Text>
             </TouchableOpacity>
           </View>
           <ConsumerLocationDisplay colors={colors} t={t} />
@@ -1400,39 +1783,106 @@ const CheckoutScreen = ({ route, navigation }) => {
         <View style={styles(colors).section}>
           <View style={styles(colors).sectionHeader}>
             <View style={styles(colors).sectionTitleRow}>
-              <Text style={styles(colors).sectionTitle}>{t('yourOrder')}</Text>
+              <Text style={styles(colors).sectionTitle}>{t("yourOrder")}</Text>
             </View>
-            <Text style={styles(colors).itemCount}>{cartItems.length} {cartItems.length === 1 ? (t('item') || 'item') : (t('items') || 'items')}</Text>
+            <Text style={styles(colors).itemCount}>
+              {cartItems.length}{" "}
+              {cartItems.length === 1
+                ? t("item") || "item"
+                : t("items") || "items"}
+            </Text>
           </View>
           <View style={styles(colors).orderItemsContainer}>
             {cartItems.map((item, index) => {
               // Priority: Backend GrandTotal > Backend Subtotal > Calculated Subtotal
               const serverItem = (checkoutResponse?.items || []).find(
-                si => String(si.productId?._id || si.productId) === String(item.product?._id || item.product || item.id || item.productId)
-                  && (!item.variationSku || si.variationSku === item.variationSku)
+                (si) =>
+                  String(si.productId?._id || si.productId) ===
+                    String(
+                      item.product?._id ||
+                        item.product ||
+                        item.id ||
+                        item.productId,
+                    ) &&
+                  (!item.variationSku || si.variationSku === item.variationSku),
               );
 
-              const itemTotal = (serverItem?.itemSummary?.grandTotal !== undefined && serverItem?.itemSummary?.grandTotal !== null)
-                ? Number(serverItem.itemSummary.grandTotal)
-                : (item.subtotal !== undefined && item.subtotal !== null)
-                  ? Number(item.subtotal)
-                  : ((item.finalPrice || item.price || 0) + (item.addons || []).reduce((s, ad) => s + Number(ad.price || 0), 0)) * item.quantity;
+              const itemTotal =
+                serverItem?.itemSummary?.grandTotal !== undefined &&
+                serverItem?.itemSummary?.grandTotal !== null
+                  ? Number(serverItem.itemSummary.grandTotal)
+                  : item.subtotal !== undefined && item.subtotal !== null
+                    ? Number(item.subtotal)
+                    : ((item.finalPrice || item.price || 0) +
+                        (item.addons || []).reduce(
+                          (s, ad) => s + Number(ad.price || 0),
+                          0,
+                        )) *
+                      item.quantity;
 
-              console.debug(`[CheckoutScreen] Item Match for ${item.name}: serverItemFound=${!!serverItem}, serverItemTotal=${serverItem?.itemSummary?.grandTotal}, itemSubtotal=${item.subtotal}, finalItemTotal=${itemTotal}`);
+              console.debug(
+                `[CheckoutScreen] Item Match for ${item.name}: serverItemFound=${!!serverItem}, serverItemTotal=${serverItem?.itemSummary?.grandTotal}, itemSubtotal=${item.subtotal}, finalItemTotal=${itemTotal}`,
+              );
 
               // Back-calculate unit price for display consistency
               // If backend gives total 25.3 for qty 3, unit is ~8.43
-              const unitPrice = item.quantity > 0 ? (itemTotal / item.quantity) : 0;
+              const unitPrice =
+                item.quantity > 0 ? itemTotal / item.quantity : 0;
 
               return (
-                <View key={item.id || index} style={[styles(colors).orderItemRow, { flexDirection: 'column', alignItems: 'flex-start' }]}>
+                <View
+                  key={item.id || index}
+                  style={[
+                    styles(colors).orderItemRow,
+                    { flexDirection: "column", alignItems: "flex-start" },
+                  ]}
+                >
                   {/* Product Header Row */}
-                  <View style={{ flexDirection: 'row', width: '100%', justifyContent: 'space-between', alignItems: 'center' }}>
-                    <View style={{ flexDirection: 'row', flex: 1, alignItems: 'center' }}>
-                      <View style={{ backgroundColor: isDarkMode ? 'rgba(220,49,115,0.15)' : 'rgba(220,49,115,0.08)', width: 28, height: 28, borderRadius: 8, alignItems: 'center', justifyContent: 'center', marginRight: 12 }}>
-                        <Text style={{ fontSize: 13, fontFamily: 'Poppins-Bold', color: colors.primary }}>{item.quantity}x</Text>
+                  <View
+                    style={{
+                      flexDirection: "row",
+                      width: "100%",
+                      justifyContent: "space-between",
+                      alignItems: "center",
+                    }}
+                  >
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        flex: 1,
+                        alignItems: "center",
+                      }}
+                    >
+                      <View
+                        style={{
+                          backgroundColor: isDarkMode
+                            ? "rgba(220,49,115,0.15)"
+                            : "rgba(220,49,115,0.08)",
+                          width: 28,
+                          height: 28,
+                          borderRadius: 8,
+                          alignItems: "center",
+                          justifyContent: "center",
+                          marginRight: 12,
+                        }}
+                      >
+                        <Text
+                          style={{
+                            fontSize: 13,
+                            fontFamily: "Poppins-Bold",
+                            color: colors.primary,
+                          }}
+                        >
+                          {item.quantity}x
+                        </Text>
                       </View>
-                      <Text style={[styles(colors).itemNameText, { fontFamily: 'Poppins-SemiBold' }]} numberOfLines={2}>
+                      <Text
+                        style={[
+                          styles(colors).itemNameText,
+                          { fontFamily: "Poppins-SemiBold" },
+                        ]}
+                        numberOfLines={2}
+                      >
                         {item.name}
                       </Text>
                     </View>
@@ -1442,17 +1892,43 @@ const CheckoutScreen = ({ route, navigation }) => {
                   </View>
 
                   {/* Sub-Details (Base Price & Add-ons) */}
-                  <View style={{ paddingLeft: 40, width: '100%', marginTop: 2 }}>
+                  <View
+                    style={{ paddingLeft: 40, width: "100%", marginTop: 2 }}
+                  >
                     {/* Base Product Price Details */}
-                    <View style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                      <Text style={{ fontSize: 13, fontFamily: 'Poppins-Regular', color: colors.text.secondary }}>
-                        {t('basePrice') || 'Base price'} ({formatCurrency(currency, item.finalPrice || item.price || 0)})
+                    <View
+                      style={{
+                        flexDirection: "row",
+                        justifyContent: "space-between",
+                        marginBottom: 4,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          fontSize: 13,
+                          fontFamily: "Poppins-Regular",
+                          color: colors.text.secondary,
+                        }}
+                      >
+                        {t("basePrice") || "Base price"} (
+                        {formatCurrency(
+                          currency,
+                          item.finalPrice || item.price || 0,
+                        )}
+                        )
                       </Text>
                     </View>
 
                     {/* Variations */}
-                    {(item.variantName && item.variantName !== 'Standard') && (
-                      <Text style={{ fontSize: 12, color: colors.text.secondary, marginBottom: 4, fontFamily: 'Poppins-Medium' }}>
+                    {item.variantName && item.variantName !== "Standard" && (
+                      <Text
+                        style={{
+                          fontSize: 12,
+                          color: colors.text.secondary,
+                          marginBottom: 4,
+                          fontFamily: "Poppins-Medium",
+                        }}
+                      >
                         • {item.variantName}
                       </Text>
                     )}
@@ -1460,18 +1936,51 @@ const CheckoutScreen = ({ route, navigation }) => {
                     {/* Add-ons List */}
                     {item.addons && item.addons.length > 0 && (
                       <View style={{ marginTop: 2 }}>
-                        <Text style={{ fontSize: 12, fontFamily: 'Poppins-SemiBold', color: colors.text.secondary, marginBottom: 4 }}>
-                          {t('addons') || 'Add-ons'}:
+                        <Text
+                          style={{
+                            fontSize: 12,
+                            fontFamily: "Poppins-SemiBold",
+                            color: colors.text.secondary,
+                            marginBottom: 4,
+                          }}
+                        >
+                          {t("addons") || "Add-ons"}:
                         </Text>
                         {item.addons.map((addon, aIdx) => {
                           const addonQty = Number(addon.quantity || 1);
-                          const addonBasePrice = Number(addon.lineTotal || (addon.originalPrice * addonQty) || (addon.price * addonQty) || 0);
+                          const addonBasePrice = Number(
+                            addon.lineTotal ||
+                              addon.originalPrice * addonQty ||
+                              addon.price * addonQty ||
+                              0,
+                          );
                           return (
-                            <View key={aIdx} style={{ flexDirection: 'row', justifyContent: 'space-between', marginBottom: 4 }}>
-                              <Text style={{ fontSize: 12, color: colors.text.secondary, flex: 1, marginRight: 8 }}>
-                                + {addon.name} {addonQty > 1 ? `×${addonQty}` : ''}
+                            <View
+                              key={aIdx}
+                              style={{
+                                flexDirection: "row",
+                                justifyContent: "space-between",
+                                marginBottom: 4,
+                              }}
+                            >
+                              <Text
+                                style={{
+                                  fontSize: 12,
+                                  color: colors.text.secondary,
+                                  flex: 1,
+                                  marginRight: 8,
+                                }}
+                              >
+                                + {addon.name}{" "}
+                                {addonQty > 1 ? `×${addonQty}` : ""}
                               </Text>
-                              <Text style={{ fontSize: 12, color: colors.text.secondary, fontFamily: 'Poppins-Medium' }}>
+                              <Text
+                                style={{
+                                  fontSize: 12,
+                                  color: colors.text.secondary,
+                                  fontFamily: "Poppins-Medium",
+                                }}
+                              >
                                 {formatCurrency(currency, addonBasePrice)}
                               </Text>
                             </View>
@@ -1481,7 +1990,7 @@ const CheckoutScreen = ({ route, navigation }) => {
                     )}
                   </View>
                 </View>
-              )
+              );
             })}
           </View>
         </View>
@@ -1493,8 +2002,9 @@ const CheckoutScreen = ({ route, navigation }) => {
               activeOpacity={0.7}
               style={styles(colors).voucherLeft}
               onPress={() => {
-                const checkoutSummaryId = extractCheckoutSummaryId(checkoutResponse);
-                navigation.navigate('Vouchers', {
+                const checkoutSummaryId =
+                  extractCheckoutSummaryId(checkoutResponse);
+                navigation.navigate("Vouchers", {
                   selectionMode: true,
                   vendorId: vendorId,
                   checkoutId: checkoutSummaryId,
@@ -1504,30 +2014,46 @@ const CheckoutScreen = ({ route, navigation }) => {
                     const selectedOffer = coupon || manualResult;
 
                     if (selectedOffer && selectedOffer.code) {
-                      console.debug('[CheckoutScreen] Voucher selected:', selectedOffer.code, 'AutoApply:', selectedOffer.autoApply);
+                      console.debug(
+                        "[CheckoutScreen] Voucher selected:",
+                        selectedOffer.code,
+                        "AutoApply:",
+                        selectedOffer.autoApply,
+                      );
 
                       // Extract Checkout ID
-                      const checkoutSummaryId = extractCheckoutSummaryId(checkoutResponse);
+                      const checkoutSummaryId =
+                        extractCheckoutSummaryId(checkoutResponse);
                       if (!checkoutSummaryId) {
-                        setStripeError(t('checkoutNotReady') === 'checkoutNotReady' ? 'Checkout session not ready. Please wait.' : t('checkoutNotReady'));
+                        setStripeError(
+                          t("checkoutNotReady") === "checkoutNotReady"
+                            ? "Checkout session not ready. Please wait."
+                            : t("checkoutNotReady"),
+                        );
                         return;
                       }
 
                       // User Request Fix: Prefer sending the CODE string if available.
                       // Some vouchers (like "SUMMER2") require the actual code string to be validated,
                       // even if they can be found by ID.
-                      let offerIdentifier = selectedOffer.code || selectedOffer.id || selectedOffer._id;
+                      let offerIdentifier =
+                        selectedOffer.code ||
+                        selectedOffer.id ||
+                        selectedOffer._id;
 
                       // Validate via API
                       try {
                         setIsProcessing(true);
                         const res = await CheckoutAPI.validateApplyOffer({
                           checkoutId: checkoutSummaryId,
-                          offerIdentifier: offerIdentifier
+                          offerIdentifier: offerIdentifier,
                         });
 
                         if (res.success) {
-                          console.debug('[CheckoutScreen] Offer validation FULL response:', JSON.stringify(res, null, 2));
+                          console.debug(
+                            "[CheckoutScreen] Offer validation FULL response:",
+                            JSON.stringify(res, null, 2),
+                          );
                           setAppliedPromo(selectedOffer);
                           // Refresh checkout data if returned
                           if (res.data && res.data.data) {
@@ -1535,66 +2061,98 @@ const CheckoutScreen = ({ route, navigation }) => {
                           }
                           setStripeError(null);
                         } else {
-                          console.warn('[CheckoutScreen] Offer validation failed:', res.error);
-                          setStripeError(res.error || 'Failed to apply voucher');
+                          console.warn(
+                            "[CheckoutScreen] Offer validation failed:",
+                            res.error,
+                          );
+                          setStripeError(
+                            res.error || "Failed to apply voucher",
+                          );
                           setAppliedPromo(null);
                         }
                       } catch (err) {
-                        console.error('[CheckoutScreen] Offer validation error:', err);
-                        setStripeError(t('failedToValidateVoucher') || 'Failed to validate voucher');
+                        console.error(
+                          "[CheckoutScreen] Offer validation error:",
+                          err,
+                        );
+                        setStripeError(
+                          t("failedToValidateVoucher") ||
+                            "Failed to validate voucher",
+                        );
                         setAppliedPromo(null);
                       } finally {
                         setIsProcessing(false);
                       }
                     } else {
-                      console.warn('[CheckoutScreen] Invalid voucher selection:', selectedOffer);
-                      setStripeError('Invalid voucher selected');
+                      console.warn(
+                        "[CheckoutScreen] Invalid voucher selection:",
+                        selectedOffer,
+                      );
+                      setStripeError("Invalid voucher selected");
                     }
-                  }
-                })
+                  },
+                });
               }}
             >
               <View style={styles(colors).voucherIconBadge}>
                 <Ionicons name="pricetag" size={20} color={colors.primary} />
               </View>
               <Text style={styles(colors).voucherButtonText}>
-                {checkoutResponse?.orderCalculation?.totalOfferDiscount > 0 || checkoutResponse?.offerDiscount > 0
-                  ? t('voucherApplied')
-                  : t('applyVoucher')}
+                {checkoutResponse?.orderCalculation?.totalOfferDiscount > 0 ||
+                checkoutResponse?.offerDiscount > 0
+                  ? t("voucherApplied")
+                  : t("applyVoucher")}
               </Text>
             </TouchableOpacity>
 
-            <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-              {(checkoutResponse?.orderCalculation?.totalOfferDiscount > 0 || checkoutResponse?.offerDiscount > 0) && (
+            <View style={{ flexDirection: "row", alignItems: "center" }}>
+              {(checkoutResponse?.orderCalculation?.totalOfferDiscount > 0 ||
+                checkoutResponse?.offerDiscount > 0) && (
                 <TouchableOpacity
                   activeOpacity={0.6}
                   onPress={handleRemoveVoucher}
                   style={{
-                    backgroundColor: colors.background === '#FFFFFF' ? '#FEE2E2' : 'rgba(239, 68, 68, 0.15)',
+                    backgroundColor:
+                      colors.background === "#FFFFFF"
+                        ? "#FEE2E2"
+                        : "rgba(239, 68, 68, 0.15)",
                     paddingHorizontal: 12,
                     paddingVertical: 6,
                     borderRadius: 8,
-                    marginRight: 10
+                    marginRight: 10,
                   }}
                 >
-                  <Text style={{ fontSize: 12, color: '#EF4444', fontFamily: 'Poppins-Bold' }}>
-                    {t('remove') || 'Remove'}
+                  <Text
+                    style={{
+                      fontSize: 12,
+                      color: "#EF4444",
+                      fontFamily: "Poppins-Bold",
+                    }}
+                  >
+                    {t("remove") || "Remove"}
                   </Text>
                 </TouchableOpacity>
               )}
               <TouchableOpacity
                 onPress={() => {
-                  const checkoutSummaryId = extractCheckoutSummaryId(checkoutResponse);
-                  navigation.navigate('Vouchers', {
+                  const checkoutSummaryId =
+                    extractCheckoutSummaryId(checkoutResponse);
+                  navigation.navigate("Vouchers", {
                     selectionMode: true,
                     vendorId: vendorId,
                     checkoutId: checkoutSummaryId,
                     currentTotal: displayTotal,
-                    onSelect: async (coupon) => { /* reuse logic above if needed or just go back */ }
+                    onSelect: async (coupon) => {
+                      /* reuse logic above if needed or just go back */
+                    },
                   });
                 }}
               >
-                <Ionicons name="chevron-forward" size={20} color={colors.text.secondary} />
+                <Ionicons
+                  name="chevron-forward"
+                  size={20}
+                  color={colors.text.secondary}
+                />
               </TouchableOpacity>
             </View>
           </View>
@@ -1609,7 +2167,9 @@ const CheckoutScreen = ({ route, navigation }) => {
                 size={20}
                 color={colors.primary}
               />
-              <Text style={styles(colors).sectionTitle}>{t('paymentMethod')}</Text>
+              <Text style={styles(colors).sectionTitle}>
+                {t("paymentMethod")}
+              </Text>
             </View>
           </View>
           <View style={styles(colors).paymentMethodsList}>
@@ -1618,16 +2178,28 @@ const CheckoutScreen = ({ route, navigation }) => {
               return (
                 <TouchableOpacity
                   key={method.id}
-                  style={isSelected ? styles(colors).methodRowSelected : styles(colors).methodRowUnselected}
+                  style={
+                    isSelected
+                      ? styles(colors).methodRowSelected
+                      : styles(colors).methodRowUnselected
+                  }
                   onPress={() => setSelectedPayment(method.id)}
                   activeOpacity={0.8}
                 >
                   {/* Left Icon Layout exactly like image */}
-                  <View style={isSelected ? styles(colors).iconCircleSelected : styles(colors).iconCircleUnselected}>
+                  <View
+                    style={
+                      isSelected
+                        ? styles(colors).iconCircleSelected
+                        : styles(colors).iconCircleUnselected
+                    }
+                  >
                     <MaterialCommunityIcons
                       name={method.icon}
                       size={22}
-                      color={isSelected ? colors.primary : colors.text.secondary}
+                      color={
+                        isSelected ? colors.primary : colors.text.secondary
+                      }
                     />
                   </View>
 
@@ -1637,12 +2209,21 @@ const CheckoutScreen = ({ route, navigation }) => {
                   {/* Recommended Badge */}
                   {method.badge && (
                     <View style={styles(colors).badge}>
-                      <Text style={styles(colors).badgeText}>{method.badge}</Text>
+                      <Text style={styles(colors).badgeText}>
+                        {method.badge}
+                      </Text>
                     </View>
                   )}
 
                   {/* Radio Button */}
-                  <View style={[styles(colors).radioContainer, isSelected ? styles(colors).radioSelected : styles(colors).radioUnselected]}>
+                  <View
+                    style={[
+                      styles(colors).radioContainer,
+                      isSelected
+                        ? styles(colors).radioSelected
+                        : styles(colors).radioUnselected,
+                    ]}
+                  >
                     {isSelected && <View style={styles(colors).radioInner} />}
                   </View>
                 </TouchableOpacity>
@@ -1655,13 +2236,13 @@ const CheckoutScreen = ({ route, navigation }) => {
         <View style={styles(colors).section}>
           <View style={styles(colors).sectionHeader}>
             <View style={styles(colors).sectionTitleRow}>
-              <Text style={styles(colors).sectionTitle}>{t('addNote')}</Text>
+              <Text style={styles(colors).sectionTitle}>{t("addNote")}</Text>
             </View>
-            <Text style={styles(colors).optionalText}>{t('optional')}</Text>
+            <Text style={styles(colors).optionalText}>{t("optional")}</Text>
           </View>
           <TextInput
             style={styles(colors).notesInput}
-            placeholder={t('specialInstructions')}
+            placeholder={t("specialInstructions")}
             placeholderTextColor={colors.text.light}
             value={notes}
             onChangeText={setNotes}
@@ -1675,26 +2256,40 @@ const CheckoutScreen = ({ route, navigation }) => {
         <View style={styles(colors).summarySection}>
           <View style={styles(colors).sectionHeader}>
             <View style={styles(colors).sectionTitleRow}>
-              <Text style={styles(colors).sectionTitle}>🧾 {t('paymentSummary') || 'Payment Summary'}</Text>
+              <Text style={styles(colors).sectionTitle}>
+                🧾 {t("paymentSummary") || "Payment Summary"}
+              </Text>
             </View>
           </View>
 
           <View style={styles(colors).summaryRows}>
             {/* 1. Items Price (Original) */}
             <View style={styles(colors).summaryRow}>
-              <Text style={styles(colors).summaryLabel}>{t('itemsPrice') || 'Items Price'}</Text>
+              <Text style={styles(colors).summaryLabel}>
+                {t("itemsPrice") || "Items Price"}
+              </Text>
               <Text style={styles(colors).summaryValue}>
-                {formatCurrency(currency, checkoutResponse?.orderCalculation?.totalOriginalPrice || cart?.totals?.itemsOriginalTotal || 0)}
+                {formatCurrency(
+                  currency,
+                  checkoutResponse?.orderCalculation?.totalOriginalPrice ||
+                    cart?.totals?.itemsOriginalTotal ||
+                    0,
+                )}
               </Text>
             </View>
 
             {/* 1.1 Add-ons (Price Breakdown) - Moved here for better flow */}
             {(() => {
-              const addonsVal = checkoutResponse?.orderCalculation?.totalAddonsOriginalPrice || cart?.totals?.addonsTotal || 0;
+              const addonsVal =
+                checkoutResponse?.orderCalculation?.totalAddonsOriginalPrice ||
+                cart?.totals?.addonsTotal ||
+                0;
               if (addonsVal > 0) {
                 return (
                   <View style={styles(colors).summaryRow}>
-                    <Text style={styles(colors).summaryLabel}>{t('addons') || 'Add-ons'}</Text>
+                    <Text style={styles(colors).summaryLabel}>
+                      {t("addons") || "Add-ons"}
+                    </Text>
                     <Text style={styles(colors).summaryValue}>
                       {formatCurrency(currency, addonsVal)}
                     </Text>
@@ -1705,29 +2300,59 @@ const CheckoutScreen = ({ route, navigation }) => {
             })()}
 
             {/* 2. Product Discount */}
-            {(checkoutResponse?.orderCalculation?.totalProductDiscount > 0 || cart?.totals?.discount > 0) && (
+            {(checkoutResponse?.orderCalculation?.totalProductDiscount > 0 ||
+              cart?.totals?.discount > 0) && (
               <View style={styles(colors).summaryRow}>
-                <Text style={styles(colors).summaryLabel}>{t('productDiscount') || 'Product Discount'}</Text>
-                <Text style={{ fontFamily: 'Poppins-SemiBold', fontSize: 13, color: '#4CAF50' }}>
-                  -{formatCurrency(currency, checkoutResponse?.orderCalculation?.totalProductDiscount || cart?.totals?.discount)}
+                <Text style={styles(colors).summaryLabel}>
+                  {t("productDiscount") || "Product Discount"}
+                </Text>
+                <Text
+                  style={{
+                    fontFamily: "Poppins-SemiBold",
+                    fontSize: 13,
+                    color: "#4CAF50",
+                  }}
+                >
+                  -
+                  {formatCurrency(
+                    currency,
+                    checkoutResponse?.orderCalculation?.totalProductDiscount ||
+                      cart?.totals?.discount,
+                  )}
                 </Text>
               </View>
             )}
 
-
             {/* 3. Subtotal (Net/Excl Tax) */}
             <View style={styles(colors).summaryRow}>
-              <Text style={styles(colors).summaryLabel}>{t('subtotalExclTax') || 'Subtotal (Excl. Tax)'}</Text>
+              <Text style={styles(colors).summaryLabel}>
+                {t("subtotalExclTax") || "Subtotal (Excl. Tax)"}
+              </Text>
               <Text style={styles(colors).summaryValue}>
-                {formatCurrency(currency, (checkoutResponse?.orderCalculation?.totalOriginalPrice - (checkoutResponse?.orderCalculation?.totalProductDiscount || 0)) || cart?.totals?.totalPrice || 0)}
+                {formatCurrency(
+                  currency,
+                  checkoutResponse?.orderCalculation?.totalOriginalPrice -
+                    (checkoutResponse?.orderCalculation?.totalProductDiscount ||
+                      0) ||
+                    cart?.totals?.totalPrice ||
+                    0,
+                )}
               </Text>
             </View>
 
             {/* 5. Delivery Fee */}
             <View style={styles(colors).summaryRow}>
-              <Text style={styles(colors).summaryLabel}>{t('deliveryFee')}</Text>
+              <Text style={styles(colors).summaryLabel}>
+                {t("deliveryFee")}
+              </Text>
               <Text style={styles(colors).summaryValue}>
-                {formatCurrency(currency, checkoutResponse?.delivery?.charge || checkoutResponse?.deliveryCharge || finalDeliveryFee || 0)}
+                {formatCurrency(
+                  currency,
+                  checkoutResponse?.delivery?.charge ||
+                    checkoutResponse?.deliveryCharge ||
+                    finalDeliveryFee ||
+                    0,
+                )}
               </Text>
             </View>
 
@@ -1736,17 +2361,29 @@ const CheckoutScreen = ({ route, navigation }) => {
 
             {/* 4. Tax (Items) */}
             {(() => {
-              const itemsTax = checkoutResponse?.orderCalculation?.totalTaxAmount || cart?.totals?.itemsTax || 0;
-              const addonsTax = checkoutResponse?.orderCalculation?.totalAddonsTaxAmount || cart?.totals?.addonsTax || 0;
-              
-              const displayItemsTax = addonsTax > 0 ? (itemsTax - addonsTax) : itemsTax;
+              const itemsTax =
+                checkoutResponse?.orderCalculation?.totalTaxAmount ||
+                cart?.totals?.itemsTax ||
+                0;
+              const addonsTax =
+                checkoutResponse?.orderCalculation?.totalAddonsTaxAmount ||
+                cart?.totals?.addonsTax ||
+                0;
+
+              const displayItemsTax =
+                addonsTax > 0 ? itemsTax - addonsTax : itemsTax;
 
               if (itemsTax > 0) {
                 return (
                   <View style={styles(colors).summaryRow}>
-                    <Text style={styles(colors).summaryLabel}>{addonsTax > 0 ? t('taxItems') : t('tax')}</Text>
+                    <Text style={styles(colors).summaryLabel}>
+                      {addonsTax > 0 ? t("taxItems") : t("tax")}
+                    </Text>
                     <Text style={styles(colors).summaryValue}>
-                      {formatCurrency(currency, addonsTax > 0 ? displayItemsTax : itemsTax)}
+                      {formatCurrency(
+                        currency,
+                        addonsTax > 0 ? displayItemsTax : itemsTax,
+                      )}
                     </Text>
                   </View>
                 );
@@ -1756,11 +2393,16 @@ const CheckoutScreen = ({ route, navigation }) => {
 
             {/* 4.1 Tax (Add-ons) (If any) */}
             {(() => {
-              const addonsTaxVal = checkoutResponse?.orderCalculation?.totalAddonsTaxAmount || cart?.totals?.addonsTax || 0;
+              const addonsTaxVal =
+                checkoutResponse?.orderCalculation?.totalAddonsTaxAmount ||
+                cart?.totals?.addonsTax ||
+                0;
               if (addonsTaxVal > 0) {
                 return (
                   <View style={styles(colors).summaryRow}>
-                    <Text style={styles(colors).summaryLabel}>{t('taxAddons') || 'Tax (Add-ons)'}</Text>
+                    <Text style={styles(colors).summaryLabel}>
+                      {t("taxAddons") || "Tax (Add-ons)"}
+                    </Text>
                     <Text style={styles(colors).summaryValue}>
                       {formatCurrency(currency, addonsTaxVal)}
                     </Text>
@@ -1771,27 +2413,61 @@ const CheckoutScreen = ({ route, navigation }) => {
             })()}
 
             {/* 6. Delivery VAT */}
-            {(checkoutResponse?.delivery?.vatAmount > 0 || checkoutResponse?.deliveryVatAmount > 0) && (
+            {(checkoutResponse?.delivery?.vatAmount > 0 ||
+              checkoutResponse?.deliveryVatAmount > 0) && (
               <View style={styles(colors).summaryRow}>
                 <Text style={styles(colors).summaryLabel}>
-                  {t('taxDelivery') || 'Delivery VAT'} {checkoutResponse?.delivery?.vatRate ? `(${checkoutResponse.delivery.vatRate}%)` : ''}
+                  {t("taxDelivery") || "Delivery VAT"}{" "}
+                  {checkoutResponse?.delivery?.vatRate
+                    ? `(${checkoutResponse.delivery.vatRate}%)`
+                    : ""}
                 </Text>
                 <Text style={styles(colors).summaryValue}>
-                  {formatCurrency(currency, checkoutResponse?.delivery?.vatAmount || checkoutResponse?.deliveryVatAmount || 0)}
+                  {formatCurrency(
+                    currency,
+                    checkoutResponse?.delivery?.vatAmount ||
+                      checkoutResponse?.deliveryVatAmount ||
+                      0,
+                  )}
                 </Text>
               </View>
             )}
 
             {/* ──────────────────────── Divider 1 */}
-            <View style={[styles(colors).divider, { marginVertical: 12, backgroundColor: colors.border, opacity: 0.6 }]} />
+            <View
+              style={[
+                styles(colors).divider,
+                {
+                  marginVertical: 12,
+                  backgroundColor: colors.border,
+                  opacity: 0.6,
+                },
+              ]}
+            />
 
             {/* 7. Order Total (Before Voucher) */}
             <View style={styles(colors).summaryRow}>
-              <Text style={[styles(colors).summaryLabel, { fontFamily: 'Poppins-Bold' }]}>{t('orderTotal') || 'Order Total'}</Text>
-              <Text style={[styles(colors).summaryValue, { fontFamily: 'Poppins-Bold' }]}>
+              <Text
+                style={[
+                  styles(colors).summaryLabel,
+                  { fontFamily: "Poppins-Bold" },
+                ]}
+              >
+                {t("orderTotal") || "Order Total"}
+              </Text>
+              <Text
+                style={[
+                  styles(colors).summaryValue,
+                  { fontFamily: "Poppins-Bold" },
+                ]}
+              >
                 {(() => {
-                  const voucherAmt = checkoutResponse?.orderCalculation?.totalOfferDiscount || checkoutResponse?.offerDiscount || 0;
-                  const grandTotal = checkoutResponse?.payoutSummary?.grandTotal || 0;
+                  const voucherAmt =
+                    checkoutResponse?.orderCalculation?.totalOfferDiscount ||
+                    checkoutResponse?.offerDiscount ||
+                    0;
+                  const grandTotal =
+                    checkoutResponse?.payoutSummary?.grandTotal || 0;
                   // Order total before voucher is simply grandTotal + voucher discount
                   return formatCurrency(currency, grandTotal + voucherAmt);
                 })()}
@@ -1799,33 +2475,59 @@ const CheckoutScreen = ({ route, navigation }) => {
             </View>
 
             {/* 8. Voucher Applied (If any) */}
-            {(checkoutResponse?.orderCalculation?.totalOfferDiscount > 0 || checkoutResponse?.offerDiscount > 0) && (
+            {(checkoutResponse?.orderCalculation?.totalOfferDiscount > 0 ||
+              checkoutResponse?.offerDiscount > 0) && (
               <View style={[styles(colors).summaryRow, { marginTop: 8 }]}>
-                <View style={{ flexDirection: 'row', alignItems: 'center' }}>
-                  <Text style={[styles(colors).summaryLabel, { color: '#059669' }]}>{t('voucherApplied') || 'Voucher Applied'}</Text>
+                <View style={{ flexDirection: "row", alignItems: "center" }}>
+                  <Text
+                    style={[styles(colors).summaryLabel, { color: "#059669" }]}
+                  >
+                    {t("voucherApplied") || "Voucher Applied"}
+                  </Text>
                   <TouchableOpacity
                     onPress={handleRemoveVoucher}
                     style={{
                       marginLeft: 8,
-                      backgroundColor: 'rgba(5, 150, 105, 0.1)',
+                      backgroundColor: "rgba(5, 150, 105, 0.1)",
                       paddingHorizontal: 8,
                       paddingVertical: 2,
-                      borderRadius: 6
+                      borderRadius: 6,
                     }}
                   >
-                    <Text style={{ fontSize: 11, color: '#059669', fontFamily: 'Poppins-Bold' }}>
-                      {t('remove') || 'Remove'}
+                    <Text
+                      style={{
+                        fontSize: 11,
+                        color: "#059669",
+                        fontFamily: "Poppins-Bold",
+                      }}
+                    >
+                      {t("remove") || "Remove"}
                     </Text>
                   </TouchableOpacity>
                 </View>
-                <Text style={{ fontFamily: 'Poppins-Bold', fontSize: 13, color: '#059669' }}>
-                  -{formatCurrency(currency, checkoutResponse?.orderCalculation?.totalOfferDiscount || checkoutResponse?.offerDiscount || 0)}
+                <Text
+                  style={{
+                    fontFamily: "Poppins-Bold",
+                    fontSize: 13,
+                    color: "#059669",
+                  }}
+                >
+                  -
+                  {formatCurrency(
+                    currency,
+                    checkoutResponse?.orderCalculation?.totalOfferDiscount ||
+                      checkoutResponse?.offerDiscount ||
+                      0,
+                  )}
                 </Text>
               </View>
             )}
 
             {/* Optional Fallback Total if No Voucher */}
-            {!(checkoutResponse?.orderCalculation?.totalOfferDiscount > 0 || checkoutResponse?.offerDiscount > 0) && (
+            {!(
+              checkoutResponse?.orderCalculation?.totalOfferDiscount > 0 ||
+              checkoutResponse?.offerDiscount > 0
+            ) && (
               <View style={{ marginTop: 12 }}>
                 {/* No special final payable needed, already shown as Order Total above or can repeat with emoji */}
               </View>
@@ -1834,131 +2536,220 @@ const CheckoutScreen = ({ route, navigation }) => {
         </View>
 
         {/* Payment Error Banner - Industry Grade */}
-        {
-          !!stripeError && (
-            <View style={{
-              backgroundColor: isDarkMode ? 'rgba(254, 242, 242, 0.05)' : '#FEF2F2',
+        {!!stripeError && (
+          <View
+            style={{
+              backgroundColor: isDarkMode
+                ? "rgba(254, 242, 242, 0.05)"
+                : "#FEF2F2",
               borderRadius: 24,
               marginHorizontal: spacing.lg,
               marginBottom: 24,
               borderWidth: 1,
-              borderColor: isDarkMode ? 'rgba(252, 202, 202, 0.2)' : '#FECACA',
-              overflow: 'hidden',
+              borderColor: isDarkMode ? "rgba(252, 202, 202, 0.2)" : "#FECACA",
+              overflow: "hidden",
               elevation: 4,
-              shadowColor: '#EF4444',
+              shadowColor: "#EF4444",
               shadowOffset: { width: 0, height: 4 },
               shadowOpacity: 0.1,
               shadowRadius: 10,
-            }}>
-              <View style={{ flexDirection: 'row', padding: 20 }}>
-                <View style={{
+            }}
+          >
+            <View style={{ flexDirection: "row", padding: 20 }}>
+              <View
+                style={{
                   width: 48,
                   height: 48,
                   borderRadius: 24,
-                  backgroundColor: '#FEE2E2',
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                  marginRight: 16
-                }}>
-                  <MaterialCommunityIcons 
-                    name={(String(stripeError).toLowerCase().includes('offer') || String(stripeError).toLowerCase().includes('promo') || String(stripeError).toLowerCase().includes('voucher')) ? 'ticket-percent-outline' : 'alert-circle-outline'} 
-                    size={28} 
-                    color="#EF4444" 
-                  />
-                </View>
+                  backgroundColor: "#FEE2E2",
+                  alignItems: "center",
+                  justifyContent: "center",
+                  marginRight: 16,
+                }}
+              >
+                <MaterialCommunityIcons
+                  name={
+                    String(stripeError).toLowerCase().includes("offer") ||
+                    String(stripeError).toLowerCase().includes("promo") ||
+                    String(stripeError).toLowerCase().includes("voucher")
+                      ? "ticket-percent-outline"
+                      : "alert-circle-outline"
+                  }
+                  size={28}
+                  color="#EF4444"
+                />
+              </View>
 
-                <View style={{ flex: 1 }}>
-                  <Text style={{ fontSize: 17, fontFamily: 'Poppins-Bold', color: '#B91C1C', marginBottom: 4 }}>
-                    {(String(stripeError).toLowerCase().includes('offer') || String(stripeError).toLowerCase().includes('promo') || String(stripeError).toLowerCase().includes('voucher')) 
-                      ? (t('voucherError') || 'Promotion Error')
-                      : (t('paymentFailed') === 'paymentFailed' ? 'Payment Failed' : t('paymentFailed'))
-                    }
-                  </Text>
-                  <Text style={{ fontSize: 14, fontFamily: 'Poppins-Medium', color: isDarkMode ? '#FCA5A5' : '#7F1D1D', marginBottom: 16, lineHeight: 22 }}>
-                    {typeof stripeError === 'string' ? stripeError : t('error')}
-                  </Text>
+              <View style={{ flex: 1 }}>
+                <Text
+                  style={{
+                    fontSize: 17,
+                    fontFamily: "Poppins-Bold",
+                    color: "#B91C1C",
+                    marginBottom: 4,
+                  }}
+                >
+                  {String(stripeError).toLowerCase().includes("offer") ||
+                  String(stripeError).toLowerCase().includes("promo") ||
+                  String(stripeError).toLowerCase().includes("voucher")
+                    ? t("voucherError") || "Promotion Error"
+                    : t("paymentFailed") === "paymentFailed"
+                      ? "Payment Failed"
+                      : t("paymentFailed")}
+                </Text>
+                <Text
+                  style={{
+                    fontSize: 14,
+                    fontFamily: "Poppins-Medium",
+                    color: isDarkMode ? "#FCA5A5" : "#7F1D1D",
+                    marginBottom: 16,
+                    lineHeight: 22,
+                  }}
+                >
+                  {typeof stripeError === "string" ? stripeError : t("error")}
+                </Text>
 
-                  <View style={{ flexDirection: 'row', gap: 12 }}>
-                    {profileIncomplete ? (
-                      <TouchableOpacity
-                        onPress={() => navigation.navigate('EditProfile')}
-                        style={{ backgroundColor: '#DC2626', paddingVertical: 12, paddingHorizontal: 24, borderRadius: 14, alignItems: 'center', elevation: 2 }}
+                <View style={{ flexDirection: "row", gap: 12 }}>
+                  {profileIncomplete ? (
+                    <TouchableOpacity
+                      onPress={() => navigation.navigate("EditProfile")}
+                      style={{
+                        backgroundColor: "#DC2626",
+                        paddingVertical: 12,
+                        paddingHorizontal: 24,
+                        borderRadius: 14,
+                        alignItems: "center",
+                        elevation: 2,
+                      }}
+                    >
+                      <Text
+                        style={{
+                          color: "#fff",
+                          fontFamily: "Poppins-Bold",
+                          fontSize: 14,
+                        }}
                       >
-                        <Text style={{ color: '#fff', fontFamily: 'Poppins-Bold', fontSize: 14 }}>{t('completeProfile') || 'Complete Profile'}</Text>
+                        {t("completeProfile") || "Complete Profile"}
+                      </Text>
+                    </TouchableOpacity>
+                  ) : (
+                    <>
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => {
+                          setStripeError(null);
+                          if (
+                            !String(stripeError).toLowerCase().includes("offer")
+                          ) {
+                            // Only go back for critical errors, or stay for voucher issues
+                            // navigation.goBack();
+                          }
+                        }}
+                        style={{
+                          paddingVertical: 10,
+                          paddingHorizontal: 20,
+                          borderRadius: 12,
+                          borderWidth: 1.5,
+                          borderColor: "#DC2626",
+                          backgroundColor: "rgba(220, 38, 38, 0.05)",
+                        }}
+                      >
+                        <Text
+                          style={{
+                            color: "#DC2626",
+                            fontFamily: "Poppins-Bold",
+                            fontSize: 13,
+                          }}
+                        >
+                          {t("dismiss") || "Dismiss"}
+                        </Text>
                       </TouchableOpacity>
-                    ) : (
-                      <>
-                        <TouchableOpacity
-                          activeOpacity={0.7}
-                          onPress={() => {
-                            setStripeError(null);
-                            if (!String(stripeError).toLowerCase().includes('offer')) {
-                                // Only go back for critical errors, or stay for voucher issues
-                                // navigation.goBack();
-                            }
-                          }}
+
+                      <TouchableOpacity
+                        activeOpacity={0.7}
+                        onPress={() => navigation.goBack()}
+                        style={{
+                          paddingVertical: 10,
+                          paddingHorizontal: 20,
+                          borderRadius: 12,
+                          backgroundColor: "#DC2626",
+                        }}
+                      >
+                        <Text
                           style={{
-                            paddingVertical: 10,
-                            paddingHorizontal: 20,
-                            borderRadius: 12,
-                            borderWidth: 1.5,
-                            borderColor: '#DC2626',
-                            backgroundColor: 'rgba(220, 38, 38, 0.05)'
+                            color: "#FFFFFF",
+                            fontFamily: "Poppins-Bold",
+                            fontSize: 13,
                           }}
                         >
-                          <Text style={{ color: '#DC2626', fontFamily: 'Poppins-Bold', fontSize: 13 }}>{t('dismiss') || 'Dismiss'}</Text>
-                        </TouchableOpacity>
-                        
-                        <TouchableOpacity
-                          activeOpacity={0.7}
-                          onPress={() => navigation.goBack()}
-                          style={{
-                            paddingVertical: 10,
-                            paddingHorizontal: 20,
-                            borderRadius: 12,
-                            backgroundColor: '#DC2626',
-                          }}
-                        >
-                          <Text style={{ color: '#FFFFFF', fontFamily: 'Poppins-Bold', fontSize: 13 }}>{t('goBack')}</Text>
-                        </TouchableOpacity>
-                      </>
-                    )}
-                  </View>
+                          {t("goBack")}
+                        </Text>
+                      </TouchableOpacity>
+                    </>
+                  )}
                 </View>
               </View>
             </View>
-          )
-        }
+          </View>
+        )}
 
         {/* Checkout Initializing Banner */}
-        {
-          initializingCheckout && (
-            <View style={{ backgroundColor: '#E3F2FD', padding: 12, borderRadius: 12, marginHorizontal: spacing.lg, marginBottom: 12, borderWidth: 1, borderColor: '#2196F3', flexDirection: 'row', alignItems: 'center' }}>
-              <ActivityIndicator size="small" color="#1976D2" style={{ marginRight: 8 }} />
-              <Text style={{ color: '#1565C0', fontFamily: 'Poppins-Medium', fontSize: 13 }}>{t('preparingCheckout')}</Text>
-            </View>
-          )
-        }
+        {initializingCheckout && (
+          <View
+            style={{
+              backgroundColor: "#E3F2FD",
+              padding: 12,
+              borderRadius: 12,
+              marginHorizontal: spacing.lg,
+              marginBottom: 12,
+              borderWidth: 1,
+              borderColor: "#2196F3",
+              flexDirection: "row",
+              alignItems: "center",
+            }}
+          >
+            <ActivityIndicator
+              size="small"
+              color="#1976D2"
+              style={{ marginRight: 8 }}
+            />
+            <Text
+              style={{
+                color: "#1565C0",
+                fontFamily: "Poppins-Medium",
+                fontSize: 13,
+              }}
+            >
+              {t("preparingCheckout")}
+            </Text>
+          </View>
+        )}
         {/* Place Order Button */}
         <View style={styles(colors).checkoutButtonContainer}>
           <View style={styles(colors).totalBarInline}>
-            <Text style={styles(colors).totalBarLabel}>{t('total')}</Text>
-            <Text style={styles(colors).totalBarAmount}>{formatCurrency(currency, displayTotal)}</Text>
+            <Text style={styles(colors).totalBarLabel}>{t("total")}</Text>
+            <Text style={styles(colors).totalBarAmount}>
+              {formatCurrency(currency, displayTotal)}
+            </Text>
           </View>
           <TouchableOpacity
-            style={{ borderRadius: 18, overflow: 'hidden', opacity: (isProcessing || initializingCheckout) ? 0.7 : 1 }}
+            style={{
+              borderRadius: 18,
+              overflow: "hidden",
+              opacity: isProcessing || initializingCheckout ? 0.7 : 1,
+            }}
             onPress={handlePlaceOrder}
             disabled={isProcessing || initializingCheckout}
             activeOpacity={0.88}
           >
             <LinearGradient
-              colors={['#DC3173', '#B51D5C', '#A8154E']}
+              colors={["#DC3173", "#B51D5C", "#A8154E"]}
               start={{ x: 0, y: 0 }}
               end={{ x: 1, y: 0 }}
               style={{
-                flexDirection: 'row',
-                alignItems: 'center',
-                justifyContent: 'center',
+                flexDirection: "row",
+                alignItems: "center",
+                justifyContent: "center",
                 height: 54,
                 paddingHorizontal: 20,
               }}
@@ -1966,36 +2757,70 @@ const CheckoutScreen = ({ route, navigation }) => {
               {/* Shimmer overlay */}
               <Animated.View
                 style={{
-                  position: 'absolute', top: 0, bottom: 0, width: 60,
-                  transform: [{ translateX: shimmerAnim.interpolate({ inputRange: [0, 1], outputRange: [-100, Dimensions.get('window').width + 800] }) }],
+                  position: "absolute",
+                  top: 0,
+                  bottom: 0,
+                  width: 60,
+                  transform: [
+                    {
+                      translateX: shimmerAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [
+                          -100,
+                          Dimensions.get("window").width + 800,
+                        ],
+                      }),
+                    },
+                  ],
                 }}
               >
                 <LinearGradient
-                  colors={['transparent', 'rgba(255,255,255,0.25)', 'rgba(255,255,255,0.35)', 'rgba(255,255,255,0.25)', 'transparent']}
-                  start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}
+                  colors={[
+                    "transparent",
+                    "rgba(255,255,255,0.25)",
+                    "rgba(255,255,255,0.35)",
+                    "rgba(255,255,255,0.25)",
+                    "transparent",
+                  ]}
+                  start={{ x: 0, y: 0 }}
+                  end={{ x: 1, y: 0 }}
                   style={{ flex: 1 }}
                 />
               </Animated.View>
 
               {isProcessing || initializingCheckout ? (
-                <ActivityIndicator size="small" color="#fff" style={{ marginRight: 8 }} />
+                <ActivityIndicator
+                  size="small"
+                  color="#fff"
+                  style={{ marginRight: 8 }}
+                />
               ) : null}
-              <Text style={[styles(colors).placeOrderBtnText, { marginRight: 10, marginBottom: Platform.OS === 'ios' ? 0 : 2 }]}>
+              <Text
+                style={[
+                  styles(colors).placeOrderBtnText,
+                  {
+                    marginRight: 10,
+                    marginBottom: Platform.OS === "ios" ? 0 : 2,
+                  },
+                ]}
+              >
                 {isProcessing
-                  ? t('processing')
+                  ? t("processing")
                   : initializingCheckout
-                    ? t('preparingCheckout')
-                    : t('placeOrder')}
+                    ? t("preparingCheckout")
+                    : t("placeOrder")}
               </Text>
               {!isProcessing && !initializingCheckout && (
-                <View style={{
-                  width: 30,
-                  height: 30,
-                  backgroundColor: '#fff',
-                  borderRadius: 15,
-                  alignItems: 'center',
-                  justifyContent: 'center',
-                }}>
+                <View
+                  style={{
+                    width: 30,
+                    height: 30,
+                    backgroundColor: "#fff",
+                    borderRadius: 15,
+                    alignItems: "center",
+                    justifyContent: "center",
+                  }}
+                >
                   <Ionicons
                     name="arrow-forward"
                     size={18}
@@ -2009,51 +2834,41 @@ const CheckoutScreen = ({ route, navigation }) => {
 
         {/* Bottom Spacing */}
         <View style={{ height: Math.max(100, insets.bottom + 40) }} />
-      </ScrollView >
+      </ScrollView>
 
       {renderProcessingModal()}
       {renderSuccessModal()}
       {renderFailureModal()}
 
-      <AlertModal
-        visible={showCancelModal}
-        onClose={() => setShowCancelModal(false)}
-        title={t('cancelPaymentTitle') || 'Cancel Payment'}
-        message={t('cancelPaymentMessage') || 'Are you sure you want to cancel the payment process?'}
-        icon="alert-circle"
-        buttons={[
-          {
-            text: t('no') || 'No',
-            style: 'cancel',
-            onPress: () => setShowCancelModal(false)
-          },
-          {
-            text: t('yes') || 'Yes',
-            onPress: () => {
-              setPaymentUrl(null);
-              setShowCancelModal(false);
-              // Reset checkout session so a FRESH one is created on next attempt.
-              // Without this, the backend keeps the old session in 'PROCESSING'
-              // state and returns "Payment already in process" if user retries.
-              setCheckoutResponse(null);
-              setStripeError(null);
-              setIsProcessing(false);
-              // Increment key to force the createCheckoutOnEnter useEffect to re-run
-              setCheckoutRetryKey(k => k + 1);
-            }
-          }
-        ]}
-      />
-
       {/* Payment WebView Modal */}
-      <Modal visible={!!paymentUrl} animationType="slide" presentationStyle="pageSheet" onRequestClose={handleCancelPayment}>
+      <Modal
+        visible={!!paymentUrl}
+        animationType="slide"
+        presentationStyle="pageSheet"
+        onRequestClose={handleCancelPayment}
+      >
         <SafeAreaView style={{ flex: 1, backgroundColor: colors.background }}>
-          <View style={{ flexDirection: 'row', alignItems: 'center', padding: 16, borderBottomWidth: 1, borderBottomColor: colors.border }}>
+          <View
+            style={{
+              flexDirection: "row",
+              alignItems: "center",
+              padding: 16,
+              borderBottomWidth: 1,
+              borderBottomColor: colors.border,
+            }}
+          >
             <TouchableOpacity onPress={handleCancelPayment}>
               <Ionicons name="close" size={28} color={colors.text.primary} />
             </TouchableOpacity>
-            <Text style={{ fontSize: 18, fontFamily: 'Poppins-SemiBold', marginLeft: 16, color: colors.text.primary }}>
-              {t('completePayment') || 'Complete Payment'}
+            <Text
+              style={{
+                fontSize: 18,
+                fontFamily: "Poppins-SemiBold",
+                marginLeft: 16,
+                color: colors.text.primary,
+              }}
+            >
+              {t("completePayment") || "Complete Payment"}
             </Text>
           </View>
           {paymentUrl && (
@@ -2061,13 +2876,16 @@ const CheckoutScreen = ({ route, navigation }) => {
               source={{ uri: paymentUrl }}
               onNavigationStateChange={handlePaymentNavigationChange}
               onShouldStartLoadWithRequest={(request) => {
-                console.log('[CheckoutScreen] WebView Loading Request:', request.url);
+                console.log(
+                  "[CheckoutScreen] WebView Loading Request:",
+                  request.url,
+                );
                 // Intercept redirection before it loads the web page
-                if (request.url.includes('payment-success')) {
+                if (request.url.includes("payment-success")) {
                   handlePaymentSuccess(request.url);
                   return false;
                 }
-                if (request.url.includes('payment-failed')) {
+                if (request.url.includes("payment-failed")) {
                   handlePaymentFailure(request.url);
                   return false;
                 }
@@ -2075,14 +2893,21 @@ const CheckoutScreen = ({ route, navigation }) => {
               }}
               onError={(syntheticEvent) => {
                 const { nativeEvent } = syntheticEvent;
-                console.warn('[CheckoutScreen] WebView Error:', nativeEvent);
-                handlePaymentFailure(`WebView Error: ${nativeEvent.description}`);
+                console.warn("[CheckoutScreen] WebView Error:", nativeEvent);
+                handlePaymentFailure(
+                  `WebView Error: ${nativeEvent.description}`,
+                );
               }}
               onHttpError={(syntheticEvent) => {
                 const { nativeEvent } = syntheticEvent;
-                console.warn('[CheckoutScreen] WebView HTTP Error:', nativeEvent);
+                console.warn(
+                  "[CheckoutScreen] WebView HTTP Error:",
+                  nativeEvent,
+                );
                 if (nativeEvent.statusCode === 404) {
-                  handlePaymentFailure('Payment session expired or invalid (404). Please try again.');
+                  handlePaymentFailure(
+                    "Payment session expired or invalid (404). Please try again.",
+                  );
                 }
               }}
               startInLoadingState={true}
@@ -2090,12 +2915,58 @@ const CheckoutScreen = ({ route, navigation }) => {
               domStorageEnabled={true}
               thirdPartyCookiesEnabled={true}
               userAgent="Mozilla/5.0 (iPhone; CPU iPhone OS 17_0 like Mac OS X) AppleWebKit/605.1.15 (KHTML, like Gecko) Version/17.0 Mobile/15E148 Safari/604.1"
-              originWhitelist={['*']}
+              originWhitelist={["*"]}
               mixedContentMode="always"
-              renderLoading={() => <ActivityIndicator size="large" color={colors.primary} style={{ flex: 1, position: 'absolute', top: '50%', left: '50%', marginTop: -20, marginLeft: -20 }} />}
+              renderLoading={() => (
+                <ActivityIndicator
+                  size="large"
+                  color={colors.primary}
+                  style={{
+                    flex: 1,
+                    position: "absolute",
+                    top: "50%",
+                    left: "50%",
+                    marginTop: -20,
+                    marginLeft: -20,
+                  }}
+                />
+              )}
               style={{ flex: 1 }}
             />
           )}
+
+          <AlertModal
+            visible={showCancelModal}
+            onClose={() => setShowCancelModal(false)}
+            title={t("cancelPaymentTitle") || "Cancel Payment"}
+            message={
+              t("cancelPaymentMessage") ||
+              "Are you sure you want to cancel the payment process?"
+            }
+            icon="alert-circle"
+            buttons={[
+              {
+                text: t("no") || "No",
+                style: "cancel",
+                onPress: () => setShowCancelModal(false),
+              },
+              {
+                text: t("yes") || "Yes",
+                onPress: () => {
+                  setPaymentUrl(null);
+                  setShowCancelModal(false);
+                  // Reset checkout session so a FRESH one is created on next attempt.
+                  // Without this, the backend keeps the old session in 'PROCESSING'
+                  // state and returns "Payment already in process" if user retries.
+                  setCheckoutResponse(null);
+                  setStripeError(null);
+                  setIsProcessing(false);
+                  // Increment key to force the createCheckoutOnEnter useEffect to re-run
+                  setCheckoutRetryKey((k) => k + 1);
+                },
+              },
+            ]}
+          />
         </SafeAreaView>
       </Modal>
 
@@ -2106,78 +2977,100 @@ const CheckoutScreen = ({ route, navigation }) => {
         animationType="slide"
         onRequestClose={handleSkipNif}
       >
-        <KeyboardAvoidingView
-          behavior="padding"
-          style={{ flex: 1 }}
-        >
-          <View style={{ flex: 1, backgroundColor: 'rgba(0,0,0,0.6)', justifyContent: 'flex-end' }}>
-            <View style={{
-              backgroundColor: isDarkMode ? '#1E1E1E' : '#FFFFFF',
-              borderTopLeftRadius: 28,
-              borderTopRightRadius: 28,
-              padding: 32,
-              paddingBottom: 40,
-              shadowColor: "#000",
-              shadowOffset: { width: 0, height: -4 },
-              shadowOpacity: 0.1,
-              shadowRadius: 8,
-              elevation: 10,
-            }}>
+        <KeyboardAvoidingView behavior="padding" style={{ flex: 1 }}>
+          <View
+            style={{
+              flex: 1,
+              backgroundColor: "rgba(0,0,0,0.6)",
+              justifyContent: "flex-end",
+            }}
+          >
+            <View
+              style={{
+                backgroundColor: isDarkMode ? "#1E1E1E" : "#FFFFFF",
+                borderTopLeftRadius: 28,
+                borderTopRightRadius: 28,
+                padding: 32,
+                paddingBottom: 40,
+                shadowColor: "#000",
+                shadowOffset: { width: 0, height: -4 },
+                shadowOpacity: 0.1,
+                shadowRadius: 8,
+                elevation: 10,
+              }}
+            >
               {/* Header Icon */}
-              <View style={{ alignItems: 'center', marginBottom: 20 }}>
-                <View style={{
-                  width: 60,
-                  height: 60,
-                  borderRadius: 30,
-                  backgroundColor: isDarkMode ? '#333' : '#F0F9FF',
-                  justifyContent: 'center',
-                  alignItems: 'center',
-                  marginBottom: 16
-                }}>
-                  <Ionicons name="card-outline" size={32} color={colors.primary} />
+              <View style={{ alignItems: "center", marginBottom: 20 }}>
+                <View
+                  style={{
+                    width: 60,
+                    height: 60,
+                    borderRadius: 30,
+                    backgroundColor: isDarkMode ? "#333" : "#F0F9FF",
+                    justifyContent: "center",
+                    alignItems: "center",
+                    marginBottom: 16,
+                  }}
+                >
+                  <Ionicons
+                    name="card-outline"
+                    size={32}
+                    color={colors.primary}
+                  />
                 </View>
-                <Text style={{
-                  fontSize: 22,
-                  fontFamily: 'Poppins-Bold',
-                  color: colors.text.primary,
-                  textAlign: 'center',
-                  marginBottom: 8
-                }}>
+                <Text
+                  style={{
+                    fontSize: 22,
+                    fontFamily: "Poppins-Bold",
+                    color: colors.text.primary,
+                    textAlign: "center",
+                    marginBottom: 8,
+                  }}
+                >
                   Add Tax ID (NIF)
                 </Text>
-                <Text style={{
-                  fontSize: 15,
-                  fontFamily: 'Poppins-Regular',
-                  color: colors.text.secondary,
-                  textAlign: 'center',
-                  lineHeight: 22,
-                  paddingHorizontal: 10
-                }}>
-                  For invoice purposes, please add your Tax ID (NIF) or skip this step.
+                <Text
+                  style={{
+                    fontSize: 15,
+                    fontFamily: "Poppins-Regular",
+                    color: colors.text.secondary,
+                    textAlign: "center",
+                    lineHeight: 22,
+                    paddingHorizontal: 10,
+                  }}
+                >
+                  For invoice purposes, please add your Tax ID (NIF) or skip
+                  this step.
                 </Text>
               </View>
 
               {/* Input Field */}
               <View style={{ marginBottom: 24 }}>
-                <Text style={{
-                  fontSize: 13,
-                  fontFamily: 'Poppins-Medium',
-                  color: colors.text.secondary,
-                  marginBottom: 8,
-                  marginLeft: 4
-                }}>
+                <Text
+                  style={{
+                    fontSize: 13,
+                    fontFamily: "Poppins-Medium",
+                    color: colors.text.secondary,
+                    marginBottom: 8,
+                    marginLeft: 4,
+                  }}
+                >
                   NIF / Fiscal Number
                 </Text>
                 <TextInput
                   style={{
-                    backgroundColor: isDarkMode ? '#2C2C2C' : '#F8F9FA',
+                    backgroundColor: isDarkMode ? "#2C2C2C" : "#F8F9FA",
                     borderRadius: 16,
                     padding: 18,
                     fontSize: 16,
-                    fontFamily: 'Poppins-Regular',
+                    fontFamily: "Poppins-Regular",
                     color: colors.text.primary,
                     borderWidth: 1.5,
-                    borderColor: nifValue ? colors.primary : (isDarkMode ? '#444' : '#E0E0E0')
+                    borderColor: nifValue
+                      ? colors.primary
+                      : isDarkMode
+                        ? "#444"
+                        : "#E0E0E0",
                   }}
                   placeholder="123 456 789"
                   placeholderTextColor={colors.text.disabled}
@@ -2198,24 +3091,29 @@ const CheckoutScreen = ({ route, navigation }) => {
                     backgroundColor: colors.primary,
                     paddingVertical: 18,
                     borderRadius: 16,
-                    alignItems: 'center',
+                    alignItems: "center",
                     shadowColor: colors.primary,
                     shadowOffset: { width: 0, height: 4 },
                     shadowOpacity: 0.2,
                     shadowRadius: 8,
                     elevation: 4,
-                    flexDirection: 'row',
-                    justifyContent: 'center'
+                    flexDirection: "row",
+                    justifyContent: "center",
                   }}
                 >
                   {isUpdatingNif ? (
-                    <ActivityIndicator color="#FFF" style={{ marginRight: 8 }} />
+                    <ActivityIndicator
+                      color="#FFF"
+                      style={{ marginRight: 8 }}
+                    />
                   ) : null}
-                  <Text style={{
-                    fontFamily: 'Poppins-SemiBold',
-                    fontSize: 16,
-                    color: '#FFF'
-                  }}>
+                  <Text
+                    style={{
+                      fontFamily: "Poppins-SemiBold",
+                      fontSize: 16,
+                      color: "#FFF",
+                    }}
+                  >
                     Save & Continue
                   </Text>
                 </TouchableOpacity>
@@ -2226,15 +3124,17 @@ const CheckoutScreen = ({ route, navigation }) => {
                   style={{
                     paddingVertical: 16,
                     borderRadius: 16,
-                    alignItems: 'center',
-                    backgroundColor: 'transparent'
+                    alignItems: "center",
+                    backgroundColor: "transparent",
                   }}
                 >
-                  <Text style={{
-                    fontFamily: 'Poppins-Medium',
-                    fontSize: 15,
-                    color: colors.text.secondary
-                  }}>
+                  <Text
+                    style={{
+                      fontFamily: "Poppins-Medium",
+                      fontSize: 15,
+                      color: colors.text.secondary,
+                    }}
+                  >
                     Skip for now
                   </Text>
                 </TouchableOpacity>
@@ -2243,786 +3143,807 @@ const CheckoutScreen = ({ route, navigation }) => {
           </View>
         </KeyboardAvoidingView>
       </Modal>
-
-    </SafeAreaView >
+    </SafeAreaView>
   );
 };
 
-const styles = (colors) => StyleSheet.create({
-  container: {
-    flex: 1,
-    backgroundColor: colors.background,
-  },
-  headerContainer: {
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 8,
-    zIndex: 100,
-  },
-  headerGradient: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingHorizontal: 20,
-    paddingTop: 16,
-    paddingBottom: 24,
-  },
-  backButton: {
-    width: 40,
-    height: 40,
-    alignItems: 'center',
-    justifyContent: 'center',
-    borderRadius: 20,
-    backgroundColor: colors.background,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  headerCenter: {
-    flex: 1,
-    alignItems: 'center',
-    paddingHorizontal: spacing.md,
-  },
-  headerTitle: {
-    fontSize: 20,
-    fontFamily: 'Poppins-Bold',
-    color: colors.text.primary,
-    marginBottom: 2,
-  },
-  headerSubtitle: {
-    fontSize: 13,
-    fontFamily: 'Poppins-Medium',
-    color: colors.text.secondary,
-  },
-  headerRight: {
-    width: 40,
-  },
-  scrollView: {
-    flex: 1,
-  },
-  scrollContent: {
-    paddingTop: 12,
-  },
-  deliveryTimeBanner: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.surface,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 20,
-    borderRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 6,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  deliveryTimeIcon: {
-    width: 48,
-    height: 48,
-    borderRadius: 24,
-    backgroundColor: colors.background === '#FFFFFF' ? '#FFF0F5' : 'rgba(220, 49, 115, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
-  },
-  deliveryTimeContent: {
-    flex: 1,
-  },
-  deliveryTimeLabel: {
-    fontSize: 13,
-    fontFamily: 'Poppins-Medium',
-    color: colors.text.secondary,
-    marginBottom: 2,
-  },
-  deliveryTimeValue: {
-    fontSize: 16,
-    fontFamily: 'Poppins-Bold',
-    color: colors.text.primary,
-    lineHeight: 22,
-  },
-  deliveryTimeBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.background === '#FFFFFF' ? '#FFF8E1' : 'rgba(255, 193, 7, 0.15)',
-    paddingHorizontal: 10,
-    paddingVertical: 6,
-    borderRadius: 20,
-    gap: 4,
-    marginLeft: 10,
-    flexShrink: 0,
-  },
-  deliveryTimeBadgeText: {
-    fontSize: 12,
-    fontFamily: 'Poppins-SemiBold',
-    color: '#F57C00',
-  },
-  section: {
-    backgroundColor: colors.surface,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 20,
-    borderRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 6,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  sectionHeader: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-  },
-  sectionTitleRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 10,
-  },
-  sectionTitle: {
-    fontSize: 17,
-    fontFamily: 'Poppins-Bold',
-    color: colors.text.primary,
-  },
-  changeButton: {
-    fontSize: 14,
-    fontFamily: 'Poppins-SemiBold',
-    color: colors.primary,
-  },
-  itemCount: {
-    fontSize: 13,
-    fontFamily: 'Poppins-Medium',
-    color: colors.text.secondary,
-  },
-  optionalText: {
-    fontSize: 12,
-    fontFamily: 'Poppins-Medium',
-    color: colors.text.light,
-    backgroundColor: colors.background,
-    paddingHorizontal: 10,
-    paddingVertical: 4,
-    borderRadius: 12,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  addressContainer: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-  },
-  addressIconWrapper: {
-    marginRight: spacing.md,
-  },
-  addressIconBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.background === '#FFFFFF' ? '#FFF0F5' : 'rgba(220, 49, 115, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  addressDetails: {
-    flex: 1,
-  },
-  addressType: {
-    fontSize: 15,
-    fontFamily: 'Poppins-SemiBold',
-    color: colors.text.primary,
-    marginBottom: 4,
-  },
-  addressFull: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Regular',
-    color: colors.text.secondary,
-    lineHeight: 21,
-  },
-  instructionsContainer: {
-    paddingHorizontal: spacing.lg,
-    marginBottom: 12,
-  },
-  instructionsBadge: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.background === '#FFFFFF' ? '#E3F2FD' : 'rgba(33, 150, 243, 0.15)',
-    padding: spacing.md,
-    borderRadius: 12,
-    borderLeftWidth: 4,
-    borderLeftColor: '#0288D1',
-  },
-  instructionsText: {
-    flex: 1,
-    fontSize: 13,
-    fontFamily: 'Poppins-Medium',
-    color: '#0277BD',
-    marginLeft: 10,
-    lineHeight: 19,
-  },
-  orderItemsContainer: {
-    gap: 12,
-  },
-  orderItemRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingBottom: 12,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  orderItemLeft: {
-    flexDirection: 'row',
-    alignItems: 'flex-start',
-    flex: 1,
-    marginRight: spacing.md,
-  },
-  quantityBadge: {
-    backgroundColor: colors.primary,
-    minWidth: 28,
-    height: 28,
-    borderRadius: 14,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 12,
-    marginTop: 2,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.2,
-    shadowRadius: 6,
-    elevation: 3,
-  },
-  quantityText: {
-    fontSize: 13,
-    fontFamily: 'Poppins-Bold',
-    color: '#FFFFFF',
-  },
-  itemNameText: {
-    flex: 1,
-    fontSize: 15,
-    fontFamily: 'Poppins-Medium',
-    color: colors.text.primary,
-    lineHeight: 22,
-  },
-  itemPriceText: {
-    fontSize: 15,
-    fontFamily: 'Poppins-Bold',
-    color: colors.text.primary,
-  },
-  voucherButton: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  voucherLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-  },
-  voucherIconBadge: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    backgroundColor: colors.background === '#FFFFFF' ? '#FFF0F5' : 'rgba(220, 49, 115, 0.15)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: spacing.md,
-  },
-  voucherButtonText: {
-    fontSize: 15,
-    fontFamily: 'Poppins-SemiBold',
-    color: colors.text.primary,
-  },
-  voucherInputContainer: {
-    flexDirection: 'row',
-    marginTop: spacing.md,
-    gap: 10,
-  },
-  voucherInput: {
-    flex: 1,
-    height: 48,
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    paddingHorizontal: spacing.md,
-    fontSize: 14,
-    fontFamily: 'Poppins-Medium',
-    color: colors.text.primary,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  applyVoucherButton: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 24,
-    height: 48,
-    borderRadius: 12,
-    alignItems: 'center',
-    justifyContent: 'center',
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.3,
-    shadowRadius: 4,
-    elevation: 3,
-  },
-  applyVoucherText: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Bold',
-    color: '#FFFFFF',
-  },
-  tipDescription: {
-    fontSize: 13,
-    fontFamily: 'Poppins-Regular',
-    color: colors.text.secondary,
-    marginBottom: spacing.md,
-  },
-  tipOptionsContainer: {
-    flexDirection: 'row',
-    gap: 10,
-  },
-  tipOption: {
-    flex: 1,
-    height: 44,
-    alignItems: 'center',
-    justifyContent: 'center',
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    borderWidth: 2,
-    borderColor: colors.border,
-  },
-  tipOptionSelected: {
-    backgroundColor: colors.background === '#FFFFFF' ? '#FFF0F5' : 'rgba(220, 49, 115, 0.15)',
-    borderColor: colors.primary,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 2 },
-    shadowOpacity: 0.2,
-    shadowRadius: 4,
-    elevation: 2,
-  },
-  tipOptionText: {
-    fontSize: 14,
-    fontFamily: 'Poppins-SemiBold',
-    color: colors.text.secondary,
-  },
-  tipOptionTextSelected: {
-    color: colors.primary,
-  },
-  paymentMethodsList: {
-    gap: 12,
-  },
-  methodRowSelected: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderColor: colors.primary,
-    borderWidth: 1.5,
-    backgroundColor: colors.background === '#FFFFFF' ? 'rgba(217, 27, 92, 0.04)' : 'rgba(217, 27, 92, 0.15)',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 0,
-  },
-  methodRowUnselected: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    borderColor: 'transparent',
-    borderWidth: 1.5,
-    backgroundColor: 'transparent',
-    borderRadius: 16,
-    padding: 16,
-    marginBottom: 0,
-  },
-  iconCircleSelected: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: colors.primary,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-    backgroundColor: 'transparent',
-  },
-  iconCircleUnselected: {
-    width: 44,
-    height: 44,
-    borderRadius: 22,
-    borderWidth: 1,
-    borderColor: colors.border,
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginRight: 16,
-    backgroundColor: 'transparent',
-  },
-  methodName: {
-    fontSize: 15,
-    fontFamily: 'Poppins-SemiBold',
-    color: colors.text.primary,
-    flex: 1,
-  },
-  badge: {
-    backgroundColor: colors.primary,
-    paddingHorizontal: 8,
-    paddingVertical: 5,
-    borderRadius: 8,
-    marginRight: 14,
-  },
-  badgeText: {
-    color: '#FFF',
-    fontSize: 10,
-    fontFamily: 'Poppins-Bold',
-    textTransform: 'none',
-    letterSpacing: 0.5,
-  },
-  radioContainer: {
-    width: 24,
-    height: 24,
-    borderRadius: 12,
-    borderWidth: 2,
-    justifyContent: 'center',
-    alignItems: 'center',
-  },
-  radioSelected: {
-    borderColor: colors.primary,
-  },
-  radioUnselected: {
-    borderColor: colors.text.light,
-  },
-  radioInner: {
-    width: 12,
-    height: 12,
-    borderRadius: 6,
-    backgroundColor: colors.primary,
-  },
-  notesInput: {
-    backgroundColor: colors.background,
-    borderRadius: 12,
-    padding: spacing.md,
-    fontSize: 14,
-    fontFamily: 'Poppins-Regular',
-    color: colors.text.primary,
-    borderWidth: 1,
-    borderColor: colors.border,
-    minHeight: 80,
-  },
-  summarySection: {
-    backgroundColor: colors.surface,
-    marginHorizontal: 16,
-    marginBottom: 16,
-    padding: 20,
-    borderRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 6,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  summaryRows: {
-    gap: 14,
-  },
-  summaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-  },
-  summaryLabel: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Regular',
-    color: colors.text.secondary,
-  },
-  summaryValue: {
-    fontSize: 15,
-    fontFamily: 'Poppins-SemiBold',
-    color: colors.text.primary,
-  },
-  summaryValueFree: {
-    fontSize: 15,
-    fontFamily: 'Poppins-Bold',
-    color: '#4CAF50',
-  },
-  discountRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    gap: 6,
-  },
-  summaryLabelDiscount: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Medium',
-    color: '#4CAF50',
-  },
-  summaryValueDiscount: {
-    fontSize: 15,
-    fontFamily: 'Poppins-Bold',
-    color: '#4CAF50',
-  },
-  summaryDivider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginVertical: 6,
-  },
-  totalSummaryRow: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    paddingTop: 4,
-  },
-  totalSummaryLabel: {
-    fontSize: 17,
-    fontFamily: 'Poppins-Bold',
-    color: colors.text.primary,
-  },
-  totalSummaryValue: {
-    fontSize: 22,
-    fontFamily: 'Poppins-Bold',
-    color: colors.primary,
-    letterSpacing: -0.5,
-  },
-  checkoutButtonContainer: {
-    backgroundColor: colors.surface,
-    marginHorizontal: 16,
-    marginTop: 16,
-    marginBottom: 16,
-    padding: 20,
-    borderRadius: 24,
-    shadowColor: '#000',
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.05,
-    shadowRadius: 10,
-    elevation: 6,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  totalBarInline: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    marginBottom: spacing.md,
-    paddingBottom: spacing.md,
-    borderBottomWidth: 1,
-    borderBottomColor: colors.border,
-  },
-  totalBar: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
-    gap: 12,
-  },
-  totalBarLeft: {
-    flex: 1,
-  },
-  totalBarLabel: {
-    fontSize: 13,
-    fontFamily: 'Poppins-Medium',
-    color: colors.text.secondary,
-    marginBottom: 2,
-  },
-  totalBarAmount: {
-    fontSize: 26,
-    fontFamily: 'Poppins-Bold',
-    color: colors.primary,
-    letterSpacing: -0.5,
-  },
-  placeOrderBtn: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    backgroundColor: colors.primary,
-    paddingHorizontal: 28,
-    paddingVertical: 16,
-    borderRadius: 20,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 6 },
-    shadowOpacity: 0.3,
-    shadowRadius: 10,
-    elevation: 6,
-  },
-  placeOrderBtnDisabled: {
-    opacity: 0.6,
-  },
-  shimmerEffect: {
-    position: 'absolute',
-    top: 0, bottom: 0, left: 0,
-    width: 200,
-    backgroundColor: 'rgba(255,255,255,0.25)',
-    transform: [{ skewX: '-20deg' }],
-  },
-  placeOrderBtnText: {
-    fontSize: 16,
-    fontFamily: 'Poppins-Bold',
-    color: '#FFFFFF',
-    marginRight: 8,
-  },
-  placeOrderArrow: {
-    width: 28,
-    height: 28,
-    borderRadius: 14,
-    backgroundColor: 'rgba(255, 255, 255, 0.3)',
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  modalOverlay: {
-    flex: 1,
-    backgroundColor: colors.overlay,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: spacing.lg,
-  },
-  processingModal: {
-    backgroundColor: colors.surface,
-    padding: 32,
-    borderRadius: 24,
-    alignItems: 'center',
-    minWidth: 260,
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  loadingSpinner: {
-    marginBottom: 16,
-  },
-  processingText: {
-    fontSize: 16,
-    fontFamily: 'Poppins-SemiBold',
-    color: colors.text.primary,
-  },
-  successModal: {
-    backgroundColor: colors.surface,
-    paddingHorizontal: 22,
-    paddingTop: 22,
-    paddingBottom: 20,
-    borderRadius: 22,
-    alignItems: 'center',
-    maxWidth: 380,
-    width: '100%',
-    shadowColor: colors.shadow,
-    shadowOffset: { width: 0, height: 10 },
-    shadowOpacity: 0.2,
-    shadowRadius: 20,
-    elevation: 10,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  successIconContainer: {
-    marginBottom: 20,
-  },
-  successIconShell: {
-    width: 88,
-    height: 88,
-    borderRadius: 44,
-    backgroundColor: 'rgba(76,175,80,0.14)',
-    alignItems: 'center',
-    justifyContent: 'center',
-    marginBottom: 14,
-  },
-  successIconCore: {
-    width: 62,
-    height: 62,
-    borderRadius: 31,
-    backgroundColor: colors.success,
-    alignItems: 'center',
-    justifyContent: 'center',
-  },
-  successTitle: {
-    fontSize: 30,
-    fontFamily: 'Poppins-Bold',
-    color: colors.text.primary,
-    textAlign: 'center',
-    marginBottom: 8,
-    lineHeight: 38,
-  },
-  successMessage: {
-    fontSize: 15,
-    fontFamily: 'Poppins-Regular',
-    color: colors.text.secondary,
-    textAlign: 'center',
-    marginBottom: 18,
-    lineHeight: 24,
-  },
-  successDetails: {
-    backgroundColor: colors.background,
-    paddingVertical: 14,
-    paddingHorizontal: 14,
-    borderRadius: 18,
-    width: '100%',
-    marginBottom: 18,
-    borderWidth: 1,
-    borderColor: colors.border,
-  },
-  successRow: {
-    flexDirection: 'row',
-    justifyContent: 'space-between',
-    alignItems: 'center',
-    minHeight: 34,
-  },
-  successRowLeft: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    flex: 1,
-    marginRight: 10,
-  },
-  successRowRight: {
-    flexShrink: 0,
-    alignItems: 'flex-end',
-  },
-  successDot: {
-    width: 8,
-    height: 8,
-    borderRadius: 4,
-    backgroundColor: colors.success,
-    marginRight: 8,
-  },
-  successLabel: {
-    fontSize: 14,
-    fontFamily: 'Poppins-Regular',
-    color: colors.text.secondary,
-    flexShrink: 1,
-  },
-  successValue: {
-    fontSize: 16,
-    fontFamily: 'Poppins-Bold',
-    color: colors.text.primary,
-    textAlign: 'right',
-  },
-  successEta: {
-    fontSize: 16,
-    fontFamily: 'Poppins-Bold',
-    color: colors.primary,
-    textAlign: 'right',
-  },
-  successDivider: {
-    height: 1,
-    backgroundColor: colors.border,
-    marginVertical: 8,
-  },
-  successCta: {
-    backgroundColor: colors.primary,
-    paddingVertical: 16,
-    paddingHorizontal: 24,
-    borderRadius: 30,
-    elevation: 4,
-    shadowColor: colors.primary,
-    shadowOffset: { width: 0, height: 4 },
-    shadowOpacity: 0.3,
-    shadowRadius: 8,
-    width: '100%',
-    alignItems: 'center',
-  },
-  successHint: {
-    marginTop: 10,
-    fontSize: 12,
-    fontFamily: 'Poppins-Regular',
-    color: colors.text.secondary,
-    textAlign: 'center',
-  },
-  successDetailText: {
-    fontSize: 14,
-    fontFamily: 'Poppins-SemiBold',
-    color: colors.primary,
-    marginBottom: 4,
-  },
-});
+const styles = (colors) =>
+  StyleSheet.create({
+    container: {
+      flex: 1,
+      backgroundColor: colors.background,
+    },
+    headerContainer: {
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.05,
+      shadowRadius: 10,
+      elevation: 8,
+      zIndex: 100,
+    },
+    headerGradient: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingHorizontal: 20,
+      paddingTop: 16,
+      paddingBottom: 24,
+    },
+    backButton: {
+      width: 40,
+      height: 40,
+      alignItems: "center",
+      justifyContent: "center",
+      borderRadius: 20,
+      backgroundColor: colors.background,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    headerCenter: {
+      flex: 1,
+      alignItems: "center",
+      paddingHorizontal: spacing.md,
+    },
+    headerTitle: {
+      fontSize: 20,
+      fontFamily: "Poppins-Bold",
+      color: colors.text.primary,
+      marginBottom: 2,
+    },
+    headerSubtitle: {
+      fontSize: 13,
+      fontFamily: "Poppins-Medium",
+      color: colors.text.secondary,
+    },
+    headerRight: {
+      width: 40,
+    },
+    scrollView: {
+      flex: 1,
+    },
+    scrollContent: {
+      paddingTop: 12,
+    },
+    deliveryTimeBanner: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.surface,
+      marginHorizontal: 16,
+      marginBottom: 16,
+      padding: 20,
+      borderRadius: 24,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.05,
+      shadowRadius: 10,
+      elevation: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    deliveryTimeIcon: {
+      width: 48,
+      height: 48,
+      borderRadius: 24,
+      backgroundColor:
+        colors.background === "#FFFFFF"
+          ? "#FFF0F5"
+          : "rgba(220, 49, 115, 0.15)",
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: spacing.md,
+    },
+    deliveryTimeContent: {
+      flex: 1,
+    },
+    deliveryTimeLabel: {
+      fontSize: 13,
+      fontFamily: "Poppins-Medium",
+      color: colors.text.secondary,
+      marginBottom: 2,
+    },
+    deliveryTimeValue: {
+      fontSize: 16,
+      fontFamily: "Poppins-Bold",
+      color: colors.text.primary,
+      lineHeight: 22,
+    },
+    deliveryTimeBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor:
+        colors.background === "#FFFFFF" ? "#FFF8E1" : "rgba(255, 193, 7, 0.15)",
+      paddingHorizontal: 10,
+      paddingVertical: 6,
+      borderRadius: 20,
+      gap: 4,
+      marginLeft: 10,
+      flexShrink: 0,
+    },
+    deliveryTimeBadgeText: {
+      fontSize: 12,
+      fontFamily: "Poppins-SemiBold",
+      color: "#F57C00",
+    },
+    section: {
+      backgroundColor: colors.surface,
+      marginHorizontal: 16,
+      marginBottom: 16,
+      padding: 20,
+      borderRadius: 24,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.05,
+      shadowRadius: 10,
+      elevation: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    sectionHeader: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: spacing.md,
+    },
+    sectionTitleRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 10,
+    },
+    sectionTitle: {
+      fontSize: 17,
+      fontFamily: "Poppins-Bold",
+      color: colors.text.primary,
+    },
+    changeButton: {
+      fontSize: 14,
+      fontFamily: "Poppins-SemiBold",
+      color: colors.primary,
+    },
+    itemCount: {
+      fontSize: 13,
+      fontFamily: "Poppins-Medium",
+      color: colors.text.secondary,
+    },
+    optionalText: {
+      fontSize: 12,
+      fontFamily: "Poppins-Medium",
+      color: colors.text.light,
+      backgroundColor: colors.background,
+      paddingHorizontal: 10,
+      paddingVertical: 4,
+      borderRadius: 12,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    addressContainer: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+    },
+    addressIconWrapper: {
+      marginRight: spacing.md,
+    },
+    addressIconBadge: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor:
+        colors.background === "#FFFFFF"
+          ? "#FFF0F5"
+          : "rgba(220, 49, 115, 0.15)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    addressDetails: {
+      flex: 1,
+    },
+    addressType: {
+      fontSize: 15,
+      fontFamily: "Poppins-SemiBold",
+      color: colors.text.primary,
+      marginBottom: 4,
+    },
+    addressFull: {
+      fontSize: 14,
+      fontFamily: "Poppins-Regular",
+      color: colors.text.secondary,
+      lineHeight: 21,
+    },
+    instructionsContainer: {
+      paddingHorizontal: spacing.lg,
+      marginBottom: 12,
+    },
+    instructionsBadge: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor:
+        colors.background === "#FFFFFF"
+          ? "#E3F2FD"
+          : "rgba(33, 150, 243, 0.15)",
+      padding: spacing.md,
+      borderRadius: 12,
+      borderLeftWidth: 4,
+      borderLeftColor: "#0288D1",
+    },
+    instructionsText: {
+      flex: 1,
+      fontSize: 13,
+      fontFamily: "Poppins-Medium",
+      color: "#0277BD",
+      marginLeft: 10,
+      lineHeight: 19,
+    },
+    orderItemsContainer: {
+      gap: 12,
+    },
+    orderItemRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingBottom: 12,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    orderItemLeft: {
+      flexDirection: "row",
+      alignItems: "flex-start",
+      flex: 1,
+      marginRight: spacing.md,
+    },
+    quantityBadge: {
+      backgroundColor: colors.primary,
+      minWidth: 28,
+      height: 28,
+      borderRadius: 14,
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 12,
+      marginTop: 2,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.2,
+      shadowRadius: 6,
+      elevation: 3,
+    },
+    quantityText: {
+      fontSize: 13,
+      fontFamily: "Poppins-Bold",
+      color: "#FFFFFF",
+    },
+    itemNameText: {
+      flex: 1,
+      fontSize: 15,
+      fontFamily: "Poppins-Medium",
+      color: colors.text.primary,
+      lineHeight: 22,
+    },
+    itemPriceText: {
+      fontSize: 15,
+      fontFamily: "Poppins-Bold",
+      color: colors.text.primary,
+    },
+    voucherButton: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    voucherLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      flex: 1,
+    },
+    voucherIconBadge: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      backgroundColor:
+        colors.background === "#FFFFFF"
+          ? "#FFF0F5"
+          : "rgba(220, 49, 115, 0.15)",
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: spacing.md,
+    },
+    voucherButtonText: {
+      fontSize: 15,
+      fontFamily: "Poppins-SemiBold",
+      color: colors.text.primary,
+    },
+    voucherInputContainer: {
+      flexDirection: "row",
+      marginTop: spacing.md,
+      gap: 10,
+    },
+    voucherInput: {
+      flex: 1,
+      height: 48,
+      backgroundColor: colors.background,
+      borderRadius: 12,
+      paddingHorizontal: spacing.md,
+      fontSize: 14,
+      fontFamily: "Poppins-Medium",
+      color: colors.text.primary,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    applyVoucherButton: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 24,
+      height: 48,
+      borderRadius: 12,
+      alignItems: "center",
+      justifyContent: "center",
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.3,
+      shadowRadius: 4,
+      elevation: 3,
+    },
+    applyVoucherText: {
+      fontSize: 14,
+      fontFamily: "Poppins-Bold",
+      color: "#FFFFFF",
+    },
+    tipDescription: {
+      fontSize: 13,
+      fontFamily: "Poppins-Regular",
+      color: colors.text.secondary,
+      marginBottom: spacing.md,
+    },
+    tipOptionsContainer: {
+      flexDirection: "row",
+      gap: 10,
+    },
+    tipOption: {
+      flex: 1,
+      height: 44,
+      alignItems: "center",
+      justifyContent: "center",
+      backgroundColor: colors.background,
+      borderRadius: 12,
+      borderWidth: 2,
+      borderColor: colors.border,
+    },
+    tipOptionSelected: {
+      backgroundColor:
+        colors.background === "#FFFFFF"
+          ? "#FFF0F5"
+          : "rgba(220, 49, 115, 0.15)",
+      borderColor: colors.primary,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 2 },
+      shadowOpacity: 0.2,
+      shadowRadius: 4,
+      elevation: 2,
+    },
+    tipOptionText: {
+      fontSize: 14,
+      fontFamily: "Poppins-SemiBold",
+      color: colors.text.secondary,
+    },
+    tipOptionTextSelected: {
+      color: colors.primary,
+    },
+    paymentMethodsList: {
+      gap: 12,
+    },
+    methodRowSelected: {
+      flexDirection: "row",
+      alignItems: "center",
+      borderColor: colors.primary,
+      borderWidth: 1.5,
+      backgroundColor:
+        colors.background === "#FFFFFF"
+          ? "rgba(217, 27, 92, 0.04)"
+          : "rgba(217, 27, 92, 0.15)",
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 0,
+    },
+    methodRowUnselected: {
+      flexDirection: "row",
+      alignItems: "center",
+      borderColor: "transparent",
+      borderWidth: 1.5,
+      backgroundColor: "transparent",
+      borderRadius: 16,
+      padding: 16,
+      marginBottom: 0,
+    },
+    iconCircleSelected: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: colors.primary,
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 16,
+      backgroundColor: "transparent",
+    },
+    iconCircleUnselected: {
+      width: 44,
+      height: 44,
+      borderRadius: 22,
+      borderWidth: 1,
+      borderColor: colors.border,
+      alignItems: "center",
+      justifyContent: "center",
+      marginRight: 16,
+      backgroundColor: "transparent",
+    },
+    methodName: {
+      fontSize: 15,
+      fontFamily: "Poppins-SemiBold",
+      color: colors.text.primary,
+      flex: 1,
+    },
+    badge: {
+      backgroundColor: colors.primary,
+      paddingHorizontal: 8,
+      paddingVertical: 5,
+      borderRadius: 8,
+      marginRight: 14,
+    },
+    badgeText: {
+      color: "#FFF",
+      fontSize: 10,
+      fontFamily: "Poppins-Bold",
+      textTransform: "none",
+      letterSpacing: 0.5,
+    },
+    radioContainer: {
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      borderWidth: 2,
+      justifyContent: "center",
+      alignItems: "center",
+    },
+    radioSelected: {
+      borderColor: colors.primary,
+    },
+    radioUnselected: {
+      borderColor: colors.text.light,
+    },
+    radioInner: {
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      backgroundColor: colors.primary,
+    },
+    notesInput: {
+      backgroundColor: colors.background,
+      borderRadius: 12,
+      padding: spacing.md,
+      fontSize: 14,
+      fontFamily: "Poppins-Regular",
+      color: colors.text.primary,
+      borderWidth: 1,
+      borderColor: colors.border,
+      minHeight: 80,
+    },
+    summarySection: {
+      backgroundColor: colors.surface,
+      marginHorizontal: 16,
+      marginBottom: 16,
+      padding: 20,
+      borderRadius: 24,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.05,
+      shadowRadius: 10,
+      elevation: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    summaryRows: {
+      gap: 14,
+    },
+    summaryRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+    },
+    summaryLabel: {
+      fontSize: 14,
+      fontFamily: "Poppins-Regular",
+      color: colors.text.secondary,
+    },
+    summaryValue: {
+      fontSize: 15,
+      fontFamily: "Poppins-SemiBold",
+      color: colors.text.primary,
+    },
+    summaryValueFree: {
+      fontSize: 15,
+      fontFamily: "Poppins-Bold",
+      color: "#4CAF50",
+    },
+    discountRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      gap: 6,
+    },
+    summaryLabelDiscount: {
+      fontSize: 14,
+      fontFamily: "Poppins-Medium",
+      color: "#4CAF50",
+    },
+    summaryValueDiscount: {
+      fontSize: 15,
+      fontFamily: "Poppins-Bold",
+      color: "#4CAF50",
+    },
+    summaryDivider: {
+      height: 1,
+      backgroundColor: colors.border,
+      marginVertical: 6,
+    },
+    totalSummaryRow: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      paddingTop: 4,
+    },
+    totalSummaryLabel: {
+      fontSize: 17,
+      fontFamily: "Poppins-Bold",
+      color: colors.text.primary,
+    },
+    totalSummaryValue: {
+      fontSize: 22,
+      fontFamily: "Poppins-Bold",
+      color: colors.primary,
+      letterSpacing: -0.5,
+    },
+    checkoutButtonContainer: {
+      backgroundColor: colors.surface,
+      marginHorizontal: 16,
+      marginTop: 16,
+      marginBottom: 16,
+      padding: 20,
+      borderRadius: 24,
+      shadowColor: "#000",
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.05,
+      shadowRadius: 10,
+      elevation: 6,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    totalBarInline: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      marginBottom: spacing.md,
+      paddingBottom: spacing.md,
+      borderBottomWidth: 1,
+      borderBottomColor: colors.border,
+    },
+    totalBar: {
+      flexDirection: "row",
+      alignItems: "center",
+      justifyContent: "space-between",
+      gap: 12,
+    },
+    totalBarLeft: {
+      flex: 1,
+    },
+    totalBarLabel: {
+      fontSize: 13,
+      fontFamily: "Poppins-Medium",
+      color: colors.text.secondary,
+      marginBottom: 2,
+    },
+    totalBarAmount: {
+      fontSize: 26,
+      fontFamily: "Poppins-Bold",
+      color: colors.primary,
+      letterSpacing: -0.5,
+    },
+    placeOrderBtn: {
+      flexDirection: "row",
+      alignItems: "center",
+      backgroundColor: colors.primary,
+      paddingHorizontal: 28,
+      paddingVertical: 16,
+      borderRadius: 20,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 6 },
+      shadowOpacity: 0.3,
+      shadowRadius: 10,
+      elevation: 6,
+    },
+    placeOrderBtnDisabled: {
+      opacity: 0.6,
+    },
+    shimmerEffect: {
+      position: "absolute",
+      top: 0,
+      bottom: 0,
+      left: 0,
+      width: 200,
+      backgroundColor: "rgba(255,255,255,0.25)",
+      transform: [{ skewX: "-20deg" }],
+    },
+    placeOrderBtnText: {
+      fontSize: 16,
+      fontFamily: "Poppins-Bold",
+      color: "#FFFFFF",
+      marginRight: 8,
+    },
+    placeOrderArrow: {
+      width: 28,
+      height: 28,
+      borderRadius: 14,
+      backgroundColor: "rgba(255, 255, 255, 0.3)",
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    modalOverlay: {
+      flex: 1,
+      backgroundColor: colors.overlay,
+      alignItems: "center",
+      justifyContent: "center",
+      paddingHorizontal: spacing.lg,
+    },
+    processingModal: {
+      backgroundColor: colors.surface,
+      padding: 32,
+      borderRadius: 24,
+      alignItems: "center",
+      minWidth: 260,
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.2,
+      shadowRadius: 20,
+      elevation: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    loadingSpinner: {
+      marginBottom: 16,
+    },
+    processingText: {
+      fontSize: 16,
+      fontFamily: "Poppins-SemiBold",
+      color: colors.text.primary,
+    },
+    successModal: {
+      backgroundColor: colors.surface,
+      paddingHorizontal: 22,
+      paddingTop: 22,
+      paddingBottom: 20,
+      borderRadius: 22,
+      alignItems: "center",
+      maxWidth: 380,
+      width: "100%",
+      shadowColor: colors.shadow,
+      shadowOffset: { width: 0, height: 10 },
+      shadowOpacity: 0.2,
+      shadowRadius: 20,
+      elevation: 10,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    successIconContainer: {
+      marginBottom: 20,
+    },
+    successIconShell: {
+      width: 88,
+      height: 88,
+      borderRadius: 44,
+      backgroundColor: "rgba(76,175,80,0.14)",
+      alignItems: "center",
+      justifyContent: "center",
+      marginBottom: 14,
+    },
+    successIconCore: {
+      width: 62,
+      height: 62,
+      borderRadius: 31,
+      backgroundColor: colors.success,
+      alignItems: "center",
+      justifyContent: "center",
+    },
+    successTitle: {
+      fontSize: 30,
+      fontFamily: "Poppins-Bold",
+      color: colors.text.primary,
+      textAlign: "center",
+      marginBottom: 8,
+      lineHeight: 38,
+    },
+    successMessage: {
+      fontSize: 15,
+      fontFamily: "Poppins-Regular",
+      color: colors.text.secondary,
+      textAlign: "center",
+      marginBottom: 18,
+      lineHeight: 24,
+    },
+    successDetails: {
+      backgroundColor: colors.background,
+      paddingVertical: 14,
+      paddingHorizontal: 14,
+      borderRadius: 18,
+      width: "100%",
+      marginBottom: 18,
+      borderWidth: 1,
+      borderColor: colors.border,
+    },
+    successRow: {
+      flexDirection: "row",
+      justifyContent: "space-between",
+      alignItems: "center",
+      minHeight: 34,
+    },
+    successRowLeft: {
+      flexDirection: "row",
+      alignItems: "center",
+      flex: 1,
+      marginRight: 10,
+    },
+    successRowRight: {
+      flexShrink: 0,
+      alignItems: "flex-end",
+    },
+    successDot: {
+      width: 8,
+      height: 8,
+      borderRadius: 4,
+      backgroundColor: colors.success,
+      marginRight: 8,
+    },
+    successLabel: {
+      fontSize: 14,
+      fontFamily: "Poppins-Regular",
+      color: colors.text.secondary,
+      flexShrink: 1,
+    },
+    successValue: {
+      fontSize: 16,
+      fontFamily: "Poppins-Bold",
+      color: colors.text.primary,
+      textAlign: "right",
+    },
+    successEta: {
+      fontSize: 16,
+      fontFamily: "Poppins-Bold",
+      color: colors.primary,
+      textAlign: "right",
+    },
+    successDivider: {
+      height: 1,
+      backgroundColor: colors.border,
+      marginVertical: 8,
+    },
+    successCta: {
+      backgroundColor: colors.primary,
+      paddingVertical: 16,
+      paddingHorizontal: 24,
+      borderRadius: 30,
+      elevation: 4,
+      shadowColor: colors.primary,
+      shadowOffset: { width: 0, height: 4 },
+      shadowOpacity: 0.3,
+      shadowRadius: 8,
+      width: "100%",
+      alignItems: "center",
+    },
+    successHint: {
+      marginTop: 10,
+      fontSize: 12,
+      fontFamily: "Poppins-Regular",
+      color: colors.text.secondary,
+      textAlign: "center",
+    },
+    successDetailText: {
+      fontSize: 14,
+      fontFamily: "Poppins-SemiBold",
+      color: colors.primary,
+      marginBottom: 4,
+    },
+  });
 
 export default CheckoutScreen;
