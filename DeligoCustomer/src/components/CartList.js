@@ -7,11 +7,12 @@ import {
   Image,
   Pressable,
   ActivityIndicator,
+  Platform,
 } from "react-native";
 import { useCart } from "../contexts/CartContext";
 import { useProducts } from "../contexts/ProductsContext";
 import { useTheme } from "../utils/ThemeContext";
-import { spacing, fontSize, borderRadius } from "../theme";
+import { spacing, fontSize, borderRadius, colors } from "../theme";
 import { useLanguage } from "../utils/LanguageContext";
 import { useLocation } from "../contexts/LocationContext";
 import { useDelivery } from "../contexts/DeliveryContext";
@@ -95,14 +96,7 @@ export default function CartList({ navigation }) {
   };
 
   return (
-    <View style={{ padding: 16, position: "relative" }}>
-      {menuForVendor && (
-        <Pressable
-          onPress={() => setMenuForVendor(null)}
-          style={[StyleSheet.absoluteFillObject, { zIndex: 1 }]}
-        />
-      )}
-
+    <View style={{ padding: 16, position: "relative", flex: 1 }}>
       {cartsArray.map((cart, index) => {
         const itemCount = Object.keys(cart.items || {}).reduce(
           (s, id) => s + (cart.items[id].quantity || 0),
@@ -224,72 +218,6 @@ export default function CartList({ navigation }) {
 
         return (
           <View key={cart.vendorId} style={{ marginBottom: 20 }}>
-            {/* Context Menu (Popover) - Placed below to avoid overlapping issues */}
-            {isMenuOpen && (
-              <View
-                style={[
-                  styles.popoverMenu,
-                  {
-                    backgroundColor: colors.surface,
-                    borderColor: isDarkMode ? "#333" : "#E8E8E8",
-                  },
-                ]}
-              >
-                <TouchableOpacity
-                  disabled={switchingVendorId === cart.vendorId}
-                  onPress={() => handleSwitchVendor(cart.vendorId)}
-                  style={styles.menuItem}
-                >
-                  {switchingVendorId === cart.vendorId ? (
-                    <ActivityIndicator size="small" color={colors.primary} />
-                  ) : (
-                    <Ionicons
-                      name="checkmark-circle-outline"
-                      size={18}
-                      color={colors.primary}
-                    />
-                  )}
-                  <Text
-                    style={[styles.menuText, { color: colors.text.primary }]}
-                  >
-                    {t("setAsActive") || "Set as Active"}
-                  </Text>
-                </TouchableOpacity>
-                <View
-                  style={[
-                    styles.menuDivider,
-                    { backgroundColor: isDarkMode ? "#333" : "#F0F0F0" },
-                  ]}
-                />
-                <TouchableOpacity
-                  disabled={deletingVendorId === cart.vendorId}
-                  onPress={() => handleDeleteVendorCart(cart.vendorId)}
-                  style={styles.menuItem}
-                >
-                  {deletingVendorId === cart.vendorId ? (
-                    <ActivityIndicator
-                      size="small"
-                      color={colors.error || "#D32F2F"}
-                    />
-                  ) : (
-                    <Ionicons
-                      name="trash-outline"
-                      size={18}
-                      color={colors.error || "#D32F2F"}
-                    />
-                  )}
-                  <Text
-                    style={[
-                      styles.menuText,
-                      { color: colors.error || "#D32F2F" },
-                    ]}
-                  >
-                    {t("removeCart") || "Delete Cart"}
-                  </Text>
-                </TouchableOpacity>
-              </View>
-            )}
-
             <TouchableOpacity
               onPress={() =>
                 navigation.navigate("CartDetail", { vendorId: cart.vendorId })
@@ -429,9 +357,10 @@ export default function CartList({ navigation }) {
 
                 {/* Overflows ellipsis */}
                 <TouchableOpacity
-                  onPress={() =>
-                    setMenuForVendor(isMenuOpen ? null : cart.vendorId)
-                  }
+                  onPress={(e) => {
+                    e.stopPropagation(); // Prevent card navigation when clicking menu
+                    setMenuForVendor(isMenuOpen ? null : cart.vendorId);
+                  }}
                   hitSlop={15}
                   style={styles.menuDots}
                 >
@@ -460,6 +389,94 @@ export default function CartList({ navigation }) {
                 </LinearGradient>
               </View>
             </TouchableOpacity>
+
+            {/* Context Menu (Popover) - Placed outside TouchableOpacity to avoid event conflicts */}
+            {isMenuOpen && (
+              <>
+                {/* Backdrop overlay to close menu when clicking outside */}
+                <Pressable
+                  onPress={() => setMenuForVendor(null)}
+                  style={[
+                    StyleSheet.absoluteFillObject,
+                    {
+                      zIndex: 9,
+                      backgroundColor: "transparent",
+                    },
+                  ]}
+                />
+                <View
+                  style={[
+                    styles.popoverMenu,
+                    {
+                      backgroundColor: colors.surface,
+                      borderColor: isDarkMode ? "#333" : "#E8E8E8",
+                      zIndex: 10,
+                    },
+                  ]}
+                >
+                  <TouchableOpacity
+                    disabled={switchingVendorId === cart.vendorId}
+                    onPress={() => {
+                      setMenuForVendor(null);
+                      handleSwitchVendor(cart.vendorId);
+                    }}
+                    style={styles.menuItem}
+                    activeOpacity={0.7}
+                  >
+                    {switchingVendorId === cart.vendorId ? (
+                      <ActivityIndicator size="small" color={colors.primary} />
+                    ) : (
+                      <Ionicons
+                        name="checkmark-circle-outline"
+                        size={18}
+                        color={colors.primary}
+                      />
+                    )}
+                    <Text
+                      style={[styles.menuText, { color: colors.text.primary }]}
+                    >
+                      {t("setAsActive") || "Set as Active"}
+                    </Text>
+                  </TouchableOpacity>
+                  <View
+                    style={[
+                      styles.menuDivider,
+                      { backgroundColor: isDarkMode ? "#333" : "#F0F0F0" },
+                    ]}
+                  />
+                  <TouchableOpacity
+                    disabled={deletingVendorId === cart.vendorId}
+                    onPress={() => {
+                      setMenuForVendor(null);
+                      handleDeleteVendorCart(cart.vendorId);
+                    }}
+                    style={styles.menuItem}
+                    activeOpacity={0.7}
+                  >
+                    {deletingVendorId === cart.vendorId ? (
+                      <ActivityIndicator
+                        size="small"
+                        color={colors.error || "#D32F2F"}
+                      />
+                    ) : (
+                      <Ionicons
+                        name="trash-outline"
+                        size={18}
+                        color={colors.error || "#D32F2F"}
+                      />
+                    )}
+                    <Text
+                      style={[
+                        styles.menuText,
+                        { color: colors.error || "#D32F2F" },
+                      ]}
+                    >
+                      {t("removeCart") || "Delete Cart"}
+                    </Text>
+                  </TouchableOpacity>
+                </View>
+              </>
+            )}
           </View>
         );
       })}
@@ -477,6 +494,7 @@ const styles = StyleSheet.create({
     shadowOpacity: 0.05,
     shadowRadius: 10,
     borderWidth: 1,
+    backgroundColor: "#fff",
   },
   cardHeader: {
     flexDirection: "row",
@@ -522,6 +540,7 @@ const styles = StyleSheet.create({
   },
   menuDots: {
     padding: 4,
+    zIndex: 5,
   },
   cardFooter: {
     marginTop: 18,
@@ -555,8 +574,8 @@ const styles = StyleSheet.create({
   // Popover
   popoverMenu: {
     position: "absolute",
-    top: 36,
-    right: 36,
+    top: 70, // Adjusted position to be below the menu button
+    right: 20,
     zIndex: 10,
     borderRadius: 14,
     borderWidth: 1,
